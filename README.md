@@ -1,16 +1,19 @@
-# Blog OS (Double Faults)
-[![Build Status](https://travis-ci.org/phil-opp/blog_os.svg?branch=post_10)](https://travis-ci.org/phil-opp/blog_os/branches)
+# RustOS for x86_64 SMP
 
-This repository contains the source code for the [Double Faults](http://os.phil-opp.com/double-faults.html) post of the [Writing an OS in Rust](http://os.phil-opp.com) series.
+A project of THU OS2018 spring.
 
-**Check out the [master branch](https://github.com/phil-opp/blog_os) for more information.**
+[Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
+
+The goal is to write a mini OS in Rust with multicore supporting.
+
+It will start from the post of the [Writing an OS in Rust](http://os.phil-opp.com) series. Then reimplement [xv6-x86_64](https://github.com/jserv/xv6-x86_64) in Rust style.
 
 ## Building
-You need to have `nasm`, `grub-mkrescue`, `xorriso`, `qemu`, a nightly Rust compiler, and [xargo] installed. Then you can run it using `make run`.
 
-[xargo]: https://github.com/japaric/xargo
+You need to have `nasm`, `grub-mkrescue`, `xorriso`, `qemu`, a nightly Rust compiler, and `xargo` installed. Then you can run it using `make run`.
 
-Please file an issue if you have any problems.
+A docker image is available and recommanded. Read [this](docker/README.md) for details.
 
 ## License
+
 The source code is dual-licensed under MIT or the Apache License (Version 2.0).

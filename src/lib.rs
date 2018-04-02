@@ -1,3 +1,4 @@
+#![feature(ptr_internals)]
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(alloc)]
