@@ -1,5 +1,7 @@
 # RustOS for x86_64 SMP
 
+[![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/wangrunji0408/RustOS)
+
 A project of THU OS2018 spring.
 
 [Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
