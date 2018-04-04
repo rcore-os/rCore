@@ -1,6 +1,7 @@
 use spin::Mutex;
 use core::ptr::Unique;
 use volatile::Volatile;
+use x86_64::instructions::port::{outw, outb};
 
 pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe{ 
     Unique::new_unchecked(0xb8000 as *mut _) 
@@ -76,6 +77,17 @@ impl VgaBuffer {
     }
     pub fn byte_at(&self, row: usize, col: usize) -> u8 {
         self.chars[row][col].read().ascii_char
+    }
+    pub fn set_cursor_at(&self, row: usize, col: usize) {
+        assert!(row < BUFFER_HEIGHT && col < BUFFER_WIDTH);
+        let pos = row * BUFFER_WIDTH + col;
+        unsafe {
+            // Reference: Rustboot project
+            outw(0x3D4, 15u16); // WARNING verify should be u16
+            outb(0x3D5, pos as u8);
+            outw(0x3D4, 14u16);
+            outb(0x3D5, (pos >> 8) as u8);
+        }
     }
 }
 

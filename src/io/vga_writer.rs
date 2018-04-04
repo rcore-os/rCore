@@ -38,6 +38,7 @@ impl VgaWriter {
 
 				self.buffer.write(row, col, byte);
                 self.column_position += 1;
+                self.buffer.set_cursor_at(row, col);
             }
         }
     }
