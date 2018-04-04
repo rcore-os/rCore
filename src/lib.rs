@@ -27,8 +27,8 @@ extern crate linked_list_allocator;
 extern crate lazy_static;
 extern crate bit_field;
 
-#[macro_use]    // println!
-mod vga_buffer;
+#[macro_use]    // print!
+mod io;
 mod memory;
 mod interrupts;
 mod lang;
@@ -42,7 +42,7 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
-    vga_buffer::clear_screen();
+    io::init();
     println!("Hello World{}", "!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };

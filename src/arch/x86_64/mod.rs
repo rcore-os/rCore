@@ -1,26 +1,7 @@
-// Enable 'No-Execute' bit in page entry
-fn enable_nxe_bit() {
-    use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
-
-    let nxe_bit = 1 << 11;
-    // The EFER register is only allowed in kernel mode
-    // But we are in kernel mode. So it's safe.
-    unsafe {
-        let efer = rdmsr(IA32_EFER);
-        wrmsr(IA32_EFER, efer | nxe_bit);
-    }
-}
-
-// Enable write protection in kernel mode
-fn enable_write_protect_bit() {
-    use x86_64::registers::control_regs::{cr0, cr0_write, Cr0};
-
-    // The CR0 register is only allowed in kernel mode
-    // But we are in kernel mode. So it's safe.
-    unsafe { cr0_write(cr0() | Cr0::WRITE_PROTECT) };
-}
+pub mod driver;
+mod cpu;
 
 pub fn init() {
-	enable_nxe_bit();
-	enable_write_protect_bit();
+	cpu::enable_nxe_bit();
+	cpu::enable_write_protect_bit();
 }

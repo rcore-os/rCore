@@ -18,5 +18,5 @@ once = "0.3.3"
 linked_list_allocator = "0.5.0"
 
 [dependencies.lazy_static]
-version = "0.2.4"
+version = "1.0.0"
 features = ["spin_no_std"]
