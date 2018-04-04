@@ -4,11 +4,12 @@ iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
 rust_os := target/$(target)/debug/libblog_os.a
 
-linker_script := src/arch/$(arch)/linker.ld
-grub_cfg := src/arch/$(arch)/grub.cfg
-assembly_source_files := $(wildcard src/arch/$(arch)/*.asm)
-assembly_object_files := $(patsubst src/arch/$(arch)/%.asm, \
-	build/arch/$(arch)/%.o, $(assembly_source_files))
+boot_src := src/arch/$(arch)/boot
+linker_script := $(boot_src)/linker.ld
+grub_cfg := $(boot_src)/grub.cfg
+assembly_source_files := $(wildcard $(boot_src)/*.asm)
+assembly_object_files := $(patsubst $(boot_src)/%.asm, \
+	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
 
 ifeq ($(shell uname), Linux)
 	prefix :=
@@ -45,7 +46,7 @@ kernel:
 	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(target)
 
 # compile assembly files
-build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
+build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 
@@ -66,7 +67,7 @@ docker_iso:
 	@docker run --rm $(docker_args) $(docker_image):$(tag) make iso
 
 docker_run: docker_iso
-	@qemu-system-x86_64 -cdrom $(iso) -s
+	@qemu-system-$(arch) -cdrom $(iso) -s
 
 docker_interactive:
 	@docker run -it --rm $(docker_args) $(docker_image):$(tag) 
