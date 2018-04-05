@@ -69,3 +69,13 @@ impl EntryFlags {
         flags
     }
 }
+
+use core::fmt;
+use core::fmt::Debug;
+
+impl Debug for Entry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{:#014X} {:?}", self.0 & 0x000fffff_fffff000, self.flags());
+        Ok(())
+    }
+}

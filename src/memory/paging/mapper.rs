@@ -116,3 +116,12 @@ impl Mapper {
         //allocator.deallocate_frame(frame);
     }
 }
+
+use core::fmt;
+use core::fmt::Debug;
+
+impl Debug for Mapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{:?}", self.p4())
+    }
+}
