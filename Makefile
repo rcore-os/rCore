@@ -27,7 +27,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	@qemu-system-$(arch) -cdrom $(iso)
+	@qemu-system-$(arch) -cdrom $(iso) -smp 2
 
 iso: $(iso)
 

@@ -7,6 +7,7 @@
 #![feature(allocator_api)]
 #![feature(global_allocator)]
 #![feature(abi_x86_interrupt)]
+#![feature(iterator_step_by)]
 #![no_std]
 
 
@@ -32,6 +33,8 @@ mod io;
 mod memory;
 mod interrupts;
 mod lang;
+#[macro_use]
+mod util;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -42,6 +45,12 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
+    println!("MP = {:?}", arch::driver::mp::find_mp());
+    println!("RDSP = {:?}", arch::driver::acpi::find_rdsp());
+    loop {
+        
+    }
+    arch::driver::ioapic::init();
     io::init();
     println!("Hello World{}", "!");
 
