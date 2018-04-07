@@ -7,7 +7,7 @@ use self::structs::*;
 pub fn find_rdsp() -> Option<*const rsdp> {
 	use util::{Checkable, find_in_memory};
 	let ebda = unsafe { *(0x40E as *const u16) as usize } << 4;
-	println!("EBDA at {:#x}", ebda);
+	debug!("EBDA at {:#x}", ebda);
 	if ebda != 0 {
 		if let Some(addr) = unsafe{ find_in_memory::<rsdp>(ebda as usize, 1024, 4) } {
 			return Some(addr as *const rsdp);

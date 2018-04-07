@@ -40,9 +40,18 @@ impl ColorCode {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-struct ScreenChar {
+pub struct ScreenChar {
     ascii_char: u8,
     color_code: ColorCode,
+}
+
+impl ScreenChar {
+    pub const fn new(ascii_char: u8, foreground_color: Color, background_color: Color) -> Self {
+        ScreenChar {
+            ascii_char,
+            color_code: ColorCode::new(foreground_color, background_color)
+        }
+    }
 }
 
 pub const BUFFER_HEIGHT: usize = 25;
@@ -53,30 +62,19 @@ pub struct VgaBuffer {
 }
 
 impl VgaBuffer {
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_char: b' ',
-            color_code: ColorCode::new(Color::White, Color::Black),
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.chars[row][col].write(blank);
-        }
-    }
     pub fn clear(&mut self) {
-        for i in 0 .. BUFFER_HEIGHT {
-            self.clear_row(i);
+        let blank = ScreenChar::new(b' ', Color::LightGray, Color::Black);
+        for row in 0 .. BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                self.chars[row][col].write(blank);
+            }
         }
     }
-    pub fn write(&mut self, row: usize, col: usize, byte: u8) {
-        let screen_char = &mut self.chars[row][col];
-        let color_code = screen_char.read().color_code;
-        screen_char.write(ScreenChar {
-            ascii_char: byte,
-            color_code: color_code,
-        });
+    pub fn write(&mut self, row: usize, col: usize, screen_char: ScreenChar) {
+        self.chars[row][col].write(screen_char);
     }
-    pub fn byte_at(&self, row: usize, col: usize) -> u8 {
-        self.chars[row][col].read().ascii_char
+    pub fn read(&self, row: usize, col: usize) -> ScreenChar {
+        self.chars[row][col].read()
     }
     pub fn set_cursor_at(&self, row: usize, col: usize) {
         assert!(row < BUFFER_HEIGHT && col < BUFFER_WIDTH);
@@ -97,6 +95,6 @@ mod test {
     fn print_something() {
         let vga = unsafe {&mut *VGA_BUFFER};
         vga.clear();
-        vga.write(0, 0, b'a');
+        vga.write(0, 0, ScreenChar::new('h', Color::LightGray, Color::Black));
     }
 }

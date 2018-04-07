@@ -20,10 +20,14 @@ impl VgaWriter {
 		buffer.clear();
 		VgaWriter {
 			column_position: 0,
-			color: Color::White,
+			color: Color::LightGray,
 			buffer: buffer,
 		}
 	}
+
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
 
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
@@ -36,7 +40,7 @@ impl VgaWriter {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-				self.buffer.write(row, col, byte);
+				self.buffer.write(row, col, ScreenChar::new(byte, self.color, Color::Black));
                 self.column_position += 1;
                 self.buffer.set_cursor_at(row, col);
             }
@@ -46,14 +50,16 @@ impl VgaWriter {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-				let byte = self.buffer.byte_at(row, col);
-				self.buffer.write(row-1, col, byte);
+				let screen_char = self.buffer.read(row, col);
+				self.buffer.write(row-1, col, screen_char);
             }
         }
+        let blank = ScreenChar::new(b' ', self.color, Color::Black);        
 		for col in 0..BUFFER_WIDTH {
-			self.buffer.write(BUFFER_HEIGHT-1, col, b' ');
+			self.buffer.write(BUFFER_HEIGHT-1, col, blank);
 		}
         self.column_position = 0;
+        self.buffer.set_cursor_at(BUFFER_HEIGHT-1, 0);
     }
 }
 
