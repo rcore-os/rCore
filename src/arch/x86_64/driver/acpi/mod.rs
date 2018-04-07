@@ -42,20 +42,35 @@ pub fn init() -> Result<(), ACPI_Error> {
 		return Err(ACPI_Error::NotMapped);
 	}
 	let rsdt = unsafe{ &*(rsdp.RsdtPhysicalAddress as *const rsdt) };
-	let entry_count = (rsdt.Header.Length as usize - size_of::<header>()) / 4;
 	let mut madt: Option<&'static madt> = None;
-	for i in 0 ..  entry_count {
-		let entry = unsafe{ rsdt.entry_at(i) };
+	for i in 0 .. rsdt.entry_count() {
+		let entry = rsdt.entry_at(i);
 		if entry > PHYSICAL_MEMORY_LIMIT {
 			return Err(ACPI_Error::NotMapped);
 		}
 		let header = unsafe{ &*(entry as *const header) };
-		debug!("{:?}", header);
+		// debug!("{:?}", header);
 		if &header.Signature == b"APIC" {
 			madt = Some(unsafe{ &*(entry as *const madt) });
 		}
 	}
 	debug!("{:?}", madt);
-	// return acpi_config_smp(madt);
+	config_smp(madt.expect("acpi: madt not found."));
 	Ok(())
+}
+
+fn config_smp(madt: &'static madt) {
+	let lapic_addr = madt.LapicAddress;
+
+	for entry in madt.entry_iter() {
+		debug!("{:?}", entry);
+		match &entry {
+			&MadtEntry::LocalApic(ref lapic) => {},
+			&MadtEntry::IoApic(ref ioapic) => {
+			},
+			_ => {},
+		}
+	}
+	// TODO
+	unimplemented!();
 }
