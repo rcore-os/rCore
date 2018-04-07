@@ -26,7 +26,7 @@ impl Checkable for rsdp {
 #[repr(C)]
 #[derive(Debug)]
 pub struct header {
-    pub Signature: [i8; 4],
+    pub Signature: [u8; 4],
     pub Length: u32,
     pub Revision: u8,
     pub Checksum: u8,
@@ -41,7 +41,13 @@ pub struct header {
 #[derive(Debug)]
 pub struct rsdt {
     pub Header: header,
-    pub TableOffsetEntry: [u32; 1],
+    TableOffsetEntry: [u32; 0],
+}
+
+impl rsdt {
+    pub unsafe fn entry_at(&self, id: usize) -> u32 {
+        *(self.TableOffsetEntry.as_ptr().offset(id as isize))
+    }
 }
 
 #[repr(C)]
@@ -50,9 +56,14 @@ pub struct madt {
     pub Header: header,
     pub Address: u32,
     pub Flags: u32,
+    Table: [u32; 0],
 }
 
-const MADT_SIGNATURE: [u8; 4] = *b"APIC";
+impl Checkable for madt {
+    fn check(&self) -> bool {
+        &self.Header.Signature == b"APIC"
+    }
+}
 
 #[repr(C)]
 #[derive(Debug)]
