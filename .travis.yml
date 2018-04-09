@@ -28,5 +28,10 @@ addons:
     packages:
       - nasm
 
+env:
+  matrix:
+    - TASK="build"
+    - TASK="run travis=1"
+
 script:
-  - make
+  - make ${TASK}

@@ -13,7 +13,7 @@ pub extern fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32
     println!("\n\nPANIC in {} at line {}:", file, line);
     println!("    {}", fmt);
     if cfg!(feature = "qemu_auto_exit") {
-        unsafe{ cpu::exit_in_qemu(1) }
+        unsafe{ cpu::exit_in_qemu(3) }
     } else {
         loop { }
     }

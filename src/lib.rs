@@ -33,8 +33,9 @@ mod io;
 mod memory;
 mod interrupts;
 mod lang;
-#[macro_use]
 mod util;
+#[macro_use]    // test!
+mod test_util;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -45,11 +46,9 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
-    println!("MP = {:?}", arch::driver::mp::find_mp());
+    test!(find_mp);
+
     arch::driver::acpi::init();
-    loop {
-        
-    }
     arch::driver::ioapic::init();
     io::init();
     println!("Hello World{}", "!");
@@ -67,23 +66,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // initialize our IDT
     interrupts::init(&mut memory_controller);
 
-    for i in 0..10000 {
-        format!("Some String");
-    }
-
-    // invoke a breakpoint exception
-    x86_64::instructions::interrupts::int3();
-
-    fn stack_overflow() {
-        stack_overflow(); // for each recursion, the return address is pushed
-    }
-
-    // trigger a stack overflow
-    stack_overflow();
-
-
-    println!("It did not crash!");
-    loop {}
+    test!(global_allocator);
+    test!(guard_page);
+    test_end!();
 }
 
 use linked_list_allocator::LockedHeap;
@@ -93,3 +78,30 @@ pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+mod test {
+    pub fn global_allocator() {
+        for i in 0..10000 {
+            format!("Some String");
+        }
+    }
+    pub fn find_mp() {
+        use arch;
+        let mp = arch::driver::mp::find_mp();
+        assert!(mp.is_some());
+    }
+    pub fn guard_page() {
+        use x86_64;
+        // invoke a breakpoint exception
+        x86_64::instructions::interrupts::int3();
+
+        fn stack_overflow() {
+            stack_overflow(); // for each recursion, the return address is pushed
+        }
+
+        // trigger a stack overflow
+        stack_overflow();
+
+        println!("It did not crash!");
+    }
+}
