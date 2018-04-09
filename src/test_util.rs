@@ -2,7 +2,7 @@ macro_rules! test_end {
 	() => (
 		println!("Test end");
 		// test success	
-		unsafe{ arch::cpu::exit_in_qemu(1) }
+		unsafe{ arch::cpu::exit_in_qemu(11) }
 	)
 }
 

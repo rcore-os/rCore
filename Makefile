@@ -10,8 +10,7 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
-qemu_opts := -cdrom $(iso) \
-			 -smp 2
+qemu_opts := -cdrom $(iso) -smp 2
 
 ifdef travis
 	test := 1
@@ -40,7 +39,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 1 ] # run qemu and assert it exit 1
+	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
 iso: $(iso)
 
