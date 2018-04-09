@@ -3,13 +3,19 @@ language: rust
 rust:
     - nightly
 
-cache: cargo
+cache: 
+  - cargo
+  directories:
+    - $HOME/qemu
 
 before_script:
   - rustup component add rust-src
   - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)
   - (test -x $HOME/.cargo/bin/xargo || cargo install xargo)
   - cargo install-update -a
+  # setup qemu
+  - bash -e travis-qemu.sh
+  - export PATH=$PATH:$HOME/qemu/bin
 
 sudo: false
 
