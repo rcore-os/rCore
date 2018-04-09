@@ -1,5 +1,5 @@
 pub mod driver;
-mod cpu;
+pub mod cpu;
 
 pub fn init() {
 	cpu::enable_nxe_bit();

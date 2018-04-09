@@ -6,6 +6,9 @@ authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 [lib]
 crate-type = ["staticlib"]
 
+[features]
+qemu_auto_exit = []
+
 [dependencies]
 bit_field = "0.7.0"
 rlibc = "1.0"

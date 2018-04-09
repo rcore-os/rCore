@@ -10,6 +10,10 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
+qemu_opts := -cdrom $(iso) \
+			 -smp 2 \
+			 -device isa-debug-exit # enable shutdown inside the qemu 
+features := qemu_auto_exit
 
 ifeq ($(shell uname), Linux)
 	prefix :=
@@ -27,7 +31,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	@qemu-system-$(arch) -cdrom $(iso) -smp 2
+	@qemu-system-$(arch) $(qemu_opts)
 
 iso: $(iso)
 
@@ -43,7 +47,7 @@ $(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
 		$(assembly_object_files) $(rust_os)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(target)
+	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(target) --features $(features)
 
 # compile assembly files
 build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
