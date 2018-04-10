@@ -1,4 +1,5 @@
 use core::fmt;
+use arch::driver::serial::SERIAL;
 
 mod vga_writer;
 
@@ -32,6 +33,7 @@ fn print_in_color(args: fmt::Arguments, color: Color) {
     let mut writer = vga_writer::VGA_WRITER.lock();
     writer.set_color(color);    
     writer.write_fmt(args).unwrap();
+    SERIAL.lock().write_fmt(args).unwrap();
 }
 
 pub fn print(args: fmt::Arguments) {
