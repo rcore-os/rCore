@@ -46,6 +46,7 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
+    test!(extern_fn);
     test!(find_mp);
 
     arch::driver::acpi::init();
@@ -80,6 +81,14 @@ pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 mod test {
+    extern {
+        fn square(x: u32) -> u32;
+    }
+
+    pub fn extern_fn() {
+        assert_eq!(unsafe{square(2)}, 4);
+    }
+
     pub fn global_allocator() {
         for i in 0..10000 {
             format!("Some String");

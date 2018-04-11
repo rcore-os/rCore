@@ -21,6 +21,9 @@ x86_64 = "0.1.2"
 once = "0.3.3"
 linked_list_allocator = "0.5.0"
 
+[build-dependencies]
+cc = "1.0"
+
 [dependencies.lazy_static]
 version = "1.0.0"
 features = ["spin_no_std"]
