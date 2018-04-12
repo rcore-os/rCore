@@ -30,13 +30,14 @@ else
 endif
 
 ld := $(prefix)ld
+objdump := $(prefix)objdump
 
-.PHONY: all clean run iso kernel build
+.PHONY: all clean run iso kernel build debug_asm
 
 all: $(kernel)
 
 clean:
-	@rm -r build
+	@rm -r build target
 
 run: $(iso)
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
@@ -44,6 +45,9 @@ run: $(iso)
 iso: $(iso)
 
 build: iso
+
+debug_asm:
+	@$(objdump) -dS $(kernel) | less
 
 $(iso): $(kernel) $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
