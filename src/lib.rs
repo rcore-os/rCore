@@ -47,32 +47,32 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
-    test!(extern_fn);
-    test!(find_mp);
-
-    let acpi = arch::driver::acpi::init();
-    debug!("{:?}", acpi);
-    unimplemented!();
-
-    arch::driver::ioapic::init();
-    io::init();
     println!("Hello World{}", "!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     arch::init();
 
     // set up guard page and map the heap pages
-    let mut memory_controller = memory::init(boot_info);
-
+    let mut memory_controller = memory::init(boot_info);    
     unsafe {
         HEAP_ALLOCATOR.lock().init(HEAP_START, HEAP_START + HEAP_SIZE);
-    }
+    }    
 
     // initialize our IDT
-    interrupts::init(&mut memory_controller);
+    interrupts::init(&mut memory_controller);    
 
     test!(global_allocator);
     test!(guard_page);
+    test!(find_mp);
+
+    // TODO Build temp page map. Now page fault.
+    let acpi = arch::driver::acpi::init().expect("Failed to init ACPI");
+    debug!("{:?}", acpi);
+    unimplemented!();
+    
+    arch::driver::apic::init(acpi.lapic_addr);
+    io::init();
+
     test_end!();
 }
 
@@ -85,14 +85,6 @@ pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 mod test {
-    extern {
-        fn square(x: u32) -> u32;
-    }
-
-    pub fn extern_fn() {
-        assert_eq!(unsafe{square(2)}, 4);
-    }
-
     pub fn global_allocator() {
         for i in 0..10000 {
             format!("Some String");

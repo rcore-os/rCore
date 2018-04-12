@@ -35,10 +35,10 @@ const PHYSICAL_MEMORY_LIMIT: u32 = 0x80000000;
 
 #[derive(Debug)]
 pub struct ACPI_Result {
-	cpu_num: u8,
-	cpu_acpi_ids: [u8; MAX_CPU_NUM],
-	ioapic_id: u8,
-	lapic_addr: u32,
+	pub cpu_num: u8,
+	pub cpu_acpi_ids: [u8; MAX_CPU_NUM],
+	pub ioapic_id: u8,
+	pub lapic_addr: *const (),
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ pub enum ACPI_Error {
 }
 
 fn config_smp(madt: &'static madt) -> Result<ACPI_Result, ACPI_Error> {
-	let lapic_addr = madt.LapicAddress;
+	let lapic_addr = madt.LapicAddress as *const ();
 
 	let mut cpu_num = 0u8;
 	let mut cpu_acpi_ids: [u8; MAX_CPU_NUM] = [0; MAX_CPU_NUM];

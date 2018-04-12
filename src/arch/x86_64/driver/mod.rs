@@ -1,5 +1,5 @@
 pub mod vga;
 pub mod acpi;
-pub mod ioapic;
+pub mod apic;
 pub mod mp;
 pub mod serial;
