@@ -36,6 +36,7 @@ mod lang;
 mod util;
 #[macro_use]    // test!
 mod test_util;
+mod consts;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -49,7 +50,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test!(extern_fn);
     test!(find_mp);
 
-    arch::driver::acpi::init();
+    let acpi = arch::driver::acpi::init();
+    debug!("{:?}", acpi);
+    unimplemented!();
+
     arch::driver::ioapic::init();
     io::init();
     println!("Hello World{}", "!");

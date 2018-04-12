@@ -1,0 +1,1 @@
+pub const MAX_CPU_NUM: usize = 8;
