@@ -31,6 +31,7 @@ endif
 
 ld := $(prefix)ld
 objdump := $(prefix)objdump
+cc := $(prefix)gcc
 
 .PHONY: all clean run iso kernel build debug_asm
 
@@ -61,7 +62,7 @@ $(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
 		$(assembly_object_files) $(rust_os)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(target) --features "$(features)"
+	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build --target $(target) --features "$(features)"
 
 # compile assembly files
 build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
