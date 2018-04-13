@@ -1,5 +1,5 @@
 use x86_64::VirtualAddress;
-use x86_64::structures::idt::{Idt, ExceptionStackFrame};
+use x86_64::structures::idt::*;
 use x86_64::structures::tss::TaskStateSegment;
 use memory::MemoryController;
 use spin::Once;
@@ -10,6 +10,7 @@ lazy_static! {
     static ref IDT: Idt = {
         let mut idt = Idt::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);        
         unsafe {
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
@@ -68,5 +69,12 @@ extern "x86-interrupt" fn double_fault_handler(
     stack_frame: &mut ExceptionStackFrame, _error_code: u64)
 {
     println!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    loop {}
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode)
+{
+    println!("\nEXCEPTION: PAGE FAULT\n{:#?}\n{:#?}", stack_frame, error_code);
     loop {}
 }
