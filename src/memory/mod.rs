@@ -1,7 +1,8 @@
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::remap_the_kernel;
 pub use self::stack_allocator::Stack;
-use self::paging::{PhysicalAddress, FromToVirtualAddress};
+pub use self::address::*;
+
 use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
 
@@ -9,6 +10,7 @@ mod area_frame_allocator;
 pub mod heap_allocator;
 mod paging;
 mod stack_allocator;
+mod address;
 
 pub const PAGE_SIZE: usize = 4096;
 

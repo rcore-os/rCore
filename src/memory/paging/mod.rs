@@ -1,19 +1,15 @@
 pub use self::entry::*;
 pub use self::mapper::Mapper;
 use core::ops::{Deref, DerefMut, Add};
-use core::ptr::Unique;
-use memory::{PAGE_SIZE, Frame, FrameAllocator};
+use super::*;
 use multiboot2::BootInformation;
-use self::table::{Table, Level4};
 use self::temporary_page::TemporaryPage;
-pub use self::address::*;
 use consts::KERNEL_OFFSET;
 
 mod entry;
 mod table;
 mod temporary_page;
 mod mapper;
-mod address;
 
 const ENTRY_COUNT: usize = 512;
 
