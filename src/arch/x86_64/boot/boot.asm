@@ -1,7 +1,7 @@
 global start
 extern long_mode_start
 
-section .text
+section .text32
 bits 32
 start:
     mov esp, stack_top
@@ -90,10 +90,11 @@ set_up_page_tables:
     or eax, 0b11 ; present + writable
     mov [p4_table + 511 * 8], eax
 
-    ; map first P4 entry to P3 table
+    ; map first & 510th P4 entry to P3 table
     mov eax, p3_table
     or eax, 0b11 ; present + writable
     mov [p4_table], eax
+    mov [p4_table + 510 * 8], eax
 
     ; map first P3 entry to P2 table
     mov eax, p2_table
@@ -148,7 +149,7 @@ error:
     mov byte  [0xb800a], al
     hlt
 
-section .bss
+section .bss32
 align 4096
 p4_table:
     resb 4096
@@ -160,7 +161,7 @@ stack_bottom:
     resb 4096 * 4
 stack_top:
 
-section .rodata
+section .rodata32
 gdt64:
     dq 0 ; zero entry
 .code: equ $ - gdt64 ; new

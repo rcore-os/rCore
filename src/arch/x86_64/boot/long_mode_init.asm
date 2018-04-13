@@ -1,7 +1,7 @@
 global long_mode_start
 extern rust_main
 
-section .text
+section .text32
 bits 64
 long_mode_start:
     ; load 0 into all data segment registers
@@ -14,7 +14,8 @@ long_mode_start:
 
     ; call the rust main
     extern rust_main
-    call rust_main
+    mov rax, rust_main
+    call rax
 
     ; print `OKAY` to screen
     mov rax, 0x2f592f412f4b2f4f
