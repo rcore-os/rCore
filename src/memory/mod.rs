@@ -3,6 +3,7 @@ pub use self::paging::remap_the_kernel;
 pub use self::stack_allocator::Stack;
 use self::paging::PhysicalAddress;
 use multiboot2::BootInformation;
+use consts::KERNEL_OFFSET;
 
 mod area_frame_allocator;
 pub mod heap_allocator;
@@ -20,10 +21,10 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         "Elf sections tag required");
 
     let kernel_start = elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.addr).min().unwrap();
+        .filter(|s| s.is_allocated()).map(|s| s.start_address()).min().unwrap() as usize;
     let kernel_end = elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.addr + s.size).max()
-        .unwrap();
+        .filter(|s| s.is_allocated()).map(|s| s.end_address()).max().unwrap() as usize
+        - KERNEL_OFFSET;
 
     println!("kernel start: {:#x}, kernel end: {:#x}",
              kernel_start,
@@ -31,9 +32,13 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     println!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
+    println!("memory area:");
+    for area in memory_map_tag.memory_areas() {
+        println!("  addr: {:#x}, size: {:#x}", area.base_addr, area.length);
+    }
 
     let mut frame_allocator = AreaFrameAllocator::new(
-        kernel_start as usize, kernel_end as usize,
+        kernel_start, kernel_end,
         boot_info.start_address(), boot_info.end_address(),
         memory_map_tag.memory_areas());
 

@@ -6,6 +6,7 @@ use memory::{PAGE_SIZE, Frame, FrameAllocator};
 use multiboot2::BootInformation;
 use self::table::{Table, Level4};
 use self::temporary_page::TemporaryPage;
+use consts::KERNEL_OFFSET;
 
 mod entry;
 mod table;
@@ -212,10 +213,18 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 
             let flags = EntryFlags::from_elf_section_flags(section);
 
-            let start_frame = Frame::containing_address(section.start_address());
-            let end_frame = Frame::containing_address(section.end_address() - 1);
+            fn to_physical_frame(addr: usize) -> Frame {
+                Frame::containing_address(
+                    if addr < KERNEL_OFFSET { addr } 
+                    else { addr - KERNEL_OFFSET })
+            }
+
+            let start_frame = to_physical_frame(section.start_address());
+            let end_frame = to_physical_frame(section.end_address() - 1);
+
             for frame in Frame::range_inclusive(start_frame, end_frame) {
-                mapper.identity_map(frame, flags, allocator);
+                let page = Page::containing_address(frame.start_address() + KERNEL_OFFSET);
+                mapper.map_to(page, frame, flags, allocator);
             }
         }
 
