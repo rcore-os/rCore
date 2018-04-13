@@ -1,3 +1,5 @@
+use core::fmt;
+use core::fmt::Debug;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::PrivilegeLevel;
@@ -85,11 +87,27 @@ impl Descriptor {
 }
 
 bitflags! {
+    /// Reference: https://wiki.osdev.org/GDT
     flags DescriptorFlags: u64 {
+        const ACCESSED          = 1 << 40,
+        const DATA_WRITABLE     = 1 << 41,
+        const CODE_READABLE     = 1 << 41,
         const CONFORMING        = 1 << 42,
         const EXECUTABLE        = 1 << 43,
         const USER_SEGMENT      = 1 << 44,
+        const USER_MODE         = 1 << 45 | 1 << 46,
         const PRESENT           = 1 << 47,
         const LONG_MODE         = 1 << 53,
+    }
+}
+
+impl Debug for Descriptor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Descriptor::UserSegment(flags) => 
+                write!(f, "UserSegment( {:?} )", DescriptorFlags{bits: *flags}),
+            Descriptor::SystemSegment(low, high) =>
+                write!(f, "SystemSegment{:?}", (low, high)),
+        }
     }
 }
