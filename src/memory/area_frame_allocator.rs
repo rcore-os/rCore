@@ -1,4 +1,4 @@
-use memory::{Frame, FrameAllocator};
+use memory::{Frame, FrameAllocator, PhysicalAddress};
 use multiboot2::{MemoryAreaIter, MemoryArea};
 
 pub struct AreaFrameAllocator {
@@ -55,18 +55,18 @@ impl FrameAllocator for AreaFrameAllocator {
 }
 
 impl AreaFrameAllocator {
-    pub fn new(kernel_start: usize, kernel_end: usize,
-        multiboot_start: usize, multiboot_end: usize,
+    pub fn new(kernel_start: PhysicalAddress, kernel_end: PhysicalAddress,
+        multiboot_start: PhysicalAddress, multiboot_end: PhysicalAddress,
         memory_areas: MemoryAreaIter) -> AreaFrameAllocator
     {
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::containing_address(0),
             current_area: None,
             areas: memory_areas,
-            kernel_start: Frame::containing_address(kernel_start),
-            kernel_end: Frame::containing_address(kernel_end),
-            multiboot_start: Frame::containing_address(multiboot_start),
-            multiboot_end: Frame::containing_address(multiboot_end),
+            kernel_start: Frame::containing_address(kernel_start.0 as usize),
+            kernel_end: Frame::containing_address(kernel_end.0 as usize),
+            multiboot_start: Frame::containing_address(multiboot_start.0 as usize),
+            multiboot_end: Frame::containing_address(multiboot_end.0 as usize),
         };
         allocator.choose_next_area();
         allocator

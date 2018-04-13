@@ -19,6 +19,8 @@ pub const MAX_CPU_NUM: usize = 8;
     pub const KERNEL_OFFSET: usize = RECURSIVE_PAGE_OFFSET - PML4_SIZE;
     pub const KERNEL_PML4: usize = (KERNEL_OFFSET & PML4_MASK)/PML4_SIZE;
 
+    pub const KERNEL_SIZE: usize = PML4_SIZE;
+
     /// Offset to kernel heap
     pub const KERNEL_HEAP_OFFSET: usize = KERNEL_OFFSET - PML4_SIZE;
     pub const KERNEL_HEAP_PML4: usize = (KERNEL_HEAP_OFFSET & PML4_MASK)/PML4_SIZE;

@@ -50,16 +50,17 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     println!("Hello World{}", "!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
-    arch::init();
+    arch::init();    
 
     // set up guard page and map the heap pages
     let mut memory_controller = memory::init(boot_info);    
     unsafe {
-        HEAP_ALLOCATOR.lock().init(HEAP_START, HEAP_START + HEAP_SIZE);
-    }    
+        use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+        HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE);
+    }
 
     // initialize our IDT
-    interrupts::init(&mut memory_controller);    
+    interrupts::init(&mut memory_controller);
 
     test!(global_allocator);
     test!(guard_page);
@@ -77,9 +78,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 }
 
 use linked_list_allocator::LockedHeap;
-
-pub const HEAP_START: usize = 0o_000_001_000_000_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();

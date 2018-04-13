@@ -1,6 +1,8 @@
 global long_mode_start
 extern rust_main
 
+KERNEL_OFFSET equ 0xffff_ff00_0000_0000
+
 section .text32
 bits 64
 long_mode_start:
@@ -11,6 +13,10 @@ long_mode_start:
     mov es, ax
     mov fs, ax
     mov gs, ax
+
+    ; translate rsp to virtual address
+    mov rax, KERNEL_OFFSET
+    add rsp, rax
 
     ; call the rust main
     extern rust_main
