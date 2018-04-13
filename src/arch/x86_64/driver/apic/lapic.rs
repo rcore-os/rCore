@@ -7,8 +7,6 @@ pub fn init(lapic_addr: *const ()) {
 	debug!("WARNING: lapic::init use C lib");	
 	unsafe {
 		lapic = lapic_addr;
-		debug!("lapic = {:?}", lapic);
-		unimplemented!();
 		lapicinit();
 	}	
 }

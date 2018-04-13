@@ -65,12 +65,19 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test!(guard_page);
     test!(find_mp);
 
-    // TODO Build temp page map. Now page fault.
+    // TODO Handle this temp page map.
+    memory_controller.map_page_identity(0); // EBDA
+    for addr in (0xE0000 .. 0x100000).step_by(0x1000) {
+        memory_controller.map_page_identity(addr);
+    }
+    memory_controller.map_page_identity(0x7fe1000); // RSDT
+    memory_controller.print_page_table();
     let acpi = arch::driver::acpi::init().expect("Failed to init ACPI");
     debug!("{:?}", acpi);
-    unimplemented!();
-    
+
+    memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
     arch::driver::apic::init(acpi.lapic_addr);
+    
     io::init();
 
     test_end!();
