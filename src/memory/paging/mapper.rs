@@ -1,4 +1,4 @@
-use super::{VirtualAddress, PhysicalAddress, Page, ENTRY_COUNT};
+use super::{VirtualAddress, PhysicalAddress, Page, ENTRY_COUNT, FromToVirtualAddress};
 use super::entry::*;
 use super::table::{self, Table, Level4, Level1};
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
@@ -26,7 +26,7 @@ impl Mapper {
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
         let offset = virtual_address % PAGE_SIZE;
         self.translate_page(Page::containing_address(virtual_address))
-            .map(|frame| frame.number * PAGE_SIZE + offset)
+            .map(|frame| PhysicalAddress((frame.number * PAGE_SIZE + offset) as u64))
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
@@ -92,7 +92,7 @@ impl Mapper {
     pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let page = Page::containing_address(frame.start_address());
+        let page = Page::containing_address(frame.start_address().to_identity_virtual());
         self.map_to(page, frame, flags, allocator)
     }
 

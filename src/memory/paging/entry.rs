@@ -27,8 +27,8 @@ impl Entry {
     }
 
     pub fn set(&mut self, frame: Frame, flags: EntryFlags) {
-        assert!(frame.start_address() & !0x000fffff_fffff000 == 0);
-        self.0 = (frame.start_address() as u64) | flags.bits();
+        assert!(frame.start_address().0 & !0x000fffff_fffff000 == 0);
+        self.0 = (frame.start_address().0) | flags.bits();
     }
 }
 

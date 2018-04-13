@@ -108,7 +108,7 @@ impl Debug for Table<Level4> {
         // Ignore the 511th recursive entry
         let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused() && *i != 511usize);
         for (i, e) in entries {
-            write!(f, "{:3}: {:?}\n", i, e)?;
+            write!(f, "{:3X}: {:?}\n", i, e)?;
             write!(f, "{:?}", self.next_table(i).unwrap())?;
         }
         Ok(())
@@ -119,7 +119,7 @@ impl Debug for Table<Level3> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
         for (i, e) in entries {
-            write!(f, "  {:3}: {:?}\n", i, e)?;
+            write!(f, "  {:3X}: {:?}\n", i, e)?;
             write!(f, "{:?}", self.next_table(i).unwrap())?;
         }
         Ok(())
@@ -130,7 +130,7 @@ impl Debug for Table<Level2> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
         for (i, e) in entries {
-            write!(f, "    {:3}: {:?}\n", i, e)?;
+            write!(f, "    {:3X}: {:?}\n", i, e)?;
             write!(f, "{:?}", self.next_table(i).unwrap())?;
         }
         Ok(())
@@ -141,7 +141,7 @@ impl Debug for Table<Level1> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
         for (i, e) in entries {
-            write!(f, "      {:3}: {:?}\n", i, e)?;
+            write!(f, "      {:3X}: {:?}\n", i, e)?;
         }
         Ok(())
     }

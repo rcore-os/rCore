@@ -6,17 +6,16 @@ use memory::{PAGE_SIZE, Frame, FrameAllocator};
 use multiboot2::BootInformation;
 use self::table::{Table, Level4};
 use self::temporary_page::TemporaryPage;
+pub use self::address::*;
 use consts::KERNEL_OFFSET;
 
 mod entry;
 mod table;
 mod temporary_page;
 mod mapper;
+mod address;
 
 const ENTRY_COUNT: usize = 512;
-
-pub type PhysicalAddress = usize;
-pub type VirtualAddress = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
@@ -151,8 +150,7 @@ impl ActivePageTable {
             ),
         };
         unsafe {
-            control_regs::cr3_write(PhysicalAddress(
-                new_table.p4_frame.start_address() as u64));
+            control_regs::cr3_write(new_table.p4_frame.start_address());
         }
         old_table
     }
@@ -223,7 +221,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
             let end_frame = to_physical_frame(section.end_address() - 1);
 
             for frame in Frame::range_inclusive(start_frame, end_frame) {
-                let page = Page::containing_address(frame.start_address() + KERNEL_OFFSET);
+                let page = Page::containing_address(frame.start_address().to_kernel_virtual());
                 mapper.map_to(page, frame, flags, allocator);
             }
         }
@@ -238,6 +236,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
         for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
             mapper.identity_map(frame, PRESENT, allocator);
         }
+        debug!("{:?}", mapper as *const Mapper);
     });
 
     let old_table = active_table.switch(new_table);
@@ -245,7 +244,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 
     // turn the old p4 page into a guard page
     let old_p4_page = Page::containing_address(
-      old_table.p4_frame.start_address()
+      old_table.p4_frame.start_address().to_identity_virtual()
     );
     active_table.unmap(old_p4_page, allocator);
     println!("guard page at {:#x}", old_p4_page.start_address());
