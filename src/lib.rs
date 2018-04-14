@@ -76,12 +76,12 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     let acpi = arch::driver::acpi::init().expect("Failed to init ACPI");
     debug!("{:?}", acpi);
 
+    arch::driver::pic::disable();    
+
     memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
     memory_controller.map_page_identity(0xFEC00000);  // IOAPIC
     arch::driver::apic::init(acpi.lapic_addr, acpi.ioapic_id);
     
-    arch::driver::pic::init();
-
     test_end!();
 }
 

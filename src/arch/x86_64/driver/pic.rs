@@ -1,8 +1,17 @@
+// Copy from Redox
+
 use syscall::io::*;
 use spin::Mutex;
 
 static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(0xA0));
+
+pub fn disable() {
+    // Mask all interrupts (Copy from xv6 x86_64)
+    MASTER.lock().cmd.write(0xFF);
+    SLAVE.lock().cmd.write(0xFF);
+    debug!("pic: disabled");
+}
 
 pub fn init() {
     assert_has_not_been_called!("pic::init must be called only once");
@@ -33,6 +42,8 @@ pub fn init() {
     // Ack remaining interrupts
     master.ack();
     slave.ack();
+
+    debug!("pic: init end");    
 }
 
 pub fn enable_irq(irq: u8)
