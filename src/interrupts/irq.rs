@@ -20,26 +20,30 @@ pub extern "x86-interrupt" fn page_fault_handler(
     loop {}
 }
 
-use arch::driver::pic;
+#[cfg(feature = "use_apic")]
+use arch::driver::apic::ack;
+#[cfg(not(feature = "use_apic"))]
+use arch::driver::pic::ack;
+
 use consts::irq::*;
 
 pub extern "x86-interrupt" fn keyboard_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
     println!("\nInterupt: Keyboard \n{:#?}", stack_frame);
-    pic::ack(IRQ_KBD);
+    ack(IRQ_KBD);
 }
 
 pub extern "x86-interrupt" fn serial_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
     println!("\nInterupt: Serial \n{:#?}", stack_frame);
-    pic::ack(IRQ_COM1);
+    ack(IRQ_COM1);
 }
 
 pub extern "x86-interrupt" fn timer_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
     println!("\nInterupt: Timer \n{:#?}", stack_frame);
-    pic::ack(IRQ_TIMER);    
+    ack(IRQ_TIMER);    
 }

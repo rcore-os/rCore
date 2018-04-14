@@ -85,7 +85,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     } else {
         arch::driver::pic::init();
     }
-    unsafe{ x86_64::instructions::interrupts::enable(); }
+    arch::driver::interrupt::enable();
     loop{}
     test_end!();
 }

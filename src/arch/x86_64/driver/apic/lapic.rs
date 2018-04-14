@@ -1,6 +1,7 @@
 extern {
 	static mut lapic: *const ();
 	fn lapicinit();	// must set `lapic` first
+	fn lapiceoi();	// ack
 }
 
 pub fn init(lapic_addr: *const ()) {
@@ -10,4 +11,10 @@ pub fn init(lapic_addr: *const ()) {
 		lapicinit();
 	}
 	debug!("lapic: init end");
+}
+
+pub fn ack(_irq: u8) {
+	unsafe {
+		lapiceoi();
+	}
 }
