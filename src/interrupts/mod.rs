@@ -56,7 +56,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
         gdt.add_entry(GNULL);
-        kcode_selector = 
+        code_selector = 
         gdt.add_entry(KCODE);
         gdt.add_entry(UCODE);
         gdt.add_entry(KDATA);
