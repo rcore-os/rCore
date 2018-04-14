@@ -3,8 +3,11 @@ extern {
 	fn lapicinit();	// must set `lapic` first
 }
 
-pub unsafe fn init(lapic_addr: *const ()) {
-	debug!("WARNING: lapic::init use C lib");	
-	lapic = lapic_addr;
-	lapicinit();
+pub fn init(lapic_addr: *const ()) {
+	debug!("WARNING: lapic::init use C lib");
+	unsafe {
+		lapic = lapic_addr;
+		lapicinit();
+	}
+	debug!("lapic: init end");
 }

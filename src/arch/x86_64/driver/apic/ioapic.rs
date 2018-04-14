@@ -12,13 +12,14 @@ use spin::Mutex;
 pub fn init(ioapic_id: u8)
 {
 	let mut ioapic = IOAPIC.lock();
-	assert!(ioapic.id() == ioapic_id, "ioapicinit: id isn't equal to ioapicid; not a MP");
+	assert!(ioapic.id() == ioapic_id, "ioapic.init: id isn't equal to ioapicid; not a MP");
 
 	// Mark all interrupts edge-triggered, active high, disabled,
 	// and not routed to any CPUs.
 	for i in 0.. ioapic.maxintr() + 1 {
 		ioapic.write_irq(i, DISABLED, 0);
 	}
+	debug!("ioapic: init end");
 }
 
 const IOAPIC_ADDRESS  : u32 = 0xFEC00000;   // Default physical address of IO APIC
@@ -80,6 +81,7 @@ impl IoApic {
 	}
 	pub fn enable(&mut self, irq: u8, cpunum: u8)
 	{
+		debug!("ioapic: enable irq {} @ cpu{}", irq, cpunum);
 		// Mark interrupt edge-triggered, active high,
 		// enabled, and routed to the given cpunum,
 		// which happens to be that cpu's APIC ID.

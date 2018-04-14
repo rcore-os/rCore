@@ -78,9 +78,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
     memory_controller.map_page_identity(0xFEC00000);  // IOAPIC
-    unsafe{ arch::driver::apic::init(acpi.lapic_addr, acpi.ioapic_id); }
+    arch::driver::apic::init(acpi.lapic_addr, acpi.ioapic_id);
     
-    unsafe{ arch::driver::pic::init(); }
+    arch::driver::pic::init();
 
     test_end!();
 }

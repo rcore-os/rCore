@@ -5,6 +5,8 @@ static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(0xA0));
 
 pub fn init() {
+    assert_has_not_been_called!("pic::init must be called only once");
+    
     let mut master = MASTER.lock();
     let mut slave = SLAVE.lock();
 
