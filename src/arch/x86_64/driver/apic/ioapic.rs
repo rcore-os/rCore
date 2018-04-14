@@ -4,10 +4,22 @@
 /// http://www.intel.com/design/chipsets/datashts/29056601.pdf
 /// See also picirq.c.
 
-use core::ptr::{read_volatile, write_volatile};
+use core::ptr::{Unique};
+use syscall::io::{Io, Mmio};
 
-pub fn init() {
+pub unsafe fn init(ioapic_id: u8)
+{
+	let ioapic = IOAPIC.as_mut();
+	let maxintr = (ioapic.read(REG_VER) >> 16) & 0xFF;
+	let id = (ioapic.read(REG_ID) >> 24) as u8;
+	assert!(id == ioapic_id, "ioapicinit: id isn't equal to ioapicid; not a MP");
 
+	// Mark all interrupts edge-triggered, active high, disabled,
+	// and not routed to any CPUs.
+	for i in 0 .. maxintr+1 {
+		ioapic.write(REG_TABLE+2*i, INT_DISABLED | (T_IRQ0 + i));
+		ioapic.write(REG_TABLE+2*i+1, 0);
+	}
 }
 
 const IOAPIC_ADDRESS  : u32 = 0xFEC00000;   // Default physical address of IO APIC
@@ -26,44 +38,28 @@ const INT_LEVEL      : u32 = 0x00008000;  // Level-triggered (vs edge-)
 const INT_ACTIVELOW  : u32 = 0x00002000;  // Active low (vs high)
 const INT_LOGICAL    : u32 = 0x00000800;  // Destination is CPU id (vs APIC ID)
 
-// static IOAPIC: *mut IoApic = IOAPIC_ADDRESS as *mut _;
+static mut IOAPIC: Unique<IoApic> = unsafe{ Unique::new_unchecked(IOAPIC_ADDRESS as *mut _) };
 
-const ioapicid: u32 = 0; // TODO fix
 const T_IRQ0: u32 = 32;
 
 // IO APIC MMIO structure: write reg, then read or write data.
 #[repr(C)]
 struct IoApic {
-	reg: u32,
-	pad: [u32; 3],
-	data: u32,
+	reg: Mmio<u32>,
+	pad: [Mmio<u32>; 3],
+	data: Mmio<u32>,
 }
 
 impl IoApic {
 	unsafe fn read(&mut self, reg: u32) -> u32
 	{
-		write_volatile(&mut self.reg as *mut _, reg);
-		read_volatile(&self.data as *const _)
+		self.reg.write(reg);
+		self.data.read()
 	}
 	unsafe fn write(&mut self, reg: u32, data: u32)
 	{
-		write_volatile(&mut self.reg as *mut _, reg);
-		write_volatile(&mut self.data as *mut _, data);
-	}
-	unsafe fn init(&mut self)
-	{
-		let maxintr = (self.read(REG_VER) >> 16) & 0xFF;
-		let id = self.read(REG_ID) >> 24;
-		if id != ioapicid {
-			println!("ioapicinit: id isn't equal to ioapicid; not a MP");
-		}
-
-		// Mark all interrupts edge-triggered, active high, disabled,
-		// and not routed to any CPUs.
-		for i in 0 .. maxintr+1 {
-			self.write(REG_TABLE+2*i, INT_DISABLED | (T_IRQ0 + i));
-			self.write(REG_TABLE+2*i+1, 0);
-		}
+		self.reg.write(reg);
+		self.data.write(data);
 	}
 	unsafe fn enable(&mut self, irq: u32, cpunum: u32)
 	{
