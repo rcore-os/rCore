@@ -27,6 +27,7 @@ extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
 extern crate bit_field;
+extern crate syscall;
 
 #[macro_use]    // print!
 mod io;
@@ -78,7 +79,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
     arch::driver::apic::init(acpi.lapic_addr);
     
-    io::init();
+    unsafe{ arch::driver::pic::init(); }
 
     test_end!();
 }
