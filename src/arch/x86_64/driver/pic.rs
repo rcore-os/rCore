@@ -1,52 +1,65 @@
 use syscall::io::*;
+use spin::Mutex;
 
-pub static mut MASTER: Pic = Pic::new(0x20);
-pub static mut SLAVE: Pic = Pic::new(0xA0);
+static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));
+static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(0xA0));
 
-pub unsafe fn init() {
+pub fn init() {
+    let mut master = MASTER.lock();
+    let mut slave = SLAVE.lock();
+
     // Start initialization
-    MASTER.cmd.write(0x11);
-    SLAVE.cmd.write(0x11);
+    master.cmd.write(0x11);
+    slave.cmd.write(0x11);
 
     // Set offsets
-    MASTER.data.write(0x20);
-    SLAVE.data.write(0x28);
+    master.data.write(0x20);
+    slave.data.write(0x28);
 
     // Set up cascade
-    MASTER.data.write(4);
-    SLAVE.data.write(2);
+    master.data.write(4);
+    slave.data.write(2);
 
     // Set up interrupt mode (1 is 8086/88 mode, 2 is auto EOI)
-    MASTER.data.write(1);
-    SLAVE.data.write(1);
+    master.data.write(1);
+    slave.data.write(1);
 
     // Unmask interrupts
-    MASTER.data.write(0);
-    SLAVE.data.write(0);
+    master.data.write(0);
+    slave.data.write(0);
 
     // Ack remaining interrupts
-    MASTER.ack();
-    SLAVE.ack();
+    master.ack();
+    slave.ack();
 }
 
-pub struct Pic {
+pub fn enable_irq(irq: u8)
+{
+    match irq {
+        _ if irq < 8 => MASTER.lock().mask_set(irq),
+        _ if irq < 16 => SLAVE.lock().mask_set(irq-8),
+        _ => panic!("irq not in 0..16"),
+    }
+}
+
+struct Pic {
     cmd: Pio<u8>,
     data: Pio<u8>,
 }
 
 impl Pic {
-    pub const fn new(port: u16) -> Pic {
+    const fn new(port: u16) -> Pic {
         Pic {
             cmd: Pio::new(port),
             data: Pio::new(port + 1),
         }
     }
 
-    pub fn ack(&mut self) {
+    fn ack(&mut self) {
         self.cmd.write(0x20);
     }
 
-    pub fn mask_set(&mut self, irq: u8) {
+    fn mask_set(&mut self, irq: u8) {
         assert!(irq < 8);
 
         let mut mask = self.data.read();
@@ -54,7 +67,7 @@ impl Pic {
         self.data.write(mask);
     }
 
-    pub fn mask_clear(&mut self, irq: u8) {
+    fn mask_clear(&mut self, irq: u8) {
         assert!(irq < 8);
 
         let mut mask = self.data.read();

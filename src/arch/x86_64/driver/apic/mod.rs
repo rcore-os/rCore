@@ -1,3 +1,5 @@
+pub use self::ioapic::IOAPIC;
+
 mod lapic;
 mod ioapic;
 

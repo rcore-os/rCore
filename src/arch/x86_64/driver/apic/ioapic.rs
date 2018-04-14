@@ -4,14 +4,14 @@
 /// http://www.intel.com/design/chipsets/datashts/29056601.pdf
 /// See also picirq.c.
 
-use core::ptr::{Unique};
 use syscall::io::{Io, Mmio};
 use bit_field::BitField;
 use consts::irq::T_IRQ0;
+use spin::Mutex;
 
-pub unsafe fn init(ioapic_id: u8)
+pub fn init(ioapic_id: u8)
 {
-	let ioapic = IOAPIC.as_mut();
+	let mut ioapic = IOAPIC.lock();
 	assert!(ioapic.id() == ioapic_id, "ioapicinit: id isn't equal to ioapicid; not a MP");
 
 	// Mark all interrupts edge-triggered, active high, disabled,
@@ -43,33 +43,42 @@ bitflags! {
 	}
 }
 
-static mut IOAPIC: Unique<IoApic> = unsafe{ Unique::new_unchecked(IOAPIC_ADDRESS as *mut _) };
+lazy_static! {
+	pub static ref IOAPIC: Mutex<IoApic> = Mutex::new(unsafe{IoApic::new()});
+}
 
 // IO APIC MMIO structure: write reg, then read or write data.
 #[repr(C)]
-struct IoApic {
+struct IoApicMmio {
 	reg: Mmio<u32>,
 	pad: [Mmio<u32>; 3],
 	data: Mmio<u32>,
 }
 
+pub struct IoApic {
+	mmio: &'static mut IoApicMmio
+}
+
 impl IoApic {
-	unsafe fn read(&mut self, reg: u8) -> u32
-	{
-		self.reg.write(reg as u32);
-		self.data.read()
+	unsafe fn new() -> Self {
+		IoApic { mmio: &mut *(IOAPIC_ADDRESS as *mut IoApicMmio) }
 	}
-	unsafe fn write(&mut self, reg: u8, data: u32)
+	fn read(&mut self, reg: u8) -> u32
 	{
-		self.reg.write(reg as u32);
-		self.data.write(data);
+		self.mmio.reg.write(reg as u32);
+		self.mmio.data.read()
 	}
-	unsafe fn write_irq(&mut self, irq: u8, flags: RedirectionEntry, dest: u8)
+	fn write(&mut self, reg: u8, data: u32)
+	{
+		self.mmio.reg.write(reg as u32);
+		self.mmio.data.write(data);
+	}
+	fn write_irq(&mut self, irq: u8, flags: RedirectionEntry, dest: u8)
 	{
 		self.write(REG_TABLE+2*irq, (T_IRQ0 + irq) as u32 | flags.bits());
 		self.write(REG_TABLE+2*irq+1, (dest as u32) << 24);
 	}
-	unsafe fn enable(&mut self, irq: u8, cpunum: u8)
+	pub fn enable(&mut self, irq: u8, cpunum: u8)
 	{
 		// Mark interrupt edge-triggered, active high,
 		// enabled, and routed to the given cpunum,
@@ -77,12 +86,12 @@ impl IoApic {
 		self.write_irq(irq, NONE, cpunum);
 	}
 	fn id(&mut self) -> u8 {
-		unsafe{ self.read(REG_ID).get_bits(24..28) as u8 }
+		self.read(REG_ID).get_bits(24..28) as u8
 	}
 	fn version(&mut self) -> u8 {
-		unsafe{ self.read(REG_VER).get_bits(0..8) as u8 }
+		self.read(REG_VER).get_bits(0..8) as u8
 	}
 	fn maxintr(&mut self) -> u8 {
-		unsafe{ self.read(REG_VER).get_bits(16..24) as u8 }
+		self.read(REG_VER).get_bits(16..24) as u8
 	}
 }
