@@ -10,9 +10,13 @@ mod irq;
 lazy_static! {
     static ref IDT: Idt = {
         use self::irq::*;
+        use consts::irq::*;
         let mut idt = Idt::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);        
+        idt.page_fault.set_handler_fn(page_fault_handler);
+        idt[(T_IRQ0 + IRQ_COM1) as usize].set_handler_fn(serial_handler);
+        idt[(T_IRQ0 + IRQ_KBD) as usize].set_handler_fn(keyboard_handler);
+        idt[(T_IRQ0 + IRQ_TIMER) as usize].set_handler_fn(timer_handler);
         unsafe {
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);

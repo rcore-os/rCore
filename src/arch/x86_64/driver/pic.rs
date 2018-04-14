@@ -55,6 +55,14 @@ pub fn enable_irq(irq: u8)
     }
 }
 
+pub fn ack(irq: u8) {
+    assert!(irq < 16);
+    MASTER.lock().ack();
+    if irq >= 8 {
+        SLAVE.lock().ack();
+    }
+}
+
 struct Pic {
     cmd: Pio<u8>,
     data: Pio<u8>,
