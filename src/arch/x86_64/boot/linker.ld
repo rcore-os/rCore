@@ -6,21 +6,22 @@ KERNEL_OFFSET = 0xffffff0000000000;
 SECTIONS {
   . = BOOT_OFFSET;
 
-  .rodata32 :
+  .rodata.32 :
   {
     /* ensure that the multiboot header is at the beginning */
     KEEP(*(.multiboot_header))
-    *(.rodata32 .rodata32.*)
+    */boot.o (.rodata)
     . = ALIGN(4K);
   }
-  .text32 :
+  .text.32 :
   {
-    *(.text32 .text32.*)
+    */boot.o (.text)
+    */long_mode_init.o (.text)
     . = ALIGN(4K);
   }
-  .bss32 :
+  .bss.32 :
   {
-    *(.bss32 .bss32.*)
+    */boot.o (.bss)
     . = ALIGN(4K);
   }
 

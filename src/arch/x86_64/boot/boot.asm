@@ -1,7 +1,7 @@
 global start
 extern long_mode_start
 
-section .text32
+section .text
 bits 32
 start:
     mov esp, stack_top
@@ -149,7 +149,7 @@ error:
     mov byte  [0xb800a], al
     hlt
 
-section .bss32
+section .bss
 align 4096
 p4_table:
     resb 4096
@@ -161,7 +161,7 @@ stack_bottom:
     resb 4096 * 4
 stack_top:
 
-section .rodata32
+section .rodata
 gdt64:
     dq 0 ; zero entry
 .code: equ $ - gdt64 ; new

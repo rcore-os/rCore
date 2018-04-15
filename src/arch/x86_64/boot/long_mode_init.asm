@@ -3,7 +3,7 @@ extern rust_main
 
 KERNEL_OFFSET equ 0xffff_ff00_0000_0000
 
-section .text32
+section .text
 bits 64
 long_mode_start:
     ; load 0 into all data segment registers
