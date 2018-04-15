@@ -45,13 +45,13 @@ SECTIONS {
     . = ALIGN(4K);
   }
 
-  .bss : AT(ADDR(.bss) - KERNEL_OFFSET)
+  .bss ALIGN(4K): AT(ADDR(.bss) - KERNEL_OFFSET)
   {
     *(.bss .bss.*)
     . = ALIGN(4K);
   }
 
-  .got : AT(ADDR(.got) - KERNEL_OFFSET)
+  .got ALIGN(4K): AT(ADDR(.got) - KERNEL_OFFSET)
   {
     *(.got)
     . = ALIGN(4K);

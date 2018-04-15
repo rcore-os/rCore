@@ -10,7 +10,8 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
-qemu_opts := -cdrom $(iso) -smp 2 -serial stdio
+qemu_opts := -cdrom $(iso) -smp 2 -serial mon:stdio
+features := use_apic
 
 ifdef travis
 	test := 1

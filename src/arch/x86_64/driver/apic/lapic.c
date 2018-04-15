@@ -98,3 +98,11 @@ lapicinit(void)
   // Enable interrupts on the APIC (but not on the processor).
   lapicw(TPR, 0);
 }
+
+// Acknowledge interrupt.
+void
+lapiceoi(void)
+{
+  if(lapic)
+    lapicw(EOI, 0);
+}

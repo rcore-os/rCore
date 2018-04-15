@@ -1,14 +1,20 @@
 extern {
 	static mut lapic: *const ();
 	fn lapicinit();	// must set `lapic` first
+	fn lapiceoi();	// ack
 }
 
 pub fn init(lapic_addr: *const ()) {
-	debug!("WARNING: lapic::init use C lib");	
+	debug!("WARNING: lapic::init use C lib");
 	unsafe {
 		lapic = lapic_addr;
-		debug!("lapic = {:?}", lapic);
-		unimplemented!();
 		lapicinit();
-	}	
+	}
+	debug!("lapic: init end");
+}
+
+pub fn ack(_irq: u8) {
+	unsafe {
+		lapiceoi();
+	}
 }

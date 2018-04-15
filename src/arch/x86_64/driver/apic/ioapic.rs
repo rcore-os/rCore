@@ -4,73 +4,96 @@
 /// http://www.intel.com/design/chipsets/datashts/29056601.pdf
 /// See also picirq.c.
 
-use core::ptr::{read_volatile, write_volatile};
+use syscall::io::{Io, Mmio};
+use bit_field::BitField;
+use consts::irq::T_IRQ0;
+use spin::Mutex;
 
-pub fn init() {
+pub fn init(ioapic_id: u8)
+{
+	let mut ioapic = IOAPIC.lock();
+	assert!(ioapic.id() == ioapic_id, "ioapic.init: id isn't equal to ioapicid; not a MP");
 
+	// Mark all interrupts edge-triggered, active high, disabled,
+	// and not routed to any CPUs.
+	for i in 0.. ioapic.maxintr() + 1 {
+		ioapic.write_irq(i, DISABLED, 0);
+	}
+	debug!("ioapic: init end");
 }
 
 const IOAPIC_ADDRESS  : u32 = 0xFEC00000;   // Default physical address of IO APIC
 
-const REG_ID     : u32 = 0x00;  // Register index: ID
-const REG_VER    : u32 = 0x01;  // Register index: version
-const REG_TABLE  : u32 = 0x10;  // Redirection table base
+const REG_ID     : u8 = 0x00;  // Register index: ID
+const REG_VER    : u8 = 0x01;  // Register index: version
+const REG_TABLE  : u8 = 0x10;  // Redirection table base
 
 // The redirection table starts at REG_TABLE and uses
 // two registers to configure each interrupt.
 // The first (low) register in a pair contains configuration bits.
 // The second (high) register contains a bitmask telling which
 // CPUs can serve that interrupt.
-const INT_DISABLED   : u32 = 0x00010000;  // Interrupt disabled
-const INT_LEVEL      : u32 = 0x00008000;  // Level-triggered (vs edge-)
-const INT_ACTIVELOW  : u32 = 0x00002000;  // Active low (vs high)
-const INT_LOGICAL    : u32 = 0x00000800;  // Destination is CPU id (vs APIC ID)
 
-// static IOAPIC: *mut IoApic = IOAPIC_ADDRESS as *mut _;
+bitflags! {
+	flags RedirectionEntry: u32 {
+		const DISABLED  = 0x00010000,  // Interrupt disabled
+		const LEVEL     = 0x00008000,  // Level-triggered (vs edge-)
+		const ACTIVELOW = 0x00002000,  // Active low (vs high)
+		const LOGICAL   = 0x00000800,  // Destination is CPU id (vs APIC ID)
+		const NONE		= 0x00000000,
+	}
+}
 
-const ioapicid: u32 = 0; // TODO fix
-const T_IRQ0: u32 = 32;
+lazy_static! {
+	pub static ref IOAPIC: Mutex<IoApic> = Mutex::new(unsafe{IoApic::new()});
+}
 
 // IO APIC MMIO structure: write reg, then read or write data.
 #[repr(C)]
-struct IoApic {
-	reg: u32,
-	pad: [u32; 3],
-	data: u32,
+struct IoApicMmio {
+	reg: Mmio<u32>,
+	pad: [Mmio<u32>; 3],
+	data: Mmio<u32>,
+}
+
+pub struct IoApic {
+	mmio: &'static mut IoApicMmio
 }
 
 impl IoApic {
-	unsafe fn read(&mut self, reg: u32) -> u32
-	{
-		write_volatile(&mut self.reg as *mut _, reg);
-		read_volatile(&self.data as *const _)
+	unsafe fn new() -> Self {
+		IoApic { mmio: &mut *(IOAPIC_ADDRESS as *mut IoApicMmio) }
 	}
-	unsafe fn write(&mut self, reg: u32, data: u32)
+	fn read(&mut self, reg: u8) -> u32
 	{
-		write_volatile(&mut self.reg as *mut _, reg);
-		write_volatile(&mut self.data as *mut _, data);
+		self.mmio.reg.write(reg as u32);
+		self.mmio.data.read()
 	}
-	unsafe fn init(&mut self)
+	fn write(&mut self, reg: u8, data: u32)
 	{
-		let maxintr = (self.read(REG_VER) >> 16) & 0xFF;
-		let id = self.read(REG_ID) >> 24;
-		if id != ioapicid {
-			println!("ioapicinit: id isn't equal to ioapicid; not a MP");
-		}
-
-		// Mark all interrupts edge-triggered, active high, disabled,
-		// and not routed to any CPUs.
-		for i in 0 .. maxintr+1 {
-			self.write(REG_TABLE+2*i, INT_DISABLED | (T_IRQ0 + i));
-			self.write(REG_TABLE+2*i+1, 0);
-		}
+		self.mmio.reg.write(reg as u32);
+		self.mmio.data.write(data);
 	}
-	unsafe fn enable(&mut self, irq: u32, cpunum: u32)
+	fn write_irq(&mut self, irq: u8, flags: RedirectionEntry, dest: u8)
 	{
+		self.write(REG_TABLE+2*irq, (T_IRQ0 + irq) as u32 | flags.bits());
+		self.write(REG_TABLE+2*irq+1, (dest as u32) << 24);
+	}
+	pub fn enable(&mut self, irq: u8, cpunum: u8)
+	{
+		debug!("ioapic: enable irq {} @ cpu{}", irq, cpunum);
 		// Mark interrupt edge-triggered, active high,
 		// enabled, and routed to the given cpunum,
 		// which happens to be that cpu's APIC ID.
-		self.write(REG_TABLE+2*irq, T_IRQ0 + irq);
-		self.write(REG_TABLE+2*irq+1, cpunum << 24);
+		self.write_irq(irq, NONE, cpunum);
+	}
+	fn id(&mut self) -> u8 {
+		self.read(REG_ID).get_bits(24..28) as u8
+	}
+	fn version(&mut self) -> u8 {
+		self.read(REG_VER).get_bits(0..8) as u8
+	}
+	fn maxintr(&mut self) -> u8 {
+		self.read(REG_VER).get_bits(16..24) as u8
 	}
 }

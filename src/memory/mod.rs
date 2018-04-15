@@ -48,8 +48,6 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     let mut active_table = remap_the_kernel(&mut frame_allocator, boot_info);
 
-    println!("{:?}", active_table);
-
     use self::paging::Page;
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
 
@@ -207,5 +205,14 @@ impl MemoryController {
                                     ref mut stack_allocator } = self;
         stack_allocator.alloc_stack(active_table, frame_allocator,
                                     size_in_pages)
+    }
+    pub fn map_page_identity(&mut self, addr: usize) {
+        use self::paging::{WRITABLE};        
+        let frame = Frame::containing_address(addr);
+        let flags = WRITABLE;
+        self.active_table.identity_map(frame, flags, &mut self.frame_allocator);
+    }
+    pub fn print_page_table(&self) {
+        debug!("{:?}", self.active_table);
     }
 }

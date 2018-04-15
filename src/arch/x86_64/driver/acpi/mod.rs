@@ -5,12 +5,11 @@ use self::structs::*;
 use consts::*;
 
 pub fn init() -> Result<ACPI_Result, ACPI_Error> {
-	use core::mem::size_of;
-	use util::Checkable;
 	let rsdp = find_rsdp().expect("acpi: rsdp not found.");
 	if rsdp.RsdtPhysicalAddress > PHYSICAL_MEMORY_LIMIT {
 		return Err(ACPI_Error::NotMapped);
 	}
+	debug!("RSDT at {:#x}", rsdp.RsdtPhysicalAddress);
 	let rsdt = unsafe{ &*(rsdp.RsdtPhysicalAddress as *const rsdt) };
 	let mut madt: Option<&'static madt> = None;
 	for i in 0 .. rsdt.entry_count() {

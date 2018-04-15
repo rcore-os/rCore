@@ -27,6 +27,7 @@ extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
 extern crate bit_field;
+extern crate syscall;
 
 #[macro_use]    // print!
 mod io;
@@ -66,14 +67,27 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test!(guard_page);
     test!(find_mp);
 
-    // TODO Build temp page map. Now page fault.
+    // TODO Handle this temp page map.
+    memory_controller.map_page_identity(0); // EBDA
+    for addr in (0xE0000 .. 0x100000).step_by(0x1000) {
+        memory_controller.map_page_identity(addr);
+    }
+    memory_controller.map_page_identity(0x7fe1000); // RSDT
+    memory_controller.print_page_table();
     let acpi = arch::driver::acpi::init().expect("Failed to init ACPI");
     debug!("{:?}", acpi);
-    unimplemented!();
-    
-    arch::driver::apic::init(acpi.lapic_addr);
-    io::init();
 
+    if cfg!(feature = "use_apic") {
+        arch::driver::pic::disable(); 
+
+        memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
+        memory_controller.map_page_identity(0xFEC00000);  // IOAPIC
+        arch::driver::apic::init(acpi.lapic_addr, acpi.ioapic_id);
+    } else {
+        arch::driver::pic::init();
+    }
+    arch::driver::interrupt::enable();
+    loop{}
     test_end!();
 }
 
