@@ -1,25 +1,16 @@
 use x86_64::VirtualAddress;
-use arch::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
+use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::structures::tss::TaskStateSegment;
 use memory::{MemoryController, as_ref_in_real};
 use spin::Once;
 
 mod gdt;
 
-static mut IDT: Idt = Idt::new();
-
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
+static IDT: Once<Idt> = Once::new();
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
-
-pub unsafe fn init_idt() {
-    IDT.breakpoint.set_handler_fn(*as_ref_in_real(&breakpoint_handler));
-    IDT.double_fault.set_handler_fn(*as_ref_in_real(&double_fault_handler));
-    IDT.page_fault.set_handler_fn(*as_ref_in_real(&page_fault_handler));
-        // .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
-    IDT.load();
-}
 
 pub fn init(memory_controller: &mut MemoryController) {
     use x86_64::structures::gdt::SegmentSelector;
@@ -41,19 +32,29 @@ pub fn init(memory_controller: &mut MemoryController) {
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
         code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment());
-        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(&tss));
+        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(unsafe{as_ref_in_real(&tss)}));
         gdt
     });
     gdt.load();
 
-     unsafe {
+    unsafe {
         // reload code segment register
         set_cs(code_selector);
         // load TSS
         load_tss(tss_selector);
     }
 
-    // IDT.load();
+    unsafe {
+        let idt = IDT.call_once(|| {
+            let mut idt = Idt::new();
+            idt.breakpoint.set_handler_fn(*as_ref_in_real(&breakpoint_handler));
+            idt.double_fault.set_handler_fn(*as_ref_in_real(&double_fault_handler));
+            idt.page_fault.set_handler_fn(*as_ref_in_real(&page_fault_handler))
+                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
+            idt
+        });
+        as_ref_in_real(&idt).load();
+    }
 }
 
 extern "x86-interrupt" fn breakpoint_handler(
