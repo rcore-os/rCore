@@ -1,5 +1,4 @@
 use super::{Page, ENTRY_COUNT};
-use super::entry::*;
 use super::table::{self, Table, Level4, Level1};
 use memory::*;
 use core::ptr::Unique;
@@ -26,7 +25,7 @@ impl Mapper {
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
         let offset = virtual_address % PAGE_SIZE;
         self.translate_page(Page::containing_address(virtual_address))
-            .map(|frame| PhysicalAddress((frame.number * PAGE_SIZE + offset) as u64))
+            .map(|frame| PhysicalAddress((frame.start_address().get() + offset) as u64))
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
@@ -39,11 +38,11 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().contains(HUGE_PAGE) {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRY_COUNT * ENTRY_COUNT) == 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.p2_index() *
-                                    ENTRY_COUNT + page.p1_index(),
-                        });
+                        assert!(start_frame.start_address().get() % (ENTRY_COUNT * ENTRY_COUNT * PAGE_SIZE) == 0);
+                        return Some(Frame::containing_address(
+                            start_frame.start_address().get() + 
+                            (page.p2_index() * ENTRY_COUNT + page.p1_index()) * PAGE_SIZE
+                        ));
                     }
                 }
                 if let Some(p2) = p3.next_table(page.p3_index()) {
@@ -52,10 +51,10 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().contains(HUGE_PAGE) {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRY_COUNT == 0);
-                            return Some(Frame {
-                                number: start_frame.number + page.p1_index()
-                            });
+                            assert!(start_frame.start_address().get() % ENTRY_COUNT == 0);
+                            return Some(Frame::containing_address(
+                                start_frame.start_address().get() + page.p1_index() * PAGE_SIZE
+                            ));
                         }
                     }
                 }

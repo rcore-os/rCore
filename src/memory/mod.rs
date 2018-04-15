@@ -1,18 +1,18 @@
 pub use self::area_frame_allocator::AreaFrameAllocator;
-pub use self::paging::*;
+pub use arch::paging::*;
 pub use self::stack_allocator::Stack;
 pub use self::address::*;
+pub use self::frame::*;
 
 use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
+use arch::paging;
 
 mod area_frame_allocator;
 pub mod heap_allocator;
-mod paging;
 mod stack_allocator;
 mod address;
-
-pub const PAGE_SIZE: usize = 4096;
+mod frame;
 
 pub fn init(boot_info: &BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
@@ -133,63 +133,16 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
     println!("NEW TABLE!!!");
 
     // turn the old p4 page into a guard page
+    let old_table_p4_frame = unsafe {
+        &*(&old_table as *const InactivePageTable as *const Frame)
+    };
     let old_p4_page = Page::containing_address(
-      old_table.p4_frame.start_address().to_kernel_virtual()
+        old_table_p4_frame.start_address().to_kernel_virtual()
     );
     active_table.unmap(old_p4_page, allocator);
     println!("guard page at {:#x}", old_p4_page.start_address());
 
     active_table
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Frame {
-    number: usize,
-}
-
-impl Frame {
-    fn containing_address(address: usize) -> Frame {
-        Frame{ number: address / PAGE_SIZE }
-    }
-
-    fn start_address(&self) -> PhysicalAddress {
-        PhysicalAddress((self.number * PAGE_SIZE) as u64)
-    }
-
-    fn clone(&self) -> Frame {
-        Frame { number: self.number }
-    }
-
-    fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
-        FrameIter {
-            start: start,
-            end: end,
-        }
-    }
-}
-
-struct FrameIter {
-    start: Frame,
-    end: Frame,
-}
-
-impl Iterator for FrameIter {
-    type Item = Frame;
-
-    fn next(&mut self) -> Option<Frame> {
-        if self.start <= self.end {
-            let frame = self.start.clone();
-            self.start.number += 1;
-            Some(frame)
-        } else {
-            None
-        }
-    }
- }
-
-pub trait FrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame>;
-    fn deallocate_frame(&mut self, frame: Frame);
 }
 
 pub struct MemoryController {

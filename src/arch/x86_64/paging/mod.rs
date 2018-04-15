@@ -1,7 +1,7 @@
 pub use self::entry::*;
 pub use self::mapper::Mapper;
 use core::ops::{Deref, DerefMut, Add};
-use super::*;
+use memory::*;
 pub use self::temporary_page::TemporaryPage;
 
 mod entry;
@@ -151,7 +151,9 @@ impl ActivePageTable {
 }
 
 pub struct InactivePageTable {
-    pub(in memory) p4_frame: Frame,
+    // WARNING: Don't change the struct. 
+    //          memory mod use the private p4_frame.
+    p4_frame: Frame,
 }
 
 impl InactivePageTable {

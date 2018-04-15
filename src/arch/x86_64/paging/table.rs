@@ -1,8 +1,8 @@
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
 use memory::FrameAllocator;
-use memory::paging::entry::*;
-use memory::paging::ENTRY_COUNT;
+use super::entry::*;
+use super::ENTRY_COUNT;
 
 pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
 
