@@ -1,7 +1,7 @@
 use x86_64::VirtualAddress;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::structures::tss::TaskStateSegment;
-use memory::{MemoryController, as_ref_in_real};
+use memory::MemoryController;
 use spin::Once;
 
 mod gdt;
@@ -32,7 +32,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
         code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment());
-        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(unsafe{as_ref_in_real(&tss)}));
+        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(&tss));
         gdt
     });
     gdt.load();
@@ -44,17 +44,18 @@ pub fn init(memory_controller: &mut MemoryController) {
         load_tss(tss_selector);
     }
 
-    unsafe {
-        let idt = IDT.call_once(|| {
-            let mut idt = Idt::new();
-            idt.breakpoint.set_handler_fn(*as_ref_in_real(&breakpoint_handler));
-            idt.double_fault.set_handler_fn(*as_ref_in_real(&double_fault_handler));
-            idt.page_fault.set_handler_fn(*as_ref_in_real(&page_fault_handler))
+    let idt = IDT.call_once(|| {
+        let mut idt = Idt::new();
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.double_fault.set_handler_fn(double_fault_handler);
+        unsafe {
+            idt.page_fault.set_handler_fn(page_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
-            idt
-        });
-        as_ref_in_real(&idt).load();
-    }
+        }
+        idt
+    });
+
+    idt.load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(

@@ -129,7 +129,6 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
         for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
             mapper.identity_map(frame, PRESENT, allocator);
         }
-        debug!("{:?}", mapper);
     });
 
     let old_table = active_table.switch(new_table);
@@ -137,7 +136,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 
     // turn the old p4 page into a guard page
     let old_p4_page = Page::containing_address(
-      old_table.p4_frame.start_address().to_identity_virtual()
+      old_table.p4_frame.start_address().to_kernel_virtual()
     );
     active_table.unmap(old_p4_page, allocator);
     println!("guard page at {:#x}", old_p4_page.start_address());
@@ -209,17 +208,4 @@ impl MemoryController {
         stack_allocator.alloc_stack(active_table, frame_allocator,
                                     size_in_pages)
     }
-}
-
-
-pub unsafe fn as_mut_in_real<T> (obj: &mut T) -> &mut T {
-    let va = obj as *mut T as VirtualAddress;
-    let pa = PhysicalAddress::from_kernel_virtual(va).0;
-    &mut *(pa as *mut T)
-}
-
-pub unsafe fn as_ref_in_real<T> (obj: &T) -> &T {
-    let va = obj as *const T as VirtualAddress;
-    let pa = PhysicalAddress::from_kernel_virtual(va).0;
-    &*(pa as *const T)
 }
