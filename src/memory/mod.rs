@@ -141,3 +141,16 @@ impl MemoryController {
                                     size_in_pages)
     }
 }
+
+
+pub unsafe fn as_mut_in_real<T> (obj: &mut T) -> &mut T {
+    let va = obj as *mut T as VirtualAddress;
+    let pa = PhysicalAddress::from_kernel_virtual(va).0;
+    &mut *(pa as *mut T)
+}
+
+pub unsafe fn as_ref_in_real<T> (obj: &T) -> &T {
+    let va = obj as *const T as VirtualAddress;
+    let pa = PhysicalAddress::from_kernel_virtual(va).0;
+    &*(pa as *const T)
+}

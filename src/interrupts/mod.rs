@@ -1,27 +1,24 @@
 use x86_64::VirtualAddress;
-use x86_64::structures::idt::{Idt, ExceptionStackFrame};
+use arch::idt::{Idt, ExceptionStackFrame};
 use x86_64::structures::tss::TaskStateSegment;
-use memory::MemoryController;
+use memory::{MemoryController, as_ref_in_real};
 use spin::Once;
 
 mod gdt;
 
-lazy_static! {
-    static ref IDT: Idt = {
-        let mut idt = Idt::new();
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
-        }
-        idt
-    };
-}
+static mut IDT: Idt = Idt::new();
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
+
+pub unsafe fn init_idt() {
+    IDT.breakpoint.set_handler_fn(*as_ref_in_real(&breakpoint_handler));
+    IDT.double_fault.set_handler_fn(*as_ref_in_real(&double_fault_handler));
+        // .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
+    IDT.load();
+}
 
 pub fn init(memory_controller: &mut MemoryController) {
     use x86_64::structures::gdt::SegmentSelector;
@@ -55,7 +52,7 @@ pub fn init(memory_controller: &mut MemoryController) {
         load_tss(tss_selector);
     }
 
-    IDT.load();
+    // IDT.load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(

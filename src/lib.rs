@@ -48,6 +48,8 @@ mod arch;
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
+    unsafe{ interrupts::init_idt(); }
+    unsafe{ let a = *(0xdeadbeaf as *const u8); }   // double fault
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     arch::init();    
