@@ -1,5 +1,5 @@
 use x86_64::VirtualAddress;
-use arch::idt::{Idt, ExceptionStackFrame};
+use arch::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::structures::tss::TaskStateSegment;
 use memory::{MemoryController, as_ref_in_real};
 use spin::Once;
@@ -16,6 +16,7 @@ const DOUBLE_FAULT_IST_INDEX: usize = 0;
 pub unsafe fn init_idt() {
     IDT.breakpoint.set_handler_fn(*as_ref_in_real(&breakpoint_handler));
     IDT.double_fault.set_handler_fn(*as_ref_in_real(&double_fault_handler));
+    IDT.page_fault.set_handler_fn(*as_ref_in_real(&page_fault_handler));
         // .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
     IDT.load();
 }
@@ -65,5 +66,14 @@ extern "x86-interrupt" fn double_fault_handler(
     stack_frame: &mut ExceptionStackFrame, _error_code: u64)
 {
     println!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    loop {}
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: &mut ExceptionStackFrame, _error_code: PageFaultErrorCode)
+{
+    use x86_64::registers::control_regs::cr2;
+    let addr = cr2();
+    println!("\nEXCEPTION: PAGE FAULT\n{:#?}\nAddress: {:#x}", stack_frame, addr);
     loop {}
 }
