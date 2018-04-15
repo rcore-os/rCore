@@ -1,5 +1,7 @@
 use x86_64;
 
+pub mod irq;
+
 #[inline(always)]
 pub unsafe fn enable() {
     x86_64::instructions::interrupts::enable();

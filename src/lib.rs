@@ -32,7 +32,6 @@ extern crate syscall;
 #[macro_use]    // print!
 mod io;
 mod memory;
-mod interrupts;
 mod lang;
 mod util;
 #[macro_use]    // test!
@@ -60,8 +59,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE);
     }
 
-    // initialize our IDT
-    interrupts::init(&mut memory_controller);
+    let double_fault_stack = memory_controller.alloc_stack(1)
+        .expect("could not allocate double fault stack");
+    arch::gdt::init(double_fault_stack.top());
+    arch::idt::init();
 
     test!(global_allocator);
     test!(guard_page);
