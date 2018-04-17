@@ -30,7 +30,10 @@ use consts::irq::*;
 pub extern "x86-interrupt" fn keyboard_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
-    println!("\nInterupt: Keyboard \n{:#?}", stack_frame);
+    use arch::driver::keyboard;
+    println!("\nInterupt: Keyboard");
+    let c = keyboard::get();
+    println!("Key = '{}' {}", c as u8 as char, c);
     ack(IRQ_KBD);
 }
 

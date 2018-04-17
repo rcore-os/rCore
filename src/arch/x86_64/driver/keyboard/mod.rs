@@ -5,3 +5,11 @@ pub fn init() {
 	use arch::interrupt::enable_irq;
 	enable_irq(IRQ_KBD);
 }
+
+pub fn get() -> i32 {
+	unsafe{ kbdgetc() }
+}
+
+extern {
+    fn kbdgetc() -> i32;
+}
