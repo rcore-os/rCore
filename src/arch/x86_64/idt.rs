@@ -12,7 +12,8 @@ pub fn init() {
         let mut idt = Idt::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.double_fault.set_handler_fn(double_fault_handler);
-        idt[(T_IRQ0 + IRQ_COM1) as usize].set_handler_fn(serial_handler);
+        idt[(T_IRQ0 + IRQ_COM1) as usize].set_handler_fn(com1_handler);
+        idt[(T_IRQ0 + IRQ_COM2) as usize].set_handler_fn(com2_handler);
         idt[(T_IRQ0 + IRQ_KBD) as usize].set_handler_fn(keyboard_handler);
         idt[(T_IRQ0 + IRQ_TIMER) as usize].set_handler_fn(timer_handler);
         unsafe {

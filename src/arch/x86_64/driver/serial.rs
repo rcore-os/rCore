@@ -1,8 +1,22 @@
+// Copy from Redox
+
 use core::fmt::{self, Write};
 use spin::Mutex;
 use syscall::io::{Io, Pio, Mmio, ReadOnly};
 
-pub static SERIAL: Mutex<Serial> = Mutex::new(Serial::new(0x3F8));
+pub static COM1: Mutex<Serial> = Mutex::new(Serial::new(0x3F8));
+pub static COM2: Mutex<Serial> = Mutex::new(Serial::new(0x2F8));
+
+pub fn init() {
+    assert_has_not_been_called!("serial::init must be called only once");
+
+    COM1.lock().init();
+    COM2.lock().init();
+    use consts::irq::*;
+    use arch::interrupt::enable_irq;
+    enable_irq(IRQ_COM1);
+    enable_irq(IRQ_COM2);
+}
 
 #[allow(dead_code)]
 pub struct SerialPort<T: Io<Value = u8>> {

@@ -34,18 +34,27 @@ pub extern "x86-interrupt" fn keyboard_handler(
     ack(IRQ_KBD);
 }
 
-pub extern "x86-interrupt" fn serial_handler(
+pub extern "x86-interrupt" fn com1_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
-    use arch::driver::serial::SERIAL;
-    println!("\nInterupt: Serial \n{:#?}", stack_frame);
-    SERIAL.lock().receive();
+    use arch::driver::serial::COM1;
+    println!("\nInterupt: COM1");
+    COM1.lock().receive();
     ack(IRQ_COM1);
+}
+
+pub extern "x86-interrupt" fn com2_handler(
+    stack_frame: &mut ExceptionStackFrame)
+{
+    use arch::driver::serial::COM2;
+    println!("\nInterupt: COM2");
+    COM2.lock().receive();
+    ack(IRQ_COM2);
 }
 
 pub extern "x86-interrupt" fn timer_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
-    println!("\nInterupt: Timer \n{:#?}", stack_frame);
+//    println!("\nInterupt: Timer \n{:#?}", stack_frame);
     ack(IRQ_TIMER);    
 }

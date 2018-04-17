@@ -4,10 +4,13 @@ pub mod apic;
 pub mod mp;
 pub mod serial;
 pub mod pic;
-pub mod console;
+pub mod keyboard;
 
 pub fn init<F>(mut page_map: F)
     where F: FnMut(usize) {
+
+    assert_has_not_been_called!();
+
     // TODO Handle this temp page map.
     page_map(0); // EBDA
     for addr in (0xE0000 .. 0x100000).step_by(0x1000) {
@@ -28,6 +31,6 @@ pub fn init<F>(mut page_map: F)
     } else {
         pic::init();
     }
-    serial::SERIAL.lock().init();
-    console::init();
+    serial::init();
+    keyboard::init();
 }
