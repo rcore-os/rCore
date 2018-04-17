@@ -55,9 +55,17 @@ pub extern "x86-interrupt" fn com2_handler(
     ack(IRQ_COM2);
 }
 
+use spin::Mutex;
+static TICK: Mutex<usize> = Mutex::new(0);
+
 pub extern "x86-interrupt" fn timer_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
-//    println!("\nInterupt: Timer \n{:#?}", stack_frame);
+    let mut tick = TICK.lock();
+    *tick += 1;
+    let tick = *tick;
+    if tick % 100 == 0 {
+        println!("\nInterupt: Timer\ntick = {}", tick);
+    }
     ack(IRQ_TIMER);    
 }

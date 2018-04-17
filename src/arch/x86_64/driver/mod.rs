@@ -5,6 +5,7 @@ pub mod mp;
 pub mod serial;
 pub mod pic;
 pub mod keyboard;
+pub mod pit;
 
 pub fn init<F>(mut page_map: F)
     where F: FnMut(usize) {
@@ -31,6 +32,7 @@ pub fn init<F>(mut page_map: F)
     } else {
         pic::init();
     }
+    pit::init();
     serial::init();
     keyboard::init();
 }
