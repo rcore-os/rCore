@@ -84,7 +84,7 @@ impl<T: Io<Value = u8>> SerialPort<T> {
     }
 
     pub fn receive(&mut self) {
-        while self.line_sts().contains(INPUT_FULL) {
+        while self.line_sts().contains(LineStsFlags::INPUT_FULL) {
             let data = self.data.read();
             write!(self, "serial receive {}", data);
             // TODO handle received data
@@ -92,7 +92,7 @@ impl<T: Io<Value = u8>> SerialPort<T> {
     }
 
     fn wait(&self) {
-        while ! self.line_sts().contains(OUTPUT_EMPTY) {}
+        while ! self.line_sts().contains(LineStsFlags::OUTPUT_EMPTY) {}
     }
 
     pub fn send(&mut self, data: u8) {
@@ -124,21 +124,21 @@ impl<T: Io<Value = u8>> Write for SerialPort<T> {
 
 bitflags! {
     /// Interrupt enable flags
-    flags IntEnFlags: u8 {
-        const RECEIVED = 1,
-        const SENT = 1 << 1,
-        const ERRORED = 1 << 2,
-        const STATUS_CHANGE = 1 << 3,
+    struct IntEnFlags: u8 {
+        const RECEIVED      = 1 << 0;
+        const SENT          = 1 << 1;
+        const ERRORED       = 1 << 2;
+        const STATUS_CHANGE = 1 << 3;
         // 4 to 7 are unused
     }
 }
 
 bitflags! {
     /// Line status flags
-    flags LineStsFlags: u8 {
-        const INPUT_FULL = 1,
+    struct LineStsFlags: u8 {
+        const INPUT_FULL    = 1 << 0;
         // 1 to 4 unknown
-        const OUTPUT_EMPTY = 1 << 5,
+        const OUTPUT_EMPTY  = 1 << 5;
         // 6 and 7 unknown
     }
 }

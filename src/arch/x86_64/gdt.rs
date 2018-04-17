@@ -107,18 +107,13 @@ pub enum Descriptor {
 }
 
 impl Descriptor {
-    pub fn kernel_code_segment() -> Descriptor {
-        let flags = USER_SEGMENT | PRESENT | EXECUTABLE | LONG_MODE;
-        Descriptor::UserSegment(flags.bits())
-    }
-
     pub fn tss_segment(tss: &'static TaskStateSegment) -> Descriptor {
         use core::mem::size_of;
         use bit_field::BitField;
 
         let ptr = tss as *const _ as u64;
 
-        let mut low = PRESENT.bits();
+        let mut low = DescriptorFlags::PRESENT.bits();
         // base
         low.set_bits(16..40, ptr.get_bits(0..24));
         low.set_bits(56..64, ptr.get_bits(24..32));
@@ -136,16 +131,16 @@ impl Descriptor {
 
 bitflags! {
     /// Reference: https://wiki.osdev.org/GDT
-    flags DescriptorFlags: u64 {
-        const ACCESSED          = 1 << 40,
-        const DATA_WRITABLE     = 1 << 41,
-        const CODE_READABLE     = 1 << 41,
-        const CONFORMING        = 1 << 42,
-        const EXECUTABLE        = 1 << 43,
-        const USER_SEGMENT      = 1 << 44,
-        const USER_MODE         = 1 << 45 | 1 << 46,
-        const PRESENT           = 1 << 47,
-        const LONG_MODE         = 1 << 53,
+    struct DescriptorFlags: u64 {
+        const ACCESSED          = 1 << 40;
+        const DATA_WRITABLE     = 1 << 41;
+        const CODE_READABLE     = 1 << 41;
+        const CONFORMING        = 1 << 42;
+        const EXECUTABLE        = 1 << 43;
+        const USER_SEGMENT      = 1 << 44;
+        const USER_MODE         = 1 << 45 | 1 << 46;
+        const PRESENT           = 1 << 47;
+        const LONG_MODE         = 1 << 53;
     }
 }
 

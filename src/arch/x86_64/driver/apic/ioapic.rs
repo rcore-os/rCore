@@ -12,12 +12,12 @@ use spin::Mutex;
 pub fn init(ioapic_id: u8)
 {
 	let mut ioapic = IOAPIC.lock();
-	assert!(ioapic.id() == ioapic_id, "ioapic.init: id isn't equal to ioapicid; not a MP");
+	assert_eq!(ioapic.id(), ioapic_id, "ioapic.init: id isn't equal to ioapicid; not a MP");
 
 	// Mark all interrupts edge-triggered, active high, disabled,
 	// and not routed to any CPUs.
 	for i in 0.. ioapic.maxintr() + 1 {
-		ioapic.write_irq(i, DISABLED, 0);
+		ioapic.write_irq(i, RedirectionEntry::DISABLED, 0);
 	}
 	debug!("ioapic: init end");
 }
@@ -35,12 +35,12 @@ const REG_TABLE  : u8 = 0x10;  // Redirection table base
 // CPUs can serve that interrupt.
 
 bitflags! {
-	flags RedirectionEntry: u32 {
-		const DISABLED  = 0x00010000,  // Interrupt disabled
-		const LEVEL     = 0x00008000,  // Level-triggered (vs edge-)
-		const ACTIVELOW = 0x00002000,  // Active low (vs high)
-		const LOGICAL   = 0x00000800,  // Destination is CPU id (vs APIC ID)
-		const NONE		= 0x00000000,
+	struct RedirectionEntry: u32 {
+		const DISABLED  = 0x00010000;  // Interrupt disabled
+		const LEVEL     = 0x00008000;  // Level-triggered (vs edge-)
+		const ACTIVELOW = 0x00002000;  // Active low (vs high)
+		const LOGICAL   = 0x00000800;  // Destination is CPU id (vs APIC ID)
+		const NONE		= 0x00000000;
 	}
 }
 
@@ -85,7 +85,7 @@ impl IoApic {
 		// Mark interrupt edge-triggered, active high,
 		// enabled, and routed to the given cpunum,
 		// which happens to be that cpu's APIC ID.
-		self.write_irq(irq, NONE, cpunum);
+		self.write_irq(irq, RedirectionEntry::NONE, cpunum);
 	}
 	fn id(&mut self) -> u8 {
 		self.read(REG_ID).get_bits(24..28) as u8

@@ -1,4 +1,4 @@
-use memory::paging::{self, Page, PageIter, ActivePageTable};
+use memory::paging::{Page, PageIter, ActivePageTable, EntryFlags};
 use memory::{PAGE_SIZE, FrameAllocator};
 
 pub struct StackAllocator {
@@ -42,7 +42,7 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 for page in Page::range_inclusive(start, end) {
-                    active_table.map(page, paging::WRITABLE, frame_allocator);
+                    active_table.map(page, EntryFlags::WRITABLE, frame_allocator);
                 }
 
                 // create a new stack

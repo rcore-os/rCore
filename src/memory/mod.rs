@@ -7,7 +7,7 @@ pub use self::frame::*;
 use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
 use arch::paging;
-
+use arch::paging::EntryFlags;
 mod area_frame_allocator;
 pub mod heap_allocator;
 mod stack_allocator;
@@ -55,7 +55,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let heap_end_page = Page::containing_address(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE-1);
 
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, paging::WRITABLE, &mut frame_allocator);
+        active_table.map(page, EntryFlags::WRITABLE, &mut frame_allocator);
     }
 
     let stack_allocator = {
@@ -119,13 +119,13 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 
         // identity map the VGA text buffer
         let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
+        mapper.identity_map(vga_buffer_frame, EntryFlags::WRITABLE, allocator);
 
         // identity map the multiboot info structure
         let multiboot_start = Frame::containing_address(boot_info.start_address());
         let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
         for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
-            mapper.identity_map(frame, PRESENT, allocator);
+            mapper.identity_map(frame, EntryFlags::PRESENT, allocator);
         }
     });
 
@@ -160,9 +160,8 @@ impl MemoryController {
                                     size_in_pages)
     }
     pub fn map_page_identity(&mut self, addr: usize) {
-        use self::paging::{WRITABLE};        
         let frame = Frame::containing_address(addr);
-        let flags = WRITABLE;
+        let flags = EntryFlags::WRITABLE;
         self.active_table.identity_map(frame, flags, &mut self.frame_allocator);
     }
     pub fn print_page_table(&self) {
