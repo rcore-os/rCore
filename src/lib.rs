@@ -69,8 +69,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test!(guard_page);
     test!(find_mp);
 
-    arch::driver::init(|addr: usize| memory_controller.map_page_identity(addr));
+    let acpi = arch::driver::init(
+        |addr: usize| memory_controller.map_page_identity(addr));
     // memory_controller.print_page_table();
+    arch::smp::start_other_cores(&acpi, &mut memory_controller);
 
     unsafe{ arch::interrupt::enable(); }
     loop{}

@@ -1,5 +1,5 @@
 pub use self::ioapic::IOAPIC;
-pub use self::lapic::ack;
+pub use self::lapic::{ack, start_ap};
 
 mod lapic;
 mod ioapic;

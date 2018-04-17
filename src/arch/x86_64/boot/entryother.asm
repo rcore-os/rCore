@@ -27,11 +27,14 @@
 %define STA_R       0x2     ; Readable (executable segments)
 %define STA_A       0x1     ; Accessed
 
-global otherstart
+global entryother_start
+global entryother_end
+
+entryother_start:
 
 section .text
 bits 16
-otherstart:
+start:
   cli
 
   xor    ax, ax
@@ -62,9 +65,9 @@ start32:
   mov    ebx, 1
 
   ; Switch to the stack allocated by startothers()
-  mov    esp, [otherstart-4]
+  mov    esp, [start-4]
   ; Call mpenter()
-  call	 [otherstart-8]
+  call	 [start-8]
 
   mov    ax, 0x8a00
   mov    dx, ax
@@ -74,10 +77,7 @@ start32:
 spin:
   jmp    spin
 
-section .bss
-  resb 4096
-
-section .rodata
+; section .rodata
 align 4
 gdt:
   ; NULL
@@ -92,3 +92,5 @@ gdt:
 .desc:
   dw   ($ - gdt - 1)
   dq   gdt
+
+entryother_end:

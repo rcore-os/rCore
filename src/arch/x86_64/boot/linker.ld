@@ -6,23 +6,6 @@ KERNEL_OFFSET = 0xffffff0000000000;
 
 SECTIONS {
 
-  . = OTHER_OFFSET - 0x1000;
-  .bss.other :
-  {
-    KEEP(*/entryother.o (.bss))
-    . = ALIGN(4K);
-  }
-  .text.other :
-  {
-    KEEP(*/entryother.o (.text))
-    . = ALIGN(4K);
-  }
-  .rodata.other :
-  {
-    KEEP(*/entryother.o (.rodata))
-    . = ALIGN(4K);
-  }
-
   . = BOOT_OFFSET;
 
   .rodata.32 :
@@ -43,6 +26,17 @@ SECTIONS {
     */boot.o (.bss)
     . = ALIGN(4K);
   }
+
+  /* bootloader for other processors */
+
+  real = .;                     /* backup va */
+  . = OTHER_OFFSET;
+  .text.other : AT(real)
+  {
+    KEEP(*/entryother.o (.text))
+    . = ALIGN(4K);
+  }
+  . = . - OTHER_OFFSET + real;  /* recover va */
 
   . += KERNEL_OFFSET;
 

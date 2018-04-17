@@ -164,6 +164,12 @@ impl MemoryController {
         let flags = EntryFlags::WRITABLE;
         self.active_table.identity_map(frame, flags, &mut self.frame_allocator);
     }
+    pub fn map_page_p2v(&mut self, addr: PhysicalAddress) {
+        let page = Page::containing_address(addr.to_kernel_virtual());
+        let frame = Frame::containing_address(addr.get());
+        let flags = EntryFlags::WRITABLE;
+        self.active_table.map_to(page, frame, flags, &mut self.frame_allocator);
+    }
     pub fn print_page_table(&self) {
         debug!("{:?}", self.active_table);
     }

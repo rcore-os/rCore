@@ -4,6 +4,7 @@ pub mod interrupt;
 pub mod paging;
 pub mod gdt;
 pub mod idt;
+pub mod smp;
 
 pub fn init() {
 	cpu::enable_nxe_bit();

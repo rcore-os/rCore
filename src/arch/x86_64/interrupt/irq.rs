@@ -16,7 +16,9 @@ pub extern "x86-interrupt" fn double_fault_handler(
 pub extern "x86-interrupt" fn page_fault_handler(
     stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode)
 {
-    println!("\nEXCEPTION: PAGE FAULT\n{:#?}\n{:#?}", stack_frame, error_code);
+    use x86_64::registers::control_regs::cr2;
+    println!("\nEXCEPTION: PAGE FAULT\n{:#?}\nErrorCode: {:#?}\nAddress: {:#x}",
+             stack_frame, error_code, cr2());
     loop {}
 }
 
