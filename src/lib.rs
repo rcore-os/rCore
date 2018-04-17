@@ -8,6 +8,7 @@
 #![feature(global_allocator)]
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]
+#![feature(unboxed_closures)]
 #![no_std]
 
 
@@ -68,26 +69,11 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test!(guard_page);
     test!(find_mp);
 
-    // TODO Handle this temp page map.
-    memory_controller.map_page_identity(0); // EBDA
-    for addr in (0xE0000 .. 0x100000).step_by(0x1000) {
-        memory_controller.map_page_identity(addr);
-    }
-    memory_controller.map_page_identity(0x7fe1000); // RSDT
-    memory_controller.print_page_table();
-    let acpi = arch::driver::acpi::init().expect("Failed to init ACPI");
-    debug!("{:?}", acpi);
+    arch::driver::init(|addr: usize| memory_controller.map_page_identity(addr));
+    // memory_controller.print_page_table();
 
-    if cfg!(feature = "use_apic") {
-        arch::driver::pic::disable(); 
-
-        memory_controller.map_page_identity(acpi.lapic_addr as usize);  // LAPIC
-        memory_controller.map_page_identity(0xFEC00000);  // IOAPIC
-        arch::driver::apic::init(acpi.lapic_addr, acpi.ioapic_id);
-    } else {
-        arch::driver::pic::init();
-    }
     unsafe{ arch::interrupt::enable(); }
+    loop{}
 
     test_end!();
 }
