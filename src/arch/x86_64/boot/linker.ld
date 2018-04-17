@@ -1,9 +1,28 @@
 ENTRY(start)
 
+OTHER_OFFSET = 0x7000;
 BOOT_OFFSET = 0x100000;
 KERNEL_OFFSET = 0xffffff0000000000;
 
 SECTIONS {
+
+  . = OTHER_OFFSET - 0x1000;
+  .bss.other :
+  {
+    KEEP(*/entryother.o (.bss))
+    . = ALIGN(4K);
+  }
+  .text.other :
+  {
+    KEEP(*/entryother.o (.text))
+    . = ALIGN(4K);
+  }
+  .rodata.other :
+  {
+    KEEP(*/entryother.o (.rodata))
+    . = ALIGN(4K);
+  }
+
   . = BOOT_OFFSET;
 
   .rodata.32 :

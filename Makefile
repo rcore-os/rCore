@@ -14,20 +14,20 @@ qemu_opts := -cdrom $(iso) -smp 2 -serial mon:stdio
 features := use_apic
 
 ifdef travis
-	test := 1
-	features := $(features) qemu_auto_exit
+test := 1
+features := $(features) qemu_auto_exit
 endif
 
 ifdef test
-	features := $(features) test
-	# enable shutdown inside the qemu 
-	qemu_opts := $(qemu_opts) -device isa-debug-exit 
+features := $(features) test
+# enable shutdown inside the qemu
+qemu_opts := $(qemu_opts) -device isa-debug-exit
 endif
 
 ifeq ($(shell uname), Linux)
-	prefix :=
+prefix :=
 else
-	prefix := x86_64-elf-
+prefix := x86_64-elf-
 endif
 
 ld := $(prefix)ld
