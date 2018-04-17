@@ -37,7 +37,9 @@ pub extern "x86-interrupt" fn keyboard_handler(
 pub extern "x86-interrupt" fn serial_handler(
     stack_frame: &mut ExceptionStackFrame)
 {
+    use arch::driver::serial::SERIAL;
     println!("\nInterupt: Serial \n{:#?}", stack_frame);
+    SERIAL.lock().receive();
     ack(IRQ_COM1);
 }
 

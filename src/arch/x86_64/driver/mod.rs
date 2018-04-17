@@ -28,5 +28,6 @@ pub fn init<F>(mut page_map: F)
     } else {
         pic::init();
     }
+    serial::SERIAL.lock().init();
     console::init();
 }
