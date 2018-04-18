@@ -1,4 +1,5 @@
 global start
+global stack_bottom
 extern long_mode_start
 
 section .text
@@ -158,7 +159,7 @@ p3_table:
 p2_table:
     resb 4096
 stack_bottom:
-    resb 4096 * 4
+    resb 4096 * 8
 stack_top:
 
 section .rodata

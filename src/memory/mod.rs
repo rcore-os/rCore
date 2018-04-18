@@ -132,15 +132,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
     let old_table = active_table.switch(new_table);
     println!("NEW TABLE!!!");
 
-    // turn the old p4 page into a guard page
-    let old_table_p4_frame = unsafe {
-        &*(&old_table as *const InactivePageTable as *const Frame)
-    };
-    let old_p4_page = Page::containing_address(
-        old_table_p4_frame.start_address().to_kernel_virtual()
-    );
-    active_table.unmap(old_p4_page, allocator);
-    println!("guard page at {:#x}", old_p4_page.start_address());
+    // turn the stack bottom into a guard page
+    extern { fn stack_bottom(); }
+    let stack_bottom = PhysicalAddress(stack_bottom as u64).to_kernel_virtual();
+    let stack_bottom_page = Page::containing_address(stack_bottom);
+    active_table.unmap(stack_bottom_page, allocator);
+    println!("guard page at {:#x}", stack_bottom_page.start_address());
 
     active_table
 }

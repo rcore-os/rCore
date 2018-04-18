@@ -27,67 +27,113 @@
 %define STA_R       0x2     ; Readable (executable segments)
 %define STA_A       0x1     ; Accessed
 
+extern other_main
+
 section .text
 bits 16
 start:
-  cli
+    cli
 
-  xor    ax, ax
-  mov    ds, ax
-  mov    es, ax
-  mov    ss, ax
+    xor     ax, ax
+    mov     ds, ax
+    mov     es, ax
+    mov     ss, ax
 
-  lgdt   [gdt.desc]
-  mov    eax, cr0
-  or     eax, CR0_PE
-  mov    cr0, eax
+    lgdt    [gdt.desc]
+    mov     eax, cr0
+    or      eax, CR0_PE
+    mov     cr0, eax
 
-;PAGEBREAK!
-  jmp    gdt.kcode: start32
+    jmp     gdt.code: start32
 
 bits 32
 start32:
-  mov    ax, gdt.kdata
-  mov    ds, ax
-  mov    es, ax
-  mov    ss, ax
-  mov    ax, 0
-  mov    fs, ax
-  mov    gs, ax
+    mov     ax, gdt.data
+    mov     ds, ax
+    mov     es, ax
+    mov     ss, ax
+    mov     ax, 0
+    mov     fs, ax
+    mov     gs, ax
 
-  ; debug
-  mov dword [0xb8000], 0x2f4b2f4f
-  hlt
+    ; Switch to the stack allocated by startothers()
+    mov     esp, [start-4]
 
-  ; defer paging until we switch to 64bit mode
-  ; set ebx=1 so shared boot code knows we're booting a secondary core
-  mov    ebx, 1
+    call    enable_paging
 
-  ; Switch to the stack allocated by startothers()
-  mov    esp, [start-4]
-  ; Call mpenter()
-  call	 [start-8]
+    ; load the 64-bit GDT
+    lgdt    [gdt64.pointer]
 
-  mov    ax, 0x8a00
-  mov    dx, ax
-  out    dx, ax
-  mov    ax, 0x8ae0
-  out    dx, ax
+    jmp     gdt64.code: start64
+
+error:
+    mov     ax, 0x8a00
+    mov     dx, ax
+    out     dx, ax
+    mov     ax, 0x8ae0
+    out     dx, ax
 spin:
-  jmp    spin
+    jmp     spin
+
+enable_paging:
+    ; load P4 to cr3 register (cpu uses this to access the P4 table)
+    mov     eax, [start-8]
+    mov     cr3, eax
+
+    ; enable PAE-flag in cr4 (Physical Address Extension)
+    mov     eax, cr4
+    or      eax, 1 << 5
+    mov     cr4, eax
+
+    ; set the long mode bit in the EFER MSR (model specific register)
+    mov     ecx, 0xC0000080
+    rdmsr
+    or      eax, 1 << 8
+    wrmsr
+
+    ; enable paging in the cr0 register
+    mov     eax, cr0
+    or      eax, 1 << 31
+    mov     cr0, eax
+
+    ret
+
+bits 64
+start64:
+    ; load 0 into all data segment registers
+    mov     ax, 0
+    mov     ss, ax
+    mov     ds, ax
+    mov     es, ax
+    mov     fs, ax
+    mov     gs, ax
+
+    ; obtain kstack from data block before entryother
+    mov     rsp, [0x7000 - 16]
+
+    mov     rax, other_main
+    call    rax
 
 ; section .rodata
 align 4
 gdt:
-  ; NULL
-  dw    0, 0
-  db    0, 0, 0, 0
-.kcode: equ $ - gdt
-  dw    0xffff, 0
-  db    0, (0x90 | STA_X | STA_R), 0xcf, 0
-.kdata: equ $ - gdt
-  dw    0xffff, 0
-  db    0, (0x90 | STA_W), 0xcf, 0
+    ; NULL
+    dw  0, 0
+    db  0, 0, 0, 0
+.code: equ $ - gdt
+    dw  0xffff, 0
+    db  0, (0x90 | STA_X | STA_R), 0xcf, 0
+.data: equ $ - gdt
+    dw  0xffff, 0
+    db  0, (0x90 | STA_W), 0xcf, 0
 .desc:
-  dw   ($ - gdt - 1)
-  dq   gdt
+    dw  $ - gdt - 1
+    dq  gdt
+
+gdt64:
+    dq  0 ; zero entry
+.code: equ $ - gdt64 ; new
+    dq  (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
+.pointer:
+    dw  $ - gdt64 - 1
+    dq  gdt64

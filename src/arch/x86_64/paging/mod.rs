@@ -151,8 +151,6 @@ impl ActivePageTable {
 }
 
 pub struct InactivePageTable {
-    // WARNING: Don't change the struct. 
-    //          memory mod use the private p4_frame.
     p4_frame: Frame,
 }
 

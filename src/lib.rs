@@ -80,6 +80,15 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     test_end!();
 }
 
+#[no_mangle]
+pub extern "C" fn other_main() {
+    // print OK
+    unsafe{ *(0xb8000 as *mut u32) = 0x2f4b2f4f; }
+    loop {}
+    // FIXME: Page Fault
+    println!("Hello world! from AP!");
+}
+
 use linked_list_allocator::LockedHeap;
 
 #[global_allocator]
