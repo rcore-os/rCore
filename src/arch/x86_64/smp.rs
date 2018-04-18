@@ -20,12 +20,11 @@ pub fn start_other_cores(acpi: &ACPI_Result, mc: &mut MemoryController) {
     for i in 1 .. acpi.cpu_num {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
         *args = EntryArgs {
-            kstack: mc.alloc_stack(1).unwrap().top() as u64,
+            kstack: mc.alloc_stack(7).unwrap().top() as u64,
             page_table: page_table,
             stack: 0x8000, // just enough stack to get us to entry64mp
         };
         start_ap(apic_id, ENTRYOTHER_ADDR);
-        loop{}
     }
 
 }
@@ -35,6 +34,7 @@ fn copy_entryother() {
     let entryother_start = entryother_start as usize;
     let entryother_end = entryother_end as usize;
     let size = entryother_end - entryother_start;
+    assert!(size <= 0x1000, "entryother code is too large, not supported.");
     unsafe{ memmove(ENTRYOTHER_ADDR as *mut u8, entryother_start as *mut u8, size); }
     debug!("smp: copied entryother code to 0x7000");
 }

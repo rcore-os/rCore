@@ -46,23 +46,22 @@ mod arch;
 
 // The entry point of Rust kernel
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
+    arch::cpu::init();
+
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
-    arch::init();
 
     // set up guard page and map the heap pages
     let mut memory_controller = memory::init(boot_info);    
     unsafe {
         use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-        HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE);
+        HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE);
     }
 
-    let double_fault_stack = memory_controller.alloc_stack(1)
-        .expect("could not allocate double fault stack");
-    arch::gdt::init(double_fault_stack.top());
+    arch::gdt::init();
     arch::idt::init();
 
     test!(global_allocator);
@@ -78,15 +77,17 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     loop{}
 
     test_end!();
+    unreachable!();
 }
 
 #[no_mangle]
-pub extern "C" fn other_main() {
-    // print OK
-    unsafe{ *(0xb8000 as *mut u32) = 0x2f4b2f4f; }
-    loop {}
-    // FIXME: Page Fault
+pub extern "C" fn other_main() -> ! {
+    arch::cpu::init();
+    arch::gdt::init();
+    arch::idt::init();
     println!("Hello world! from AP!");
+    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
+    loop {}
 }
 
 use linked_list_allocator::LockedHeap;

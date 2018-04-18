@@ -1,10 +1,10 @@
 use x86_64::structures::idt::Idt;
 use spin::Once;
+use alloc::boxed::Box;
 
-static IDT: Once<Idt> = Once::new();
-
+/// Alloc IDT at kernel heap, then init and load it.
 pub fn init() {
-    let idt = IDT.call_once(|| {
+    let idt = Box::new({
         use arch::interrupt::irq::*;
         use consts::irq::*;
 		use arch::gdt::DOUBLE_FAULT_IST_INDEX;
@@ -22,6 +22,7 @@ pub fn init() {
         }
         idt
     });
+    let idt = unsafe{ &*Box::into_raw(idt) };
 
     idt.load();
 }

@@ -1,3 +1,8 @@
+pub fn init() {
+    enable_nxe_bit();
+    enable_write_protect_bit();
+}
+
 /// Enable 'No-Execute' bit in page entry
 pub fn enable_nxe_bit() {
     use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
@@ -26,7 +31,7 @@ pub fn enable_write_protect_bit() {
 /// The error code is `value written to 0x501` *2 +1, so it should be odd
 pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
     use x86_64::instructions::port::outb;
-    assert!(error_code & 1 == 1);
+    assert_eq!(error_code & 1, 1, "error code should be odd");
     outb(0x501, (error_code - 1) / 2);
     unreachable!()
 }

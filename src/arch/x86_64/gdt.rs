@@ -4,25 +4,33 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::{PrivilegeLevel, VirtualAddress};
 use spin::Once;
+use alloc::boxed::Box;
 
-static TSS: Once<TaskStateSegment> = Once::new();
-static GDT: Once<Gdt> = Once::new();
-
-pub fn init(double_fault_stack_top: usize) {
+/// Alloc TSS & GDT at kernel heap, then init and load it.
+/// The double fault stack will be allocated at kernel heap too.
+pub fn init() {
     use x86_64::structures::gdt::SegmentSelector;
     use x86_64::instructions::segmentation::set_cs;
     use x86_64::instructions::tables::load_tss;
 
-    let tss = TSS.call_once(|| {
+    struct DoubleFaultStack {
+        space: [u8; 4096]
+    }
+    let double_fault_stack_top = Box::into_raw(Box::new(
+        DoubleFaultStack{space: [0; 4096]}
+    )) as usize + 4096;
+
+    let mut tss = Box::new({
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX]
             = VirtualAddress(double_fault_stack_top);
         tss
     });
+    let tss = unsafe{ &*Box::into_raw(tss) };
 
     let mut code_selector = SegmentSelector(0);
     let mut tss_selector = SegmentSelector(0);
-    let gdt = GDT.call_once(|| {
+    let gdt = Box::new({
         let mut gdt = Gdt::new();
         gdt.add_entry(GNULL);
         code_selector = 
@@ -33,6 +41,7 @@ pub fn init(double_fault_stack_top: usize) {
         tss_selector = gdt.add_entry(Descriptor::tss_segment(&tss));
         gdt
     });
+    let gdt = unsafe{ &*Box::into_raw(gdt) };
     gdt.load();
 
     unsafe {
