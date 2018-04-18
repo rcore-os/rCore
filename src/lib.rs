@@ -9,6 +9,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]
 #![feature(unboxed_closures)]
+#![feature(asm)]
 #![no_std]
 
 
@@ -21,6 +22,7 @@ extern crate spin;
 extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
 extern crate x86_64;
 #[macro_use]
 extern crate once;
@@ -74,6 +76,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::smp::start_other_cores(&acpi, &mut memory_controller);
 
     unsafe{ arch::interrupt::enable(); }
+
+    unsafe{ int!(120); } // to user
+
     loop{}
 
     test_end!();

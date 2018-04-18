@@ -22,6 +22,12 @@ pub extern "x86-interrupt" fn page_fault_handler(
     loop {}
 }
 
+pub extern "x86-interrupt" fn general_protection_fault_handler(
+    stack_frame: &mut ExceptionStackFrame, error_code: u64)
+{
+    println!("\nEXCEPTION: General Protection Fault\n{:#?}\nErrorCode: {:#x}", stack_frame, error_code);
+}
+
 #[cfg(feature = "use_apic")]
 use arch::driver::apic::ack;
 #[cfg(not(feature = "use_apic"))]
@@ -70,4 +76,26 @@ pub extern "x86-interrupt" fn timer_handler(
         println!("\nInterupt: Timer\ntick = {}", tick);
     }
     ack(IRQ_TIMER);    
+}
+
+pub extern "x86-interrupt" fn to_user_handler(
+    stack_frame: &mut ExceptionStackFrame)
+{
+    println!("\nInterupt: To User");
+    stack_frame.code_segment = 16;
+    stack_frame.stack_segment = 32;
+}
+
+pub extern "x86-interrupt" fn to_kernel_handler(
+    stack_frame: &mut ExceptionStackFrame)
+{
+    println!("\nInterupt: To Kernel");
+    stack_frame.code_segment = 8;
+    stack_frame.stack_segment = 24;
+}
+
+pub extern "x86-interrupt" fn syscall_handler(
+    stack_frame: &mut ExceptionStackFrame)
+{
+    println!("\nInterupt: Syscall");
 }

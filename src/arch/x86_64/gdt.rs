@@ -32,8 +32,7 @@ pub fn init() {
     let mut tss_selector = SegmentSelector(0);
     let gdt = Box::new({
         let mut gdt = Gdt::new();
-        gdt.add_entry(GNULL);
-        code_selector = 
+        code_selector =
         gdt.add_entry(KCODE);
         gdt.add_entry(UCODE);
         gdt.add_entry(KDATA);
@@ -55,7 +54,6 @@ pub fn init() {
 pub const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 // Copied from xv6 x86_64
-const GNULL: Descriptor = Descriptor::UserSegment(0);
 const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000);  // EXECUTABLE | USER_SEGMENT | PRESENT | LONG_MODE
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000);  // DATA_WRITABLE | USER_SEGMENT | PRESENT
