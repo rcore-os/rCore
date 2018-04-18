@@ -25,8 +25,8 @@ pub fn start_other_cores(acpi: &ACPI_Result, mc: &mut MemoryController) {
             stack: 0x8000, // just enough stack to get us to entry64mp
         };
         start_ap(apic_id, ENTRYOTHER_ADDR);
+        while unsafe{ !STARTED[i as usize] } {}
     }
-
 }
 
 fn copy_entryother() {
@@ -44,4 +44,11 @@ struct EntryArgs {
     kstack: u64,
     page_table: u32,
     stack: u32,
+}
+
+use consts::MAX_CPU_NUM;
+static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
+
+pub unsafe fn notify_started(cpu_id: u8) {
+    STARTED[cpu_id as usize] = true;
 }
