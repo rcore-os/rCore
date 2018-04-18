@@ -27,11 +27,6 @@
 %define STA_R       0x2     ; Readable (executable segments)
 %define STA_A       0x1     ; Accessed
 
-global entryother_start
-global entryother_end
-
-entryother_start:
-
 section .text
 bits 16
 start:
@@ -59,6 +54,10 @@ start32:
   mov    ax, 0
   mov    fs, ax
   mov    gs, ax
+
+  ; debug
+  mov dword [0xb8000], 0x2f4b2f4f
+  hlt
 
   ; defer paging until we switch to 64bit mode
   ; set ebx=1 so shared boot code knows we're booting a secondary core
@@ -92,5 +91,3 @@ gdt:
 .desc:
   dw   ($ - gdt - 1)
   dq   gdt
-
-entryother_end:

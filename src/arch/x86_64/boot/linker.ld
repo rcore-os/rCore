@@ -29,14 +29,15 @@ SECTIONS {
 
   /* bootloader for other processors */
 
-  real = .;                     /* backup va */
+  entryother_start = .;         /* backup va */
   . = OTHER_OFFSET;
-  .text.other : AT(real)
+  .text.other : AT(entryother_start)
   {
     KEEP(*/entryother.o (.text))
     . = ALIGN(4K);
   }
-  . = . - OTHER_OFFSET + real;  /* recover va */
+  entryother_end = . - OTHER_OFFSET + entryother_start;
+  . = entryother_end;           /* recover va */
 
   . += KERNEL_OFFSET;
 
