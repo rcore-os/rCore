@@ -85,7 +85,9 @@ pub extern "C" fn other_main() -> ! {
     arch::cpu::init();
     arch::gdt::init();
     arch::idt::init();
-    println!("Hello world! from AP!");
+    arch::driver::apic::other_init();
+    // FIXME: deadlock!
+    println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
     unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }
