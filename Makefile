@@ -26,9 +26,9 @@ endif
 
 
 ifeq ($(OS),Windows_NT)
-	uname := Win32
+uname := Win32
 else
-	uname := $(shell uname)
+uname := $(shell uname)
 endif
 
 ifeq ($(uname), Linux)
@@ -82,13 +82,13 @@ docker_image ?= blog_os
 tag ?= 0.1
 pwd ?= $(realpath ./)
 ifeq ($(OS),Windows_NT)
-	uid ?= 0
-	gid ?= 0
-	innerpwd ?= /root/blog_os
+uid ?= 0
+gid ?= 0
+innerpwd ?= /root/blog_os
 else
-	uid ?= $(shell id -u)
-	gid ?= $(shell id -g)
-	innerpwd ?= pwd
+uid ?= $(shell id -u)
+gid ?= $(shell id -g)
+innerpwd ?= pwd
 endif
 docker_cargo_volume ?=  blogos-$(uid)-$(gid)-cargo
 docker_rustup_volume ?=  blogos-$(uid)-$(gid)-rustup
