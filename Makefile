@@ -24,7 +24,14 @@ features := $(features) test
 qemu_opts := $(qemu_opts) -device isa-debug-exit
 endif
 
-ifeq ($(shell uname), Linux)
+
+ifeq ($(OS),Windows_NT)
+	uname := Win32
+else
+	uname := $(shell uname)
+endif
+
+ifeq ($(uname), Linux)
 prefix :=
 else
 prefix := x86_64-elf-
@@ -73,24 +80,34 @@ build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
 # used by docker_* targets
 docker_image ?= blog_os
 tag ?= 0.1
-docker_cargo_volume ?=  blogos-$(shell id -u)-$(shell id -g)-cargo
-docker_rustup_volume ?=  blogos-$(shell id -u)-$(shell id -g)-rustup
-docker_args ?= -e LOCAL_UID=$(shell id -u) -e LOCAL_GID=$(shell id -g) -v $(docker_cargo_volume):/usr/local/cargo -v $(docker_rustup_volume):/usr/local/rustup -v $(shell pwd):$(shell pwd) -w $(shell pwd)
+pwd ?= $(realpath ./)
+ifeq ($(OS),Windows_NT)
+	uid ?= 0
+	gid ?= 0
+	innerpwd ?= /root/blog_os
+else
+	uid ?= $(shell id -u)
+	gid ?= $(shell id -g)
+	innerpwd ?= pwd
+endif
+docker_cargo_volume ?=  blogos-$(uid)-$(gid)-cargo
+docker_rustup_volume ?=  blogos-$(uid)-$(gid)-rustup
+docker_args ?= -e LOCAL_UID=$(uid) -e LOCAL_GID=$(gid) -v $(docker_cargo_volume):/usr/local/cargo -v $(docker_rustup_volume):/usr/local/rustup -v $(pwd):$(innerpwd) -w $(innerpwd)
 docker_clean_args ?= $(docker_cargo_volume) $(docker_rustup_volume)
 
-# docker_* targets 
+# docker_* targets
 
 docker_build:
 	@docker build docker/ -t $(docker_image):$(tag)
 
-docker_iso: 
-	@docker run --rm $(docker_args) $(docker_image):$(tag) make iso
+docker_iso:
+	docker run --rm $(docker_args) $(docker_image):$(tag) make iso
 
 docker_run: docker_iso
 	@qemu-system-$(arch) -cdrom $(iso) -s
 
 docker_interactive:
-	@docker run -it --rm $(docker_args) $(docker_image):$(tag) 
+	@docker run -it --rm $(docker_args) $(docker_image):$(tag)
 
 docker_clean:
 	@docker volume rm $(docker_clean_args)
