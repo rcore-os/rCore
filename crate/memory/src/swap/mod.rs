@@ -11,9 +11,9 @@ trait SwapManager<T: PageTable> {
     /// Called when map a swappable page into the memory
     fn push(&mut self, addr: Addr);
     /// Called to delete the addr entry from the swap manager
-    fn pop(&mut self, addr: Addr);
+    fn remove(&mut self, addr: Addr);
     /// Try to swap out a page, return then victim
-    fn swap(&mut self) -> Option<Addr>;
+    fn pop(&mut self) -> Option<Addr>;
 }
 
 trait PageTable {

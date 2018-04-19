@@ -5,10 +5,11 @@ pub struct MockPageTable {
     mapped_set: BTreeSet<Addr>,
     accessed_set: BTreeSet<Addr>,
     dirty_set: BTreeSet<Addr>,
-    pgfault_handler: PgfaultHandler,
+    page_fault_handler: PageFaultHandler,
+    capacity: usize,
 }
 
-type PgfaultHandler = fn(&mut MockPageTable, Addr);
+type PageFaultHandler = fn(&mut MockPageTable, Addr);
 
 impl PageTable for MockPageTable {
     fn accessed(&self, addr: Addr) -> bool {
@@ -20,18 +21,19 @@ impl PageTable for MockPageTable {
 }
 
 impl MockPageTable {
-    pub fn new(pgfault_handler: PgfaultHandler) -> Self {
+    pub fn new(capacity: usize, page_fault_handler: PageFaultHandler) -> Self {
         MockPageTable {
             mapped_set: BTreeSet::<Addr>::new(),
             accessed_set: BTreeSet::<Addr>::new(),
             dirty_set: BTreeSet::<Addr>::new(),
-            pgfault_handler,
+            page_fault_handler,
+            capacity,
         }
     }
     /// Read memory, mark accessed, trigger page fault if not present
     pub fn read(&mut self, addr: Addr) {
         while !self.mapped_set.contains(&addr) {
-            (self.pgfault_handler)(self, addr);
+            (self.page_fault_handler)(self, addr);
         }
         self.accessed_set.insert(addr);
 
@@ -39,14 +41,20 @@ impl MockPageTable {
     /// Write memory, mark accessed and dirty, trigger page fault if not present
     pub fn write(&mut self, addr: Addr) {
         while !self.mapped_set.contains(&addr) {
-            (self.pgfault_handler)(self, addr);
+            (self.page_fault_handler)(self, addr);
         }
         self.accessed_set.insert(addr);
         self.dirty_set.insert(addr);
     }
-    pub fn map(&mut self, addr: Addr) {
+    /// Map a page, return false if no more space
+    pub fn map(&mut self, addr: Addr) -> bool {
+        if self.mapped_set.len() == self.capacity {
+            return false;
+        }
         self.mapped_set.insert(addr);
+        true
     }
+    /// Unmap a page
     pub fn unmap(&mut self, addr: Addr) {
         self.mapped_set.remove(&addr);
     }
@@ -64,11 +72,11 @@ mod test {
 
     #[test]
     fn test() {
-        fn pgfault_handler(pt: &mut MockPageTable, addr: Addr) {
+        fn page_fault_handler(pt: &mut MockPageTable, addr: Addr) {
             unsafe{ PGFAULT_COUNT += 1; }
             pt.map(addr);
         }
-        let mut pt = MockPageTable::new(pgfault_handler);
+        let mut pt = MockPageTable::new(2, page_fault_handler);
 
         pt.map(0);
         pt.read(0);
@@ -80,6 +88,8 @@ mod test {
         assert_pgfault_eq(1);
         assert!(pt.accessed(1));
         assert!(pt.dirty(1));
+
+        assert_eq!(pt.map(2), false);
 
         pt.unmap(0);
         pt.read(0);

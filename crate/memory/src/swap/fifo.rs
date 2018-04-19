@@ -22,14 +22,14 @@ impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
         self.deque.push_back(addr);
     }
 
-    fn pop(&mut self, addr: usize) {
+    fn remove(&mut self, addr: usize) {
         let id = self.deque.iter()
             .position(|&x| x == addr)
             .expect("address not found");
         self.deque.remove(id);
     }
 
-    fn swap(&mut self) -> Option<Addr> {
+    fn pop(&mut self) -> Option<Addr> {
         self.deque.pop_front()
     }
 }
@@ -52,19 +52,20 @@ mod test {
     static mut PAGE: *mut MockPageTable = 0 as *mut _;
     static mut FIFO: *mut FifoSwapManager<MockPageTable> = 0 as *mut _;
 
-    fn pgfault_handler(pt: &mut MockPageTable, addr: Addr) {
+    fn page_fault_handler(pt: &mut MockPageTable, addr: Addr) {
         unsafe{ PGFAULT_COUNT += 1; }
         let fifo = unsafe{ &mut *FIFO };
-        if let Some(x) = fifo.swap() {
-            pt.unmap(x);
+        if !pt.map(addr) {  // is full?
+            pt.unmap(fifo.pop().unwrap());
+            pt.map(addr);
         }
-        pt.map(addr);
+        fifo.push(addr);
     }
 
     #[test]
     fn test() {
         use self::MemOp::{R, W};
-        let mut pt = MockPageTable::new(pgfault_handler);
+        let mut pt = MockPageTable::new(4, page_fault_handler);
         let mut fifo = FifoSwapManager::<MockPageTable>::new(
             unsafe{ &*(&pt as *const _) });
         unsafe {
