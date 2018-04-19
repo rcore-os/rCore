@@ -5,7 +5,7 @@ type Addr = usize;
 
 trait SwapManager<T: PageTable> {
     /// Create and initialize for the swap manager
-    fn new(page_table: &T) -> Self;
+    fn new(page_table: &'static T) -> Self;
     /// Called when tick interrupt occured
     fn tick(&mut self);
     /// Called when map a swappable page into the memory
