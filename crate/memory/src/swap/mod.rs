@@ -1,5 +1,6 @@
 pub mod fifo;
 mod mock_page_table;
+mod mock_swapper;
 
 type Addr = usize;
 
@@ -19,4 +20,9 @@ trait SwapManager<T: PageTable> {
 trait PageTable {
     fn accessed(&self, addr: Addr) -> bool;
     fn dirty(&self, addr: Addr) -> bool;
+}
+
+trait Swapper {
+    fn swap_out(&mut self, data: &[u8; 4096]) -> usize;
+    fn swap_in(&mut self, token: usize, data: &mut [u8; 4096]);
 }
