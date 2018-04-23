@@ -3,14 +3,14 @@ use super::*;
 
 struct FifoSwapManager<T: 'static + PageTable> {
     page_table: &'static T,
-    deque: VecDeque<Addr>,
+    deque: VecDeque<VirtAddr>,
 }
 
 impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
     fn new(page_table: &'static T) -> Self {
         FifoSwapManager {
             page_table,
-            deque: VecDeque::<Addr>::new()
+            deque: VecDeque::<VirtAddr>::new()
         }
     }
 
@@ -29,7 +29,7 @@ impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
         self.deque.remove(id);
     }
 
-    fn pop(&mut self) -> Option<Addr> {
+    fn pop(&mut self) -> Option<VirtAddr> {
         self.deque.pop_front()
     }
 }
@@ -37,7 +37,7 @@ impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::mock_page_table::MockPageTable;
+    use page_table::mock_page_table::MockPageTable;
 
     enum MemOp {
         R(usize), W(usize)
@@ -52,7 +52,7 @@ mod test {
     static mut PAGE: *mut MockPageTable = 0 as *mut _;
     static mut FIFO: *mut FifoSwapManager<MockPageTable> = 0 as *mut _;
 
-    fn page_fault_handler(pt: &mut MockPageTable, addr: Addr) {
+    fn page_fault_handler(pt: &mut MockPageTable, addr: VirtAddr) {
         unsafe{ PGFAULT_COUNT += 1; }
         let fifo = unsafe{ &mut *FIFO };
         if !pt.map(addr) {  // is full?

@@ -1,8 +1,8 @@
-pub mod fifo;
-mod mock_page_table;
-mod mock_swapper;
+use super::*;
+use super::page_table::PageTable;
 
-type Addr = usize;
+pub mod fifo;
+mod mock_swapper;
 
 trait SwapManager<T: PageTable> {
     /// Create and initialize for the swap manager
@@ -10,16 +10,11 @@ trait SwapManager<T: PageTable> {
     /// Called when tick interrupt occured
     fn tick(&mut self);
     /// Called when map a swappable page into the memory
-    fn push(&mut self, addr: Addr);
+    fn push(&mut self, addr: VirtAddr);
     /// Called to delete the addr entry from the swap manager
-    fn remove(&mut self, addr: Addr);
+    fn remove(&mut self, addr: VirtAddr);
     /// Try to swap out a page, return then victim
-    fn pop(&mut self) -> Option<Addr>;
-}
-
-trait PageTable {
-    fn accessed(&self, addr: Addr) -> bool;
-    fn dirty(&self, addr: Addr) -> bool;
+    fn pop(&mut self) -> Option<VirtAddr>;
 }
 
 trait Swapper {
