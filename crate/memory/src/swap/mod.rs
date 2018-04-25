@@ -4,9 +4,7 @@ use super::page_table::PageTable;
 pub mod fifo;
 mod mock_swapper;
 
-trait SwapManager<T: PageTable> {
-    /// Create and initialize for the swap manager
-    fn new(page_table: &'static T) -> Self;
+trait SwapManager {
     /// Called when tick interrupt occured
     fn tick(&mut self);
     /// Called when map a swappable page into the memory

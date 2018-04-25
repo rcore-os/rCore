@@ -1,4 +1,4 @@
-use alloc::btree_set::BTreeSet;
+use alloc::{boxed::Box, btree_set::BTreeSet};
 use super::*;
 
 pub struct MockPageTable {
@@ -9,7 +9,7 @@ pub struct MockPageTable {
     capacity: usize,
 }
 
-type PageFaultHandler = fn(&mut MockPageTable, VirtAddr);
+type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
 
 impl PageTable for MockPageTable {
     fn accessed(&self, addr: VirtAddr) -> bool {
@@ -44,7 +44,8 @@ impl MockPageTable {
     /// Read memory, mark accessed, trigger page fault if not present
     pub fn read(&mut self, addr: VirtAddr) {
         while !self.mapped_set.contains(&addr) {
-            (self.page_fault_handler)(self, addr);
+            let self_mut = unsafe{ &mut *(self as *mut Self) };
+            (self.page_fault_handler)(self_mut, addr);
         }
         self.accessed_set.insert(addr);
 
@@ -52,7 +53,8 @@ impl MockPageTable {
     /// Write memory, mark accessed and dirty, trigger page fault if not present
     pub fn write(&mut self, addr: VirtAddr) {
         while !self.mapped_set.contains(&addr) {
-            (self.page_fault_handler)(self, addr);
+            let self_mut = unsafe{ &mut *(self as *mut Self) };
+            (self.page_fault_handler)(self_mut, addr);
         }
         self.accessed_set.insert(addr);
         self.dirty_set.insert(addr);
@@ -62,29 +64,29 @@ impl MockPageTable {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    static mut PGFAULT_COUNT: usize = 0;
-
-    fn assert_pgfault_eq(x: usize) {
-        assert_eq!(unsafe{ PGFAULT_COUNT }, x);
-    }
+    use alloc::arc::Arc;
+    use core::cell::RefCell;
 
     #[test]
     fn test() {
-        fn page_fault_handler(pt: &mut MockPageTable, addr: VirtAddr) {
-            unsafe{ PGFAULT_COUNT += 1; }
-            pt.map(addr);
-        }
-        let mut pt = MockPageTable::new(2, page_fault_handler);
+        let page_fault_count = Arc::new(RefCell::new(0usize));
+
+        let mut pt = MockPageTable::new(2, Box::new({
+            let page_fault_count1 = page_fault_count.clone();
+            move |pt: &mut MockPageTable, addr: VirtAddr| {
+                *page_fault_count1.borrow_mut() += 1;
+                pt.map(addr);
+            }
+        }));
 
         pt.map(0);
         pt.read(0);
-        assert_pgfault_eq(0);
+        assert_eq!(*page_fault_count.borrow(), 0);
         assert!(pt.accessed(0));
         assert!(!pt.dirty(0));
 
         pt.write(1);
-        assert_pgfault_eq(1);
+        assert_eq!(*page_fault_count.borrow(), 1);
         assert!(pt.accessed(1));
         assert!(pt.dirty(1));
 
@@ -92,6 +94,6 @@ mod test {
 
         pt.unmap(0);
         pt.read(0);
-        assert_pgfault_eq(2);
+        assert_eq!(*page_fault_count.borrow(), 2);
     }
 }

@@ -1,19 +1,11 @@
 use alloc::vec_deque::VecDeque;
 use super::*;
 
-struct FifoSwapManager<T: 'static + PageTable> {
-    page_table: &'static T,
+struct FifoSwapManager {
     deque: VecDeque<VirtAddr>,
 }
 
-impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
-    fn new(page_table: &'static T) -> Self {
-        FifoSwapManager {
-            page_table,
-            deque: VecDeque::<VirtAddr>::new()
-        }
-    }
-
+impl SwapManager for FifoSwapManager {
     fn tick(&mut self) {
 
     }
@@ -34,44 +26,45 @@ impl<T: 'static + PageTable> SwapManager<T> for FifoSwapManager<T> {
     }
 }
 
+impl FifoSwapManager {
+    fn new() -> Self {
+        FifoSwapManager {
+            deque: VecDeque::<VirtAddr>::new()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloc::{arc::Arc, boxed::Box};
+    use core::cell::RefCell;
     use page_table::mock_page_table::MockPageTable;
 
     enum MemOp {
         R(usize), W(usize)
     }
 
-    fn assert_pgfault_eq(x: usize) {
-        assert_eq!(unsafe{ PGFAULT_COUNT }, x);
-    }
-
-    // For pgfault_handler:
-    static mut PGFAULT_COUNT: usize = 0;
-    static mut PAGE: *mut MockPageTable = 0 as *mut _;
-    static mut FIFO: *mut FifoSwapManager<MockPageTable> = 0 as *mut _;
-
-    fn page_fault_handler(pt: &mut MockPageTable, addr: VirtAddr) {
-        unsafe{ PGFAULT_COUNT += 1; }
-        let fifo = unsafe{ &mut *FIFO };
-        if !pt.map(addr) {  // is full?
-            pt.unmap(fifo.pop().unwrap());
-            pt.map(addr);
-        }
-        fifo.push(addr);
-    }
-
     #[test]
     fn test() {
         use self::MemOp::{R, W};
-        let mut pt = MockPageTable::new(4, page_fault_handler);
-        let mut fifo = FifoSwapManager::<MockPageTable>::new(
-            unsafe{ &*(&pt as *const _) });
-        unsafe {
-            PAGE = &mut pt as *mut _;
-            FIFO = &mut fifo as *mut _;
-        }
+        let page_fault_count = Arc::new(RefCell::new(0usize));
+
+        let mut pt = MockPageTable::new(4, Box::new({
+            let page_fault_count1 = page_fault_count.clone();
+            let mut fifo = FifoSwapManager::new();
+
+            move |pt: &mut MockPageTable, addr: VirtAddr| {
+                *page_fault_count1.borrow_mut() += 1;
+
+                if !pt.map(addr) {  // is full?
+                    pt.unmap(fifo.pop().unwrap());
+                    pt.map(addr);
+                }
+                fifo.push(addr);
+            }
+        }));
+
         let op_seq = [
             R(1), R(2), R(3), R(4),
             W(3), W(1), W(4), W(2), W(5),
@@ -87,7 +80,7 @@ mod test {
                 R(addr) => pt.read(*addr),
                 W(addr) => pt.write(*addr),
             }
-            assert_pgfault_eq(count);
+            assert_eq!(*(*page_fault_count).borrow(), count);
         }
     }
 }
