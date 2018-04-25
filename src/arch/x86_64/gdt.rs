@@ -13,12 +13,7 @@ pub fn init() {
     use x86_64::instructions::segmentation::set_cs;
     use x86_64::instructions::tables::load_tss;
 
-    struct DoubleFaultStack {
-        space: [u8; 4096]
-    }
-    let double_fault_stack_top = Box::into_raw(Box::new(
-        DoubleFaultStack{space: [0; 4096]}
-    )) as usize + 4096;
+    let double_fault_stack_top = Box::into_raw(Box::new([0u8; 4096])) as usize + 4096;
 
     let mut tss = Box::new({
         let mut tss = TaskStateSegment::new();

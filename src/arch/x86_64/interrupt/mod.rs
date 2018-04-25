@@ -1,7 +1,8 @@
 use x86_64;
 use arch::driver::{apic::IOAPIC, pic};
 
-pub mod irq;
+pub mod handler;
+pub mod consts;
 
 #[inline(always)]
 pub unsafe fn enable() {

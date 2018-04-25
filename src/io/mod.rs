@@ -30,11 +30,11 @@ use arch::driver::vga::Color;
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use core::fmt::Write;
     use arch::driver::vga::*;
-    {
-        let mut writer = vga_writer::VGA_WRITER.lock();
-        writer.set_color(color);
-        writer.write_fmt(args).unwrap();
-    }
+//    {
+//        let mut writer = vga_writer::VGA_WRITER.lock();
+//        writer.set_color(color);
+//        writer.write_fmt(args).unwrap();
+//    }
     COM1.lock().write_fmt(args).unwrap();
 }
 

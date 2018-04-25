@@ -9,6 +9,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]
 #![feature(unboxed_closures)]
+#![feature(naked_functions)]
 #![feature(asm)]
 #![no_std]
 
