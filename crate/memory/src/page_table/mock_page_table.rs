@@ -5,7 +5,7 @@ pub struct MockPageTable {
     mapped_set: BTreeSet<VirtAddr>,
     accessed_set: BTreeSet<VirtAddr>,
     dirty_set: BTreeSet<VirtAddr>,
-    page_fault_handler: PageFaultHandler,
+    page_fault_handler: Option<PageFaultHandler>,
     capacity: usize,
 }
 
@@ -17,6 +17,12 @@ impl PageTable for MockPageTable {
     }
     fn dirty(&self, addr: VirtAddr) -> bool {
         self.dirty_set.contains(&addr)
+    }
+    fn clear_accessed(&mut self, addr: usize) {
+        self.accessed_set.remove(&addr);
+    }
+    fn clear_dirty(&mut self, addr: usize) {
+        self.dirty_set.remove(&addr);
     }
     /// Map a page, return false if no more space
     fn map(&mut self, addr: VirtAddr) -> bool {
@@ -32,30 +38,33 @@ impl PageTable for MockPageTable {
 }
 
 impl MockPageTable {
-    pub fn new(capacity: usize, page_fault_handler: PageFaultHandler) -> Self {
+    pub fn new(capacity: usize) -> Self {
         MockPageTable {
             mapped_set: BTreeSet::<VirtAddr>::new(),
             accessed_set: BTreeSet::<VirtAddr>::new(),
             dirty_set: BTreeSet::<VirtAddr>::new(),
-            page_fault_handler,
+            page_fault_handler: None,
             capacity,
+        }
+    }
+    pub fn set_handler(&mut self, page_fault_handler: PageFaultHandler) {
+        self.page_fault_handler = Some(page_fault_handler);
+    }
+    fn trigger_page_fault_if_not_present(&mut self, addr: VirtAddr) {
+        while !self.mapped_set.contains(&addr) {
+            let self_mut = unsafe{ &mut *(self as *mut Self) };
+            (self.page_fault_handler.as_mut().unwrap())(self_mut, addr);
         }
     }
     /// Read memory, mark accessed, trigger page fault if not present
     pub fn read(&mut self, addr: VirtAddr) {
-        while !self.mapped_set.contains(&addr) {
-            let self_mut = unsafe{ &mut *(self as *mut Self) };
-            (self.page_fault_handler)(self_mut, addr);
-        }
+        self.trigger_page_fault_if_not_present(addr);
         self.accessed_set.insert(addr);
 
     }
     /// Write memory, mark accessed and dirty, trigger page fault if not present
     pub fn write(&mut self, addr: VirtAddr) {
-        while !self.mapped_set.contains(&addr) {
-            let self_mut = unsafe{ &mut *(self as *mut Self) };
-            (self.page_fault_handler)(self_mut, addr);
-        }
+        self.trigger_page_fault_if_not_present(addr);
         self.accessed_set.insert(addr);
         self.dirty_set.insert(addr);
     }
@@ -71,7 +80,8 @@ mod test {
     fn test() {
         let page_fault_count = Arc::new(RefCell::new(0usize));
 
-        let mut pt = MockPageTable::new(2, Box::new({
+        let mut pt = MockPageTable::new(2);
+        pt.set_handler(Box::new({
             let page_fault_count1 = page_fault_count.clone();
             move |pt: &mut MockPageTable, addr: VirtAddr| {
                 *page_fault_count1.borrow_mut() += 1;
@@ -85,10 +95,16 @@ mod test {
         assert!(pt.accessed(0));
         assert!(!pt.dirty(0));
 
+        pt.clear_accessed(0);
+        assert!(!pt.accessed(0));
+
         pt.write(1);
         assert_eq!(*page_fault_count.borrow(), 1);
         assert!(pt.accessed(1));
         assert!(pt.dirty(1));
+
+        pt.clear_dirty(1);
+        assert!(!pt.dirty(1));
 
         assert_eq!(pt.map(2), false);
 

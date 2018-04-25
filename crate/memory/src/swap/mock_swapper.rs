@@ -6,14 +6,25 @@ pub struct MockSwapper {
 }
 
 impl Swapper for MockSwapper {
-    fn swap_out(&mut self, data: &[u8; 4096]) -> usize {
+    fn swap_out(&mut self, data: &[u8; 4096]) -> Result<usize, ()> {
         let id = self.alloc_id();
         self.map.insert(id, data.clone());
-        id
+        Ok(id)
     }
 
-    fn swap_in(&mut self, token: usize, data: &mut [u8; 4096]) {
-        *data = self.map.remove(&token).unwrap();
+    fn swap_update(&mut self, token: usize, data: &[u8; 4096]) -> Result<(), ()> {
+        if !self.map.contains_key(&token) {
+            return Err(());
+        }
+        self.map.insert(token, data.clone());
+        Ok(())
+    }
+    fn swap_in(&mut self, token: usize, data: &mut [u8; 4096]) -> Result<(), ()> {
+        match self.map.remove(&token) {
+            Some(d) => *data = d,
+            None => return Err(()),
+        }
+        Ok(())
     }
 }
 
@@ -31,16 +42,25 @@ mod test {
     use super::*;
     use core::mem::uninitialized;
 
+    fn assert_data_eq(data1: &[u8; 4096], data2: &[u8; 4096]) {
+        for (&a, &b) in data2.iter().zip(data1.iter()) {
+            assert_eq!(a, b);
+        }
+    }
+
     #[test]
     fn test() {
         let mut swapper = MockSwapper::new();
-        let data: [u8; 4096] = unsafe{ uninitialized() };
-        let mut data1: [u8; 4096] = unsafe{ uninitialized() };
-        let token = swapper.swap_out(&data);
-        swapper.swap_in(token, &mut data1);
-        for (&a, &b) in data.iter().zip(data1.iter()) {
-            assert_eq!(a, b);
-        }
+        let mut data: [u8; 4096] = unsafe{ uninitialized() };
+        let data1: [u8; 4096] = unsafe{ uninitialized() };
+        let token = swapper.swap_out(&data1).unwrap();
+        swapper.swap_in(token, &mut data);
+        assert_data_eq(&data, &data1);
+
+        let data2: [u8; 4096] = unsafe{ uninitialized() };
+        swapper.swap_update(token, &data2);
+        swapper.swap_in(token, &mut data);
+        assert_data_eq(&data, &data2);
     }
 
     #[test]

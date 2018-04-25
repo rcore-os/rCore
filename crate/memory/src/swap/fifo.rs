@@ -1,7 +1,7 @@
 use alloc::vec_deque::VecDeque;
 use super::*;
 
-struct FifoSwapManager {
+pub struct FifoSwapManager {
     deque: VecDeque<VirtAddr>,
 }
 
@@ -27,7 +27,7 @@ impl SwapManager for FifoSwapManager {
 }
 
 impl FifoSwapManager {
-    fn new() -> Self {
+    pub fn new() -> Self {
         FifoSwapManager {
             deque: VecDeque::<VirtAddr>::new()
         }
@@ -50,7 +50,8 @@ mod test {
         use self::MemOp::{R, W};
         let page_fault_count = Arc::new(RefCell::new(0usize));
 
-        let mut pt = MockPageTable::new(4, Box::new({
+        let mut pt = MockPageTable::new(4);
+        pt.set_handler(Box::new({
             let page_fault_count1 = page_fault_count.clone();
             let mut fifo = FifoSwapManager::new();
 
