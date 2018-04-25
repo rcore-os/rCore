@@ -117,17 +117,17 @@ mod test {
 
 
         let op_seq = [
-            R(1), R(2), R(3), R(4),
-            R(3), W(1), R(4), W(2), R(5),
-            R(2), W(1), R(2), R(3), R(4)];
+            R(0x1000), R(0x2000), R(0x3000), R(0x4000),
+            R(0x3000), W(0x1000), R(0x4000), W(0x2000), R(0x5000),
+            R(0x2000), W(0x1000), R(0x2000), R(0x3000), R(0x4000)];
         let pgfault_count = [
             1, 2, 3, 4,
             4, 4, 4, 4, 5,
             5, 5, 5, 6, 7];
         for (op, &count) in op_seq.iter().zip(pgfault_count.iter()) {
             match op {
-                R(addr) => pt.read(*addr),
-                W(addr) => pt.write(*addr),
+                R(addr) => {pt.read(*addr);},
+                W(addr) => pt.write(*addr, 0),
             }
             assert_eq!(*(*page_fault_count).borrow(), count);
         }

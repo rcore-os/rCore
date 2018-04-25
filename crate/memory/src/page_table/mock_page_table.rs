@@ -1,10 +1,14 @@
-use alloc::{boxed::Box, btree_set::BTreeSet};
+use alloc::boxed::Box;
 use super::*;
 
+const PAGE_COUNT: usize = 16;
+const PAGE_SIZE: usize = 4096;
+
 pub struct MockPageTable {
-    mapped_set: BTreeSet<VirtAddr>,
-    accessed_set: BTreeSet<VirtAddr>,
-    dirty_set: BTreeSet<VirtAddr>,
+    mapped: [bool; PAGE_COUNT],
+    accessed: [bool; PAGE_COUNT],
+    dirty: [bool; PAGE_COUNT],
+    data: [u8; PAGE_SIZE * PAGE_COUNT],
     page_fault_handler: Option<PageFaultHandler>,
     capacity: usize,
 }
@@ -13,36 +17,38 @@ type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
 
 impl PageTable for MockPageTable {
     fn accessed(&self, addr: VirtAddr) -> bool {
-        self.accessed_set.contains(&addr)
+        self.accessed[addr / PAGE_SIZE]
     }
     fn dirty(&self, addr: VirtAddr) -> bool {
-        self.dirty_set.contains(&addr)
+        self.dirty[addr / PAGE_SIZE]
     }
     fn clear_accessed(&mut self, addr: usize) {
-        self.accessed_set.remove(&addr);
+        self.accessed[addr / PAGE_SIZE] = false;
     }
     fn clear_dirty(&mut self, addr: usize) {
-        self.dirty_set.remove(&addr);
+        self.dirty[addr / PAGE_SIZE] = false;
     }
     /// Map a page, return false if no more space
     fn map(&mut self, addr: VirtAddr) -> bool {
-        if self.mapped_set.len() == self.capacity {
+        if self.mapped.iter().filter(|&&b| b).count() == self.capacity {
             return false;
         }
-        self.mapped_set.insert(addr);
+        self.mapped[addr / PAGE_SIZE] = true;
         true
     }
     fn unmap(&mut self, addr: VirtAddr) {
-        self.mapped_set.remove(&addr);
+        self.mapped[addr / PAGE_SIZE] = false;
     }
 }
 
 impl MockPageTable {
     pub fn new(capacity: usize) -> Self {
+        use core::mem::uninitialized;
         MockPageTable {
-            mapped_set: BTreeSet::<VirtAddr>::new(),
-            accessed_set: BTreeSet::<VirtAddr>::new(),
-            dirty_set: BTreeSet::<VirtAddr>::new(),
+            mapped: [false; PAGE_COUNT],
+            accessed: [false; PAGE_COUNT],
+            dirty: [false; PAGE_COUNT],
+            data: unsafe{ uninitialized() },
             page_fault_handler: None,
             capacity,
         }
@@ -51,22 +57,26 @@ impl MockPageTable {
         self.page_fault_handler = Some(page_fault_handler);
     }
     fn trigger_page_fault_if_not_present(&mut self, addr: VirtAddr) {
-        while !self.mapped_set.contains(&addr) {
+        let page_id = addr / PAGE_SIZE;
+        while !self.mapped[page_id] {
             let self_mut = unsafe{ &mut *(self as *mut Self) };
             (self.page_fault_handler.as_mut().unwrap())(self_mut, addr);
         }
     }
     /// Read memory, mark accessed, trigger page fault if not present
-    pub fn read(&mut self, addr: VirtAddr) {
+    pub fn read(&mut self, addr: VirtAddr) -> u8 {
+        let page_id = addr / PAGE_SIZE;
         self.trigger_page_fault_if_not_present(addr);
-        self.accessed_set.insert(addr);
-
+        self.accessed[page_id] = true;
+        self.data[addr]
     }
     /// Write memory, mark accessed and dirty, trigger page fault if not present
-    pub fn write(&mut self, addr: VirtAddr) {
+    pub fn write(&mut self, addr: VirtAddr, data: u8) {
+        let page_id = addr / PAGE_SIZE;
         self.trigger_page_fault_if_not_present(addr);
-        self.accessed_set.insert(addr);
-        self.dirty_set.insert(addr);
+        self.accessed[page_id] = true;
+        self.dirty[page_id] = true;
+        self.data[addr] = data;
     }
 }
 
@@ -98,15 +108,20 @@ mod test {
         pt.clear_accessed(0);
         assert!(!pt.accessed(0));
 
-        pt.write(1);
+        pt.read(1);
+        assert_eq!(*page_fault_count.borrow(), 0);
+        assert!(pt.accessed(0));
+
+        pt.write(0x1000, 0xff);
         assert_eq!(*page_fault_count.borrow(), 1);
-        assert!(pt.accessed(1));
-        assert!(pt.dirty(1));
+        assert!(pt.accessed(0x1000));
+        assert!(pt.dirty(0x1000));
+        assert_eq!(pt.read(0x1000), 0xff);
 
-        pt.clear_dirty(1);
-        assert!(!pt.dirty(1));
+        pt.clear_dirty(0x1000);
+        assert!(!pt.dirty(0x1000));
 
-        assert_eq!(pt.map(2), false);
+        assert_eq!(pt.map(0x2000), false);
 
         pt.unmap(0);
         pt.read(0);

@@ -49,25 +49,31 @@ mod test {
     }
 
     #[test]
-    fn test() {
+    fn swap_out_in() {
         let mut swapper = MockSwapper::new();
         let mut data: [u8; 4096] = unsafe{ uninitialized() };
         let data1: [u8; 4096] = unsafe{ uninitialized() };
         let token = swapper.swap_out(&data1).unwrap();
-        swapper.swap_in(token, &mut data);
+        swapper.swap_in(token, &mut data).unwrap();
         assert_data_eq(&data, &data1);
+    }
 
+    #[test]
+    fn swap_update() {
+        let mut swapper = MockSwapper::new();
+        let mut data: [u8; 4096] = unsafe{ uninitialized() };
+        let data1: [u8; 4096] = unsafe{ uninitialized() };
         let data2: [u8; 4096] = unsafe{ uninitialized() };
-        swapper.swap_update(token, &data2);
-        swapper.swap_in(token, &mut data);
+        let token = swapper.swap_out(&data1).unwrap();
+        swapper.swap_update(token, &data2).unwrap();
+        swapper.swap_in(token, &mut data).unwrap();
         assert_data_eq(&data, &data2);
     }
 
     #[test]
-    #[should_panic]
     fn invalid_token() {
         let mut swapper = MockSwapper::new();
         let mut data: [u8; 4096] = unsafe{ uninitialized() };
-        swapper.swap_in(0, &mut data);
+        assert_eq!(swapper.swap_in(0, &mut data), Err(()));
     }
 }
