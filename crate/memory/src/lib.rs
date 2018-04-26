@@ -3,8 +3,10 @@
 
 extern crate alloc;
 
+pub mod physical;
+pub mod paging;
 pub mod memory_set;
 pub mod swap;
-pub mod page_table;
 
 type VirtAddr = usize;
+const PAGE_SIZE: usize = 4096;

@@ -2,7 +2,7 @@ pub use self::fifo::FifoSwapManager;
 pub use self::enhanced_clock::EnhancedClockSwapManager;
 
 use super::*;
-use super::page_table::PageTable;
+use super::paging::PageTable;
 
 mod fifo;
 mod enhanced_clock;

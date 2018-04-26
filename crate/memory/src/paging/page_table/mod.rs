@@ -1,6 +1,7 @@
 use super::*;
+pub use self::mock_page_table::MockPageTable;
 
-pub mod mock_page_table;
+mod mock_page_table;
 
 pub trait PageTable {
     fn accessed(&self, addr: VirtAddr) -> bool;

@@ -39,7 +39,7 @@ mod test {
     use super::*;
     use alloc::{arc::Arc, boxed::Box};
     use core::cell::RefCell;
-    use page_table::mock_page_table::MockPageTable;
+    use paging::MockPageTable;
 
     enum MemOp {
         R(usize), W(usize)

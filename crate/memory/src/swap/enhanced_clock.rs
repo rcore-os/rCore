@@ -81,7 +81,7 @@ mod test {
     use alloc::{arc::Arc, boxed::Box};
     use core::mem::uninitialized;
     use core::cell::RefCell;
-    use page_table::mock_page_table::MockPageTable;
+    use paging::MockPageTable;
 
     impl SwappablePageTable for MockPageTable {
         fn swap_out(&mut self, addr: usize) -> Result<(), ()> {
