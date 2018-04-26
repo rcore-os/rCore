@@ -41,6 +41,7 @@ mod util;
 #[macro_use]    // test!
 mod test_util;
 mod consts;
+mod process;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -76,9 +77,11 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     // memory_controller.print_page_table();
     arch::smp::start_other_cores(&acpi, &mut memory_controller);
 
+    process::init(memory_controller.kernel_stack.take().unwrap());
+
     unsafe{ arch::interrupt::enable(); }
 
-    unsafe{ int!(120); } // to user
+//    unsafe{ int!(120); } // to user
 
     loop{}
 
@@ -95,7 +98,7 @@ pub extern "C" fn other_main() -> ! {
     let cpu_id = arch::driver::apic::lapic_id();
     println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
     unsafe{ arch::smp::notify_started(cpu_id); }
-    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
+//    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }
 
