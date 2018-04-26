@@ -38,8 +38,8 @@ mod io;
 mod memory;
 mod lang;
 mod util;
-#[macro_use]    // test!
-mod test_util;
+#[macro_use]
+mod macros;
 mod consts;
 mod process;
 
@@ -77,7 +77,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     // memory_controller.print_page_table();
     arch::smp::start_other_cores(&acpi, &mut memory_controller);
 
-    process::init(memory_controller.kernel_stack.take().unwrap());
+    process::init(&mut memory_controller);
 
     unsafe{ arch::interrupt::enable(); }
 

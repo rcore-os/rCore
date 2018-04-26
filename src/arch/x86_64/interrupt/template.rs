@@ -2,6 +2,7 @@
 
 #[allow(dead_code)]
 #[repr(packed)]
+#[derive(Clone, Default)]
 pub struct ScratchRegisters {
     pub r11: usize,
     pub r10: usize,
@@ -60,6 +61,7 @@ macro_rules! scratch_pop {
 
 #[allow(dead_code)]
 #[repr(packed)]
+#[derive(Clone, Default)]
 pub struct PreservedRegisters {
     pub r15: usize,
     pub r14: usize,
@@ -122,6 +124,7 @@ macro_rules! fs_pop {
 
 #[allow(dead_code)]
 #[repr(packed)]
+#[derive(Clone, Default)]
 pub struct IretRegisters {
     pub rip: usize,
     pub cs: usize,
@@ -282,6 +285,7 @@ macro_rules! interrupt_error {
 
 #[allow(dead_code)]
 #[repr(packed)]
+#[derive(Clone, Default)]
 pub struct InterruptStackP {
     pub fs: usize,
     pub preserved: PreservedRegisters,
@@ -295,6 +299,17 @@ impl InterruptStackP {
         self.scratch.dump();
         self.preserved.dump();
         println!("FS:    {:>016X}", { self.fs });
+    }
+}
+
+use core::fmt::Debug;
+use core::fmt::Formatter;
+use core::fmt::Error;
+
+impl Debug for InterruptStackP {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        self.dump();
+        Ok(())
     }
 }
 

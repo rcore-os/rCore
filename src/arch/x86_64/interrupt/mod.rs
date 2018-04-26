@@ -4,6 +4,8 @@ use arch::driver::{apic::IOAPIC, pic};
 pub mod handler;
 pub mod consts;
 
+pub use self::handler::TrapFrame;
+
 #[inline(always)]
 pub unsafe fn enable() {
     x86_64::instructions::interrupts::enable();

@@ -2,6 +2,7 @@
 #[path = "./template.rs"]
 mod template;
 use self::template::*;
+pub type TrapFrame = InterruptStackP;
 
 interrupt_stack!(breakpoint, stack, {
     println!("\nEXCEPTION: Breakpoint");
@@ -60,12 +61,14 @@ interrupt!(com2, {
 use spin::Mutex;
 static TICK: Mutex<usize> = Mutex::new(0);
 
-interrupt!(timer, {
+interrupt_stack_p!(timer, stack, {
     let mut tick = TICK.lock();
     *tick += 1;
     let tick = *tick;
     if tick % 100 == 0 {
         println!("\nInterupt: Timer\ntick = {}", tick);
+        use process;
+        process::schedule(stack);
     }
     ack(IRQ_TIMER);
 });
