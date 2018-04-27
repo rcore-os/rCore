@@ -19,8 +19,12 @@ pub fn start_other_cores(acpi: &ACPI_Result, mc: &mut MemoryController) {
     let page_table = unsafe{ *(0xFFFF_FFFF_FFFF_FFF8 as *const u32) } & 0xFFFF_F000;
     for i in 1 .. acpi.cpu_num {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
+        let kstack = mc.alloc_stack(7).unwrap();
+        let kstack_top = kstack.top() as u64;
+        use core::mem::forget;
+        forget(kstack);  // TODO pass this kstack to new AP
         *args = EntryArgs {
-            kstack: mc.alloc_stack(7).unwrap().top() as u64,
+            kstack: kstack_top,
             page_table: page_table,
             stack: 0x8000, // just enough stack to get us to entry64mp
         };

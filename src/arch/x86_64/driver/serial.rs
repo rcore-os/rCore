@@ -12,8 +12,7 @@ pub fn init() {
 
     COM1.lock().init();
     COM2.lock().init();
-    use consts::irq::*;
-    use arch::interrupt::enable_irq;
+    use arch::interrupt::{enable_irq, consts::{IRQ_COM1, IRQ_COM2}};
     enable_irq(IRQ_COM1);
     enable_irq(IRQ_COM2);
 }

@@ -46,7 +46,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         boot_info_start, boot_info_end,
         memory_map_tag.memory_areas());
 
-    let mut active_table = remap_the_kernel(&mut frame_allocator, boot_info);
+    let (mut active_table, kernel_stack) = remap_the_kernel(&mut frame_allocator, boot_info);
 
     use self::paging::Page;
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
@@ -67,14 +67,15 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     };
     
     MemoryController {
-        active_table: active_table,
-        frame_allocator: frame_allocator,
-        stack_allocator: stack_allocator,
+        kernel_stack: Some(kernel_stack),
+        active_table,
+        frame_allocator,
+        stack_allocator,
     }
 }
 
 pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
-    -> ActivePageTable
+    -> (ActivePageTable, Stack)
     where A: FrameAllocator
 {
     let mut temporary_page = TemporaryPage::new(Page::containing_address(0xcafebabe), allocator);
@@ -137,12 +138,14 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
     let stack_bottom = PhysicalAddress(stack_bottom as u64).to_kernel_virtual();
     let stack_bottom_page = Page::containing_address(stack_bottom);
     active_table.unmap(stack_bottom_page, allocator);
+    let kernel_stack = Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE);
     println!("guard page at {:#x}", stack_bottom_page.start_address());
 
-    active_table
+    (active_table, kernel_stack)
 }
 
 pub struct MemoryController {
+    pub kernel_stack: Option<Stack>,
     active_table: paging::ActivePageTable,
     frame_allocator: AreaFrameAllocator,
     stack_allocator: stack_allocator::StackAllocator,
@@ -150,7 +153,8 @@ pub struct MemoryController {
 
 impl MemoryController {
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        let &mut MemoryController { ref mut active_table,
+        let &mut MemoryController { ref mut kernel_stack,
+                                    ref mut active_table,
                                     ref mut frame_allocator,
                                     ref mut stack_allocator } = self;
         stack_allocator.alloc_stack(active_table, frame_allocator,

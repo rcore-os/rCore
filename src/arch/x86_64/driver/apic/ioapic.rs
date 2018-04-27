@@ -6,7 +6,7 @@
 
 use syscall::io::{Io, Mmio};
 use bit_field::BitField;
-use consts::irq::T_IRQ0;
+use arch::interrupt::consts::T_IRQ0;
 use spin::Mutex;
 
 pub fn init(ioapic_id: u8)

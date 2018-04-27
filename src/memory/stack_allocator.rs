@@ -61,7 +61,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    fn new(top: usize, bottom: usize) -> Stack {
+    pub(super) fn new(top: usize, bottom: usize) -> Stack {
         assert!(top > bottom);
         Stack {
             top: top,
@@ -75,5 +75,11 @@ impl Stack {
 
     pub fn bottom(&self) -> usize {
         self.bottom
+    }
+}
+
+impl Drop for Stack {
+    fn drop(&mut self) {
+        panic!("stack leak: {:#x?}", self);
     }
 }

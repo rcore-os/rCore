@@ -9,6 +9,8 @@
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]
 #![feature(unboxed_closures)]
+#![feature(naked_functions)]
+#![feature(asm)]
 #![no_std]
 
 
@@ -21,6 +23,7 @@ extern crate spin;
 extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
 extern crate x86_64;
 #[macro_use]
 extern crate once;
@@ -35,9 +38,10 @@ mod io;
 mod memory;
 mod lang;
 mod util;
-#[macro_use]    // test!
-mod test_util;
+#[macro_use]
+mod macros;
 mod consts;
+mod process;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -71,10 +75,32 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     let acpi = arch::driver::init(
         |addr: usize| memory_controller.map_page_identity(addr));
     // memory_controller.print_page_table();
-    arch::smp::start_other_cores(&acpi, &mut memory_controller);
+
+    // FIXME: 开启SMP后，导致switch_to_user中设置rsp无效
+//    arch::smp::start_other_cores(&acpi, &mut memory_controller);
+    process::init(&mut memory_controller);
 
     unsafe{ arch::interrupt::enable(); }
-    loop{}
+
+    unsafe{
+        use arch::syscall;
+        // 在用户模式下触发时钟中断，会导致GPF
+        // （可能是由于没有合理分离栈）
+        no_interrupt!({
+            syscall::switch_to_user();
+            println!("Now in user mode");
+            syscall::switch_to_kernel();
+            println!("Now in kernel mode");
+        });
+    }
+
+    loop{
+        println!("init ...");
+        let mut i = 0;
+        while i < 1 << 22 {
+            i += 1;
+        }
+    }
 
     test_end!();
     unreachable!();
@@ -89,7 +115,7 @@ pub extern "C" fn other_main() -> ! {
     let cpu_id = arch::driver::apic::lapic_id();
     println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
     unsafe{ arch::smp::notify_started(cpu_id); }
-    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
+//    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }
 

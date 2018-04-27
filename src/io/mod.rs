@@ -30,11 +30,14 @@ use arch::driver::vga::Color;
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use core::fmt::Write;
     use arch::driver::vga::*;
-    {
-        let mut writer = vga_writer::VGA_WRITER.lock();
-        writer.set_color(color);
-        writer.write_fmt(args).unwrap();
-    }
+//    {
+//        let mut writer = vga_writer::VGA_WRITER.lock();
+//        writer.set_color(color);
+//        writer.write_fmt(args).unwrap();
+//    }
+    // TODO: 解决死锁问题
+    // 若进程在持有锁时被中断，中断处理程序请求输出，就会死锁
+    unsafe{ COM1.force_unlock(); }
     COM1.lock().write_fmt(args).unwrap();
 }
 
