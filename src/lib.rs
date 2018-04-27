@@ -80,19 +80,27 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 //    arch::smp::start_other_cores(&acpi, &mut memory_controller);
     process::init(&mut memory_controller);
 
-    // FIXME: 在用户模式下触发时钟中断，导致GPF
-//    unsafe{ arch::interrupt::enable(); }
+    unsafe{ arch::interrupt::enable(); }
 
     unsafe{
         use arch::syscall;
-        syscall::switch_to_user();
-        println!("Now in user mode");
-//        loop{}
-        syscall::switch_to_kernel();
-        println!("Now in kernel mode");
+        // 在用户模式下触发时钟中断，会导致GPF
+        // （可能是由于没有合理分离栈）
+        no_interrupt!({
+            syscall::switch_to_user();
+            println!("Now in user mode");
+            syscall::switch_to_kernel();
+            println!("Now in kernel mode");
+        });
     }
 
-    loop{}
+    loop{
+        println!("init ...");
+        let mut i = 0;
+        while i < 1 << 22 {
+            i += 1;
+        }
+    }
 
     test_end!();
     unreachable!();

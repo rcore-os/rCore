@@ -15,7 +15,7 @@ interrupt_error_p!(double_fault, stack, {
     loop {}
 });
 
-interrupt_stack_p!(page_fault, stack, {
+interrupt_error_p!(page_fault, stack, {
     use x86_64::registers::control_regs::cr2;
     println!("\nEXCEPTION: Page Fault\nAddress: {:#x}", cr2());
     stack.dump();
@@ -62,7 +62,7 @@ use spin::Mutex;
 // FIXME: Deadlock
 //static TICK: Mutex<usize> = Mutex::new(0);
 
-interrupt_stack_p!(timer, stack, {
+interrupt_switch!(timer, rsp, {
 //    let mut tick = TICK.lock();
 //    *tick += 1;
 //    let tick = *tick;
@@ -71,9 +71,8 @@ interrupt_stack_p!(timer, stack, {
     if tick % 100 == 0 {
         println!("\nInterupt: Timer\ntick = {}", tick);
         use process;
-//        process::schedule(stack);
+        process::schedule(rsp);
     }
-    stack.dump();
     ack(IRQ_TIMER);
 });
 

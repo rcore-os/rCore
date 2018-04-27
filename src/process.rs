@@ -6,29 +6,37 @@ use spin::{Once, Mutex};
 ///
 /// ## 必须实现的特性
 ///
-/// * Clone: 用于对栈中TrapFrame的替换
 /// * Debug: 用于Debug输出
 use arch::interrupt::TrapFrame;
 
 pub fn init(mc: &mut MemoryController) {
-    PROCESSOR.call_once(|| {Mutex::new(Processor::new(mc))});
+    PROCESSOR.call_once(|| {Mutex::new({
+        let mut processor = Processor::new(mc);
+        let initproc = Process::new_init(mc);
+        let idleproc = Process::new("idle", idle_thread, mc);
+        processor.add(initproc);
+        processor.add(idleproc);
+        processor
+    })});
 }
 
 static PROCESSOR: Once<Mutex<Processor>> = Once::new();
 
 /// Called by timer handler in arch
-pub fn schedule(trap_frame: &mut TrapFrame) {
-    PROCESSOR.try().unwrap().lock().schedule(trap_frame);
+/// 设置rsp，指向接下来要执行线程的 内核栈顶
+/// 之后中断处理例程会重置rsp，恢复对应线程的上下文
+pub fn schedule(rsp: &mut usize) {
+    PROCESSOR.try().unwrap().lock().schedule(rsp);
 }
 
 #[derive(Debug)]
 pub struct Process {
     pid: Pid,
-    name: String,
+    name: &'static str,
     kstack: Stack,
 //    page_table: Box<PageTable>,
     status: Status,
-    trap_frame: TrapFrame,
+    rsp: usize,
 }
 
 #[derive(Debug)]
@@ -45,33 +53,10 @@ type Pid = usize;
 
 impl Processor {
     fn new(mc: &mut MemoryController) -> Self {
-        let mut processor = Processor {
+        Processor {
             procs: BTreeMap::<Pid, Box<Process>>::new(),
             current_pid: 0,
-        };
-        let initproc = Box::new(Process{
-            pid: 0,
-            name: String::from("initproc"),
-            kstack: mc.kernel_stack.take().unwrap(),
-            status: Status::Running,
-            trap_frame: TrapFrame::default(),
-        });
-        let idleproc = Box::new(Process{
-            pid: 1,
-            name: String::from("idleproc"),
-            kstack: mc.alloc_stack(7).unwrap(),
-            status: Status::Ready,
-            trap_frame: {
-                let mut tf = TrapFrame::default();
-                tf.iret.cs = 8;
-                tf.iret.rip = idle_thread as usize;
-                tf.iret.rflags = 0x282;
-                tf
-            },
-        });
-        processor.procs.insert(0, initproc);
-        processor.procs.insert(1, idleproc);
-        processor
+        }
     }
     fn alloc_pid(&self) -> Pid {
         let mut next: Pid = 0;
@@ -84,31 +69,88 @@ impl Processor {
         }
         return next;
     }
-    fn schedule(&mut self, trap_frame: &mut TrapFrame) {
-        self.switch(1, trap_frame);
+    fn add(&mut self, mut process: Box<Process>) {
+        let pid = self.alloc_pid();
+        process.pid = pid;
+        self.procs.insert(pid, process);
     }
-    fn switch(&mut self, pid: Pid, trap_frame: &mut TrapFrame) {
+    fn schedule(&mut self, rsp: &mut usize) {
+        let pid = self.find_next();
+        self.switch_to(pid, rsp);
+    }
+    fn find_next(&self) -> Pid {
+        *self.procs.keys()
+            .find(|&&i| i > self.current_pid)
+            .unwrap_or(self.procs.keys().nth(0).unwrap())
+    }
+    fn switch_to(&mut self, pid: Pid, rsp: &mut usize) {
+        // for debug print
+        let pid0 = self.current_pid;
+        let rsp0 = *rsp;
+
         if pid == self.current_pid {
             return;
         }
         {
             let current = self.procs.get_mut(&self.current_pid).unwrap();
             current.status = Status::Ready;
+            current.rsp = *rsp;
         }
         {
             let process = self.procs.get_mut(&pid).unwrap();
-            *trap_frame = process.trap_frame.clone();
+            process.status = Status::Running;
+            *rsp = process.rsp;
             // TODO switch page table
         }
         self.current_pid = pid;
+        debug!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
+    }
+}
+
+impl Process {
+    /// Make a new kernel thread
+    fn new(name: &'static str, entry: extern fn(), mc: &mut MemoryController) -> Box<Self> {
+        let kstack = mc.alloc_stack(7).unwrap();
+        let rsp = unsafe{ (kstack.top() as *mut TrapFrame).offset(-1) } as usize;
+
+        let mut tf = unsafe{ &mut *(rsp as *mut TrapFrame) };
+
+        // TODO: move to arch
+        *tf = TrapFrame::default();
+        tf.iret.cs = 8;
+        tf.iret.rip = entry as usize;
+        tf.iret.ss = 24;
+        tf.iret.rsp = kstack.top();
+        tf.iret.rflags = 0x282;
+
+        Box::new(Process {
+            pid: 0,
+            name,
+            kstack,
+            status: Status::Ready,
+            rsp,
+        })
+    }
+    /// Make the first kernel thread `initproc`
+    /// Should be called only once
+    fn new_init(mc: &mut MemoryController) -> Box<Self> {
+        assert_has_not_been_called!();
+        Box::new(Process {
+            pid: 0,
+            name: "init",
+            kstack: mc.kernel_stack.take().unwrap(),
+            status: Status::Running,
+            rsp: 0, // will be set at first schedule
+        })
     }
 }
 
 extern fn idle_thread() {
     loop {
         println!("idle ...");
-        for i in 0 .. 1 << 20 {
-
+        let mut i = 0;
+        while i < 1 << 22 {
+            i += 1;
         }
     }
 }

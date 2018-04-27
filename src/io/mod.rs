@@ -35,6 +35,9 @@ fn print_in_color(args: fmt::Arguments, color: Color) {
 //        writer.set_color(color);
 //        writer.write_fmt(args).unwrap();
 //    }
+    // TODO: 解决死锁问题
+    // 若进程在持有锁时被中断，中断处理程序请求输出，就会死锁
+    unsafe{ COM1.force_unlock(); }
     COM1.lock().write_fmt(args).unwrap();
 }
 

@@ -318,6 +318,45 @@ impl Debug for InterruptStackP {
 }
 
 #[macro_export]
+macro_rules! interrupt_switch {
+    ($name:ident, $rsp: ident, $func:block) => {
+        #[naked]
+        pub unsafe extern fn $name () {
+            #[inline(never)]
+            unsafe fn inner($rsp: &mut usize) {
+                $func
+            }
+
+            // Push scratch registers
+            scratch_push!();
+            preserved_push!();
+            fs_push!();
+
+            // Get reference to stack variables
+            let mut rsp: usize;
+            asm!("" : "={rsp}"(rsp) : : : "intel", "volatile");
+
+            // Map kernel
+//            $crate::arch::x86_64::pti::map();
+
+            // Call inner rust function
+            inner(&mut rsp);
+
+            asm!("" : : "{rsp}"(rsp) : : "intel", "volatile");
+
+            // Unmap kernel
+//            $crate::arch::x86_64::pti::unmap();
+
+            // Pop scratch registers and return
+            fs_pop!();
+            preserved_pop!();
+            scratch_pop!();
+            iret!();
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! interrupt_stack_p {
     ($name:ident, $stack: ident, $func:block) => {
         #[naked]
