@@ -59,28 +59,40 @@ interrupt!(com2, {
 });
 
 use spin::Mutex;
-static TICK: Mutex<usize> = Mutex::new(0);
+// FIXME: Deadlock
+//static TICK: Mutex<usize> = Mutex::new(0);
 
 interrupt_stack_p!(timer, stack, {
-    let mut tick = TICK.lock();
-    *tick += 1;
-    let tick = *tick;
+//    let mut tick = TICK.lock();
+//    *tick += 1;
+//    let tick = *tick;
+    static mut tick: usize = 0;
+    unsafe{ tick += 1; }
     if tick % 100 == 0 {
         println!("\nInterupt: Timer\ntick = {}", tick);
         use process;
-        process::schedule(stack);
+//        process::schedule(stack);
     }
+    stack.dump();
     ack(IRQ_TIMER);
 });
 
 interrupt_stack_p!(to_user, stack, {
+    use arch::gdt;
     println!("\nInterupt: To User");
-    stack.iret.cs = 16;
+    let rsp = unsafe{ (stack as *const InterruptStackP).offset(1) } as usize;
+    gdt::set_ring0_rsp(rsp);
+    stack.iret.cs = gdt::UCODE_SELECTOR.0 as usize;
+    stack.iret.ss = gdt::UDATA_SELECTOR.0 as usize;
+    stack.iret.rflags |= 3 << 12;   // 设置EFLAG的I/O特权位，使得在用户态可使用in/out指令
 });
 
 interrupt_stack_p!(to_kernel, stack, {
+//    println!("rsp @ {:#x}", stack as *const _ as usize);
+    use arch::gdt;
     println!("\nInterupt: To Kernel");
-    stack.iret.cs = 8;
+    stack.iret.cs = gdt::KCODE_SELECTOR.0 as usize;
+    stack.iret.ss = gdt::KDATA_SELECTOR.0 as usize;
 });
 
 interrupt_stack_p!(syscall, stack, {

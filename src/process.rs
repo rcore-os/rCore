@@ -1,7 +1,14 @@
 use alloc::{boxed::Box, string::String, btree_map::BTreeMap};
 use memory::{MemoryController, Stack};
-use arch::interrupt::TrapFrame;
 use spin::{Once, Mutex};
+
+/// 平台相关依赖：struct TrapFrame
+///
+/// ## 必须实现的特性
+///
+/// * Clone: 用于对栈中TrapFrame的替换
+/// * Debug: 用于Debug输出
+use arch::interrupt::TrapFrame;
 
 pub fn init(mc: &mut MemoryController) {
     PROCESSOR.call_once(|| {Mutex::new(Processor::new(mc))});
@@ -78,20 +85,30 @@ impl Processor {
         return next;
     }
     fn schedule(&mut self, trap_frame: &mut TrapFrame) {
-        self.run(1, trap_frame);
+        self.switch(1, trap_frame);
     }
-    fn run(&mut self, pid: Pid, trap_frame: &mut TrapFrame) {
+    fn switch(&mut self, pid: Pid, trap_frame: &mut TrapFrame) {
         if pid == self.current_pid {
             return;
         }
-        let process = self.procs.get_mut(&pid).unwrap();
+        {
+            let current = self.procs.get_mut(&self.current_pid).unwrap();
+            current.status = Status::Ready;
+        }
+        {
+            let process = self.procs.get_mut(&pid).unwrap();
+            *trap_frame = process.trap_frame.clone();
+            // TODO switch page table
+        }
         self.current_pid = pid;
-        *trap_frame = process.trap_frame.clone();
-        // TODO switch page table
     }
 }
 
 extern fn idle_thread() {
-    println!("idle ...");
-    loop {}
+    loop {
+        println!("idle ...");
+        for i in 0 .. 1 << 20 {
+
+        }
+    }
 }

@@ -75,13 +75,22 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     let acpi = arch::driver::init(
         |addr: usize| memory_controller.map_page_identity(addr));
     // memory_controller.print_page_table();
-    arch::smp::start_other_cores(&acpi, &mut memory_controller);
 
+    // FIXME: 开启SMP后，导致switch_to_user中设置rsp无效
+//    arch::smp::start_other_cores(&acpi, &mut memory_controller);
     process::init(&mut memory_controller);
 
-    unsafe{ arch::interrupt::enable(); }
+    // FIXME: 在用户模式下触发时钟中断，导致GPF
+//    unsafe{ arch::interrupt::enable(); }
 
-//    unsafe{ int!(120); } // to user
+    unsafe{
+        use arch::syscall;
+        syscall::switch_to_user();
+        println!("Now in user mode");
+//        loop{}
+        syscall::switch_to_kernel();
+        println!("Now in kernel mode");
+    }
 
     loop{}
 

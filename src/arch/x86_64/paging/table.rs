@@ -50,7 +50,8 @@ impl<L> Table<L> where L: HierarchicalLevel {
             assert!(!self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            // TODO: Remove USER_ACCESSIBLE
+            self.entries[index].set(frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

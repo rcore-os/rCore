@@ -56,7 +56,7 @@ bitflags! {
 pub struct IdtEntry {
     offsetl: u16,
     selector: u16,
-    zero: u8,
+    ist: u8,
     attribute: u8,
     offsetm: u16,
     offseth: u32,
@@ -68,7 +68,7 @@ impl IdtEntry {
         IdtEntry {
             offsetl: 0,
             selector: 0,
-            zero: 0,
+            ist: 0,
             attribute: 0,
             offsetm: 0,
             offseth: 0,
@@ -76,15 +76,17 @@ impl IdtEntry {
         }
     }
 
-    pub fn set_flags(&mut self, flags: IdtFlags) {
+    pub fn set_flags(&mut self, flags: IdtFlags) -> &mut Self {
         self.attribute = flags.bits;
+        self
     }
 
-    pub fn set_offset(&mut self, selector: u16, base: usize) {
+    pub fn set_offset(&mut self, selector: u16, base: usize) -> &mut Self {
         self.selector = selector;
         self.offsetl = base as u16;
         self.offsetm = (base >> 16) as u16;
         self.offseth = (base >> 32) as u32;
+        self
     }
 
     // A function to set the offset more easily
@@ -97,8 +99,7 @@ impl IdtEntry {
     pub unsafe fn set_stack_index(&mut self, index: u16) -> &mut Self {
         // The hardware IST index starts at 1, but our software IST index
         // starts at 0. Therefore we need to add 1 here.
-        self.offsetl &= !0b111;
-        self.offsetl += index + 1;
+        self.ist = (index + 1) as u8;
         self
     }
 }

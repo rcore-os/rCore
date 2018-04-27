@@ -129,10 +129,14 @@ pub struct IretRegisters {
     pub rip: usize,
     pub cs: usize,
     pub rflags: usize,
+    pub rsp: usize,
+    pub ss: usize,
 }
 
 impl IretRegisters {
     pub fn dump(&self) {
+        println!("SS:    {:>016X}", { self.ss });
+        println!("RSP:   {:>016X}", { self.rsp });
         println!("RFLAG: {:>016X}", { self.rflags });
         println!("CS:    {:>016X}", { self.cs });
         println!("RIP:   {:>016X}", { self.rip });

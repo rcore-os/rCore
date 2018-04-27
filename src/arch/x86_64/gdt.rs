@@ -5,6 +5,7 @@ use x86_64::structures::gdt::SegmentSelector;
 use x86_64::{PrivilegeLevel, VirtualAddress};
 use spin::Once;
 use alloc::boxed::Box;
+use core::ptr::Unique;
 
 /// Alloc TSS & GDT at kernel heap, then init and load it.
 /// The double fault stack will be allocated at kernel heap too.
@@ -14,25 +15,27 @@ pub fn init() {
     use x86_64::instructions::tables::load_tss;
 
     let double_fault_stack_top = Box::into_raw(Box::new([0u8; 4096])) as usize + 4096;
+    debug!("Double fault stack top @ {:#x}", double_fault_stack_top);
 
     let mut tss = Box::new({
         let mut tss = TaskStateSegment::new();
+
+        // 设置 Double Fault 时，自动切换栈的地址
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX]
             = VirtualAddress(double_fault_stack_top);
+
         tss
     });
-    let tss = unsafe{ &*Box::into_raw(tss) };
+    unsafe{ TSS_PTR = Unique::new_unchecked(Box::into_raw(tss)); }
+    let tss = unsafe{ TSS_PTR.as_ref() };
 
-    let mut code_selector = SegmentSelector(0);
-    let mut tss_selector = SegmentSelector(0);
     let gdt = Box::new({
         let mut gdt = Gdt::new();
-        code_selector =
         gdt.add_entry(KCODE);
         gdt.add_entry(UCODE);
         gdt.add_entry(KDATA);
         gdt.add_entry(UDATA);
-        tss_selector = gdt.add_entry(Descriptor::tss_segment(&tss));
+        gdt.add_entry(Descriptor::tss_segment(&tss));
         gdt
     });
     let gdt = unsafe{ &*Box::into_raw(gdt) };
@@ -40,9 +43,23 @@ pub fn init() {
 
     unsafe {
         // reload code segment register
-        set_cs(code_selector);
+        set_cs(KCODE_SELECTOR);
         // load TSS
-        load_tss(tss_selector);
+        load_tss(TSS_SELECTOR);
+    }
+}
+
+// TODO: more elegant?
+static mut TSS_PTR: Unique<TaskStateSegment> = unsafe{ Unique::new_unchecked(0 as *mut _) };
+
+/// 设置从Ring3跳到Ring0时，自动切换栈的地址
+///
+/// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
+pub fn set_ring0_rsp(rsp: usize) {
+    debug!("gdt.set_ring0_rsp: {:#x}", rsp);
+    unsafe {
+        TSS_PTR.as_mut().privilege_stack_table[0] = VirtualAddress(rsp);
+//        debug!("TSS:\n{:?}", TSS_PTR.as_ref());
     }
 }
 
@@ -53,6 +70,13 @@ const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000);  // EXECU
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000);  // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000);  // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
+
+pub const KCODE_SELECTOR: SegmentSelector = SegmentSelector::new(1, PrivilegeLevel::Ring0);
+pub const UCODE_SELECTOR: SegmentSelector = SegmentSelector::new(2, PrivilegeLevel::Ring3);
+pub const KDATA_SELECTOR: SegmentSelector = SegmentSelector::new(3, PrivilegeLevel::Ring0);
+pub const UDATA_SELECTOR: SegmentSelector = SegmentSelector::new(4, PrivilegeLevel::Ring3);
+pub const TSS_SELECTOR: SegmentSelector = SegmentSelector::new(5, PrivilegeLevel::Ring0);
+
 
 pub struct Gdt {
     table: [u64; 8],
