@@ -6,6 +6,19 @@ pub mod consts;
 
 pub use self::handler::TrapFrame;
 
+impl TrapFrame {
+    pub fn new_kernel_thread(entry: extern fn(), rsp: usize) -> Self {
+        use arch::gdt;
+        let mut tf = TrapFrame::default();
+        tf.iret.cs = gdt::KCODE_SELECTOR.0 as usize;
+        tf.iret.rip = entry as usize;
+        tf.iret.ss = gdt::KDATA_SELECTOR.0 as usize;
+        tf.iret.rsp = rsp;
+        tf.iret.rflags = 0x282;
+        tf
+    }
+}
+
 #[inline(always)]
 pub unsafe fn enable() {
     x86_64::instructions::interrupts::enable();
