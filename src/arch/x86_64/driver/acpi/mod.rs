@@ -4,23 +4,23 @@ mod structs;
 use self::structs::*;
 use consts::*;
 
-pub fn init() -> Result<ACPI_Result, ACPI_Error> {
+pub fn init() -> Result<AcpiResult, AcpiError> {
 	let rsdp = find_rsdp().expect("acpi: rsdp not found.");
-	if rsdp.RsdtPhysicalAddress > PHYSICAL_MEMORY_LIMIT {
-		return Err(ACPI_Error::NotMapped);
+	if rsdp.rsdt_physical_address > PHYSICAL_MEMORY_LIMIT {
+		return Err(AcpiError::NotMapped);
 	}
-	debug!("RSDT at {:#x}", rsdp.RsdtPhysicalAddress);
-	let rsdt = unsafe{ &*(rsdp.RsdtPhysicalAddress as *const rsdt) };
-	let mut madt: Option<&'static madt> = None;
+	debug!("RSDT at {:#x}", rsdp.rsdt_physical_address);
+	let rsdt = unsafe{ &*(rsdp.rsdt_physical_address as *const Rsdt) };
+	let mut madt: Option<&'static Madt> = None;
 	for i in 0 .. rsdt.entry_count() {
 		let entry = rsdt.entry_at(i);
 		if entry > PHYSICAL_MEMORY_LIMIT {
-			return Err(ACPI_Error::NotMapped);
+			return Err(AcpiError::NotMapped);
 		}
-		let header = unsafe{ &*(entry as *const header) };
+		let header = unsafe{ &*(entry as *const Header) };
 		// debug!("{:?}", header);
-		if &header.Signature == b"APIC" {
-			madt = Some(unsafe{ &*(entry as *const madt) });
+		if &header.signature == b"APIC" {
+			madt = Some(unsafe{ &*(entry as *const Madt) });
 		}
 	}
 	debug!("{:?}", madt);
@@ -33,7 +33,7 @@ const PHYSICAL_MEMORY_LIMIT: u32 = 0x0E000000;
 const PHYSICAL_MEMORY_LIMIT: u32 = 0x80000000;
 
 #[derive(Debug)]
-pub struct ACPI_Result {
+pub struct AcpiResult {
 	pub cpu_num: u8,
 	pub cpu_acpi_ids: [u8; MAX_CPU_NUM],
 	pub ioapic_id: u8,
@@ -41,13 +41,13 @@ pub struct ACPI_Result {
 }
 
 #[derive(Debug)]
-pub enum ACPI_Error {
+pub enum AcpiError {
 	NotMapped,
-	IOACPI_NotFound,
+	IoacpiNotFound,
 }
 
-fn config_smp(madt: &'static madt) -> Result<ACPI_Result, ACPI_Error> {
-	let lapic_addr = madt.LapicAddress as *const ();
+fn config_smp(madt: &'static Madt) -> Result<AcpiResult, AcpiError> {
+	let lapic_addr = madt.lapic_address as *const ();
 
 	let mut cpu_num = 0u8;
 	let mut cpu_acpi_ids: [u8; MAX_CPU_NUM] = [0; MAX_CPU_NUM];
@@ -56,33 +56,33 @@ fn config_smp(madt: &'static madt) -> Result<ACPI_Result, ACPI_Error> {
 		debug!("{:?}", entry);
 		match &entry {
 			&MadtEntry::LocalApic(ref lapic) => {
-				cpu_acpi_ids[cpu_num as usize] = lapic.Id;
+				cpu_acpi_ids[cpu_num as usize] = lapic.id;
 				cpu_num += 1;
 			},
 			&MadtEntry::IoApic(ref ioapic) => {
-				ioapic_id = Some(ioapic.Id);
+				ioapic_id = Some(ioapic.id);
 			},
 			_ => {},
 		}
 	}
 
 	if ioapic_id.is_none() {
-		return Err(ACPI_Error::IOACPI_NotFound);
+		return Err(AcpiError::IoacpiNotFound);
 	}
 	let ioapic_id = ioapic_id.unwrap();
-	Ok(ACPI_Result { cpu_num, cpu_acpi_ids, ioapic_id, lapic_addr })
+	Ok(AcpiResult { cpu_num, cpu_acpi_ids, ioapic_id, lapic_addr })
 }
 
 /// See https://wiki.osdev.org/RSDP -- Detecting the RSDP
-fn find_rsdp() -> Option<&'static rsdp> {
+fn find_rsdp() -> Option<&'static Rsdp> {
 	use util::{Checkable, find_in_memory};
 	let ebda = unsafe { *(0x40E as *const u16) as usize } << 4;
 	debug!("EBDA at {:#x}", ebda);
 
 	macro_rules! return_if_find_in {
 		($begin:expr, $end:expr) => (
-			if let Some(addr) = unsafe{ find_in_memory::<rsdp>($begin, $end, 4) } {
-				return Some(unsafe{ &*(addr as *const rsdp) });
+			if let Some(addr) = unsafe{ find_in_memory::<Rsdp>($begin, $end, 4) } {
+				return Some(unsafe{ &*(addr as *const Rsdp) });
 			}
 		)
 	}

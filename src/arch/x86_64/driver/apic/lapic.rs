@@ -1,4 +1,5 @@
 extern {
+	//noinspection RsStaticConstNaming
 	static mut lapic: *const ();
 	fn lapicinit();	// must set `lapic` first
 	fn lapiceoi();	// ack

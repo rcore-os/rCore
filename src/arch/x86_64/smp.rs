@@ -1,5 +1,5 @@
-use arch::driver::{acpi::ACPI_Result, apic::start_ap};
-use memory::{MemoryController, PhysicalAddress};
+use arch::driver::{acpi::AcpiResult, apic::start_ap};
+use memory::{MemoryController, PhysAddr};
 
 extern {
     fn entryother_start();  // physical addr of entryother
@@ -8,11 +8,11 @@ extern {
 
 const ENTRYOTHER_ADDR: u32 = 0x7000;
 
-pub fn start_other_cores(acpi: &ACPI_Result, mc: &mut MemoryController) {
+pub fn start_other_cores(acpi: &AcpiResult, mc: &mut MemoryController) {
     mc.map_page_identity(ENTRYOTHER_ADDR as usize - 1);
     mc.map_page_identity(ENTRYOTHER_ADDR as usize);
     mc.map_page_identity(entryother_start as usize);
-    mc.map_page_p2v(PhysicalAddress(0));
+    mc.map_page_p2v(PhysAddr(0));
     copy_entryother();
 
     let args = unsafe{ &mut *(ENTRYOTHER_ADDR as *mut EntryArgs).offset(-1) };
@@ -21,7 +21,7 @@ pub fn start_other_cores(acpi: &ACPI_Result, mc: &mut MemoryController) {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
         *args = EntryArgs {
             kstack: mc.alloc_stack(7).unwrap().top() as u64,
-            page_table: page_table,
+            page_table,
             stack: 0x8000, // just enough stack to get us to entry64mp
         };
         start_ap(apic_id, ENTRYOTHER_ADDR);
