@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
-use memory::FrameAllocator;
+use memory::alloc_frame;
 use super::entry::*;
 use super::ENTRY_COUNT;
 
@@ -40,16 +40,12 @@ impl<L> Table<L> where L: HierarchicalLevel {
             .map(|address| unsafe { &mut *(address as *mut _) })
     }
 
-    pub fn next_table_create<A>(&mut self,
-                                index: usize,
-                                allocator: &mut A)
-                                -> &mut Table<L::NextLevel>
-        where A: FrameAllocator
+    pub fn next_table_create(&mut self, index: usize) -> &mut Table<L::NextLevel>
     {
         if self.next_table(index).is_none() {
             assert!(!self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
                     "mapping code does not support huge pages");
-            let frame = allocator.allocate_frame().expect("no frames available");
+            let frame = alloc_frame();
             // TODO: Remove USER_ACCESSIBLE
             self.entries[index].set(frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
             self.next_table_mut(index).unwrap().zero();
@@ -98,52 +94,4 @@ impl HierarchicalLevel for Level3 {
 
 impl HierarchicalLevel for Level2 {
     type NextLevel = Level1;
-}
-
-
-use core::fmt;
-use core::fmt::Debug;
-
-impl Debug for Table<Level4> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        // Ignore the 511th recursive entry
-        let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused() && *i != 511usize);
-        for (i, e) in entries {
-            write!(f, "{:3X}: {:?}\n", i, e)?;
-            write!(f, "{:?}", self.next_table(i).unwrap())?;
-        }
-        Ok(())
-    }
-}
-
-impl Debug for Table<Level3> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
-        for (i, e) in entries {
-            write!(f, "  {:3X}: {:?}\n", i, e)?;
-            write!(f, "{:?}", self.next_table(i).unwrap())?;
-        }
-        Ok(())
-    }
-}
-
-impl Debug for Table<Level2> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
-        for (i, e) in entries {
-            write!(f, "    {:3X}: {:?}\n", i, e)?;
-            write!(f, "{:?}", self.next_table(i).unwrap())?;
-        }
-        Ok(())
-    }
-}
-
-impl Debug for Table<Level1> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let entries = self.entries.iter().enumerate().filter(|(i, e)| !e.is_unused());
-        for (i, e) in entries {
-            write!(f, "      {:3X}: {:?}\n", i, e)?;
-        }
-        Ok(())
-    }
 }

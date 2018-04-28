@@ -14,7 +14,7 @@ user_object_files := $(wildcard user/*.o)
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio
 features := use_apic
 
-link_user = 1
+#link_user = 1
 
 ifdef link_user
 features := $(features) link_user_program

@@ -172,13 +172,3 @@ impl InactivePageTable {
         InactivePageTable { p4_frame: frame }
     }
 }
-
-use core::fmt;
-use core::fmt::Debug;
-
-impl Debug for ActivePageTable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "ActivePageTable:\n")?;
-        write!(f, "{:?}", &self.mapper)
-    }
-}

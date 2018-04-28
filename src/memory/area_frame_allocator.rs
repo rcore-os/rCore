@@ -11,6 +11,9 @@ pub struct AreaFrameAllocator {
     multiboot_end: Frame,
 }
 
+// 必须写这句，否则不能放在Mutex中？？？
+unsafe impl Send for AreaFrameAllocator {}
+
 impl FrameAllocator for AreaFrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame> {
         if let Some(area) = self.current_area {

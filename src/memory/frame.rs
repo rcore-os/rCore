@@ -1,4 +1,5 @@
 use super::address::PhysAddr;
+use memory::FRAME_ALLOCATOR;
 
 pub const PAGE_SIZE: usize = 4096;
 
