@@ -3,7 +3,7 @@ use x86::cpuid::CpuId;
 use x86::msr::*;
 
 use memory::Frame;
-use paging::{ActivePageTable, PhysicalAddress, Page, VirtualAddress};
+use paging::{ActivePageTable, PhysAddr, Page, VirtualAddress};
 use paging::entry::EntryFlags;
 
 pub static mut LOCAL_APIC: LocalApic = LocalApic {
@@ -32,7 +32,7 @@ impl LocalApic {
 
         if ! self.x2 {
             let page = Page::containing_address(VirtualAddress::new(self.address));
-            let frame = Frame::containing_address(PhysicalAddress::new(self.address - ::KERNEL_OFFSET));
+            let frame = Frame::containing_address(PhysAddr::new(self.address - ::KERNEL_OFFSET));
             let result = active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE);
             result.flush(active_table);
         }

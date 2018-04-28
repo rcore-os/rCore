@@ -6,48 +6,48 @@ use core::mem::size_of;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct rsdp {
-    pub Signature: [u8; 8],
-    pub Checksum: u8,
-    pub OemId: [i8; 6],
-    pub Revision: u8,
-    pub RsdtPhysicalAddress: u32,
-    pub Length: u32,
-    pub XsdtPhysicalAddress: u64,
-    pub ExtendedChecksum: u8,
-    pub Reserved: [u8; 3],
+pub struct Rsdp {
+    pub signature: [u8; 8],
+    pub checksum: u8,
+    pub oem_id: [i8; 6],
+    pub revision: u8,
+    pub rsdt_physical_address: u32,
+    pub length: u32,
+    pub xsdt_physical_address: u64,
+    pub extended_checksum: u8,
+    pub reserved: [u8; 3],
 }
 
-impl Checkable for rsdp {
+impl Checkable for Rsdp {
     fn check(&self) -> bool {
-        &self.Signature == b"RSD PTR " && bytes_sum(self) == 0
+        &self.signature == b"RSD PTR " && bytes_sum(self) == 0
     }
 }
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct header {
-    pub Signature: [u8; 4],
-    pub Length: u32,
-    pub Revision: u8,
-    pub Checksum: u8,
-    pub OemId: [i8; 6],
-    pub OemTableId: [i8; 8],
-    pub OemRevision: u32,
-    pub AslCompilerId: [i8; 4],
-    pub AslCompilerRevision: u32,
+pub struct Header {
+    pub signature: [u8; 4],
+    pub length: u32,
+    pub revision: u8,
+    pub checksum: u8,
+    pub oem_id: [i8; 6],
+    pub oem_table_id: [i8; 8],
+    pub oem_revision: u32,
+    pub asl_compiler_id: [i8; 4],
+    pub asl_compiler_revision: u32,
 }
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct rsdt {
-    pub Header: header,
-    TableOffsetEntry: [u32; 0],
+pub struct Rsdt {
+    pub header: Header,
+    table_offset_entry: [u32; 0],
 }
 
-impl rsdt {
+impl Rsdt {
     pub fn entry_count(&self) -> usize {
-        (self.Header.Length as usize - size_of::<Self>()) / 4
+        (self.header.length as usize - size_of::<Self>()) / 4
     }
     pub fn entry_at(&self, id: usize) -> u32 {
         assert!(id < self.entry_count());
@@ -60,62 +60,62 @@ impl rsdt {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct madt {
-    pub Header: header,
-    pub LapicAddress: u32,
-    pub Flags: u32,
-    Table: [u32; 0],
+pub struct Madt {
+    pub header: Header,
+    pub lapic_address: u32,
+    pub flags: u32,
+    table: [u32; 0],
 }
 
-impl Checkable for madt {
+impl Checkable for Madt {
     fn check(&self) -> bool {
-        &self.Header.Signature == b"APIC" && self.Header.Length >= size_of::<Self>() as u32
+        &self.header.signature == b"APIC" && self.header.length >= size_of::<Self>() as u32
     }
 }
 
 #[derive(Debug)]
 pub enum MadtEntry {
-    Unknown(MadtEntry_Unknown),
-    LocalApic(MadtEntry_LocalApic),
-    IoApic(MadtEntry_IoApic),
+    Unknown(MadtEntryUnknown),
+    LocalApic(MadtEntryLocalApic),
+    IoApic(MadtEntryIoApic),
 }
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct MadtEntry_Unknown {
-    pub Type: u8,
-    pub Length: u8,
+pub struct MadtEntryUnknown {
+    pub type_: u8,
+    pub length: u8,
 }
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct MadtEntry_LocalApic {
-    pub Type: u8,   // 0
-    pub Length: u8,
-    pub ProcessorId: u8,
-    pub Id: u8,
-    pub LapicFlags: u32,
+pub struct MadtEntryLocalApic {
+    pub type_: u8,   // 0
+    pub length: u8,
+    pub processor_id: u8,
+    pub id: u8,
+    pub lapic_flags: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct MadtEntry_IoApic {
-    pub Type: u8,   // 1
-    pub Length: u8,
-    pub Id: u8,
-    pub Reserved: u8,
-    pub Address: u32,
-    pub GlobalIrqBase: u32,
+pub struct MadtEntryIoApic {
+    pub type_: u8,   // 1
+    pub length: u8,
+    pub id: u8,
+    pub reserved: u8,
+    pub address: u32,
+    pub global_irq_base: u32,
 }
 
 #[derive(Debug)]
 pub struct MadtEntryIter<'a> {
-    madt: &'a madt,
+    madt: &'a Madt,
     ptr: *const u8,
     end_ptr: *const u8,
 }
 
-impl madt {
+impl Madt {
     pub fn entry_iter(&self) -> MadtEntryIter {
         let ptr = unsafe{ (self as *const Self).offset(1) } as *const u8;
-        let end_ptr = unsafe{ ptr.offset(self.Header.Length as isize) };
+        let end_ptr = unsafe{ ptr.offset(self.header.length as isize) };
         MadtEntryIter { madt: self, ptr, end_ptr }
     }
 }
@@ -127,12 +127,12 @@ impl<'a> Iterator for MadtEntryIter<'a> {
             return None;
         }
         unsafe {
-            let typeId = *self.ptr.offset(0);
+            let type_id = *self.ptr.offset(0);
             let len = *self.ptr.offset(1);
-            let ret = Some(match typeId {
-                0 => MadtEntry::LocalApic( (&*(self.ptr as *const MadtEntry_LocalApic)).clone() ),
-                1 => MadtEntry::IoApic( (&*(self.ptr as *const MadtEntry_IoApic)).clone() ),
-                _ => MadtEntry::Unknown( (&*(self.ptr as *const MadtEntry_Unknown)).clone() ),
+            let ret = Some(match type_id {
+                0 => MadtEntry::LocalApic( (&*(self.ptr as *const MadtEntryLocalApic)).clone() ),
+                1 => MadtEntry::IoApic( (&*(self.ptr as *const MadtEntryIoApic)).clone() ),
+                _ => MadtEntry::Unknown( (&*(self.ptr as *const MadtEntryUnknown)).clone() ),
             });        
             self.ptr = self.ptr.offset(len as isize);
             ret       

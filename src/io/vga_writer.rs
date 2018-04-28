@@ -21,7 +21,7 @@ impl VgaWriter {
 		VgaWriter {
 			column_position: 0,
 			color: Color::LightGray,
-			buffer: buffer,
+			buffer,
 		}
 	}
 

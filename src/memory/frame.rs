@@ -1,4 +1,4 @@
-use super::address::PhysicalAddress;
+use super::address::PhysAddr;
 
 pub const PAGE_SIZE: usize = 4096;
 
@@ -8,12 +8,12 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn containing_address(address: usize) -> Frame {
+    pub fn of_addr(address: usize) -> Frame {
         Frame{ number: address / PAGE_SIZE }
     }
     //TODO: Set private
-    pub fn start_address(&self) -> PhysicalAddress {
-        PhysicalAddress((self.number * PAGE_SIZE) as u64)
+    pub fn start_address(&self) -> PhysAddr {
+        PhysAddr((self.number * PAGE_SIZE) as u64)
     }
 
     pub fn clone(&self) -> Frame {
@@ -22,8 +22,8 @@ impl Frame {
     //TODO: Set private    
     pub fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
         FrameIter {
-            start: start,
-            end: end,
+            start,
+            end,
         }
     }
 }

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub const MAX_CPU_NUM: usize = 8;
 
 // Copy from Redox consts.rs:

@@ -7,7 +7,7 @@ pub mod pic;
 pub mod keyboard;
 pub mod pit;
 
-pub fn init<F>(mut page_map: F) -> acpi::ACPI_Result
+pub fn init<F>(mut page_map: F) -> acpi::AcpiResult
     where F: FnMut(usize) {
 
     assert_has_not_been_called!();

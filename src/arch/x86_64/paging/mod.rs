@@ -17,7 +17,7 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn containing_address(address: VirtualAddress) -> Page {
+    pub fn of_addr(address: VirtAddr) -> Page {
         assert!(address < 0x0000_8000_0000_0000 ||
             address >= 0xffff_8000_0000_0000,
             "invalid address: 0x{:x}", address);
@@ -43,8 +43,8 @@ impl Page {
 
     pub fn range_inclusive(start: Page, end: Page) -> PageIter {
         PageIter {
-            start: start,
-            end: end,
+            start,
+            end,
         }
     }
 }
@@ -113,7 +113,7 @@ impl ActivePageTable {
         use x86_64::registers::control_regs;
 
         {
-            let backup = Frame::containing_address(
+            let backup = Frame::of_addr(
                 control_regs::cr3().0 as usize);
 
             // map temporary_page to current p4 table
@@ -139,7 +139,7 @@ impl ActivePageTable {
         use x86_64::registers::control_regs;
 
         let old_table = InactivePageTable {
-            p4_frame: Frame::containing_address(
+            p4_frame: Frame::of_addr(
                 control_regs::cr3().0 as usize
             ),
         };

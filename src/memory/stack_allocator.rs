@@ -64,8 +64,8 @@ impl Stack {
     pub(super) fn new(top: usize, bottom: usize) -> Stack {
         assert!(top > bottom);
         Stack {
-            top: top,
-            bottom: bottom,
+            top,
+            bottom,
         }
     }
 

@@ -1,6 +1,6 @@
 use super::{Page, ActivePageTable};
 use super::table::{Table, Level1};
-use memory::{Frame, FrameAllocator, VirtualAddress};
+use memory::{Frame, FrameAllocator, VirtAddr};
 
 pub struct TemporaryPage {
     page: Page,
@@ -12,7 +12,7 @@ impl TemporaryPage {
         where A: FrameAllocator
     {
         TemporaryPage {
-            page: page,
+            page,
             allocator: TinyAllocator::new(allocator),
         }
     }
@@ -20,7 +20,7 @@ impl TemporaryPage {
     /// Maps the temporary page to the given frame in the active table.
     /// Returns the start address of the temporary page.
     pub fn map(&mut self, frame: Frame, active_table: &mut ActivePageTable)
-        -> VirtualAddress
+        -> VirtAddr
     {
         use super::entry::EntryFlags;
 
