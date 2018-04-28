@@ -32,6 +32,7 @@ extern crate linked_list_allocator;
 extern crate lazy_static;
 extern crate bit_field;
 extern crate syscall;
+extern crate xmas_elf;
 
 #[macro_use]    // print!
 mod io;

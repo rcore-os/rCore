@@ -6,6 +6,8 @@ KERNEL_OFFSET = 0xffffff0000000000;
 
 SECTIONS {
 
+  /* bootloader for first processor */
+
   . = BOOT_OFFSET;
 
   .rodata.32 :
@@ -39,7 +41,15 @@ SECTIONS {
   entryother_end = . - OTHER_OFFSET + entryother_start;
   . = entryother_end;           /* recover va */
 
+  /* kernel */
+
   . += KERNEL_OFFSET;
+
+  .user ALIGN(4K): AT(ADDR(.user) - KERNEL_OFFSET)
+  {
+    KEEP(user/*.o (.data))
+    . = ALIGN(4K);
+  }
 
   .rodata : AT(ADDR(.rodata) - KERNEL_OFFSET)
   {

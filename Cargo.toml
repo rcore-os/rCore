@@ -10,6 +10,7 @@ crate-type = ["staticlib"]
 use_apic = []
 test = []
 qemu_auto_exit = []
+link_user_program = []
 
 [dependencies]
 bit_field = "0.7.0"
@@ -22,6 +23,7 @@ x86_64 = "0.1.2"
 once = "0.3.3"
 linked_list_allocator = "0.5.0"
 redox_syscall = "0.1.37"
+xmas-elf = "0.6"
 
 [build-dependencies]
 cc = "1.0"

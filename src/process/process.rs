@@ -1,5 +1,7 @@
 use super::*;
 use memory::Stack;
+use xmas_elf::ElfFile;
+use core::slice;
 
 #[derive(Debug)]
 pub struct Process {
@@ -46,5 +48,17 @@ impl Process {
             status: Status::Running,
             rsp: 0, // will be set at first schedule
         }
+    }
+
+    pub fn new_user(begin: usize, end: usize) -> Self {
+        let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
+        let elf = ElfFile::new(slice).expect("failed to read elf");
+        for program_header in elf.program_iter() {
+            println!("{:?}", program_header);
+        }
+//        for section in elf.section_iter() {
+//            println!("{:?}", section);
+//        }
+        unimplemented!();
     }
 }
