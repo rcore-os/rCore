@@ -43,7 +43,7 @@ pub fn init(mc: &mut MemoryController) {
         let idleproc = Process::new("idle", idle_thread, mc);
         #[cfg(feature = "link_user_program")]
         let forktest = Process::new_user(_binary_user_forktest_start as usize,
-                                         _binary_user_forktest_end as usize);
+                                         _binary_user_forktest_end as usize, mc);
         processor.add(initproc);
         processor.add(idleproc);
         processor

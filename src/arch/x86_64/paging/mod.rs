@@ -103,15 +103,12 @@ impl ActivePageTable {
         }
     }
 
-    pub fn with<F>(&mut self,
-                   table: &mut InactivePageTable,
-                   temporary_page: &mut temporary_page::TemporaryPage, // new
-                   f: F)
-        where F: FnOnce(&mut Mapper)
+    pub fn with(&mut self, table: &mut InactivePageTable, f: impl FnOnce(&mut Mapper))
     {
         use x86_64::instructions::tlb;
         use x86_64::registers::control_regs;
 
+        let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
         {
             let backup = Frame::of_addr(
                 control_regs::cr3().0 as usize);
@@ -155,10 +152,8 @@ pub struct InactivePageTable {
 }
 
 impl InactivePageTable {
-    pub fn new(frame: Frame,
-               active_table: &mut ActivePageTable,
-               temporary_page: &mut TemporaryPage)
-               -> InactivePageTable {
+    pub fn new(frame: Frame, active_table: &mut ActivePageTable) -> InactivePageTable {
+        let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
         {
             let table = temporary_page.map_table_frame(frame.clone(),
                 active_table);

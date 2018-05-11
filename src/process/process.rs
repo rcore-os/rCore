@@ -50,15 +50,38 @@ impl Process {
         }
     }
 
-    pub fn new_user(begin: usize, end: usize) -> Self {
+    pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
         let elf = ElfFile::new(slice).expect("failed to read elf");
         for program_header in elf.program_iter() {
             println!("{:?}", program_header);
         }
-//        for section in elf.section_iter() {
-//            println!("{:?}", section);
-//        }
+        for section in elf.section_iter() {
+            println!("{:?}", section);
+        }
         unimplemented!();
     }
+}
+
+use memory::{MemorySet, MemoryArea};
+
+fn new_memory_set_from_elf(elf: ElfFile, mc: &mut MemoryController) -> MemorySet {
+    use xmas_elf::program::ProgramHeader;
+
+    let mut set = MemorySet::new(mc);
+    for ph in elf.program_iter() {
+        match ph {
+            ProgramHeader::Ph32(ph) => unimplemented!(),
+            ProgramHeader::Ph64(ph) => {
+                set.push(MemoryArea {
+                    start_addr: ph.virtual_addr as usize,
+                    end_addr: (ph.virtual_addr + ph.mem_size) as usize,
+                    flags: ph.flags.0,  // TODO: handle it
+                    name: "",
+                    mapped: false,
+                });
+            },
+        }
+    }
+    set
 }

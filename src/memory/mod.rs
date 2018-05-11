@@ -88,13 +88,11 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
 pub fn remap_the_kernel(boot_info: &BootInformation) -> (ActivePageTable, Stack)
 {
-    let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
-
     let mut active_table = unsafe { ActivePageTable::new() };
     let mut new_table =
-        InactivePageTable::new(alloc_frame(), &mut active_table, &mut temporary_page);
+        InactivePageTable::new(alloc_frame(), &mut active_table);
 
-    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
+    active_table.with(&mut new_table, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag()
             .expect("Memory map tag required");
 
@@ -165,9 +163,8 @@ impl MemoryController {
         stack_allocator.alloc_stack(active_table, size_in_pages)
     }
     pub fn new_page_table(&mut self) -> InactivePageTable {
-        let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
         let frame = alloc_frame();
-        let page_table = InactivePageTable::new(frame, &mut self.active_table, &mut temporary_page);
+        let page_table = InactivePageTable::new(frame, &mut self.active_table);
         page_table
     }
     pub fn map_page_identity(&mut self, addr: usize) {
