@@ -26,7 +26,7 @@ pub fn alloc_frame() -> Frame {
         .allocate_frame().expect("no more frame")
 }
 
-pub fn init(boot_info: &BootInformation) -> MemoryController {
+pub fn init(boot_info: BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
 
     let memory_map_tag = boot_info.memory_map_tag().expect(
@@ -35,9 +35,9 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         "Elf sections tag required");
 
     let kernel_start = PhysAddr(elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.start_address()).min().unwrap() as u64);
+        .filter(|s| s.is_allocated()).map(|s| s.start_address()).min().unwrap());
     let kernel_end = PhysAddr::from_kernel_virtual(elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.end_address()).max().unwrap());
+        .filter(|s| s.is_allocated()).map(|s| s.end_address()).max().unwrap() as usize);
 
     let boot_info_start = PhysAddr(boot_info.start_address() as u64);
     let boot_info_end = PhysAddr(boot_info.end_address() as u64);
@@ -66,7 +66,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     }
 }
 
-pub fn remap_the_kernel(boot_info: &BootInformation) -> (ActivePageTable, Stack)
+pub fn remap_the_kernel(boot_info: BootInformation) -> (ActivePageTable, Stack)
 {
     let mut active_table = unsafe { ActivePageTable::new() };
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
@@ -115,8 +115,8 @@ pub fn remap_the_kernel(boot_info: &BootInformation) -> (ActivePageTable, Stack)
 
 use multiboot2::{ElfSectionsTag, ElfSection, ElfSectionFlags};
 
-impl From<&'static ElfSectionsTag> for MemorySet {
-    fn from(sections: &'static ElfSectionsTag) -> Self {
+impl From<ElfSectionsTag> for MemorySet {
+    fn from(sections: ElfSectionsTag) -> Self {
         assert_has_not_been_called!();
         // WARNING: must ensure it's large enough
         static mut SPACE: [u8; 0x1000] = [0; 0x1000];
@@ -132,26 +132,29 @@ impl From<&'static ElfSectionsTag> for MemorySet {
     }
 }
 
-impl<'a> From<&'a ElfSection> for MemoryArea {
-    fn from(section: &'a ElfSection) -> Self {
+impl From<ElfSection> for MemoryArea {
+    fn from(section: ElfSection) -> Self {
         use self::address::FromToVirtualAddress;
-        assert_eq!(section.start_address() % PAGE_SIZE, 0, "sections need to be page aligned");
-        if section.start_address() < KERNEL_OFFSET {
+        let start_addr = section.start_address() as usize;
+        let end_addr = section.end_address() as usize;
+        assert_eq!(start_addr % PAGE_SIZE, 0, "sections need to be page aligned");
+        let name = unsafe { &*(section.name() as *const str) };
+        if start_addr < KERNEL_OFFSET {
             MemoryArea {
-                start_addr: section.start_address() + KERNEL_OFFSET,
-                end_addr: section.end_address() + KERNEL_OFFSET,
+                start_addr: start_addr + KERNEL_OFFSET,
+                end_addr: end_addr + KERNEL_OFFSET,
                 phys_start_addr: Some(PhysAddr(section.start_address() as u64)),
                 flags: EntryFlags::from(section.flags()).bits() as u32,
-                name: "",
+                name,
                 mapped: false,
             }
         } else {
             MemoryArea {
-                start_addr: section.start_address(),
-                end_addr: section.end_address(),
-                phys_start_addr: Some(PhysAddr::from_kernel_virtual(section.start_address())),
+                start_addr,
+                end_addr,
+                phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
                 flags: EntryFlags::from(section.flags()).bits() as u32,
-                name: "",
+                name,
                 mapped: false,
             }
         }
@@ -160,19 +163,16 @@ impl<'a> From<&'a ElfSection> for MemoryArea {
 
 impl From<ElfSectionFlags> for EntryFlags {
     fn from(elf_flags: ElfSectionFlags) -> Self {
-        use multiboot2::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE,
-                         ELF_SECTION_EXECUTABLE};
-
         let mut flags = EntryFlags::empty();
 
-        if elf_flags.contains(ELF_SECTION_ALLOCATED) {
+        if elf_flags.contains(ElfSectionFlags::ALLOCATED) {
             // section is loaded to memory
             flags = flags | EntryFlags::PRESENT;
         }
-        if elf_flags.contains(ELF_SECTION_WRITABLE) {
+        if elf_flags.contains(ElfSectionFlags::WRITABLE) {
             flags = flags | EntryFlags::WRITABLE;
         }
-        if !elf_flags.contains(ELF_SECTION_EXECUTABLE) {
+        if !elf_flags.contains(ElfSectionFlags::EXECUTABLE) {
             flags = flags | EntryFlags::NO_EXECUTE;
         }
         flags

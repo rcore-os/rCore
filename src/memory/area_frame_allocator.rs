@@ -23,7 +23,7 @@ impl FrameAllocator for AreaFrameAllocator {
 
             // the last frame of the current area
             let current_area_last_frame = {
-                let address = area.base_addr + area.length - 1;
+                let address = area.end_address() - 1;
                 Frame::of_addr(address as usize)
             };
 
@@ -77,12 +77,12 @@ impl AreaFrameAllocator {
 
     fn choose_next_area(&mut self) {
         self.current_area = self.areas.clone().filter(|area| {
-            let address = area.base_addr + area.length - 1;
+            let address = area.end_address() - 1;
             Frame::of_addr(address as usize) >= self.next_free_frame
-        }).min_by_key(|area| area.base_addr);
+        }).min_by_key(|area| area.start_address());
 
         if let Some(area) = self.current_area {
-            let start_frame = Frame::of_addr(area.base_addr as usize);
+            let start_frame = Frame::of_addr(area.start_address());
             if self.next_free_frame < start_frame {
                 self.next_free_frame = start_frame;
             }
