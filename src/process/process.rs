@@ -1,8 +1,9 @@
 use super::*;
 use memory::{Stack, InactivePageTable};
-use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}};
+use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
 use core::slice;
 use alloc::rc::Rc;
+use rlibc::memcpy;
 
 #[derive(Debug)]
 pub struct Process {
@@ -58,19 +59,32 @@ impl Process {
     }
 
     pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
+        // Parse elf
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
         let elf = ElfFile::new(slice).expect("failed to read elf");
-        let phys_start = PhysAddr::from_kernel_virtual(begin);
-        let mut memory_set = MemorySet::from((&elf, phys_start));
+
+        // Make page table
+        let mut memory_set = MemorySet::from(&elf);
         let page_table = mc.make_page_table(&mut memory_set);
         debug!("{:#x?}", memory_set);
 
-        use xmas_elf::header::HeaderPt2;
+        // Temporary switch to it, in order to copy data
+        let page_table = mc.with(page_table, || {
+            for ph in elf.program_iter() {
+                let ph = match ph {
+                    ProgramHeader::Ph64(ph) => ph,
+                    _ => unimplemented!(),
+                };
+                unsafe { memcpy(ph.virtual_addr as *mut u8, (begin + ph.offset as usize) as *mut u8, ph.file_size as usize) };
+            }
+        });
+
         let entry_addr = match elf.header.pt2 {
             HeaderPt2::Header64(header) => header.entry_point,
             _ => unimplemented!(),
         } as usize;
 
+        // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
         let tf = TrapFrame::new_user_thread(entry_addr, kstack.top());
         let rsp = kstack.push_at_top(tf);
@@ -90,9 +104,8 @@ impl Process {
 
 use memory::{MemorySet, MemoryArea, PhysAddr, FromToVirtualAddress, EntryFlags};
 
-impl<'a> From<(&'a ElfFile<'a>, PhysAddr)> for MemorySet {
-    fn from(input: (&'a ElfFile<'a>, PhysAddr)) -> Self {
-        let (elf, phys_start) = input;
+impl<'a> From<&'a ElfFile<'a>> for MemorySet {
+    fn from(elf: &'a ElfFile<'a>) -> Self {
         let mut set = MemorySet::new();
         for ph in elf.program_iter() {
             let ph = match ph {
@@ -102,7 +115,7 @@ impl<'a> From<(&'a ElfFile<'a>, PhysAddr)> for MemorySet {
             set.push(MemoryArea {
                 start_addr: ph.virtual_addr as usize,
                 end_addr: (ph.virtual_addr + ph.mem_size) as usize,
-                phys_start_addr: Some(PhysAddr(phys_start.get() as u64 + ph.offset)),
+                phys_start_addr: None,
                 flags: EntryFlags::from(ph.flags).bits() as u32,
                 name: "",
                 mapped: false,

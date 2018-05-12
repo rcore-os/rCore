@@ -19,7 +19,11 @@ impl MemoryArea {
         addr >= self.start_addr && addr < self.end_addr
     }
     fn is_overlap_with(&self, other: &MemoryArea) -> bool {
-        !(self.end_addr <= other.start_addr || self.start_addr >= other.end_addr)
+        let p0 = Page::of_addr(self.start_addr);
+        let p1 = Page::of_addr(self.end_addr - 1) + 1;
+        let p2 = Page::of_addr(other.start_addr);
+        let p3 = Page::of_addr(other.end_addr - 1) + 1;
+        !(p1 <= p2 || p0 >= p3)
     }
 }
 
@@ -50,7 +54,11 @@ impl MemorySet {
         self.areas.iter().find(|area| area.contains(addr))
     }
     pub fn push(&mut self, area: MemoryArea) {
-        debug_assert!(area.start_addr <= area.end_addr, "invalid memory area");
+        assert!(area.start_addr <= area.end_addr, "invalid memory area");
+        if let Some(phys_addr) = area.phys_start_addr {
+            assert_eq!(area.start_addr % PAGE_SIZE, phys_addr.get() % PAGE_SIZE,
+                       "virtual & physical start address must have same page offset");
+        }
         assert!(self.areas.iter()
             .find(|other| area.is_overlap_with(other))
                     .is_none(), "memory area overlap");

@@ -225,4 +225,9 @@ impl MemoryController {
         });
         page_table
     }
+    pub fn with(&mut self, page_table: InactivePageTable, mut f: impl FnMut()) -> InactivePageTable {
+        let backup = self.active_table.switch(page_table);
+        f();
+        self.active_table.switch(backup)
+    }
 }
