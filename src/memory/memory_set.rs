@@ -6,15 +6,48 @@ use core::fmt::{Debug, Formatter, Error};
 /// 对应ucore中 `vma_struct`
 #[derive(Debug, Eq, PartialEq)]
 pub struct MemoryArea {
-    pub start_addr: VirtAddr,
-    pub end_addr: VirtAddr,
-    pub phys_start_addr: Option<PhysAddr>,
-    pub flags: u32,
-    pub name: &'static str,
-    pub mapped: bool,
+    start_addr: VirtAddr,
+    end_addr: VirtAddr,
+    phys_start_addr: Option<PhysAddr>,
+    flags: u64,
+    name: &'static str,
+    mapped: bool,
 }
 
 impl MemoryArea {
+    pub fn new(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        MemoryArea {
+            start_addr,
+            end_addr,
+            phys_start_addr: None,
+            flags: flags.bits(),
+            name,
+            mapped: false,
+        }
+    }
+    pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        MemoryArea {
+            start_addr,
+            end_addr,
+            phys_start_addr: Some(PhysAddr(start_addr as u64)),
+            flags: flags.bits(),
+            name,
+            mapped: false,
+        }
+    }
+    pub fn new_kernel(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        MemoryArea {
+            start_addr,
+            end_addr,
+            phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
+            flags: flags.bits(),
+            name,
+            mapped: false,
+        }
+    }
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
     }
@@ -54,11 +87,6 @@ impl MemorySet {
         self.areas.iter().find(|area| area.contains(addr))
     }
     pub fn push(&mut self, area: MemoryArea) {
-        assert!(area.start_addr <= area.end_addr, "invalid memory area");
-        if let Some(phys_addr) = area.phys_start_addr {
-            assert_eq!(area.start_addr % PAGE_SIZE, phys_addr.get() % PAGE_SIZE,
-                       "virtual & physical start address must have same page offset");
-        }
         assert!(self.areas.iter()
             .find(|other| area.is_overlap_with(other))
                     .is_none(), "memory area overlap");

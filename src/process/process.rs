@@ -64,7 +64,10 @@ impl Process {
         let elf = ElfFile::new(slice).expect("failed to read elf");
 
         // Make page table
+        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
         let mut memory_set = MemorySet::from(&elf);
+        memory_set.push(MemoryArea::new(USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE,
+                                        EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
         let page_table = mc.make_page_table(&mut memory_set);
         debug!("{:#x?}", memory_set);
 
@@ -86,7 +89,7 @@ impl Process {
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = TrapFrame::new_user_thread(entry_addr, kstack.top());
+        let tf = TrapFrame::new_user_thread(entry_addr, USER_STACK_OFFSET + USER_STACK_SIZE);
         let rsp = kstack.push_at_top(tf);
 
         Process {
@@ -112,14 +115,11 @@ impl<'a> From<&'a ElfFile<'a>> for MemorySet {
                 ProgramHeader::Ph64(ph) => ph,
                 _ => unimplemented!(),
             };
-            set.push(MemoryArea {
-                start_addr: ph.virtual_addr as usize,
-                end_addr: (ph.virtual_addr + ph.mem_size) as usize,
-                phys_start_addr: None,
-                flags: EntryFlags::from(ph.flags).bits() as u32,
-                name: "",
-                mapped: false,
-            });
+            set.push(MemoryArea::new(
+                ph.virtual_addr as usize,
+                (ph.virtual_addr + ph.mem_size) as usize,
+                EntryFlags::from(ph.flags),
+                ""));
         }
         set
     }

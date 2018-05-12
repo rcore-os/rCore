@@ -71,30 +71,9 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> (ActivePageTable, Stack)
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    memory_set.push(MemoryArea {
-        start_addr: 0xb8000,
-        end_addr: 0xb9000,
-        phys_start_addr: Some(PhysAddr(0xb8000)),
-        flags: EntryFlags::WRITABLE.bits() as u32,
-        name: "VGA",
-        mapped: false,
-    });
-    memory_set.push(MemoryArea {
-        start_addr: boot_info.start_address(),
-        end_addr: boot_info.end_address(),
-        phys_start_addr: Some(PhysAddr(boot_info.start_address() as u64)),
-        flags: EntryFlags::PRESENT.bits() as u32,
-        name: "multiboot",
-        mapped: false,
-    });
-    memory_set.push(MemoryArea {
-        start_addr: KERNEL_HEAP_OFFSET,
-        end_addr: KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
-        phys_start_addr: None,
-        flags: EntryFlags::WRITABLE.bits() as u32,
-        name: "kernel_heap",
-        mapped: false,
-    });
+    memory_set.push(MemoryArea::new_identity(0xb8000, 0xb9000, EntryFlags::WRITABLE, "VGA"));
+    memory_set.push(MemoryArea::new_identity(boot_info.start_address(), boot_info.end_address(), EntryFlags::PRESENT, "multiboot"));
+    memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, EntryFlags::WRITABLE, "kernel_heap"));
 
     let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);
     active_table.with(&mut page_table, |pt| memory_set.map(pt));
@@ -136,29 +115,15 @@ impl From<ElfSectionsTag> for MemorySet {
 impl From<ElfSection> for MemoryArea {
     fn from(section: ElfSection) -> Self {
         use self::address::FromToVirtualAddress;
-        let start_addr = section.start_address() as usize;
-        let end_addr = section.end_address() as usize;
+        let mut start_addr = section.start_address() as usize;
+        let mut end_addr = section.end_address() as usize;
         assert_eq!(start_addr % PAGE_SIZE, 0, "sections need to be page aligned");
         let name = unsafe { &*(section.name() as *const str) };
         if start_addr < KERNEL_OFFSET {
-            MemoryArea {
-                start_addr: start_addr + KERNEL_OFFSET,
-                end_addr: end_addr + KERNEL_OFFSET,
-                phys_start_addr: Some(PhysAddr(section.start_address() as u64)),
-                flags: EntryFlags::from(section.flags()).bits() as u32,
-                name,
-                mapped: false,
-            }
-        } else {
-            MemoryArea {
-                start_addr,
-                end_addr,
-                phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
-                flags: EntryFlags::from(section.flags()).bits() as u32,
-                name,
-                mapped: false,
-            }
+            start_addr += KERNEL_OFFSET;
+            end_addr += KERNEL_OFFSET;
         }
+        MemoryArea::new_kernel(start_addr, end_addr, EntryFlags::from(section.flags()), name)
     }
 }
 
