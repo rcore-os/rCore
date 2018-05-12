@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use super::*;
+use core::fmt::{Debug, Formatter, Error};
 
 /// 一片连续内存空间，有相同的访问权限
 /// 对应ucore中 `vma_struct`
@@ -7,6 +8,7 @@ use super::*;
 pub struct MemoryArea {
     pub start_addr: VirtAddr,
     pub end_addr: VirtAddr,
+    pub phys_start_addr: Option<PhysAddr>,
     pub flags: u32,
     pub name: &'static str,
     pub mapped: bool,
@@ -25,14 +27,23 @@ impl MemoryArea {
 /// 对应ucore中 `mm_struct`
 pub struct MemorySet {
     areas: Vec<MemoryArea>,
-    page_table: InactivePageTable,
+    pub(in memory) page_table: Option<InactivePageTable>,
 }
 
 impl MemorySet {
-    pub fn new(mc: &mut MemoryController) -> Self {
+    pub fn new() -> Self {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
-            page_table: mc.new_page_table(),
+            page_table: None,
+        }
+    }
+    /// Used for remap_kernel() where heap alloc is unavailable
+    pub unsafe fn new_from_raw_space(slice: &mut [u8]) -> Self {
+        use core::mem::size_of;
+        let cap = slice.len() / size_of::<MemoryArea>();
+        MemorySet {
+            areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
+            page_table: None,
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -47,8 +58,38 @@ impl MemorySet {
         }
         self.areas.push(area);
     }
-    pub fn map(&mut self, mc: &mut MemoryController) {
-//        mc.active_table.with(self.page_table, )
+    pub fn map(&mut self, active_table: &mut ActivePageTable) {
+        let mut page_table = InactivePageTable::new(alloc_frame(), active_table);
+        active_table.with(&mut page_table, |pt: &mut Mapper| {
+            for area in self.areas.iter_mut() {
+                if area.mapped {
+                    continue
+                }
+                match area.phys_start_addr {
+                    Some(phys_start) => {
+                        for page in Page::range_of(area.start_addr, area.end_addr) {
+                            let frame = Frame::of_addr(phys_start.get() + page.start_address() - area.start_addr);
+                            pt.map_to(page, frame.clone(), EntryFlags::from_bits(area.flags.into()).unwrap());
+                        }
+                    },
+                    None => {
+                        for page in Page::range_of(area.start_addr, area.end_addr) {
+                            pt.map(page, EntryFlags::from_bits(area.flags.into()).unwrap());
+                        }
+                    },
+                }
+                area.mapped = true;
+            }
+        });
+        self.page_table = Some(page_table);
+    }
+}
+
+impl Debug for MemorySet {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.debug_list()
+            .entries(self.areas.iter())
+            .finish()
     }
 }
 

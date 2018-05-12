@@ -2,13 +2,14 @@ use super::*;
 use memory::Stack;
 use xmas_elf::ElfFile;
 use core::slice;
+use alloc::rc::Rc;
 
 #[derive(Debug)]
 pub struct Process {
     pub(in process) pid: Pid,
                     name: &'static str,
                     kstack: Stack,
-    //    page_table: Box<PageTable>,
+    //                    memory_set: Rc<MemorySet>,
     pub(in process) status: Status,
     pub(in process) rsp: usize,
 }
@@ -53,35 +54,34 @@ impl Process {
     pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
         let elf = ElfFile::new(slice).expect("failed to read elf");
-        for program_header in elf.program_iter() {
-            println!("{:?}", program_header);
-        }
-        for section in elf.section_iter() {
-            println!("{:?}", section);
-        }
+        let mut set = MemorySet::from(&elf);
+//        set.map(mc);
         unimplemented!();
     }
 }
 
 use memory::{MemorySet, MemoryArea};
 
-fn new_memory_set_from_elf(elf: ElfFile, mc: &mut MemoryController) -> MemorySet {
-    use xmas_elf::program::ProgramHeader;
+impl<'a> From<&'a ElfFile<'a>> for MemorySet {
+    fn from(elf: &'a ElfFile<'a>) -> Self {
+        use xmas_elf::program::ProgramHeader;
 
-    let mut set = MemorySet::new(mc);
-    for ph in elf.program_iter() {
-        match ph {
-            ProgramHeader::Ph32(ph) => unimplemented!(),
-            ProgramHeader::Ph64(ph) => {
-                set.push(MemoryArea {
-                    start_addr: ph.virtual_addr as usize,
-                    end_addr: (ph.virtual_addr + ph.mem_size) as usize,
-                    flags: ph.flags.0,  // TODO: handle it
-                    name: "",
-                    mapped: false,
-                });
-            },
+        let mut set = MemorySet::new();
+        for ph in elf.program_iter() {
+            match ph {
+                ProgramHeader::Ph32(ph) => unimplemented!(),
+                ProgramHeader::Ph64(ph) => {
+                    set.push(MemoryArea {
+                        start_addr: ph.virtual_addr as usize,
+                        end_addr: (ph.virtual_addr + ph.mem_size) as usize,
+                        phys_start_addr: None,
+                        flags: ph.flags.0,  // TODO: handle it
+                        name: "",
+                        mapped: false,
+                    });
+                },
+            }
         }
+        set
     }
-    set
 }

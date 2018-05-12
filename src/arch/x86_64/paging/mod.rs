@@ -47,6 +47,14 @@ impl Page {
             end,
         }
     }
+
+    /// Iterate pages of address [begin, end)
+    pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageIter {
+        PageIter {
+            start: Page::of_addr(begin),
+            end: Page::of_addr(end - 1),
+        }
+    }
 }
 
 impl Add<usize> for Page {

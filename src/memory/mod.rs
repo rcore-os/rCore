@@ -42,17 +42,6 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let boot_info_start = PhysAddr(boot_info.start_address() as u64);
     let boot_info_end = PhysAddr(boot_info.end_address() as u64);
 
-    println!("kernel start: {:#x}, kernel end: {:#x}",
-             kernel_start,
-             kernel_end);
-    println!("multiboot start: {:#x}, multiboot end: {:#x}",
-             boot_info_start,
-             boot_info_end);
-    println!("memory area:");
-    for area in memory_map_tag.memory_areas() {
-        println!("  addr: {:#x}, size: {:#x}", area.base_addr, area.length);
-    }
-
     *FRAME_ALLOCATOR.lock() = Some(AreaFrameAllocator::new(
         kernel_start, kernel_end,
         boot_info_start, boot_info_end,
@@ -64,18 +53,9 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     use self::paging::Page;
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
 
-    let heap_start_page = Page::of_addr(KERNEL_HEAP_OFFSET);
-    let heap_end_page = Page::of_addr(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE-1);
-
-    for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, EntryFlags::WRITABLE);
-    }
-
     let stack_allocator = {
-        let stack_alloc_start = heap_end_page + 1;
-        let stack_alloc_end = stack_alloc_start + 100;
-        let stack_alloc_range = Page::range_inclusive(stack_alloc_start,
-                                                      stack_alloc_end);
+        let stack_alloc_range = Page::range_of(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
+                                               KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE + 0x100000);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
     
@@ -89,53 +69,37 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 pub fn remap_the_kernel(boot_info: &BootInformation) -> (ActivePageTable, Stack)
 {
     let mut active_table = unsafe { ActivePageTable::new() };
-    let mut new_table =
-        InactivePageTable::new(alloc_frame(), &mut active_table);
+    let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
-    active_table.with(&mut new_table, |mapper| {
-        let elf_sections_tag = boot_info.elf_sections_tag()
-            .expect("Memory map tag required");
-
-        for section in elf_sections_tag.sections() {
-            if !section.is_allocated() {
-                // section is not loaded to memory
-                continue;
-            }
-            assert_eq!(section.start_address() % PAGE_SIZE, 0, "sections need to be page aligned");
-
-            println!("mapping section at addr: {:#x}, size: {:#x}",
-                section.addr, section.size);
-
-            let flags = EntryFlags::from_elf_section_flags(section);
-
-            fn to_physical_frame(addr: usize) -> Frame {
-                Frame::of_addr(
-                    if addr < KERNEL_OFFSET { addr } 
-                    else { addr - KERNEL_OFFSET })
-            }
-
-            let start_frame = to_physical_frame(section.start_address());
-            let end_frame = to_physical_frame(section.end_address() - 1);
-
-            for frame in Frame::range_inclusive(start_frame, end_frame) {
-                let page = Page::of_addr(frame.start_address().to_kernel_virtual());
-                mapper.map_to(page, frame, flags);
-            }
-        }
-
-        // identity map the VGA text buffer
-        let vga_buffer_frame = Frame::of_addr(0xb8000);
-        mapper.identity_map(vga_buffer_frame, EntryFlags::WRITABLE);
-
-        // identity map the multiboot info structure
-        let multiboot_start = Frame::of_addr(boot_info.start_address());
-        let multiboot_end = Frame::of_addr(boot_info.end_address() - 1);
-        for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
-            mapper.identity_map(frame, EntryFlags::PRESENT);
-        }
+    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+    memory_set.push(MemoryArea {
+        start_addr: 0xb8000,
+        end_addr: 0xb9000,
+        phys_start_addr: Some(PhysAddr(0xb8000)),
+        flags: EntryFlags::WRITABLE.bits() as u32,
+        name: "VGA",
+        mapped: false,
     });
+    memory_set.push(MemoryArea {
+        start_addr: boot_info.start_address(),
+        end_addr: boot_info.end_address(),
+        phys_start_addr: Some(PhysAddr(boot_info.start_address() as u64)),
+        flags: EntryFlags::PRESENT.bits() as u32,
+        name: "multiboot",
+        mapped: false,
+    });
+    memory_set.push(MemoryArea {
+        start_addr: KERNEL_HEAP_OFFSET,
+        end_addr: KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
+        phys_start_addr: None,
+        flags: EntryFlags::WRITABLE.bits() as u32,
+        name: "kernel_heap",
+        mapped: false,
+    });
+    memory_set.map(&mut active_table);
+    println!("{:#x?}", memory_set);
 
-    let old_table = active_table.switch(new_table);
+    let old_table = active_table.switch(memory_set.page_table.take().unwrap());
     println!("NEW TABLE!!!");
 
     // turn the stack bottom into a guard page
@@ -147,6 +111,72 @@ pub fn remap_the_kernel(boot_info: &BootInformation) -> (ActivePageTable, Stack)
     println!("guard page at {:#x}", stack_bottom_page.start_address());
 
     (active_table, kernel_stack)
+}
+
+use multiboot2::{ElfSectionsTag, ElfSection, ElfSectionFlags};
+
+impl From<&'static ElfSectionsTag> for MemorySet {
+    fn from(sections: &'static ElfSectionsTag) -> Self {
+        assert_has_not_been_called!();
+        // WARNING: must ensure it's large enough
+        static mut SPACE: [u8; 0x1000] = [0; 0x1000];
+        let mut set = unsafe { MemorySet::new_from_raw_space(&mut SPACE) };
+        for section in sections.sections() {
+            if !section.is_allocated() {
+                // section is not loaded to memory
+                continue;
+            }
+            set.push(MemoryArea::from(section));
+        }
+        set
+    }
+}
+
+impl<'a> From<&'a ElfSection> for MemoryArea {
+    fn from(section: &'a ElfSection) -> Self {
+        use self::address::FromToVirtualAddress;
+        assert_eq!(section.start_address() % PAGE_SIZE, 0, "sections need to be page aligned");
+        if section.start_address() < KERNEL_OFFSET {
+            MemoryArea {
+                start_addr: section.start_address() + KERNEL_OFFSET,
+                end_addr: section.end_address() + KERNEL_OFFSET,
+                phys_start_addr: Some(PhysAddr(section.start_address() as u64)),
+                flags: EntryFlags::from(section.flags()).bits() as u32,
+                name: "",
+                mapped: false,
+            }
+        } else {
+            MemoryArea {
+                start_addr: section.start_address(),
+                end_addr: section.end_address(),
+                phys_start_addr: Some(PhysAddr::from_kernel_virtual(section.start_address())),
+                flags: EntryFlags::from(section.flags()).bits() as u32,
+                name: "",
+                mapped: false,
+            }
+        }
+    }
+}
+
+impl From<ElfSectionFlags> for EntryFlags {
+    fn from(elf_flags: ElfSectionFlags) -> Self {
+        use multiboot2::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE,
+                         ELF_SECTION_EXECUTABLE};
+
+        let mut flags = EntryFlags::empty();
+
+        if elf_flags.contains(ELF_SECTION_ALLOCATED) {
+            // section is loaded to memory
+            flags = flags | EntryFlags::PRESENT;
+        }
+        if elf_flags.contains(ELF_SECTION_WRITABLE) {
+            flags = flags | EntryFlags::WRITABLE;
+        }
+        if !elf_flags.contains(ELF_SECTION_EXECUTABLE) {
+            flags = flags | EntryFlags::NO_EXECUTE;
+        }
+        flags
+    }
 }
 
 pub struct MemoryController {
