@@ -4,7 +4,7 @@
 /// http://www.intel.com/design/chipsets/datashts/29056601.pdf
 /// See also picirq.c.
 
-use syscall::io::{Io, Mmio};
+use redox_syscall::io::{Io, Mmio};
 use bit_field::BitField;
 use arch::interrupt::consts::T_IRQ0;
 use spin::Mutex;

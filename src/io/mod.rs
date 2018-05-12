@@ -48,3 +48,11 @@ pub fn print(args: fmt::Arguments) {
 pub fn debug(args: fmt::Arguments) {
     print_in_color(args, Color::LightRed);
 }
+
+pub fn write(fd: usize, base: *const u8, len: usize) {
+    //    debug!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+    use core::slice;
+    use core::str;
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    print!("{}", str::from_utf8(slice).unwrap());
+}

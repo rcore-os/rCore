@@ -101,5 +101,7 @@ interrupt_stack_p!(to_kernel, stack, {
 });
 
 interrupt_stack_p!(syscall, stack, {
-    println!("\nInterupt: Syscall");
+    println!("\nInterupt: Syscall {}", stack.scratch.rax);
+    use syscall::syscall;
+    syscall(stack);
 });

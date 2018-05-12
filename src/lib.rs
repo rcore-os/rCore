@@ -31,7 +31,7 @@ extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
 extern crate bit_field;
-extern crate syscall;
+extern crate syscall as redox_syscall;
 extern crate xmas_elf;
 
 #[macro_use]    // print!
@@ -43,6 +43,7 @@ mod util;
 mod macros;
 mod consts;
 mod process;
+mod syscall;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

@@ -26,6 +26,7 @@ pub const IRQ_COM1     : u8 =  4;
 pub const IRQ_IDE      : u8 = 14;
 pub const IRQ_ERROR    : u8 = 19;
 pub const IRQ_SPURIOUS : u8 = 31;
-pub const T_SYSCALL    : u8 = 0x80;     // SYSCALL, ONLY FOR THIS PROJ
+pub const T_SYSCALL: u8 = 0x40;
+// SYSCALL, ONLY FOR THIS PROJ
 pub const T_SWITCH_TOU : u8 = 120;      // user/kernel switch
 pub const T_SWITCH_TOK : u8 = 121;      // user/kernel switch

@@ -69,3 +69,7 @@ extern fn idle_thread() {
         }
     }
 }
+
+pub fn fork(tf: &TrapFrame) {
+    unimplemented!()
+}

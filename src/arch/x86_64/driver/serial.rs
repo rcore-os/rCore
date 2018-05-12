@@ -2,7 +2,7 @@
 
 use core::fmt::{self, Write};
 use spin::Mutex;
-use syscall::io::{Io, Pio, Mmio, ReadOnly};
+use redox_syscall::io::{Io, Pio, Mmio, ReadOnly};
 
 pub static COM1: Mutex<Serial> = Mutex::new(Serial::new(0x3F8));
 pub static COM2: Mutex<Serial> = Mutex::new(Serial::new(0x2F8));
