@@ -28,6 +28,12 @@ interrupt_error_p!(general_protection_fault, stack, {
     loop {}
 });
 
+interrupt_stack_p!(invalid_opcode, stack, {
+    println!("\nEXCEPTION: Invalid Opcode");
+    stack.dump();
+    loop {}
+});
+
 #[cfg(feature = "use_apic")]
 use arch::driver::apic::ack;
 #[cfg(not(feature = "use_apic"))]

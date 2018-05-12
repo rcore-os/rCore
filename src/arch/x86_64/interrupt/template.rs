@@ -336,16 +336,18 @@ macro_rules! interrupt_switch {
             let mut rsp: usize;
             asm!("" : "={rsp}"(rsp) : : : "intel", "volatile");
 
-            // Map kernel
-//            $crate::arch::x86_64::pti::map();
-
             // Call inner rust function
             inner(&mut rsp);
 
-            asm!("" : : "{rsp}"(rsp) : : "intel", "volatile");
+            // Set return rsp if to user
+            use arch::gdt;
+            use core::mem::size_of;
+            let tf = &mut *(rsp as *mut TrapFrame);
+            if tf.iret.cs == gdt::UCODE_SELECTOR.0 as usize {
+                gdt::set_ring0_rsp(rsp + size_of::<TrapFrame>());
+            }
 
-            // Unmap kernel
-//            $crate::arch::x86_64::pti::unmap();
+            asm!("" : : "{rsp}"(rsp) : : "intel", "volatile");
 
             // Pop scratch registers and return
             fs_pop!();

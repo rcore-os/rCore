@@ -14,6 +14,7 @@ pub fn init() {
         idt[T_BRKPT].set_handler_fn(breakpoint);
         idt[T_PGFLT].set_handler_fn(page_fault);
         idt[T_GPFLT].set_handler_fn(general_protection_fault);
+        idt[T_ILLOP].set_handler_fn(invalid_opcode);
         idt[T_IRQ0 + IRQ_COM1].set_handler_fn(com1);
         idt[T_IRQ0 + IRQ_COM2].set_handler_fn(com2);
         idt[T_IRQ0 + IRQ_KBD].set_handler_fn(keyboard);
