@@ -27,7 +27,7 @@ impl MemoryArea {
 /// 对应ucore中 `mm_struct`
 pub struct MemorySet {
     areas: Vec<MemoryArea>,
-    pub(in memory) page_table: Option<InactivePageTable>,
+    page_table: Option<InactivePageTable>,
 }
 
 impl MemorySet {
@@ -51,37 +51,42 @@ impl MemorySet {
     }
     pub fn push(&mut self, area: MemoryArea) {
         debug_assert!(area.start_addr <= area.end_addr, "invalid memory area");
-        if self.areas.iter()
+        assert!(self.areas.iter()
             .find(|other| area.is_overlap_with(other))
-            .is_some() {
-            panic!("memory area overlap");
-        }
+                    .is_none(), "memory area overlap");
         self.areas.push(area);
     }
-    pub fn map(&mut self, active_table: &mut ActivePageTable) {
-        let mut page_table = InactivePageTable::new(alloc_frame(), active_table);
-        active_table.with(&mut page_table, |pt: &mut Mapper| {
-            for area in self.areas.iter_mut() {
-                if area.mapped {
-                    continue
-                }
-                match area.phys_start_addr {
-                    Some(phys_start) => {
-                        for page in Page::range_of(area.start_addr, area.end_addr) {
-                            let frame = Frame::of_addr(phys_start.get() + page.start_address() - area.start_addr);
-                            pt.map_to(page, frame.clone(), EntryFlags::from_bits(area.flags.into()).unwrap());
-                        }
-                    },
-                    None => {
-                        for page in Page::range_of(area.start_addr, area.end_addr) {
-                            pt.map(page, EntryFlags::from_bits(area.flags.into()).unwrap());
-                        }
-                    },
-                }
-                area.mapped = true;
+    pub fn map(&mut self, pt: &mut Mapper) {
+        for area in self.areas.iter_mut() {
+            if area.mapped {
+                continue
             }
-        });
-        self.page_table = Some(page_table);
+            match area.phys_start_addr {
+                Some(phys_start) => {
+                    for page in Page::range_of(area.start_addr, area.end_addr) {
+                        let frame = Frame::of_addr(phys_start.get() + page.start_address() - area.start_addr);
+                        pt.map_to(page, frame.clone(), EntryFlags::from_bits(area.flags.into()).unwrap());
+                    }
+                },
+                None => {
+                    for page in Page::range_of(area.start_addr, area.end_addr) {
+                        pt.map(page, EntryFlags::from_bits(area.flags.into()).unwrap());
+                    }
+                },
+            }
+            area.mapped = true;
+        }
+    }
+    pub fn unmap(&mut self, pt: &mut Mapper) {
+        for area in self.areas.iter_mut() {
+            if !area.mapped {
+                continue
+            }
+            for page in Page::range_of(area.start_addr, area.end_addr) {
+                pt.unmap(page);
+            }
+            area.mapped = false;
+        }
     }
 }
 

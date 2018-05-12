@@ -7,9 +7,7 @@ pub mod pic;
 pub mod keyboard;
 pub mod pit;
 
-pub fn init<F>(mut page_map: F) -> acpi::AcpiResult
-    where F: FnMut(usize) {
-
+pub fn init(mut page_map: impl FnMut(usize)) -> acpi::AcpiResult {
     assert_has_not_been_called!();
 
     // TODO Handle this temp page map.

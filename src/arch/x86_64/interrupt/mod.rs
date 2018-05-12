@@ -17,6 +17,16 @@ impl TrapFrame {
         tf.iret.rflags = 0x282;
         tf
     }
+    pub fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
+        use arch::gdt;
+        let mut tf = TrapFrame::default();
+        tf.iret.cs = gdt::UCODE_SELECTOR.0 as usize;
+        tf.iret.rip = entry_addr;
+        tf.iret.ss = gdt::UDATA_SELECTOR.0 as usize;
+        tf.iret.rsp = rsp;
+        tf.iret.rflags = 0x3282;
+        tf
+    }
 }
 
 #[inline(always)]

@@ -46,6 +46,7 @@ pub fn init(mc: &mut MemoryController) {
                                          _binary_user_forktest_end as usize, mc);
         processor.add(initproc);
         processor.add(idleproc);
+        processor.add(forktest);
         processor
     })});
 }

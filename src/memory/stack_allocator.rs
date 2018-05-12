@@ -73,6 +73,13 @@ impl Stack {
     pub fn bottom(&self) -> usize {
         self.bottom
     }
+
+    /// Push a value of type `T` at the top of the stack, return the rsp after.
+    pub fn push_at_top<T>(&self, value: T) -> usize {
+        let ptr = unsafe { (self.top as *mut T).offset(-1) };
+        unsafe { *ptr = value; }
+        ptr as usize
+    }
 }
 
 impl Drop for Stack {

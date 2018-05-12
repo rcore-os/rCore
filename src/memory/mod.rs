@@ -8,7 +8,6 @@ pub use self::memory_set::*;
 use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
 use arch::paging;
-use arch::paging::EntryFlags;
 use spin::Mutex;
 
 mod memory_set;
@@ -96,10 +95,12 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> (ActivePageTable, Stack)
         name: "kernel_heap",
         mapped: false,
     });
-    memory_set.map(&mut active_table);
+
+    let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);
+    active_table.with(&mut page_table, |pt| memory_set.map(pt));
     println!("{:#x?}", memory_set);
 
-    let old_table = active_table.switch(memory_set.page_table.take().unwrap());
+    let old_table = active_table.switch(page_table);
     println!("NEW TABLE!!!");
 
     // turn the stack bottom into a guard page
@@ -207,5 +208,10 @@ impl MemoryController {
         let frame = Frame::of_addr(addr.get());
         let flags = EntryFlags::WRITABLE;
         self.active_table.map_to(page, frame, flags);
+    }
+    pub fn make_page_table(&mut self, set: &mut MemorySet) -> InactivePageTable {
+        let mut page_table = InactivePageTable::new(alloc_frame(), &mut self.active_table);
+        self.active_table.with(&mut page_table, |pt| set.map(pt));
+        page_table
     }
 }
