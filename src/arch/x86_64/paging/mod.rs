@@ -155,6 +155,7 @@ impl ActivePageTable {
     }
 }
 
+#[derive(Debug)]
 pub struct InactivePageTable {
     p4_frame: Frame,
 }

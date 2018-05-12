@@ -211,7 +211,18 @@ impl MemoryController {
     }
     pub fn make_page_table(&mut self, set: &mut MemorySet) -> InactivePageTable {
         let mut page_table = InactivePageTable::new(alloc_frame(), &mut self.active_table);
-        self.active_table.with(&mut page_table, |pt| set.map(pt));
+
+        use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};
+        let e510 = self.active_table.p4()[KERNEL_PML4].clone();
+        let e509 = self.active_table.p4()[KERNEL_HEAP_PML4].clone();
+
+        self.active_table.with(&mut page_table, |pt: &mut Mapper| {
+            set.map(pt);
+
+            pt.p4_mut()[KERNEL_PML4] = e510;
+            pt.p4_mut()[KERNEL_HEAP_PML4] = e509;
+            pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::WRITABLE); // LAPIC
+        });
         page_table
     }
 }

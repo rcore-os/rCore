@@ -18,12 +18,13 @@ pub fn init(mut page_map: impl FnMut(usize)) -> acpi::AcpiResult {
     page_map(0x7fe1000); // RSDT
 
     let acpi = acpi::init().expect("Failed to init ACPI");
+    assert_eq!(acpi.lapic_addr as usize, 0xfee00000);
     debug!("{:?}", acpi);
 
     if cfg!(feature = "use_apic") {
         pic::disable();
 
-        page_map(acpi.lapic_addr as usize);  // LAPIC
+        page_map(0xfee00000);  // LAPIC
         page_map(0xFEC00000);  // IOAPIC
 
         apic::init(acpi.lapic_addr, acpi.ioapic_id);

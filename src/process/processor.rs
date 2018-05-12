@@ -1,4 +1,5 @@
 use alloc::BTreeMap;
+use memory::{ActivePageTable, InactivePageTable};
 use super::*;
 
 #[derive(Debug)]
@@ -61,7 +62,13 @@ impl Processor {
             let process = self.procs.get_mut(&pid).unwrap();
             process.status = Status::Running;
             *rsp = process.rsp;
-            // TODO switch page table
+
+            // switch page table
+            if let Some(page_table) = process.page_table.take() {
+                let mut active_table = unsafe { ActivePageTable::new() };
+                let old_table = active_table.switch(page_table);
+                process.page_table = Some(old_table);
+            }
         }
         self.current_pid = pid;
         debug!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);

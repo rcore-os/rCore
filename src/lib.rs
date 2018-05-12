@@ -83,17 +83,18 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
     unsafe{ arch::interrupt::enable(); }
 
-    unsafe{
-        use arch::syscall;
-        // 在用户模式下触发时钟中断，会导致GPF
-        // （可能是由于没有合理分离栈）
-        no_interrupt!({
-            syscall::switch_to_user();
-            println!("Now in user mode");
-            syscall::switch_to_kernel();
-            println!("Now in kernel mode");
-        });
-    }
+    // 直接进入用户态暂不可用：内核代码用户不可访问
+//    unsafe{
+//        use arch::syscall;
+//        // 在用户模式下触发时钟中断，会导致GPF
+//        // （可能是由于没有合理分离栈）
+//        no_interrupt!({
+//            syscall::switch_to_user();
+//            println!("Now in user mode");
+//            syscall::switch_to_kernel();
+//            println!("Now in kernel mode");
+//        });
+//    }
 
     loop{
         println!("init ...");

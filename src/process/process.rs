@@ -1,5 +1,5 @@
 use super::*;
-use memory::Stack;
+use memory::{Stack, InactivePageTable};
 use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}};
 use core::slice;
 use alloc::rc::Rc;
@@ -9,7 +9,8 @@ pub struct Process {
     pub(in process) pid: Pid,
                     name: &'static str,
                     kstack: Stack,
-    //                    memory_set: Rc<MemorySet>,
+    pub(in process) memory_set: Option<MemorySet>,
+    pub(in process) page_table: Option<InactivePageTable>,
     pub(in process) status: Status,
     pub(in process) rsp: usize,
     pub(in process) is_user: bool,
@@ -33,6 +34,8 @@ impl Process {
             pid: 0,
             name,
             kstack,
+            memory_set: None,
+            page_table: None,
             status: Status::Ready,
             rsp,
             is_user: false,
@@ -46,6 +49,8 @@ impl Process {
             pid: 0,
             name: "init",
             kstack: mc.kernel_stack.take().unwrap(),
+            memory_set: None,
+            page_table: None,
             status: Status::Running,
             rsp: 0, // will be set at first schedule
             is_user: false,
@@ -56,9 +61,9 @@ impl Process {
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
         let elf = ElfFile::new(slice).expect("failed to read elf");
         let phys_start = PhysAddr::from_kernel_virtual(begin);
-        let mut set = MemorySet::from((&elf, phys_start));
-        let page_table = mc.make_page_table(&mut set);
-        debug!("{:#x?}", set);
+        let mut memory_set = MemorySet::from((&elf, phys_start));
+        let page_table = mc.make_page_table(&mut memory_set);
+        debug!("{:#x?}", memory_set);
 
         use xmas_elf::header::HeaderPt2;
         let entry_addr = match elf.header.pt2 {
@@ -74,6 +79,8 @@ impl Process {
             pid: 0,
             name: "user",
             kstack,
+            memory_set: Some(memory_set),
+            page_table: Some(page_table),
             status: Status::Ready,
             rsp,
             is_user: true,
@@ -107,7 +114,7 @@ impl<'a> From<(&'a ElfFile<'a>, PhysAddr)> for MemorySet {
 
 impl From<Flags> for EntryFlags {
     fn from(elf_flags: Flags) -> Self {
-        let mut flags = EntryFlags::PRESENT;
+        let mut flags = EntryFlags::PRESENT | EntryFlags::USER_ACCESSIBLE;
         if elf_flags.is_write() {
             flags = flags | EntryFlags::WRITABLE;
         }

@@ -76,8 +76,7 @@ impl Mapper {
         let mut p1 = p2.next_table_create(page.p2_index());
 
         assert!(p1[page.p1_index()].is_unused());
-        // TODO: Remove USER_ACCESSIBLE
-        p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags::USER_ACCESSIBLE);
+        p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
     }
 
     pub fn map(&mut self, page: Page, flags: EntryFlags)

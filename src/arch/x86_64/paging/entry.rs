@@ -1,5 +1,6 @@
 use memory::Frame;
 
+#[derive(Copy, Clone)]
 pub struct Entry(u64);
 
 impl Entry {
