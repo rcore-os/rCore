@@ -33,6 +33,7 @@ extern crate lazy_static;
 extern crate bit_field;
 extern crate syscall as redox_syscall;
 extern crate xmas_elf;
+extern crate arrayvec;
 
 #[macro_use]    // print!
 mod io;
@@ -76,7 +77,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
     // FIXME: 开启SMP后，导致switch_to_user中设置rsp无效
 //    arch::smp::start_other_cores(&acpi, &mut memory_controller);
-    process::init(&mut memory_controller);
+    process::init(memory_controller);
 
     unsafe{ arch::interrupt::enable(); }
 

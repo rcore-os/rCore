@@ -1,5 +1,5 @@
 use super::*;
-use memory::{Stack, InactivePageTable};
+use memory::{self, Stack, InactivePageTable};
 use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
 use core::slice;
 use alloc::rc::Rc;
@@ -71,7 +71,7 @@ impl Process {
         let mut memory_set = MemorySet::from(&elf);
         memory_set.push(MemoryArea::new(USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE,
                                         EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
-        let page_table = mc.make_page_table(&mut memory_set);
+        let page_table = mc.make_page_table(&memory_set);
         debug!("{:#x?}", memory_set);
 
         // Temporary switch to it, in order to copy data
@@ -108,9 +108,42 @@ impl Process {
     }
 
     /// Fork
-    pub fn fork(&mut self) -> Self {
+    pub fn fork(&self, tf: &TrapFrame, mc: &mut MemoryController) -> Self {
         assert!(self.is_user);
-        unimplemented!()
+
+        // Clone memory set, make a new page table
+        let memory_set = self.memory_set.as_ref().unwrap().clone();
+        let page_table = mc.make_page_table(&memory_set);
+
+        // Copy data to temp space
+        use alloc::Vec;
+        let datas: Vec<Vec<u8>> = memory_set.iter().map(|area| {
+            Vec::from(unsafe { area.as_slice() })
+        }).collect();
+
+        // Temporary switch to it, in order to copy data
+        let page_table = mc.with(page_table, || {
+            for (area, data) in memory_set.iter().zip(datas.iter()) {
+                unsafe { area.as_slice_mut() }.copy_from_slice(data.as_slice())
+            }
+        });
+
+        // Allocate kernel stack and push trap frame
+        let kstack = mc.alloc_stack(7).unwrap();
+        let mut tf = tf.clone();
+        tf.scratch.rax = 1;
+        let rsp = kstack.push_at_top(tf);
+
+        Process {
+            pid: 0,
+            name: "fork",
+            kstack,
+            memory_set: Some(memory_set),
+            page_table: Some(page_table),
+            status: Status::Ready,
+            rsp,
+            is_user: true,
+        }
     }
 }
 

@@ -44,6 +44,14 @@ impl MemoryArea {
             name,
         }
     }
+    pub unsafe fn as_slice(&self) -> &[u8] {
+        use core::slice;
+        slice::from_raw_parts(self.start_addr as *const u8, self.end_addr - self.start_addr)
+    }
+    pub unsafe fn as_slice_mut(&self) -> &mut [u8] {
+        use core::slice;
+        slice::from_raw_parts_mut(self.start_addr as *mut u8, self.end_addr - self.start_addr)
+    }
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
     }
@@ -58,16 +66,17 @@ impl MemoryArea {
 
 /// 内存空间集合，包含若干段连续空间
 /// 对应ucore中 `mm_struct`
+#[derive(Clone)]
 pub struct MemorySet {
     areas: Vec<MemoryArea>,
-    page_table: Option<InactivePageTable>,
+//    page_table: Option<InactivePageTable>,
 }
 
 impl MemorySet {
     pub fn new() -> Self {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
-            page_table: None,
+//            page_table: None,
         }
     }
     /// Used for remap_kernel() where heap alloc is unavailable
@@ -76,7 +85,7 @@ impl MemorySet {
         let cap = slice.len() / size_of::<MemoryArea>();
         MemorySet {
             areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
-            page_table: None,
+//            page_table: None,
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -88,8 +97,8 @@ impl MemorySet {
                     .is_none(), "memory area overlap");
         self.areas.push(area);
     }
-    pub fn map(&mut self, pt: &mut Mapper) {
-        for area in self.areas.iter_mut() {
+    pub fn map(&self, pt: &mut Mapper) {
+        for area in self.areas.iter() {
             match area.phys_start_addr {
                 Some(phys_start) => {
                     for page in Page::range_of(area.start_addr, area.end_addr) {
@@ -105,12 +114,15 @@ impl MemorySet {
             }
         }
     }
-    pub fn unmap(&mut self, pt: &mut Mapper) {
-        for area in self.areas.iter_mut() {
+    pub fn unmap(&self, pt: &mut Mapper) {
+        for area in self.areas.iter() {
             for page in Page::range_of(area.start_addr, area.end_addr) {
                 pt.unmap(page);
             }
         }
+    }
+    pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
+        self.areas.iter()
     }
 }
 

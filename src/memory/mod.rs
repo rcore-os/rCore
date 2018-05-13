@@ -18,8 +18,6 @@ mod stack_allocator;
 mod address;
 mod frame;
 
-pub static ACITVE_PAGETABLE: Mutex<ActivePageTable> = Mutex::new(unsafe { ActivePageTable::new() });
-
 pub static FRAME_ALLOCATOR: Mutex<Option<AreaFrameAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Frame {
@@ -30,6 +28,8 @@ pub fn alloc_frame() -> Frame {
 
 pub fn init(boot_info: BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
+
+    debug!("{:?}", boot_info);
 
     let memory_map_tag = boot_info.memory_map_tag().expect(
         "Memory map tag required");
@@ -70,14 +70,12 @@ pub fn init(boot_info: BootInformation) -> MemoryController {
     }
 }
 
-pub fn remap_the_kernel(boot_info: BootInformation) -> Stack
-{
-    let mut active_table = ACITVE_PAGETABLE.lock();
+pub fn remap_the_kernel(boot_info: BootInformation) -> Stack {
+    let mut active_table = unsafe { ActivePageTable::new() };
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     memory_set.push(MemoryArea::new_identity(0xb8000, 0xb9000, EntryFlags::WRITABLE, "VGA"));
-    memory_set.push(MemoryArea::new_identity(boot_info.start_address(), boot_info.end_address(), EntryFlags::PRESENT, "multiboot"));
     memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, EntryFlags::WRITABLE, "kernel_heap"));
 
     let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);
@@ -179,7 +177,7 @@ impl MemoryController {
         let flags = EntryFlags::WRITABLE;
         self.active_table.map_to(page, frame, flags);
     }
-    pub fn make_page_table(&mut self, set: &mut MemorySet) -> InactivePageTable {
+    pub fn make_page_table(&mut self, set: &MemorySet) -> InactivePageTable {
         let mut page_table = InactivePageTable::new(alloc_frame(), &mut self.active_table);
 
         use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};

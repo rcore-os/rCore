@@ -1,16 +1,18 @@
 use alloc::BTreeMap;
 use memory::{ActivePageTable, InactivePageTable};
 use super::*;
+use core::cell::RefCell;
 
-#[derive(Debug)]
 pub struct Processor {
+    mc: RefCell<MemoryController>,
     procs: BTreeMap<Pid, Process>,
     current_pid: Pid,
 }
 
 impl Processor {
-    pub fn new() -> Self {
+    pub fn new(mc: MemoryController) -> Self {
         Processor {
+            mc: RefCell::new(mc),
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,
         }
@@ -72,5 +74,15 @@ impl Processor {
         }
         self.current_pid = pid;
         debug!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
+    }
+
+    pub fn current(&self) -> &Process {
+        self.procs.get(&self.current_pid).unwrap()
+    }
+
+    /// Fork the current process
+    pub fn fork(&mut self, tf: &TrapFrame) {
+        let new = self.current().fork(tf, &mut self.mc.borrow_mut());
+        self.add(new);
     }
 }

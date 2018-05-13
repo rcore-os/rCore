@@ -37,14 +37,14 @@ extern {
 }
 
 
-pub fn init(mc: &mut MemoryController) {
+pub fn init(mut mc: MemoryController) {
     PROCESSOR.call_once(|| {Mutex::new({
-        let mut processor = Processor::new();
-        let initproc = Process::new_init(mc);
-        let idleproc = Process::new("idle", idle_thread, mc);
+        let initproc = Process::new_init(&mut mc);
+        let idleproc = Process::new("idle", idle_thread, &mut mc);
         #[cfg(feature = "link_user_program")]
         let forktest = Process::new_user(_binary_user_forktest_start as usize,
-                                         _binary_user_forktest_end as usize, mc);
+                                         _binary_user_forktest_end as usize, &mut mc);
+        let mut processor = Processor::new(mc);
         processor.add(initproc);
         processor.add(idleproc);
         processor.add(forktest);
@@ -71,6 +71,7 @@ extern fn idle_thread() {
     }
 }
 
+/// Fork the current process
 pub fn fork(tf: &TrapFrame) {
-    unimplemented!()
+    PROCESSOR.try().unwrap().lock().fork(tf);
 }

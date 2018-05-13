@@ -1,10 +1,11 @@
 use memory::{Frame, FrameAllocator, PhysAddr};
 use multiboot2::{MemoryAreaIter, MemoryArea};
+use arrayvec::ArrayVec;
 
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
-    current_area: Option<&'static MemoryArea>,
-    areas: MemoryAreaIter,
+    current_area: Option<Area>,
+    areas: ArrayVec<[Area; 4]>,
     kernel_start: Frame,
     kernel_end: Frame,
     multiboot_start: Frame,
@@ -62,10 +63,12 @@ impl AreaFrameAllocator {
                multiboot_start: PhysAddr, multiboot_end: PhysAddr,
                memory_areas: MemoryAreaIter) -> AreaFrameAllocator
     {
+        let areas: ArrayVec<[Area; 4]> = memory_areas.map(|a| Area::from(a)).collect();
+
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::of_addr(0),
             current_area: None,
-            areas: memory_areas,
+            areas,
             kernel_start: Frame::of_addr(kernel_start.0 as usize),
             kernel_end: Frame::of_addr(kernel_end.0 as usize),
             multiboot_start: Frame::of_addr(multiboot_start.0 as usize),
@@ -76,16 +79,44 @@ impl AreaFrameAllocator {
     }
 
     fn choose_next_area(&mut self) {
-        self.current_area = self.areas.clone().filter(|area| {
+        self.current_area = self.areas.iter().filter(|area| {
             let address = area.end_address() - 1;
             Frame::of_addr(address as usize) >= self.next_free_frame
-        }).min_by_key(|area| area.start_address());
+        }).min_by_key(|area| area.start_address())
+            .map(|area| area.clone());
 
         if let Some(area) = self.current_area {
             let start_frame = Frame::of_addr(area.start_address());
             if self.next_free_frame < start_frame {
                 self.next_free_frame = start_frame;
             }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Area {
+    start: usize,
+    end: usize,
+}
+
+impl Area {
+    pub fn start_address(&self) -> usize {
+        self.start
+    }
+    pub fn end_address(&self) -> usize {
+        self.end
+    }
+    pub fn size(&self) -> usize {
+        self.end - self.start
+    }
+}
+
+impl<'a> From<&'a MemoryArea> for Area {
+    fn from(a: &'a MemoryArea) -> Self {
+        Area {
+            start: a.start_address(),
+            end: a.end_address(),
         }
     }
 }
