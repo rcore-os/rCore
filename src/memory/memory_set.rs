@@ -4,14 +4,13 @@ use core::fmt::{Debug, Formatter, Error};
 
 /// 一片连续内存空间，有相同的访问权限
 /// 对应ucore中 `vma_struct`
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct MemoryArea {
     start_addr: VirtAddr,
     end_addr: VirtAddr,
     phys_start_addr: Option<PhysAddr>,
     flags: u64,
     name: &'static str,
-    mapped: bool,
 }
 
 impl MemoryArea {
@@ -23,7 +22,6 @@ impl MemoryArea {
             phys_start_addr: None,
             flags: flags.bits(),
             name,
-            mapped: false,
         }
     }
     pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
@@ -34,7 +32,6 @@ impl MemoryArea {
             phys_start_addr: Some(PhysAddr(start_addr as u64)),
             flags: flags.bits(),
             name,
-            mapped: false,
         }
     }
     pub fn new_kernel(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
@@ -45,7 +42,6 @@ impl MemoryArea {
             phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
             flags: flags.bits(),
             name,
-            mapped: false,
         }
     }
     pub fn contains(&self, addr: VirtAddr) -> bool {
@@ -94,9 +90,6 @@ impl MemorySet {
     }
     pub fn map(&mut self, pt: &mut Mapper) {
         for area in self.areas.iter_mut() {
-            if area.mapped {
-                continue
-            }
             match area.phys_start_addr {
                 Some(phys_start) => {
                     for page in Page::range_of(area.start_addr, area.end_addr) {
@@ -110,18 +103,13 @@ impl MemorySet {
                     }
                 },
             }
-            area.mapped = true;
         }
     }
     pub fn unmap(&mut self, pt: &mut Mapper) {
         for area in self.areas.iter_mut() {
-            if !area.mapped {
-                continue
-            }
             for page in Page::range_of(area.start_addr, area.end_addr) {
                 pt.unmap(page);
             }
-            area.mapped = false;
         }
     }
 }

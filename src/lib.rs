@@ -50,7 +50,7 @@ mod syscall;
 #[path = "arch/x86_64/mod.rs"]
 mod arch;
 
-// The entry point of Rust kernel
+/// The entry point of Rust kernel
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::cpu::init();
@@ -61,11 +61,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
 
     // set up guard page and map the heap pages
-    let mut memory_controller = memory::init(boot_info);    
-    unsafe {
-        use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-        HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE);
-    }
+    let mut memory_controller = memory::init(boot_info);
 
     arch::gdt::init();
     arch::idt::init();
@@ -109,6 +105,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     unreachable!();
 }
 
+/// The entry point for another processors
 #[no_mangle]
 pub extern "C" fn other_main() -> ! {
     arch::cpu::init();
@@ -124,6 +121,11 @@ pub extern "C" fn other_main() -> ! {
 
 use linked_list_allocator::LockedHeap;
 
+/// Global heap allocator
+///
+/// Available after `memory::init()`.
+///
+/// It should be defined in memory mod, but in Rust `global_allocator` must be in root mod.
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 

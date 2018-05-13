@@ -105,7 +105,7 @@ impl DerefMut for ActivePageTable {
 }
 
 impl ActivePageTable {
-    pub unsafe fn new() -> ActivePageTable {
+    pub const unsafe fn new() -> ActivePageTable {
         ActivePageTable {
             mapper: Mapper::new(),
         }

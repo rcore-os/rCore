@@ -9,7 +9,7 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn new(mc: &mut MemoryController) -> Self {
+    pub fn new() -> Self {
         Processor {
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,

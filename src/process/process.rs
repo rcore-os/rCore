@@ -42,6 +42,7 @@ impl Process {
             is_user: false,
         }
     }
+
     /// Make the first kernel thread `initproc`
     /// Should be called only once
     pub fn new_init(mc: &mut MemoryController) -> Self {
@@ -58,6 +59,8 @@ impl Process {
         }
     }
 
+    /// Make a new user thread
+    /// The program elf data is placed at [begin, end)
     pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
         // Parse elf
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
@@ -102,6 +105,12 @@ impl Process {
             rsp,
             is_user: true,
         }
+    }
+
+    /// Fork
+    pub fn fork(&mut self) -> Self {
+        assert!(self.is_user);
+        unimplemented!()
     }
 }
 

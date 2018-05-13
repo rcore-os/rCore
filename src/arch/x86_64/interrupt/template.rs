@@ -151,7 +151,6 @@ macro_rules! iret {
 }
 
 /// Create an interrupt function that can safely run rust code
-#[macro_export]
 macro_rules! interrupt {
     ($name:ident, $func:block) => {
         #[naked]
@@ -198,7 +197,6 @@ impl InterruptStack {
     }
 }
 
-#[macro_export]
 macro_rules! interrupt_stack {
     ($name:ident, $stack: ident, $func:block) => {
         #[naked]
@@ -251,7 +249,6 @@ impl InterruptErrorStack {
     }
 }
 
-#[macro_export]
 macro_rules! interrupt_error {
     ($name:ident, $stack:ident, $func:block) => {
         #[naked]
@@ -317,7 +314,6 @@ impl Debug for InterruptStackP {
     }
 }
 
-#[macro_export]
 macro_rules! interrupt_switch {
     ($name:ident, $rsp: ident, $func:block) => {
         #[naked]
@@ -358,7 +354,6 @@ macro_rules! interrupt_switch {
     };
 }
 
-#[macro_export]
 macro_rules! interrupt_stack_p {
     ($name:ident, $stack: ident, $func:block) => {
         #[naked]
@@ -415,7 +410,6 @@ impl InterruptErrorStackP {
     }
 }
 
-#[macro_export]
 macro_rules! interrupt_error_p {
     ($name:ident, $stack:ident, $func:block) => {
         #[naked]

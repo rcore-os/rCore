@@ -9,6 +9,7 @@ use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
 use arch::paging;
 use spin::Mutex;
+use super::HEAP_ALLOCATOR;
 
 mod memory_set;
 mod area_frame_allocator;
@@ -16,6 +17,8 @@ pub mod heap_allocator;
 mod stack_allocator;
 mod address;
 mod frame;
+
+pub static ACITVE_PAGETABLE: Mutex<ActivePageTable> = Mutex::new(unsafe { ActivePageTable::new() });
 
 pub static FRAME_ALLOCATOR: Mutex<Option<AreaFrameAllocator>> = Mutex::new(None);
 
@@ -47,10 +50,12 @@ pub fn init(boot_info: BootInformation) -> MemoryController {
         memory_map_tag.memory_areas()
     ));
 
-    let (mut active_table, kernel_stack) = remap_the_kernel(boot_info);
+    let kernel_stack = remap_the_kernel(boot_info);
 
     use self::paging::Page;
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+
+    unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
 
     let stack_allocator = {
         let stack_alloc_range = Page::range_of(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
@@ -60,14 +65,14 @@ pub fn init(boot_info: BootInformation) -> MemoryController {
     
     MemoryController {
         kernel_stack: Some(kernel_stack),
-        active_table,
+        active_table: unsafe { ActivePageTable::new() },
         stack_allocator,
     }
 }
 
-pub fn remap_the_kernel(boot_info: BootInformation) -> (ActivePageTable, Stack)
+pub fn remap_the_kernel(boot_info: BootInformation) -> Stack
 {
-    let mut active_table = unsafe { ActivePageTable::new() };
+    let mut active_table = ACITVE_PAGETABLE.lock();
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
@@ -90,7 +95,7 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> (ActivePageTable, Stack)
     let kernel_stack = Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE);
     println!("guard page at {:#x}", stack_bottom_page.start_address());
 
-    (active_table, kernel_stack)
+    kernel_stack
 }
 
 use multiboot2::{ElfSectionsTag, ElfSection, ElfSectionFlags};

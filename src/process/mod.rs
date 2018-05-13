@@ -1,5 +1,6 @@
 use memory::MemoryController;
 use spin::{Once, Mutex};
+use core::slice;
 
 use self::process::*;
 use self::processor::*;
@@ -38,7 +39,7 @@ extern {
 
 pub fn init(mc: &mut MemoryController) {
     PROCESSOR.call_once(|| {Mutex::new({
-        let mut processor = Processor::new(mc);
+        let mut processor = Processor::new();
         let initproc = Process::new_init(mc);
         let idleproc = Process::new("idle", idle_thread, mc);
         #[cfg(feature = "link_user_program")]

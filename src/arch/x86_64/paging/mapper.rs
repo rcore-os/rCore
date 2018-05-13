@@ -8,7 +8,7 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub unsafe fn new() -> Mapper {
+    pub const unsafe fn new() -> Mapper {
         Mapper {
             p4: Unique::new_unchecked(table::P4),
         }
