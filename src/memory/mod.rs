@@ -26,6 +26,13 @@ pub fn alloc_frame() -> Frame {
         .allocate_frame().expect("no more frame")
 }
 
+// Return true to continue, false to halt
+pub fn page_fault_handler(addr: VirtAddr) -> bool {
+    // Handle copy on write
+    let mut page_table = unsafe { ActivePageTable::new() };
+    page_table.try_copy_on_write(addr)
+}
+
 pub fn init(boot_info: BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
 

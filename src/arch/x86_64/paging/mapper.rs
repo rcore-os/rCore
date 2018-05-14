@@ -68,15 +68,19 @@ impl Mapper {
             .or_else(huge_page)
     }
 
-    pub fn map_to(&mut self, page: Page, frame: Frame, flags: EntryFlags)
-    {
+    pub(super) fn entry_mut(&mut self, page: Page) -> &mut Entry {
+        use core::ops::IndexMut;
         let p4 = self.p4_mut();
         let mut p3 = p4.next_table_create(page.p4_index());
         let mut p2 = p3.next_table_create(page.p3_index());
         let mut p1 = p2.next_table_create(page.p2_index());
+        p1.index_mut(page.p1_index())
+    }
 
-        assert!(p1[page.p1_index()].is_unused());
-        p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+    pub fn map_to(&mut self, page: Page, frame: Frame, flags: EntryFlags) {
+        let entry = self.entry_mut(page);
+        assert!(entry.is_unused());
+        entry.set(frame, flags | EntryFlags::PRESENT);
     }
 
     pub fn map(&mut self, page: Page, flags: EntryFlags)

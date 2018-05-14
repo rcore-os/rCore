@@ -17,7 +17,14 @@ interrupt_error_p!(double_fault, stack, {
 
 interrupt_error_p!(page_fault, stack, {
     use x86_64::registers::control_regs::cr2;
-    println!("\nEXCEPTION: Page Fault\nAddress: {:#x}", cr2());
+    let addr = cr2().0;
+    println!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+
+    use memory::page_fault_handler;
+    if page_fault_handler(addr) {
+        return;
+    }
+
     stack.dump();
     loop {}
 });

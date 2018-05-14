@@ -44,6 +44,9 @@ bitflags! {
         const HUGE_PAGE =       1 << 7;
         const GLOBAL =          1 << 8;
         const NO_EXECUTE =      1 << 63;
+        // Types at bit 9-11
+        const SHARED =          1 << 9;
+        const COW =             2 << 9;
     }
 }
 

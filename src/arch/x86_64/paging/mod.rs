@@ -3,11 +3,13 @@ pub use self::mapper::Mapper;
 use core::ops::{Deref, DerefMut, Add};
 use memory::*;
 pub use self::temporary_page::TemporaryPage;
+pub use self::cow::*;
 
 mod entry;
 mod table;
 mod temporary_page;
 mod mapper;
+mod cow;
 
 const ENTRY_COUNT: usize = 512;
 

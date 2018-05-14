@@ -67,6 +67,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::gdt::init();
     arch::idt::init();
 
+    arch::paging::test_cow();
+
     test!(global_allocator);
     test!(guard_page);
     test!(find_mp);
