@@ -2,16 +2,10 @@ use super::*;
 use process;
 use arch::interrupt::TrapFrame;
 
-pub unsafe fn syscall(tf: &TrapFrame, is32: bool) -> i32 {
+pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
     let id = match is32 {
-        false => tf.scratch.rax,
-        true => match tf.scratch.rax {
-            UCORE_SYS_OPEN => SYS_OPEN,
-            UCORE_SYS_CLOSE => SYS_CLOSE,
-            UCORE_SYS_WRITE => SYS_WRITE,
-            UCORE_SYS_READ => SYS_READ,
-            _ => 0,
-        }
+        false => Syscall::Xv6(tf.scratch.rax),
+        true => Syscall::Ucore(tf.scratch.rax),
     };
     let args = match is32 {
         // For ucore x86
@@ -19,22 +13,38 @@ pub unsafe fn syscall(tf: &TrapFrame, is32: bool) -> i32 {
         // For xv6 x86_64
         false => [tf.scratch.rdi, tf.scratch.rsi, tf.scratch.rdx, tf.scratch.rcx, tf.scratch.r8, tf.scratch.r9],
     };
-    debug!("id: {:#x}, args: {:#x?}", id, args);
 
     match id {
-        SYS_FORK => {
-            process::fork(tf);
-            0
-        }
-        SYS_WRITE => {
-            io::write(args[0], args[1] as *const u8, args[2]);
-            0
-        }
+        Syscall::Xv6(SYS_WRITE) | Syscall::Ucore(UCORE_SYS_WRITE) =>
+            io::write(args[0], args[1] as *const u8, args[2]),
+        Syscall::Xv6(SYS_OPEN) | Syscall::Ucore(UCORE_SYS_OPEN) =>
+            io::open(args[0] as *const u8, args[1]),
+        Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
+            io::close(args[0]),
+        Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
+            process::sys_fork(tf),
+        Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
+            process::sys_kill(args[0]),
+        Syscall::Xv6(SYS_EXIT) | Syscall::Ucore(UCORE_SYS_EXIT) =>
+            process::sys_exit(rsp, args[0]),
+        Syscall::Ucore(UCORE_SYS_GETPID) =>
+            process::sys_getpid(),
+        Syscall::Ucore(UCORE_SYS_PUTC) =>
+            {
+                print!("{}", args[0] as u8 as char);
+                0
+            },
         _ => {
-            debug!("unknown syscall {:#x}", id);
+            debug!("unknown syscall {:#x?}", id);
             -1
-        }
+        },
     }
+}
+
+#[derive(Debug)]
+enum Syscall {
+    Xv6(usize),
+    Ucore(usize),
 }
 
 const SYS_FORK: usize = 1;

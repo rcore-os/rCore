@@ -315,11 +315,11 @@ impl Debug for InterruptStackP {
 }
 
 macro_rules! interrupt_switch {
-    ($name:ident, $rsp: ident, $func:block) => {
+    ($name:ident, $stack: ident, $rsp: ident, $func:block) => {
         #[naked]
         pub unsafe extern fn $name () {
             #[inline(never)]
-            unsafe fn inner($rsp: &mut usize) {
+            unsafe fn inner($stack: &mut InterruptStackP, $rsp: &mut usize) {
                 $func
             }
 
@@ -333,7 +333,7 @@ macro_rules! interrupt_switch {
             asm!("" : "={rsp}"(rsp) : : : "intel", "volatile");
 
             // Call inner rust function
-            inner(&mut rsp);
+            inner(&mut *(rsp as *mut InterruptStackP), &mut rsp);
 
             // Set return rsp if to user
             use arch::gdt;

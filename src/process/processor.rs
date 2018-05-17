@@ -43,7 +43,8 @@ impl Processor {
 
     fn find_next(&self) -> Pid {
         *self.procs.keys()
-            .find(|&&i| i > self.current_pid)
+            .find(|&&i| i > self.current_pid
+                && self.get(i).status != Status::Exited)
             .unwrap_or(self.procs.keys().nth(0).unwrap())
     }
 
@@ -76,13 +77,28 @@ impl Processor {
         debug!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
     }
 
+    fn get(&self, pid: Pid) -> &Process {
+        self.procs.get(&pid).unwrap()
+    }
+
     pub fn current(&self) -> &Process {
-        self.procs.get(&self.current_pid).unwrap()
+        self.get(self.current_pid)
     }
 
     /// Fork the current process
     pub fn fork(&mut self, tf: &TrapFrame) {
         let new = self.current().fork(tf, &mut self.mc.borrow_mut());
         self.add(new);
+    }
+
+    pub fn kill(&mut self, pid: Pid) {
+        let process = self.procs.get_mut(&pid).unwrap();
+        process.status = Status::Exited;
+        // TODO: Remove process from set
+    }
+
+    pub fn exit(&mut self, pid: Pid, error_code: usize) {
+        debug!("Processor: {} exit, code: {}", pid, error_code);
+        self.kill(pid);
     }
 }

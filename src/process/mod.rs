@@ -76,6 +76,27 @@ extern fn idle_thread() {
 }
 
 /// Fork the current process
-pub fn fork(tf: &TrapFrame) {
+pub fn sys_fork(tf: &TrapFrame) -> i32 {
     PROCESSOR.try().unwrap().lock().fork(tf);
+    0
+}
+
+/// Kill the process
+pub fn sys_kill(pid: usize) -> i32 {
+    PROCESSOR.try().unwrap().lock().kill(pid);
+    0
+}
+
+/// Get the current process id
+pub fn sys_getpid() -> i32 {
+    PROCESSOR.try().unwrap().lock().current().pid as i32
+}
+
+/// Exit the current process
+pub fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let pid = processor.current().pid;
+    processor.schedule(rsp);
+    processor.exit(pid, error_code);
+    0
 }

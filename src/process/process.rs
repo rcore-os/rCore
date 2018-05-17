@@ -19,7 +19,7 @@ pub struct Process {
 
 pub type Pid = usize;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Status {
     Ready, Running, Sleeping(usize), Exited
 }

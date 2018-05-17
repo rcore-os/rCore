@@ -75,7 +75,7 @@ use spin::Mutex;
 // FIXME: Deadlock
 //static TICK: Mutex<usize> = Mutex::new(0);
 
-interrupt_switch!(timer, rsp, {
+interrupt_switch!(timer, stack, rsp, {
 //    let mut tick = TICK.lock();
 //    *tick += 1;
 //    let tick = *tick;
@@ -107,16 +107,16 @@ interrupt_stack_p!(to_kernel, stack, {
     stack.iret.ss = gdt::KDATA_SELECTOR.0 as usize;
 });
 
-interrupt_stack_p!(syscall, stack, {
+interrupt_switch!(syscall, stack, rsp, {
     println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
-    let ret = syscall(stack, false);
+    let ret = syscall(stack, rsp, false);
     stack.scratch.rax = ret as usize;
 });
 
-interrupt_stack_p!(syscall32, stack, {
-    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
+interrupt_switch!(syscall32, stack, rsp, {
+//    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
-    let ret = syscall(stack, true);
+    let ret = syscall(stack, rsp, true);
     stack.scratch.rax = ret as usize;
 });
