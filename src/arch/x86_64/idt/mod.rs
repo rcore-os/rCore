@@ -25,6 +25,8 @@ pub fn init() {
             .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::INTERRUPT);
         idt[T_SYSCALL].set_handler_fn(syscall)
             .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::TRAP);
+        idt[0x80].set_handler_fn(syscall32)
+            .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::TRAP);
 
         unsafe {
             idt[T_DBLFLT].set_handler_fn(double_fault)

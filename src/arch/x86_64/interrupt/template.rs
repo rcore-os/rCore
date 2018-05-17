@@ -339,7 +339,7 @@ macro_rules! interrupt_switch {
             use arch::gdt;
             use core::mem::size_of;
             let tf = &mut *(rsp as *mut TrapFrame);
-            if tf.iret.cs == gdt::UCODE_SELECTOR.0 as usize {
+            if tf.iret.cs & 0x3 == 3 {
                 gdt::set_ring0_rsp(rsp + size_of::<TrapFrame>());
             }
 

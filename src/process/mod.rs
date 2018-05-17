@@ -34,6 +34,8 @@ use arch::interrupt::TrapFrame;
 extern {
     fn _binary_user_forktest_start();
     fn _binary_user_forktest_end();
+    fn _binary_hello_start();
+    fn _binary_hello_end();
 }
 
 
@@ -42,12 +44,14 @@ pub fn init(mut mc: MemoryController) {
         let initproc = Process::new_init(&mut mc);
         let idleproc = Process::new("idle", idle_thread, &mut mc);
         #[cfg(feature = "link_user_program")]
-        let forktest = Process::new_user(_binary_user_forktest_start as usize,
-                                         _binary_user_forktest_end as usize, &mut mc);
+//        let forktest = Process::new_user(_binary_user_forktest_start as usize,
+//                                         _binary_user_forktest_end as usize, &mut mc);
+        let hello = Process::new_user(_binary_hello_start as usize,
+                                      _binary_hello_end as usize, &mut mc);
         let mut processor = Processor::new(mc);
         processor.add(initproc);
         processor.add(idleproc);
-        processor.add(forktest);
+        processor.add(hello);
         processor
     })});
 }

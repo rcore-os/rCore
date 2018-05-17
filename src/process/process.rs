@@ -61,39 +61,60 @@ impl Process {
 
     /// Make a new user thread
     /// The program elf data is placed at [begin, end)
+    /// uCore x86 32bit program is planned to be supported.
     pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
         // Parse elf
         let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
         let elf = ElfFile::new(slice).expect("failed to read elf");
+        let is32 = match elf.header.pt2 {
+            HeaderPt2::Header32(_) => true,
+            HeaderPt2::Header64(_) => false,
+        };
+
+        // User stack
+        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER_TCB_OFFSET};
+        let (user_stack_buttom, mut user_stack_top) = match is32 {
+            true => (USER_TCB_OFFSET, USER_TCB_OFFSET + USER_STACK_SIZE),
+            false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
+        };
 
         // Make page table
-        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
         let mut memory_set = MemorySet::from(&elf);
-        memory_set.push(MemoryArea::new(USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE,
+        memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top,
                                         EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
         let page_table = mc.make_page_table(&memory_set);
         debug!("{:#x?}", memory_set);
 
+        let entry_addr = match elf.header.pt2 {
+            HeaderPt2::Header32(header) => header.entry_point as usize,
+            HeaderPt2::Header64(header) => header.entry_point as usize,
+        };
+
         // Temporary switch to it, in order to copy data
         let page_table = mc.with(page_table, || {
             for ph in elf.program_iter() {
-                let ph = match ph {
-                    ProgramHeader::Ph64(ph) => ph,
-                    _ => unimplemented!(),
+                let (virt_addr, offset, file_size) = match ph {
+                    ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
+                    ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
                 };
-                unsafe { memcpy(ph.virtual_addr as *mut u8, (begin + ph.offset as usize) as *mut u8, ph.file_size as usize) };
+                unsafe { memcpy(virt_addr as *mut u8, (begin + offset) as *mut u8, file_size) };
+            }
+            if is32 {
+                unsafe {
+                    // TODO: full argc & argv
+                    *(user_stack_top as *mut u32).offset(-1) = 0; // argv
+                    *(user_stack_top as *mut u32).offset(-2) = 0; // argc
+                    user_stack_top -= 8;
+                }
             }
         });
 
-        let entry_addr = match elf.header.pt2 {
-            HeaderPt2::Header64(header) => header.entry_point,
-            _ => unimplemented!(),
-        } as usize;
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = TrapFrame::new_user_thread(entry_addr, USER_STACK_OFFSET + USER_STACK_SIZE);
+        let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top, is32);
         let rsp = kstack.push_at_top(tf);
+        debug!("rsp = {:#x}", rsp);
 
         Process {
             pid: 0,
@@ -153,15 +174,11 @@ impl<'a> From<&'a ElfFile<'a>> for MemorySet {
     fn from(elf: &'a ElfFile<'a>) -> Self {
         let mut set = MemorySet::new();
         for ph in elf.program_iter() {
-            let ph = match ph {
-                ProgramHeader::Ph64(ph) => ph,
-                _ => unimplemented!(),
+            let (virt_addr, mem_size, flags) = match ph {
+                ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
+                ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
             };
-            set.push(MemoryArea::new(
-                ph.virtual_addr as usize,
-                (ph.virtual_addr + ph.mem_size) as usize,
-                EntryFlags::from(ph.flags),
-                ""));
+            set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, EntryFlags::from(flags), ""));
         }
         set
     }
@@ -170,7 +187,9 @@ impl<'a> From<&'a ElfFile<'a>> for MemorySet {
 impl From<Flags> for EntryFlags {
     fn from(elf_flags: Flags) -> Self {
         let mut flags = EntryFlags::PRESENT | EntryFlags::USER_ACCESSIBLE;
-        if elf_flags.is_write() {
+//        if elf_flags.is_write() {
+        // TODO: handle readonly
+        if true {
             flags = flags | EntryFlags::WRITABLE;
         }
         if !elf_flags.is_execute() {

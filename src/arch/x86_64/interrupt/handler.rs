@@ -18,7 +18,7 @@ interrupt_error_p!(double_fault, stack, {
 interrupt_error_p!(page_fault, stack, {
     use x86_64::registers::control_regs::cr2;
     let addr = cr2().0;
-    println!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    println!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, stack.code);
 
     use memory::page_fault_handler;
     if page_fault_handler(addr) {
@@ -108,7 +108,15 @@ interrupt_stack_p!(to_kernel, stack, {
 });
 
 interrupt_stack_p!(syscall, stack, {
-    println!("\nInterupt: Syscall {}", stack.scratch.rax);
+    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
-    syscall(stack);
+    let ret = syscall(stack, false);
+    stack.scratch.rax = ret as usize;
+});
+
+interrupt_stack_p!(syscall32, stack, {
+    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
+    use syscall::syscall;
+    let ret = syscall(stack, true);
+    stack.scratch.rax = ret as usize;
 });

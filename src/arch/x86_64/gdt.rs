@@ -35,6 +35,8 @@ pub fn init() {
         gdt.add_entry(UCODE);
         gdt.add_entry(KDATA);
         gdt.add_entry(UDATA);
+        gdt.add_entry(UCODE32);
+        gdt.add_entry(UDATA32);
         gdt.add_entry(Descriptor::tss_segment(&tss));
         gdt
     });
@@ -70,23 +72,29 @@ const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000);  // EXECU
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000);  // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000);  // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
+// Copied from xv6
+const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff);
+// EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
+const UDATA32: Descriptor = Descriptor::UserSegment(0x00cff200_0000ffff);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 
 pub const KCODE_SELECTOR: SegmentSelector = SegmentSelector::new(1, PrivilegeLevel::Ring0);
 pub const UCODE_SELECTOR: SegmentSelector = SegmentSelector::new(2, PrivilegeLevel::Ring3);
 pub const KDATA_SELECTOR: SegmentSelector = SegmentSelector::new(3, PrivilegeLevel::Ring0);
 pub const UDATA_SELECTOR: SegmentSelector = SegmentSelector::new(4, PrivilegeLevel::Ring3);
-pub const TSS_SELECTOR: SegmentSelector = SegmentSelector::new(5, PrivilegeLevel::Ring0);
+pub const UCODE32_SELECTOR: SegmentSelector = SegmentSelector::new(5, PrivilegeLevel::Ring3);
+pub const UDATA32_SELECTOR: SegmentSelector = SegmentSelector::new(6, PrivilegeLevel::Ring3);
+pub const TSS_SELECTOR: SegmentSelector = SegmentSelector::new(7, PrivilegeLevel::Ring0);
 
 
 pub struct Gdt {
-    table: [u64; 8],
+    table: [u64; 10],
     next_free: usize,
 }
 
 impl Gdt {
     pub fn new() -> Gdt {
         Gdt {
-            table: [0; 8],
+            table: [0; 10],
             next_free: 1,
         }
     }
