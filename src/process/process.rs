@@ -2,13 +2,12 @@ use super::*;
 use memory::{self, Stack, InactivePageTable};
 use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
 use core::slice;
-use alloc::rc::Rc;
-use rlibc::memcpy;
+use alloc::{rc::Rc, String};
 
 #[derive(Debug)]
 pub struct Process {
     pub(in process) pid: Pid,
-                    name: &'static str,
+    pub(in process) name: String,
                     kstack: Stack,
     pub(in process) memory_set: Option<MemorySet>,
     pub(in process) page_table: Option<InactivePageTable>,
@@ -26,14 +25,14 @@ pub enum Status {
 
 impl Process {
     /// Make a new kernel thread
-    pub fn new(name: &'static str, entry: extern fn(), mc: &mut MemoryController) -> Self {
+    pub fn new(name: &str, entry: extern fn(), mc: &mut MemoryController) -> Self {
         let kstack = mc.alloc_stack(7).unwrap();
         let tf = TrapFrame::new_kernel_thread(entry, kstack.top());
         let rsp = kstack.push_at_top(tf);
 
         Process {
             pid: 0,
-            name,
+            name: String::from(name),
             kstack,
             memory_set: None,
             page_table: None,
@@ -49,7 +48,7 @@ impl Process {
         assert_has_not_been_called!();
         Process {
             pid: 0,
-            name: "init",
+            name: String::from("init"),
             kstack: mc.kernel_stack.take().unwrap(),
             memory_set: None,
             page_table: None,
@@ -62,10 +61,10 @@ impl Process {
     /// Make a new user thread
     /// The program elf data is placed at [begin, end)
     /// uCore x86 32bit program is planned to be supported.
-    pub fn new_user(begin: usize, end: usize, mc: &mut MemoryController) -> Self {
+    pub fn new_user(data: &[u8], mc: &mut MemoryController) -> Self {
         // Parse elf
-        let slice = unsafe{ slice::from_raw_parts(begin as *const u8, end - begin) };
-        let elf = ElfFile::new(slice).expect("failed to read elf");
+        let begin = data.as_ptr() as usize;
+        let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
             HeaderPt2::Header32(_) => true,
             HeaderPt2::Header64(_) => false,
@@ -83,7 +82,7 @@ impl Process {
         memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top,
                                         EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
         let page_table = mc.make_page_table(&memory_set);
-        debug!("{:#x?}", memory_set);
+//        debug!("{:#x?}", memory_set);
 
         let entry_addr = match elf.header.pt2 {
             HeaderPt2::Header32(header) => header.entry_point as usize,
@@ -97,7 +96,8 @@ impl Process {
                     ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
                     ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
                 };
-                unsafe { memcpy(virt_addr as *mut u8, (begin + offset) as *mut u8, file_size) };
+                let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
+                target.copy_from_slice(&data[offset..offset + file_size]);
             }
             if is32 {
                 unsafe {
@@ -114,11 +114,11 @@ impl Process {
         let kstack = mc.alloc_stack(7).unwrap();
         let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top, is32);
         let rsp = kstack.push_at_top(tf);
-        debug!("rsp = {:#x}", rsp);
+//        debug!("rsp = {:#x}", rsp);
 
         Process {
             pid: 0,
-            name: "user",
+            name: String::new(),
             kstack,
             memory_set: Some(memory_set),
             page_table: Some(page_table),
@@ -157,7 +157,7 @@ impl Process {
 
         Process {
             pid: 0,
-            name: "fork",
+            name: self.name.clone() + "_fork",
             kstack,
             memory_set: Some(memory_set),
             page_table: Some(page_table),

@@ -2,17 +2,16 @@ use alloc::BTreeMap;
 use memory::{ActivePageTable, InactivePageTable};
 use super::*;
 use core::cell::RefCell;
+use core::fmt::{Debug, Formatter, Error};
 
 pub struct Processor {
-    mc: RefCell<MemoryController>,
     procs: BTreeMap<Pid, Process>,
     current_pid: Pid,
 }
 
 impl Processor {
-    pub fn new(mc: MemoryController) -> Self {
+    pub fn new() -> Self {
         Processor {
-            mc: RefCell::new(mc),
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,
         }
@@ -85,12 +84,6 @@ impl Processor {
         self.get(self.current_pid)
     }
 
-    /// Fork the current process
-    pub fn fork(&mut self, tf: &TrapFrame) {
-        let new = self.current().fork(tf, &mut self.mc.borrow_mut());
-        self.add(new);
-    }
-
     pub fn kill(&mut self, pid: Pid) {
         let process = self.procs.get_mut(&pid).unwrap();
         process.status = Status::Exited;
@@ -100,5 +93,13 @@ impl Processor {
     pub fn exit(&mut self, pid: Pid, error_code: usize) {
         debug!("Processor: {} exit, code: {}", pid, error_code);
         self.kill(pid);
+    }
+}
+
+impl Debug for Processor {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.debug_map()
+            .entries(self.procs.iter().map(|(pid, proc0)| { (pid, &proc0.name) }))
+            .finish()
     }
 }

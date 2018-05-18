@@ -1,6 +1,7 @@
 use memory::MemoryController;
 use spin::{Once, Mutex};
 use core::slice;
+use alloc::String;
 
 use self::process::*;
 use self::processor::*;
@@ -15,48 +16,20 @@ mod processor;
 /// * Debug: 用于Debug输出
 use arch::interrupt::TrapFrame;
 
-// TODO: 使用宏来更优雅地导入符号，现在会有编译错误
-//
-//    #![feature(concat_idents)]
-//
-//    macro_rules! binary_symbol {
-//        ($name: ident) => {
-//            extern {
-//                fn concat_idents!(_binary_user_, $name, _start)();
-//                fn concat_idents!(_binary_user_, $name, _end)();
-//            }
-//        };
-//    }
-//
-//    binary_symbol!(forktest);
-
-#[cfg(feature = "link_user_program")]
-extern {
-    fn _binary_user_forktest_start();
-    fn _binary_user_forktest_end();
-    fn _binary_hello_start();
-    fn _binary_hello_end();
-}
-
-
 pub fn init(mut mc: MemoryController) {
     PROCESSOR.call_once(|| {Mutex::new({
         let initproc = Process::new_init(&mut mc);
         let idleproc = Process::new("idle", idle_thread, &mut mc);
-        #[cfg(feature = "link_user_program")]
-//        let forktest = Process::new_user(_binary_user_forktest_start as usize,
-//                                         _binary_user_forktest_end as usize, &mut mc);
-        let hello = Process::new_user(_binary_hello_start as usize,
-                                      _binary_hello_end as usize, &mut mc);
-        let mut processor = Processor::new(mc);
+        let mut processor = Processor::new();
         processor.add(initproc);
         processor.add(idleproc);
-        processor.add(hello);
         processor
     })});
+    MC.call_once(|| Mutex::new(mc));
 }
 
 static PROCESSOR: Once<Mutex<Processor>> = Once::new();
+static MC: Once<Mutex<MemoryController>> = Once::new();
 
 /// Called by timer handler in arch
 /// 设置rsp，指向接下来要执行线程的 内核栈顶
@@ -77,7 +50,10 @@ extern fn idle_thread() {
 
 /// Fork the current process
 pub fn sys_fork(tf: &TrapFrame) -> i32 {
-    PROCESSOR.try().unwrap().lock().fork(tf);
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut mc = MC.try().unwrap().lock();
+    let new = processor.current().fork(tf, &mut mc);
+    processor.add(new);
     0
 }
 
@@ -99,4 +75,16 @@ pub fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
     processor.schedule(rsp);
     processor.exit(pid, error_code);
     0
+}
+
+pub fn add_user_process(name: &str, data: &[u8]) {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut mc = MC.try().unwrap().lock();
+    let mut new = Process::new_user(data, &mut mc);
+    new.name = String::from(name);
+    processor.add(new);
+}
+
+pub fn print() {
+    debug!("{:#x?}", *PROCESSOR.try().unwrap().lock());
 }

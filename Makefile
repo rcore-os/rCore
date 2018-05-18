@@ -59,6 +59,9 @@ clean:
 run: $(iso)
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
+debug: $(iso)
+	@qemu-system-$(arch) $(qemu_opts) -s -S &
+
 iso: $(iso)
 
 build: iso

@@ -25,6 +25,7 @@ linked_list_allocator = "0.5.0"
 redox_syscall = "0.1.37"
 xmas-elf = "0.6"
 arrayvec = { version = "0.4.7", default-features = false }
+simple-filesystem = { path = "../simple-filesystem" }
 
 [build-dependencies]
 cc = "1.0"
