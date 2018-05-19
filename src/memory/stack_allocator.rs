@@ -84,6 +84,6 @@ impl Stack {
 
 impl Drop for Stack {
     fn drop(&mut self) {
-        panic!("stack leak: {:#x?}", self);
+        debug!("WARNING: stack leak: {:#x?}", self);
     }
 }

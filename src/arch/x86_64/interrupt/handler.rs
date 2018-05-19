@@ -84,7 +84,7 @@ interrupt_switch!(timer, stack, rsp, {
     if tick % 100 == 0 {
         println!("\nInterupt: Timer\ntick = {}", tick);
         use process;
-        process::schedule(rsp);
+        process::schedule(&mut rsp);
     }
     ack(IRQ_TIMER);
 });
@@ -110,13 +110,13 @@ interrupt_stack_p!(to_kernel, stack, {
 interrupt_switch!(syscall, stack, rsp, {
     println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
-    let ret = syscall(stack, rsp, false);
+    let ret = syscall(stack, &mut rsp, false);
     stack.scratch.rax = ret as usize;
 });
 
 interrupt_switch!(syscall32, stack, rsp, {
 //    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
-    let ret = syscall(stack, rsp, true);
+    let ret = syscall(stack, &mut rsp, true);
     stack.scratch.rax = ret as usize;
 });

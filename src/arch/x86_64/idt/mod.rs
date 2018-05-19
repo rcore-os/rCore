@@ -23,10 +23,11 @@ pub fn init() {
         idt[T_SWITCH_TOU].set_handler_fn(to_user);
         idt[T_SWITCH_TOK].set_handler_fn(to_kernel)
             .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::INTERRUPT);
+        // TODO: Enable interrupt during syscall
         idt[T_SYSCALL].set_handler_fn(syscall)
-            .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::TRAP);
+            .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::INTERRUPT);
         idt[0x80].set_handler_fn(syscall32)
-            .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::TRAP);
+            .set_flags(IdtFlags::PRESENT | IdtFlags::RING_3 | IdtFlags::INTERRUPT);
 
         unsafe {
             idt[T_DBLFLT].set_handler_fn(double_fault)

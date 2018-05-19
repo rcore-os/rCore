@@ -37,14 +37,15 @@ pub fn load_sfs() {
     let files = root.borrow().list().unwrap();
     debug!("Loading programs: {:?}", files);
 
-    for name in files.iter().filter(|&f| f != "." && f != "..") {
+//    for name in files.iter().filter(|&f| f != "." && f != "..") {
+    for name in files.iter().filter(|&f| f == "forktest") {
         static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
         let file = root.borrow().lookup(name.as_str()).unwrap();
         let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
-        process::add_user_process(name.as_str(), unsafe { &BUF[..len] });
+        process::add_user_process(name, unsafe { &BUF[..len] });
     }
 
-    process::add_user_process("forktest", unsafe { MemBuf::new(_binary_user_forktest_start, _binary_user_forktest_end).0 });
+//    process::add_user_process("forktest", unsafe { MemBuf::new(_binary_user_forktest_start, _binary_user_forktest_end).0 });
 
     process::print();
 }

@@ -7,6 +7,7 @@ use alloc::{rc::Rc, String};
 #[derive(Debug)]
 pub struct Process {
     pub(in process) pid: Pid,
+    pub(in process) parent: Pid,
     pub(in process) name: String,
                     kstack: Stack,
     pub(in process) memory_set: Option<MemorySet>,
@@ -17,10 +18,14 @@ pub struct Process {
 }
 
 pub type Pid = usize;
+pub type ErrorCode = usize;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Status {
-    Ready, Running, Sleeping(usize), Exited
+    Ready,
+    Running,
+    Sleeping(Pid),
+    Exited(ErrorCode),
 }
 
 impl Process {
@@ -32,6 +37,7 @@ impl Process {
 
         Process {
             pid: 0,
+            parent: 0,
             name: String::from(name),
             kstack,
             memory_set: None,
@@ -48,6 +54,7 @@ impl Process {
         assert_has_not_been_called!();
         Process {
             pid: 0,
+            parent: 0,
             name: String::from("init"),
             kstack: mc.kernel_stack.take().unwrap(),
             memory_set: None,
@@ -72,7 +79,7 @@ impl Process {
 
         // User stack
         use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER_TCB_OFFSET};
-        let (user_stack_buttom, mut user_stack_top) = match is32 {
+        let (user_stack_buttom, user_stack_top) = match is32 {
             true => (USER_TCB_OFFSET, USER_TCB_OFFSET + USER_STACK_SIZE),
             false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
         };
@@ -104,7 +111,6 @@ impl Process {
                     // TODO: full argc & argv
                     *(user_stack_top as *mut u32).offset(-1) = 0; // argv
                     *(user_stack_top as *mut u32).offset(-2) = 0; // argc
-                    user_stack_top -= 8;
                 }
             }
         });
@@ -112,12 +118,13 @@ impl Process {
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top, is32);
+        let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top - 8, is32);
         let rsp = kstack.push_at_top(tf);
 //        debug!("rsp = {:#x}", rsp);
 
         Process {
             pid: 0,
+            parent: 0,
             name: String::new(),
             kstack,
             memory_set: Some(memory_set),
@@ -152,11 +159,12 @@ impl Process {
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
         let mut tf = tf.clone();
-        tf.scratch.rax = 1;
+        tf.scratch.rax = 0; // sys_fork return 0 for child
         let rsp = kstack.push_at_top(tf);
 
         Process {
             pid: 0,
+            parent: self.pid,
             name: self.name.clone() + "_fork",
             kstack,
             memory_set: Some(memory_set),
@@ -164,6 +172,17 @@ impl Process {
             status: Status::Ready,
             rsp,
             is_user: true,
+        }
+    }
+
+    pub fn set_return_value(&self, value: usize) {
+        let tf = unsafe { &mut *(self.rsp as *mut TrapFrame) };
+        tf.scratch.rax = value;
+    }
+    pub fn exit_code(&self) -> Option<ErrorCode> {
+        match self.status {
+            Status::Exited(code) => Some(code),
+            _ => None,
         }
     }
 }

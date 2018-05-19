@@ -318,9 +318,21 @@ macro_rules! interrupt_switch {
     ($name:ident, $stack: ident, $rsp: ident, $func:block) => {
         #[naked]
         pub unsafe extern fn $name () {
+            // WARNING: Don't do anything outside the inner function.
+            //          rbp is not pointing to kernel stack!
             #[inline(never)]
-            unsafe fn inner($stack: &mut InterruptStackP, $rsp: &mut usize) {
+            unsafe fn inner($stack: &mut InterruptStackP) -> usize {
+                let mut $rsp = $stack as *const _ as usize;
                 $func
+
+                // Set return rsp if to user
+                use arch::gdt;
+                use core::mem::size_of;
+                let tf = &mut *($rsp as *mut TrapFrame);
+                if tf.iret.cs & 0x3 == 3 {
+                    gdt::set_ring0_rsp($rsp + size_of::<TrapFrame>());
+                }
+                $rsp
             }
 
             // Push scratch registers
@@ -329,20 +341,11 @@ macro_rules! interrupt_switch {
             fs_push!();
 
             // Get reference to stack variables
-            let mut rsp: usize;
+            let rsp: usize;
             asm!("" : "={rsp}"(rsp) : : : "intel", "volatile");
 
             // Call inner rust function
-            inner(&mut *(rsp as *mut InterruptStackP), &mut rsp);
-
-            // Set return rsp if to user
-            use arch::gdt;
-            use core::mem::size_of;
-            let tf = &mut *(rsp as *mut TrapFrame);
-            if tf.iret.cs & 0x3 == 3 {
-                gdt::set_ring0_rsp(rsp + size_of::<TrapFrame>());
-            }
-
+            let rsp = inner(&mut *(rsp as *mut InterruptStackP));
             asm!("" : : "{rsp}"(rsp) : : "intel", "volatile");
 
             // Pop scratch registers and return

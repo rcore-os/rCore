@@ -66,7 +66,7 @@ pub fn init(boot_info: BootInformation) -> MemoryController {
 
     let stack_allocator = {
         let stack_alloc_range = Page::range_of(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
-                                               KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE + 0x100000);
+                                               KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE + 0x1000000);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
     

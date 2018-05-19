@@ -48,13 +48,32 @@ extern fn idle_thread() {
     }
 }
 
-/// Fork the current process
+/// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let mut mc = MC.try().unwrap().lock();
     let new = processor.current().fork(tf, &mut mc);
-    processor.add(new);
-    0
+    let pid = processor.add(new);
+    debug!("fork: {}", pid);
+    pid as i32
+}
+
+/// Wait the process exit. Return the exit code.
+pub fn sys_wait(rsp: &mut usize, pid: usize) -> i32 {
+    debug!("wait: {}", pid);
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let target = match pid {
+        0 => WaitTarget::AnyChild,
+        _ => WaitTarget::Proc(pid),
+    };
+    match processor.current_wait_for(target) {
+        WaitResult::Ok(error_code) => error_code as i32,
+        WaitResult::Blocked => {
+            processor.schedule(rsp);
+            0 /* unused */
+        },
+        WaitResult::NotExist => { -1 }
+    }
 }
 
 /// Kill the process
@@ -69,7 +88,7 @@ pub fn sys_getpid() -> i32 {
 }
 
 /// Exit the current process
-pub fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
+pub fn sys_exit(rsp: &mut usize, error_code: ErrorCode) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current().pid;
     processor.schedule(rsp);
@@ -77,11 +96,11 @@ pub fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
     0
 }
 
-pub fn add_user_process(name: &str, data: &[u8]) {
+pub fn add_user_process(name: impl AsRef<str>, data: &[u8]) {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let mut mc = MC.try().unwrap().lock();
     let mut new = Process::new_user(data, &mut mc);
-    new.name = String::from(name);
+    new.name = String::from(name.as_ref());
     processor.add(new);
 }
 

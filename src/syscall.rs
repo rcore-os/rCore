@@ -21,6 +21,8 @@ pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
             io::open(args[0] as *const u8, args[1]),
         Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
             io::close(args[0]),
+        Syscall::Xv6(SYS_WAIT) | Syscall::Ucore(UCORE_SYS_WAIT) =>
+            process::sys_wait(rsp, args[0]),
         Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
             process::sys_fork(tf),
         Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
