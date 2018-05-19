@@ -89,7 +89,7 @@ impl Process {
         memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top,
                                         EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
         let page_table = mc.make_page_table(&memory_set);
-//        debug!("{:#x?}", memory_set);
+        trace!("{:#x?}", memory_set);
 
         let entry_addr = match elf.header.pt2 {
             HeaderPt2::Header32(header) => header.entry_point as usize,
@@ -120,7 +120,7 @@ impl Process {
         let kstack = mc.alloc_stack(7).unwrap();
         let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top - 8, is32);
         let rsp = kstack.push_at_top(tf);
-//        debug!("rsp = {:#x}", rsp);
+        trace!("rsp = {:#x}", rsp);
 
         Process {
             pid: 0,

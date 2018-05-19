@@ -5,7 +5,7 @@ static mut PIT: Pit = Pit::new(0x40);
 pub fn init() {
     assert_has_not_been_called!("pit::init must be called only once");
     unsafe{ PIT.init(100); }
-    debug!("pit: init end");
+    info!("pit: init end");
 }
 
 struct Pit {

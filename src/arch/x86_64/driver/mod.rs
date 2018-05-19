@@ -19,7 +19,7 @@ pub fn init(mut page_map: impl FnMut(usize)) -> acpi::AcpiResult {
 
     let acpi = acpi::init().expect("Failed to init ACPI");
     assert_eq!(acpi.lapic_addr as usize, 0xfee00000);
-    debug!("{:?}", acpi);
+    trace!("acpi = {:?}", acpi);
 
     if cfg!(feature = "use_apic") {
         pic::disable();

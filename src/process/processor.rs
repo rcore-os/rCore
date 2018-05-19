@@ -81,7 +81,7 @@ impl Processor {
             from.page_table = Some(old_table);
         }
 
-        debug!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
+        info!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
     }
 
     fn get(&self, pid: Pid) -> &Process {
@@ -108,7 +108,7 @@ impl Processor {
 
     pub fn exit(&mut self, pid: Pid, error_code: ErrorCode) {
         assert_ne!(pid, self.current_pid);
-        debug!("Processor: {} exit, code: {}", pid, error_code);
+        info!("Processor: {} exit, code: {}", pid, error_code);
         self.get_mut(pid).status = Status::Exited(error_code);
         if let Some(waiter) = self.find_waiter(pid) {
             {
@@ -116,7 +116,7 @@ impl Processor {
                 p.status = Status::Ready;
                 p.set_return_value(error_code);
             }
-            debug!("Processor: remove {}", pid);
+            info!("Processor: remove {}", pid);
             self.procs.remove(&pid);
         }
     }
@@ -139,11 +139,11 @@ impl Processor {
             WaitTarget::Proc(pid) => (pid, self.get(pid).exit_code()),
         };
         if let Some(exit_code) = exit_code {
-            debug!("Processor: remove {}", pid);
+            info!("Processor: {} wait find and remove {}", self.current_pid, pid);
             self.procs.remove(&pid);
             WaitResult::Ok(exit_code)
         } else {
-            debug!("Processor: {} wait for {}", self.current_pid, pid);
+            info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
             self.get_mut(current_pid).status = Status::Sleeping(pid);
             WaitResult::Blocked

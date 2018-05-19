@@ -10,7 +10,7 @@ pub fn disable() {
     // Mask all interrupts (Copy from xv6 x86_64)
     MASTER.lock().cmd.write(0xFF);
     SLAVE.lock().cmd.write(0xFF);
-    debug!("pic: disabled");
+    info!("pic: disabled");
 }
 
 pub fn init() {
@@ -43,7 +43,7 @@ pub fn init() {
     master.ack();
     slave.ack();
 
-    debug!("pic: init end");    
+    info!("pic: init end");
 }
 
 pub fn enable_irq(irq: u8)

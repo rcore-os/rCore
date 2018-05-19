@@ -37,7 +37,7 @@ pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
                 0
             },
         _ => {
-            debug!("unknown syscall {:#x?}", id);
+            warn!("unknown syscall {:#x?}", id);
             -1
         },
     }

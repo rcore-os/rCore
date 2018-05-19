@@ -35,7 +35,7 @@ pub fn load_sfs() {
     let sfs = SimpleFileSystem::open(Box::new(slice)).unwrap();
     let root = sfs.root_inode();
     let files = root.borrow().list().unwrap();
-    debug!("Loading programs: {:?}", files);
+    trace!("Loading programs: {:?}", files);
 
 //    for name in files.iter().filter(|&f| f != "." && f != "..") {
     for name in files.iter().filter(|&f| f == "forktest") {

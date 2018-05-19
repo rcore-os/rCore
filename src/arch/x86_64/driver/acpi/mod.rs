@@ -9,7 +9,7 @@ pub fn init() -> Result<AcpiResult, AcpiError> {
 	if rsdp.rsdt_physical_address > PHYSICAL_MEMORY_LIMIT {
 		return Err(AcpiError::NotMapped);
 	}
-	debug!("RSDT at {:#x}", rsdp.rsdt_physical_address);
+    trace!("RSDT at {:#x}", rsdp.rsdt_physical_address);
 	let rsdt = unsafe{ &*(rsdp.rsdt_physical_address as *const Rsdt) };
 	let mut madt: Option<&'static Madt> = None;
 	for i in 0 .. rsdt.entry_count() {
@@ -18,12 +18,12 @@ pub fn init() -> Result<AcpiResult, AcpiError> {
 			return Err(AcpiError::NotMapped);
 		}
 		let header = unsafe{ &*(entry as *const Header) };
-		// debug!("{:?}", header);
+        trace!("{:?}", header);
 		if &header.signature == b"APIC" {
 			madt = Some(unsafe{ &*(entry as *const Madt) });
 		}
 	}
-	debug!("{:?}", madt);
+    trace!("{:?}", madt);
 	config_smp(madt.expect("acpi: madt not found."))
 }
 
@@ -53,7 +53,7 @@ fn config_smp(madt: &'static Madt) -> Result<AcpiResult, AcpiError> {
 	let mut cpu_acpi_ids: [u8; MAX_CPU_NUM] = [0; MAX_CPU_NUM];
 	let mut ioapic_id: Option<u8> = None;
 	for entry in madt.entry_iter() {
-		debug!("{:?}", entry);
+        trace!("{:?}", entry);
 		match &entry {
 			&MadtEntry::LocalApic(ref lapic) => {
 				cpu_acpi_ids[cpu_num as usize] = lapic.id;
@@ -77,7 +77,7 @@ fn config_smp(madt: &'static Madt) -> Result<AcpiResult, AcpiError> {
 fn find_rsdp() -> Option<&'static Rsdp> {
 	use util::{Checkable, find_in_memory};
 	let ebda = unsafe { *(0x40E as *const u16) as usize } << 4;
-	debug!("EBDA at {:#x}", ebda);
+    trace!("EBDA at {:#x}", ebda);
 
 	macro_rules! return_if_find_in {
 		($begin:expr, $end:expr) => (

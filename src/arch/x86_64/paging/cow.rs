@@ -169,8 +169,6 @@ mod test {
     use super::*;
 
     pub fn test_cow() {
-        debug!("Testing: Copy on write");
-
         let mut page_table = unsafe { ActivePageTable::new() };
         let frame = alloc_frame();
 
@@ -208,7 +206,5 @@ mod test {
                    "The last write reference should not allocate new frame.");
         assert_eq!(unsafe { *(0x1000 as *const u8) }, 2);
         assert_eq!(unsafe { *(0x2000 as *const u8) }, 3);
-
-        debug!("Success: Copy on write");
     }
 }

@@ -34,6 +34,8 @@ extern crate bit_field;
 extern crate syscall as redox_syscall;
 extern crate xmas_elf;
 extern crate arrayvec;
+#[macro_use]
+extern crate log;
 extern crate simple_filesystem;
 
 #[macro_use]    // print!
@@ -57,6 +59,7 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::cpu::init();
+    io::init();
 
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
@@ -69,8 +72,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::gdt::init();
     arch::idt::init();
 
-    arch::paging::test_cow();
-
+    test!(cow);
     test!(global_allocator);
     test!(guard_page);
     test!(find_mp);
@@ -160,5 +162,10 @@ mod test {
         stack_overflow();
 
         println!("It did not crash!");
+    }
+
+    pub fn cow() {
+        use arch;
+        arch::paging::test_cow();
     }
 }

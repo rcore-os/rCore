@@ -58,10 +58,10 @@ static mut TSS_PTR: Unique<TaskStateSegment> = unsafe{ Unique::new_unchecked(0 a
 ///
 /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
 pub fn set_ring0_rsp(rsp: usize) {
-//    debug!("gdt.set_ring0_rsp: {:#x}", rsp);
+    trace!("gdt.set_ring0_rsp: {:#x}", rsp);
     unsafe {
         TSS_PTR.as_mut().privilege_stack_table[0] = VirtualAddress(rsp);
-//        debug!("TSS:\n{:?}", TSS_PTR.as_ref());
+        trace!("TSS:\n{:?}", TSS_PTR.as_ref());
     }
 }
 

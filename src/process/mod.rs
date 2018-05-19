@@ -54,13 +54,12 @@ pub fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut mc = MC.try().unwrap().lock();
     let new = processor.current().fork(tf, &mut mc);
     let pid = processor.add(new);
-    debug!("fork: {}", pid);
+    info!("fork: {} -> {}", processor.current().pid, pid);
     pid as i32
 }
 
 /// Wait the process exit. Return the exit code.
 pub fn sys_wait(rsp: &mut usize, pid: usize) -> i32 {
-    debug!("wait: {}", pid);
     let mut processor = PROCESSOR.try().unwrap().lock();
     let target = match pid {
         0 => WaitTarget::AnyChild,

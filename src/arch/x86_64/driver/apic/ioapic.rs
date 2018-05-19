@@ -19,7 +19,7 @@ pub fn init(ioapic_id: u8)
 	for i in 0.. ioapic.maxintr() + 1 {
 		ioapic.write_irq(i, RedirectionEntry::DISABLED, 0);
 	}
-	debug!("ioapic: init end");
+    info!("ioapic: init end");
 }
 
 const IOAPIC_ADDRESS  : u32 = 0xFEC00000;   // Default physical address of IO APIC
@@ -81,7 +81,7 @@ impl IoApic {
 	}
 	pub fn enable(&mut self, irq: u8, cpunum: u8)
 	{
-		debug!("ioapic: enable irq {} @ cpu{}", irq, cpunum);
+        info!("ioapic: enable irq {} @ cpu{}", irq, cpunum);
 		// Mark interrupt edge-triggered, active high,
 		// enabled, and routed to the given cpunum,
 		// which happens to be that cpu's APIC ID.

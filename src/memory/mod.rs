@@ -36,7 +36,7 @@ pub fn page_fault_handler(addr: VirtAddr) -> bool {
 pub fn init(boot_info: BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
 
-    debug!("{:?}", boot_info);
+    info!("{:?}", boot_info);
 
     let memory_map_tag = boot_info.memory_map_tag().expect(
         "Memory map tag required");

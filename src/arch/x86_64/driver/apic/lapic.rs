@@ -13,11 +13,11 @@ pub fn set_addr(lapic_addr: *const ()) {
 }
 
 pub fn init() {
-	debug!("WARNING: lapic::init use C lib");
+    warn!("lapic::init use C lib");
 	unsafe {
 		lapicinit();
 	}
-	debug!("lapic: init end");
+    info!("lapic: init end");
 }
 
 pub fn ack(_irq: u8) {
@@ -27,7 +27,7 @@ pub fn ack(_irq: u8) {
 }
 
 pub fn start_ap(apicid: u8, addr: u32) {
-	debug!("WARNING: lapic::start_ap use C lib");
+    warn!("lapic::start_ap use C lib");
 	unsafe {
 		lapicstartap(apicid, addr);
 	}

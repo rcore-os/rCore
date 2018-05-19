@@ -5,12 +5,12 @@ use self::template::*;
 pub type TrapFrame = InterruptStackP;
 
 interrupt_stack!(breakpoint, stack, {
-    println!("\nEXCEPTION: Breakpoint");
+    error!("\nEXCEPTION: Breakpoint");
     stack.dump();
 });
 
 interrupt_error_p!(double_fault, stack, {
-    println!("\nEXCEPTION: Double Fault");
+    error!("\nEXCEPTION: Double Fault");
     stack.dump();
     loop {}
 });
@@ -18,7 +18,7 @@ interrupt_error_p!(double_fault, stack, {
 interrupt_error_p!(page_fault, stack, {
     use x86_64::registers::control_regs::cr2;
     let addr = cr2().0;
-    println!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, stack.code);
+    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, stack.code);
 
     use memory::page_fault_handler;
     if page_fault_handler(addr) {
@@ -30,13 +30,13 @@ interrupt_error_p!(page_fault, stack, {
 });
 
 interrupt_error_p!(general_protection_fault, stack, {
-    println!("\nEXCEPTION: General Protection Fault");
+    error!("\nEXCEPTION: General Protection Fault");
     stack.dump();
     loop {}
 });
 
 interrupt_stack_p!(invalid_opcode, stack, {
-    println!("\nEXCEPTION: Invalid Opcode");
+    error!("\nEXCEPTION: Invalid Opcode");
     stack.dump();
     loop {}
 });
@@ -50,23 +50,23 @@ use super::consts::*;
 
 interrupt!(keyboard, {
     use arch::driver::keyboard;
-    println!("\nInterupt: Keyboard");
+    info!("\nInterupt: Keyboard");
     let c = keyboard::get();
-    println!("Key = '{}' {}", c as u8 as char, c);
+    info!("Key = '{}' {}", c as u8 as char, c);
     ack(IRQ_KBD);
 
 });
 
 interrupt!(com1, {
     use arch::driver::serial::COM1;
-    println!("\nInterupt: COM1");
+    info!("\nInterupt: COM1");
     COM1.lock().receive();
     ack(IRQ_COM1);
 });
 
 interrupt!(com2, {
     use arch::driver::serial::COM2;
-    println!("\nInterupt: COM2");
+    info!("\nInterupt: COM2");
     COM2.lock().receive();
     ack(IRQ_COM2);
 });
@@ -82,7 +82,7 @@ interrupt_switch!(timer, stack, rsp, {
     static mut tick: usize = 0;
     unsafe{ tick += 1; }
     if tick % 100 == 0 {
-        println!("\nInterupt: Timer\ntick = {}", tick);
+        info!("\nInterupt: Timer\ntick = {}", tick);
         use process;
         process::schedule(&mut rsp);
     }
@@ -91,7 +91,7 @@ interrupt_switch!(timer, stack, rsp, {
 
 interrupt_stack_p!(to_user, stack, {
     use arch::gdt;
-    println!("\nInterupt: To User");
+    info!("\nInterupt: To User");
     let rsp = unsafe{ (stack as *const InterruptStackP).offset(1) } as usize;
     gdt::set_ring0_rsp(rsp);
     stack.iret.cs = gdt::UCODE_SELECTOR.0 as usize;
@@ -100,22 +100,22 @@ interrupt_stack_p!(to_user, stack, {
 });
 
 interrupt_stack_p!(to_kernel, stack, {
-//    println!("rsp @ {:#x}", stack as *const _ as usize);
+//    info!("rsp @ {:#x}", stack as *const _ as usize);
     use arch::gdt;
-    println!("\nInterupt: To Kernel");
+    info!("\nInterupt: To Kernel");
     stack.iret.cs = gdt::KCODE_SELECTOR.0 as usize;
     stack.iret.ss = gdt::KDATA_SELECTOR.0 as usize;
 });
 
 interrupt_switch!(syscall, stack, rsp, {
-    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
+    info!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
     let ret = syscall(stack, &mut rsp, false);
     stack.scratch.rax = ret as usize;
 });
 
 interrupt_switch!(syscall32, stack, rsp, {
-//    println!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
+//    info!("\nInterupt: Syscall {:#x?}", stack.scratch.rax);
     use syscall::syscall;
     let ret = syscall(stack, &mut rsp, true);
     stack.scratch.rax = ret as usize;
