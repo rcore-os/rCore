@@ -95,6 +95,11 @@ pub fn sys_exit(rsp: &mut usize, error_code: ErrorCode) -> i32 {
     0
 }
 
+pub fn sys_sleep(rsp: &mut usize, time: usize) -> i32 {
+    info!("sleep: {} ticks", time);
+    unimplemented!()
+}
+
 pub fn add_user_process(name: impl AsRef<str>, data: &[u8]) {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let mut mc = MC.try().unwrap().lock();

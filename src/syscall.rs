@@ -31,15 +31,19 @@ pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
             process::sys_exit(rsp, args[0]),
         Syscall::Ucore(UCORE_SYS_GETPID) =>
             process::sys_getpid(),
+        Syscall::Ucore(UCORE_SYS_SLEEP) =>
+            process::sys_sleep(rsp, args[0]),
+        Syscall::Ucore(UCORE_SYS_GETTIME) =>
+            schedule::get_time(),
         Syscall::Ucore(UCORE_SYS_PUTC) =>
             {
                 print!("{}", args[0] as u8 as char);
                 0
-            },
+            }
         _ => {
-            warn!("unknown syscall {:#x?}", id);
+            error!("unknown syscall {:#x?}", id);
             -1
-        },
+        }
     }
 }
 

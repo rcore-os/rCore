@@ -38,7 +38,7 @@ pub fn load_sfs() {
     trace!("Loading programs: {:?}", files);
 
 //    for name in files.iter().filter(|&f| f != "." && f != "..") {
-    for name in files.iter().filter(|&f| f == "forktest") {
+    for name in files.iter().filter(|&f| f == "sleep") {
         static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
         let file = root.borrow().lookup(name.as_str()).unwrap();
         let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();

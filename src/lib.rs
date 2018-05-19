@@ -49,6 +49,7 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
+mod schedule;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

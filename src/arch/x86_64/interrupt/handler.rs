@@ -71,21 +71,9 @@ interrupt!(com2, {
     ack(IRQ_COM2);
 });
 
-use spin::Mutex;
-// FIXME: Deadlock
-//static TICK: Mutex<usize> = Mutex::new(0);
-
 interrupt_switch!(timer, stack, rsp, {
-//    let mut tick = TICK.lock();
-//    *tick += 1;
-//    let tick = *tick;
-    static mut tick: usize = 0;
-    unsafe{ tick += 1; }
-    if tick % 100 == 0 {
-        info!("\nInterupt: Timer\ntick = {}", tick);
-        use process;
-        process::schedule(&mut rsp);
-    }
+    use schedule;
+    schedule::timer_handler(stack, &mut rsp);
     ack(IRQ_TIMER);
 });
 
