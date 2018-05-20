@@ -105,7 +105,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     loop{
         println!("init ...");
         let mut i = 0;
-        while i < 1 << 23 {
+        while i < 1 << 22 {
             i += 1;
         }
     }

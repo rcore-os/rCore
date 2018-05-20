@@ -21,7 +21,7 @@ impl Processor {
             current_pid: 0,
             event_hub: {
                 let mut e = EventHub::new();
-                e.push(100, Event::Schedule);
+                e.push(10, Event::Schedule);
                 e
             },
             kernel_page_table: None,
@@ -48,7 +48,7 @@ impl Processor {
             debug!("Processor: event {:?}", event);
             match event {
                 Event::Schedule => {
-                    self.event_hub.push(100, Event::Schedule);
+                    self.event_hub.push(10, Event::Schedule);
                     self.schedule(rsp);
                 },
                 Event::Wakeup(pid) => {
@@ -78,7 +78,7 @@ impl Processor {
     fn find_next(&self) -> Pid {
         *self.procs.keys()
             .find(|&&i| i > self.current_pid
-                && self.get(i).exit_code().is_none())
+                && self.get(i).status == Status::Ready)
             .unwrap_or(self.procs.keys().next().unwrap())
     }
 
@@ -162,6 +162,7 @@ impl Processor {
 
     /// Let current process wait for another
     pub fn current_wait_for(&mut self, target: WaitTarget) -> WaitResult {
+        info!("Processor: current {} wait for {:?}", self.current_pid, target);
         // Find one target process and it's exit code
         let (pid, exit_code) = match target {
             WaitTarget::AnyChild => {
@@ -180,7 +181,7 @@ impl Processor {
         if let Some(exit_code) = exit_code {
             info!("Processor: {} wait find and remove {}", self.current_pid, pid);
             self.procs.remove(&pid);
-            WaitResult::Ok(exit_code)
+            WaitResult::Ok(pid, exit_code)
         } else {
             info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
@@ -205,17 +206,19 @@ impl Debug for Processor {
     }
 }
 
+#[derive(Debug)]
 pub enum WaitTarget {
     AnyChild,
     Proc(Pid),
 }
 
+#[derive(Debug)]
 pub enum WaitResult {
     /// The target process is still running.
     /// The waiter's status will be set to `Waiting`.
     Blocked,
     /// The target process is exited with `ErrorCode`.
-    Ok(ErrorCode),
+    Ok(Pid, ErrorCode),
     /// The target process is not exist.
     NotExist,
 }

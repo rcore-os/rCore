@@ -35,7 +35,7 @@ extern fn idle_thread() {
     loop {
         println!("idle ...");
         let mut i = 0;
-        while i < 1 << 23 {
+        while i < 1 << 22 {
             i += 1;
         }
     }
@@ -51,21 +51,34 @@ pub fn sys_fork(tf: &TrapFrame) -> i32 {
     pid as i32
 }
 
-/// Wait the process exit. Return the exit code.
-pub fn sys_wait(rsp: &mut usize, pid: usize) -> i32 {
+/// Wait the process exit.
+/// Return the PID. Store exit code to `code` if it's not null.
+pub fn sys_wait(rsp: &mut usize, pid: usize, code: *mut i32) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let target = match pid {
         0 => WaitTarget::AnyChild,
         _ => WaitTarget::Proc(pid),
     };
     match processor.current_wait_for(target) {
-        WaitResult::Ok(error_code) => error_code as i32,
+        WaitResult::Ok(pid, error_code) => {
+            if !code.is_null() {
+                unsafe { *code = error_code as i32 };
+            }
+            0 // pid as i32
+        },
         WaitResult::Blocked => {
             processor.schedule(rsp);
             0 /* unused */
         },
-        WaitResult::NotExist => { -1 }
+        WaitResult::NotExist => -1,
     }
+}
+
+pub fn sys_yield(rsp: &mut usize) -> i32 {
+    info!("yield:");
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    processor.schedule(rsp);
+    0
 }
 
 /// Kill the process

@@ -152,6 +152,8 @@ impl ActivePageTable {
         unsafe {
             control_regs::cr3_write(new_table.p4_frame.start_address());
         }
+        use core::mem::forget;
+        forget(new_table);
         old_table
     }
 }
@@ -175,5 +177,11 @@ impl InactivePageTable {
         temporary_page.unmap(active_table);
 
         InactivePageTable { p4_frame: frame }
+    }
+}
+
+impl Drop for InactivePageTable {
+    fn drop(&mut self) {
+        warn!("PageTable dropped: {:?}", self);
     }
 }

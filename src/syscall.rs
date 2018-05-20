@@ -22,13 +22,15 @@ pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
         Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
             io::close(args[0]),
         Syscall::Xv6(SYS_WAIT) | Syscall::Ucore(UCORE_SYS_WAIT) =>
-            process::sys_wait(rsp, args[0]),
+            process::sys_wait(rsp, args[0], args[1] as *mut i32),
         Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
             process::sys_fork(tf),
         Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
             process::sys_kill(args[0]),
         Syscall::Xv6(SYS_EXIT) | Syscall::Ucore(UCORE_SYS_EXIT) =>
             process::sys_exit(rsp, args[0]),
+        Syscall::Ucore(UCORE_SYS_YIELD) =>
+            process::sys_yield(rsp),
         Syscall::Ucore(UCORE_SYS_GETPID) =>
             process::sys_getpid(),
         Syscall::Ucore(UCORE_SYS_SLEEP) =>

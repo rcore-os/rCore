@@ -87,10 +87,10 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> Stack {
 
     let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);
     active_table.with(&mut page_table, |pt| memory_set.map(pt));
-    println!("{:#x?}", memory_set);
+    debug!("{:#x?}", memory_set);
 
     let old_table = active_table.switch(page_table);
-    println!("NEW TABLE!!!");
+    info!("NEW TABLE!!!");
 
     // turn the stack bottom into a guard page
     extern { fn stack_bottom(); }
@@ -98,7 +98,7 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> Stack {
     let stack_bottom_page = Page::of_addr(stack_bottom);
     active_table.unmap(stack_bottom_page);
     let kernel_stack = Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE);
-    println!("guard page at {:#x}", stack_bottom_page.start_address());
+    debug!("guard page at {:#x}", stack_bottom_page.start_address());
 
     kernel_stack
 }
