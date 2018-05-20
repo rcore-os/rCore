@@ -49,7 +49,6 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
-mod schedule;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -106,7 +105,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     loop{
         println!("init ...");
         let mut i = 0;
-        while i < 1 << 22 {
+        while i < 1 << 23 {
             i += 1;
         }
     }

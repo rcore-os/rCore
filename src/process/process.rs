@@ -24,7 +24,8 @@ pub type ErrorCode = usize;
 pub enum Status {
     Ready,
     Running,
-    Sleeping(Pid),
+    Waiting(Pid),
+    Sleeping,
     Exited(ErrorCode),
 }
 

@@ -32,6 +32,10 @@ features := $(features) test
 qemu_opts := $(qemu_opts) -device isa-debug-exit
 endif
 
+ifdef int
+qemu_opts := $(qemu_opts) -d int
+endif
+
 
 ifeq ($(OS),Windows_NT)
 uname := Win32

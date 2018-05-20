@@ -3,10 +3,15 @@ use memory::{ActivePageTable, InactivePageTable};
 use super::*;
 use core::cell::RefCell;
 use core::fmt::{Debug, Formatter, Error};
+use util::{EventHub, GetMut2};
 
 pub struct Processor {
     procs: BTreeMap<Pid, Process>,
     current_pid: Pid,
+    event_hub: EventHub<Event>,
+    /// All kernel threads share one page table.
+    /// When running user process, it will be stored here.
+    kernel_page_table: Option<InactivePageTable>,
 }
 
 impl Processor {
@@ -14,6 +19,12 @@ impl Processor {
         Processor {
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,
+            event_hub: {
+                let mut e = EventHub::new();
+                e.push(100, Event::Schedule);
+                e
+            },
+            kernel_page_table: None,
         }
     }
 
@@ -27,6 +38,29 @@ impl Processor {
             }
         }
         return next;
+    }
+
+    /// Called by timer.
+    /// Handle events.
+    pub fn tick(&mut self, rsp: &mut usize) {
+        self.event_hub.tick();
+        while let Some(event) = self.event_hub.pop() {
+            debug!("Processor: event {:?}", event);
+            match event {
+                Event::Schedule => {
+                    self.event_hub.push(100, Event::Schedule);
+                    self.schedule(rsp);
+                },
+                Event::Wakeup(pid) => {
+                    self.get_mut(pid).status = Status::Ready;
+                    self.switch_to(pid, rsp);
+                },
+            }
+        }
+    }
+
+    pub fn get_time(&self) -> usize {
+        self.event_hub.get_time()
     }
 
     pub fn add(&mut self, mut process: Process) -> Pid {
@@ -61,7 +95,7 @@ impl Processor {
         }
         self.current_pid = pid;
 
-        let (from, to) = self.get_mut2(pid0, pid);
+        let (from, to) = self.procs.get_mut2(pid0, pid);
 
         // set `from`
         if from.status == Status::Running {
@@ -75,10 +109,18 @@ impl Processor {
         *rsp = to.rsp;
 
         // switch page table
-        if let Some(page_table) = to.page_table.take() {
+        if from.is_user || to.is_user {
+            let (from_pt, to_pt) = match (from.is_user, to.is_user) {
+                (true, true) => (&mut from.page_table, &mut to.page_table),
+                (true, false) => (&mut from.page_table, &mut self.kernel_page_table),
+                (false, true) => (&mut self.kernel_page_table, &mut to.page_table),
+                _ => panic!(),
+            };
+            assert!(from_pt.is_none());
+            assert!(to_pt.is_some());
             let mut active_table = unsafe { ActivePageTable::new() };
-            let old_table = active_table.switch(page_table);
-            from.page_table = Some(old_table);
+            let old_table = active_table.switch(to_pt.take().unwrap());
+            *from_pt = Some(old_table);
         }
 
         info!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
@@ -89,14 +131,6 @@ impl Processor {
     }
     fn get_mut(&mut self, pid: Pid) -> &mut Process {
         self.procs.get_mut(&pid).unwrap()
-    }
-    fn get_mut2(&mut self, pid1: Pid, pid2: Pid) -> (&mut Process, &mut Process) {
-        assert_ne!(pid1, pid2);
-        let procs1 = &mut self.procs as *mut BTreeMap<_, _>;
-        let procs2 = procs1;
-        let p1 = unsafe { &mut *procs1 }.get_mut(&pid1).unwrap();
-        let p2 = unsafe { &mut *procs2 }.get_mut(&pid2).unwrap();
-        (p1, p2)
     }
     pub fn current(&self) -> &Process {
         self.get(self.current_pid)
@@ -119,6 +153,11 @@ impl Processor {
             info!("Processor: remove {}", pid);
             self.procs.remove(&pid);
         }
+    }
+
+    pub fn sleep(&mut self, pid: Pid, time: usize) {
+        self.get_mut(pid).status = Status::Sleeping;
+        self.event_hub.push(time, Event::Wakeup(pid));
     }
 
     /// Let current process wait for another
@@ -145,15 +184,15 @@ impl Processor {
         } else {
             info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
-            self.get_mut(current_pid).status = Status::Sleeping(pid);
+            self.get_mut(current_pid).status = Status::Waiting(pid);
             WaitResult::Blocked
         }
     }
 
     fn find_waiter(&self, pid: Pid) -> Option<Pid> {
         self.procs.values().find(|&p| {
-            p.status == Status::Sleeping(pid) ||
-                (p.status == Status::Sleeping(0) && self.get(pid).parent == p.pid)
+            p.status == Status::Waiting(pid) ||
+                (p.status == Status::Waiting(0) && self.get(pid).parent == p.pid)
         }).map(|ref p| p.pid)
     }
 }
@@ -173,10 +212,23 @@ pub enum WaitTarget {
 
 pub enum WaitResult {
     /// The target process is still running.
-    /// The waiter's status will be set to `Sleeping`.
+    /// The waiter's status will be set to `Waiting`.
     Blocked,
     /// The target process is exited with `ErrorCode`.
     Ok(ErrorCode),
     /// The target process is not exist.
     NotExist,
+}
+
+#[derive(Debug)]
+enum Event {
+    Schedule,
+    Wakeup(Pid),
+}
+
+impl GetMut2<Pid> for BTreeMap<Pid, Process> {
+    type Output = Process;
+    fn get_mut(&mut self, id: Pid) -> &mut Process {
+        self.get_mut(&id).unwrap()
+    }
 }

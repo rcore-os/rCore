@@ -144,11 +144,10 @@ impl ActivePageTable {
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
         use x86_64::PhysicalAddress;
         use x86_64::registers::control_regs;
+        debug!("switch table to {:?}", new_table.p4_frame);
 
         let old_table = InactivePageTable {
-            p4_frame: Frame::of_addr(
-                control_regs::cr3().0 as usize
-            ),
+            p4_frame: Frame::of_addr(control_regs::cr3().0 as usize),
         };
         unsafe {
             control_regs::cr3_write(new_table.p4_frame.start_address());

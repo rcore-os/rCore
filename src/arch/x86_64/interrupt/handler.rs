@@ -72,8 +72,8 @@ interrupt!(com2, {
 });
 
 interrupt_switch!(timer, stack, rsp, {
-    use schedule;
-    schedule::timer_handler(stack, &mut rsp);
+    use process;
+    process::timer_handler(stack, &mut rsp);
     ack(IRQ_TIMER);
 });
 
