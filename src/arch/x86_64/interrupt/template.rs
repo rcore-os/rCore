@@ -342,7 +342,8 @@ macro_rules! interrupt_switch {
 
             // Get reference to stack variables
             let rsp: usize;
-            asm!("" : "={rsp}"(rsp) : : : "intel", "volatile");
+            asm!("mov rbp, rsp" : "={rsp}"(rsp) : : : "intel", "volatile");
+            // "mov rbp, rsp" <-- Fix a lot of bugs!
 
             // Call inner rust function
             let rsp = inner(&mut *(rsp as *mut InterruptStackP));
