@@ -27,7 +27,7 @@ addons:
 env:
   matrix:
     - TASK="build"
-    - TASK="run travis=1"
+#    - TASK="run travis=1"
 
 script:
   - make ${TASK}
