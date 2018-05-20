@@ -2,16 +2,16 @@ use super::*;
 use process;
 use arch::interrupt::TrapFrame;
 
-pub unsafe fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
+pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
     let id = match is32 {
-        false => Syscall::Xv6(tf.scratch.rax),
-        true => Syscall::Ucore(tf.scratch.rax),
+        false => Syscall::Xv6(tf.rax),
+        true => Syscall::Ucore(tf.rax),
     };
     let args = match is32 {
         // For ucore x86
-        true => [tf.scratch.rdx, tf.scratch.rcx, tf.preserved.rbx, tf.scratch.rdi, tf.scratch.rsi, 0],
+        true => [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0],
         // For xv6 x86_64
-        false => [tf.scratch.rdi, tf.scratch.rsi, tf.scratch.rdx, tf.scratch.rcx, tf.scratch.r8, tf.scratch.r9],
+        false => [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9],
     };
 
     match id {

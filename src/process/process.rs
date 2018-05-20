@@ -160,7 +160,7 @@ impl Process {
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
         let mut tf = tf.clone();
-        tf.scratch.rax = 0; // sys_fork return 0 for child
+        tf.rax = 0; // sys_fork return 0 for child
         let rsp = kstack.push_at_top(tf);
 
         Process {
@@ -178,7 +178,7 @@ impl Process {
 
     pub fn set_return_value(&self, value: usize) {
         let tf = unsafe { &mut *(self.rsp as *mut TrapFrame) };
-        tf.scratch.rax = value;
+        tf.rax = value;
     }
     pub fn exit_code(&self) -> Option<ErrorCode> {
         match self.status {
