@@ -2,7 +2,7 @@ arch ?= x86_64
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
-rust_os := target/$(target)/debug/libblog_os.a
+rust_os := target/$(target)/debug/librust_ucore.a
 
 boot_src := src/arch/$(arch)/boot
 linker_script := $(boot_src)/linker.ld
@@ -103,7 +103,7 @@ innerpwd ?= /root/blog_os
 else
 uid ?= $(shell id -u)
 gid ?= $(shell id -g)
-innerpwd ?= pwd
+innerpwd ?= $(pwd)
 endif
 docker_cargo_volume ?=  blogos-$(uid)-$(gid)-cargo
 docker_rustup_volume ?=  blogos-$(uid)-$(gid)-rustup
