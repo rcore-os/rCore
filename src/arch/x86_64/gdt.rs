@@ -3,9 +3,10 @@ use core::fmt::Debug;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::{PrivilegeLevel, VirtualAddress};
-use spin::Once;
+use spin::{Once, Mutex, MutexGuard};
 use alloc::boxed::Box;
-use core::ptr::Unique;
+use arch::driver::apic::lapic_id;
+use consts::MAX_CPU_NUM;
 
 /// Alloc TSS & GDT at kernel heap, then init and load it.
 /// The double fault stack will be allocated at kernel heap too.
@@ -26,8 +27,7 @@ pub fn init() {
 
         tss
     });
-    unsafe{ TSS_PTR = Unique::new_unchecked(Box::into_raw(tss)); }
-    let tss = unsafe{ TSS_PTR.as_ref() };
+    let tss = Box::into_raw(tss);
 
     let gdt = Box::new({
         let mut gdt = Gdt::new();
@@ -37,7 +37,7 @@ pub fn init() {
         gdt.add_entry(UDATA);
         gdt.add_entry(UCODE32);
         gdt.add_entry(UDATA32);
-        gdt.add_entry(Descriptor::tss_segment(&tss));
+        gdt.add_entry(Descriptor::tss_segment(unsafe { &*tss }));
         gdt
     });
     let gdt = unsafe{ &*Box::into_raw(gdt) };
@@ -49,19 +49,35 @@ pub fn init() {
         // load TSS
         load_tss(TSS_SELECTOR);
     }
+
+    CPUS[lapic_id() as usize].call_once(||
+        Mutex::new(Cpu { gdt, tss: unsafe { &mut *tss } }));
 }
 
-// TODO: more elegant?
-static mut TSS_PTR: Unique<TaskStateSegment> = unsafe{ Unique::new_unchecked(0 as *mut _) };
+static CPUS: [Once<Mutex<Cpu>>; MAX_CPU_NUM] = [
+    // TODO: More elegant ?
+    Once::new(), Once::new(), Once::new(), Once::new(),
+    Once::new(), Once::new(), Once::new(), Once::new(),
+];
 
-/// 设置从Ring3跳到Ring0时，自动切换栈的地址
-///
-/// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
-pub fn set_ring0_rsp(rsp: usize) {
-    trace!("gdt.set_ring0_rsp: {:#x}", rsp);
-    unsafe {
-        TSS_PTR.as_mut().privilege_stack_table[0] = VirtualAddress(rsp);
-        trace!("TSS:\n{:?}", TSS_PTR.as_ref());
+pub struct Cpu {
+    gdt: &'static Gdt,
+    tss: &'static mut TaskStateSegment,
+}
+
+impl Cpu {
+    pub fn current() -> MutexGuard<'static, Cpu> {
+        CPUS[lapic_id() as usize].try().unwrap().lock()
+    }
+
+    /// 设置从Ring3跳到Ring0时，自动切换栈的地址
+    ///
+    /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
+    pub fn set_ring0_rsp(&mut self, rsp: usize) {
+        trace!("gdt.set_ring0_rsp: {:#x}", rsp);
+        unsafe {
+            self.tss.privilege_stack_table[0] = VirtualAddress(rsp);
+        }
     }
 }
 

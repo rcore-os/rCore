@@ -35,6 +35,9 @@ pub fn start_ap(apicid: u8, addr: u32) {
 
 pub fn lapic_id() -> u8 {
 	unsafe{
+        if lapic.is_null() {
+            return 0;
+        }
 		(*(lapic as *const u32).offset(0x0020/4) >> 24) as u8
 	}
 }

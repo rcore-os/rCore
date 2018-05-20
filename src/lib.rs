@@ -81,8 +81,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
         |addr: usize| memory_controller.map_page_identity(addr));
     // memory_controller.print_page_table();
 
-    // FIXME: 开启SMP后，导致switch_to_user中设置rsp无效
-//    arch::smp::start_other_cores(&acpi, &mut memory_controller);
+    arch::smp::start_other_cores(&acpi, &mut memory_controller);
     process::init(memory_controller);
 
     fs::load_sfs();

@@ -126,10 +126,10 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
 }
 
 fn set_return_rsp(tf: &TrapFrame) {
-    use arch::gdt;
+    use arch::gdt::Cpu;
     use core::mem::size_of;
     if tf.cs & 0x3 == 3 {
-        gdt::set_ring0_rsp(tf as *const _ as usize + size_of::<TrapFrame>());
+        Cpu::current().set_ring0_rsp(tf as *const _ as usize + size_of::<TrapFrame>());
     }
 }
 
