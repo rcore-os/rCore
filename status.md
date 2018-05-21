@@ -1,10 +1,10 @@
 ## uCore 32bit user programs pass status
 - [ ] badarg
 - [ ] badsegment
-- [ ] divzero
+- [x] divzero
 - [ ] exit
-- [ ] faultread
-- [ ] faultreadkernel
+- [x] faultread
+- [x] faultreadkernel
 - [x] forktest
 - [x] forktree
 - [x] hello
@@ -15,8 +15,8 @@
 - [ ] sh
 - [ ] sleep
 - [x] sleepkill
-- [ ] softint
+- [x] softint
 - [x] spin
-- [ ] testbss
+- [x] testbss
 - [x] waitkill
 - [x] yield

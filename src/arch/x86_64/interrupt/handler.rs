@@ -30,7 +30,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
         T_BRKPT => breakpoint(),
         T_DBLFLT => double_fault(),
         T_PGFLT => page_fault(tf),
-        T_GPFLT => general_protection_fault(),
         T_IRQ0...64 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
             match irq {
@@ -50,6 +49,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
         T_SWITCH_TOU => to_user(tf),
         T_SYSCALL => syscall(tf),
         T_SYSCALL32 => syscall32(tf),
+        T_DIVIDE | T_GPFLT | T_ILLOP => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 
@@ -83,17 +83,7 @@ fn page_fault(tf: &mut TrapFrame) {
         return;
     }
 
-    loop {}
-}
-
-fn general_protection_fault() {
-    error!("\nEXCEPTION: General Protection Fault");
-    loop {}
-}
-
-fn invalid_opcode() {
-    error!("\nEXCEPTION: Invalid Opcode");
-    loop {}
+    error(tf);
 }
 
 use super::consts::*;
@@ -150,6 +140,14 @@ fn syscall32(tf: &mut TrapFrame) {
     use syscall::syscall;
     let ret = syscall(tf, true);
     tf.rax = ret as usize;
+}
+
+fn error(tf: &TrapFrame) {
+    use process::PROCESSOR;
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let pid = processor.current_pid();
+    error!("Process {} error:\n{:#x?}", pid, tf);
+    processor.exit(pid, 0x100); // TODO: Exit code for error
 }
 
 fn set_return_rsp(tf: &TrapFrame) {
