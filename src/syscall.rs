@@ -1,7 +1,14 @@
-use super::*;
-use process;
-use arch::interrupt::TrapFrame;
+//! 系统调用解析执行模块
 
+use arch::interrupt::TrapFrame;
+use process::*;
+use util;
+
+/// 系统调用入口点
+///
+/// 当发生系统调用中断时，中断服务例程将控制权转移到这里。
+/// 它从中断帧中提取参数，根据系统调用号分发执行具体操作。
+/// 它同时支持 xv6的64位程序 和 uCore的32位程序。
 pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
     let id = match is32 {
         false => Syscall::Xv6(tf.rax),
@@ -16,27 +23,27 @@ pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
 
     match id {
         Syscall::Xv6(SYS_WRITE) | Syscall::Ucore(UCORE_SYS_WRITE) =>
-            io::write(args[0], args[1] as *const u8, args[2]),
+            sys_write(args[0], args[1] as *const u8, args[2]),
         Syscall::Xv6(SYS_OPEN) | Syscall::Ucore(UCORE_SYS_OPEN) =>
-            io::open(args[0] as *const u8, args[1]),
+            sys_open(args[0] as *const u8, args[1]),
         Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
-            io::close(args[0]),
+            sys_close(args[0]),
         Syscall::Xv6(SYS_WAIT) | Syscall::Ucore(UCORE_SYS_WAIT) =>
-            process::sys_wait(rsp, args[0], args[1] as *mut i32),
+            sys_wait(rsp, args[0], args[1] as *mut i32),
         Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
-            process::sys_fork(tf),
+            sys_fork(tf),
         Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
-            process::sys_kill(args[0]),
+            sys_kill(args[0]),
         Syscall::Xv6(SYS_EXIT) | Syscall::Ucore(UCORE_SYS_EXIT) =>
-            process::sys_exit(rsp, args[0]),
+            sys_exit(rsp, args[0]),
         Syscall::Ucore(UCORE_SYS_YIELD) =>
-            process::sys_yield(rsp),
+            sys_yield(rsp),
         Syscall::Ucore(UCORE_SYS_GETPID) =>
-            process::sys_getpid(),
+            sys_getpid(),
         Syscall::Ucore(UCORE_SYS_SLEEP) =>
-            process::sys_sleep(rsp, args[0]),
+            sys_sleep(rsp, args[0]),
         Syscall::Ucore(UCORE_SYS_GETTIME) =>
-            process::sys_get_time(),
+            sys_get_time(),
         Syscall::Ucore(UCORE_SYS_PUTC) =>
             {
                 print!("{}", args[0] as u8 as char);
@@ -48,6 +55,105 @@ pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
         }
     }
 }
+
+fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
+    info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+    use core::slice;
+    use core::str;
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    print!("{}", str::from_utf8(slice).unwrap());
+    0
+}
+
+fn sys_open(path: *const u8, flags: usize) -> i32 {
+    let path = unsafe { util::from_cstr(path) };
+    info!("open: path: {:?}, flags: {:?}", path, flags);
+    match path {
+        "stdin:" => 0,
+        "stdout:" => 1,
+        _ => -1,
+    }
+}
+
+fn sys_close(fd: usize) -> i32 {
+    info!("close: fd: {:?}", fd);
+    0
+}
+
+/// Fork the current process. Return the child's PID.
+fn sys_fork(tf: &TrapFrame) -> i32 {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut mc = MC.try().unwrap().lock();
+    let new = processor.current().fork(tf, &mut mc);
+    let pid = processor.add(new);
+    info!("fork: {} -> {}", processor.current_pid(), pid);
+    pid as i32
+}
+
+/// Wait the process exit.
+/// Return the PID. Store exit code to `code` if it's not null.
+fn sys_wait(rsp: &mut usize, pid: usize, code: *mut i32) -> i32 {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let target = match pid {
+        0 => WaitTarget::AnyChild,
+        _ => WaitTarget::Proc(pid),
+    };
+    match processor.current_wait_for(target) {
+        WaitResult::Ok(pid, error_code) => {
+            if !code.is_null() {
+                unsafe { *code = error_code as i32 };
+            }
+            0 // pid as i32
+        },
+        WaitResult::Blocked => {
+            processor.schedule(rsp);
+            0 /* unused */
+        },
+        WaitResult::NotExist => -1,
+    }
+}
+
+fn sys_yield(rsp: &mut usize) -> i32 {
+    info!("yield:");
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    processor.schedule(rsp);
+    0
+}
+
+/// Kill the process
+fn sys_kill(pid: usize) -> i32 {
+    PROCESSOR.try().unwrap().lock().kill(pid);
+    0
+}
+
+/// Get the current process id
+fn sys_getpid() -> i32 {
+    PROCESSOR.try().unwrap().lock().current_pid() as i32
+}
+
+/// Exit the current process
+fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let pid = processor.current_pid();
+    processor.schedule(rsp);
+    processor.exit(pid, error_code);
+    0
+}
+
+fn sys_sleep(rsp: &mut usize, time: usize) -> i32 {
+    info!("sleep: {} ticks", time);
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    let pid = processor.current_pid();
+    processor.schedule(rsp);
+    processor.sleep(pid, time);
+    0
+}
+
+fn sys_get_time() -> i32 {
+    let processor = PROCESSOR.try().unwrap().lock();
+    processor.get_time() as i32
+}
+
 
 #[derive(Debug)]
 enum Syscall {

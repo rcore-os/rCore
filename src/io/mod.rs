@@ -50,36 +50,6 @@ pub fn print(args: fmt::Arguments) {
     COM1.lock().write_fmt(args).unwrap();
 }
 
-pub fn write(fd: usize, base: *const u8, len: usize) -> i32 {
-    info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
-    use core::slice;
-    use core::str;
-    let slice = unsafe { slice::from_raw_parts(base, len) };
-    print!("{}", str::from_utf8(slice).unwrap());
-    0
-}
-
-pub fn open(path: *const u8, flags: usize) -> i32 {
-    let path = unsafe { from_cstr(path) };
-    info!("open: path: {:?}, flags: {:?}", path, flags);
-    match path {
-        "stdin:" => 0,
-        "stdout:" => 1,
-        _ => -1,
-    }
-}
-
-pub fn close(fd: usize) -> i32 {
-    info!("close: fd: {:?}", fd);
-    0
-}
-
-pub unsafe fn from_cstr(s: *const u8) -> &'static str {
-    use core::{str, slice};
-    let len = (0usize..).find(|&i| *s.offset(i as isize) == 0).unwrap();
-    str::from_utf8(slice::from_raw_parts(s, len)).unwrap()
-}
-
 use log;
 use log::{Record, Level, Metadata, Log, SetLoggerError, LevelFilter};
 

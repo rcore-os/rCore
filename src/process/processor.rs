@@ -1,6 +1,6 @@
 use alloc::BTreeMap;
 use memory::{ActivePageTable, InactivePageTable};
-use super::*;
+use super::process::*;
 use core::cell::RefCell;
 use core::fmt::{Debug, Formatter, Error};
 use util::{EventHub, GetMut2};
@@ -134,6 +134,9 @@ impl Processor {
     }
     pub fn current(&self) -> &Process {
         self.get(self.current_pid)
+    }
+    pub fn current_pid(&self) -> Pid {
+        self.current_pid
     }
 
     pub fn kill(&mut self, pid: Pid) {
