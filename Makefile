@@ -104,7 +104,7 @@ $(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
 		$(assembly_object_files) $(rust_os)
 
 kernel:
-	@RUSTFLAGS=-g RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
+	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
 
 # compile assembly files
 build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm

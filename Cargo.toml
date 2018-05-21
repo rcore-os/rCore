@@ -12,6 +12,9 @@ test = []
 qemu_auto_exit = []
 link_user_program = []
 
+[profile.release]
+debug = true
+
 [dependencies]
 bit_field = "0.7.0"
 rlibc = "1.0"
