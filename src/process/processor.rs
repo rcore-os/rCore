@@ -12,6 +12,8 @@ pub struct Processor {
     /// All kernel threads share one page table.
     /// When running user process, it will be stored here.
     kernel_page_table: Option<InactivePageTable>,
+    /// Choose what on next schedule ?
+    next: Option<Pid>,
 }
 
 impl Processor {
@@ -25,7 +27,13 @@ impl Processor {
                 e
             },
             kernel_page_table: None,
+            next: None,
         }
+    }
+
+    pub fn set_reschedule(&mut self) {
+        let pid = self.current_pid;
+        self.get_mut(pid).status = Status::Ready;
     }
 
     fn alloc_pid(&self) -> Pid {
@@ -42,18 +50,19 @@ impl Processor {
 
     /// Called by timer.
     /// Handle events.
-    pub fn tick(&mut self, rsp: &mut usize) {
+    pub fn tick(&mut self) {
         self.event_hub.tick();
         while let Some(event) = self.event_hub.pop() {
             debug!("Processor: event {:?}", event);
             match event {
                 Event::Schedule => {
                     self.event_hub.push(10, Event::Schedule);
-                    self.schedule(rsp);
+                    self.set_reschedule();
                 },
                 Event::Wakeup(pid) => {
                     self.get_mut(pid).status = Status::Ready;
-                    self.switch_to(pid, rsp);
+                    self.set_reschedule();
+                    self.next = Some(pid);
                 },
             }
         }
@@ -70,8 +79,13 @@ impl Processor {
         pid
     }
 
+    /// Called every interrupt end
+    /// Do schedule ONLY IF current status != Running
     pub fn schedule(&mut self, rsp: &mut usize) {
-        let pid = self.find_next();
+        if self.current().status == Status::Running {
+            return;
+        }
+        let pid = self.next.take().unwrap_or_else(|| self.find_next());
         self.switch_to(pid, rsp);
     }
 
@@ -84,7 +98,7 @@ impl Processor {
 
     /// Switch process to `pid`, switch page table if necessary.
     /// Store `rsp` and point it to target kernel stack.
-    /// The current status will be set to `Ready` if it is `Running` now.
+    /// The current status must be set before, and not be `Running`.
     fn switch_to(&mut self, pid: Pid, rsp: &mut usize) {
         // for debug print
         let pid0 = self.current_pid;
@@ -98,9 +112,7 @@ impl Processor {
         let (from, to) = self.procs.get_mut2(pid0, pid);
 
         // set `from`
-        if from.status == Status::Running {
-            from.status = Status::Ready;
-        }
+        assert_ne!(from.status, Status::Running);
         from.rsp = *rsp;
 
         // set `to`
@@ -144,7 +156,6 @@ impl Processor {
     }
 
     pub fn exit(&mut self, pid: Pid, error_code: ErrorCode) {
-        assert_ne!(pid, self.current_pid);
         info!("Processor: {} exit, code: {}", pid, error_code);
         self.get_mut(pid).status = Status::Exited(error_code);
         if let Some(waiter) = self.find_waiter(pid) {
@@ -153,8 +164,10 @@ impl Processor {
                 p.status = Status::Ready;
                 p.set_return_value(error_code);
             }
-            info!("Processor: remove {}", pid);
-            self.procs.remove(&pid);
+            // FIXME: remove this process
+            self.get_mut(pid).parent = 0;
+//            info!("Processor: remove {}", pid);
+//            self.procs.remove(&pid);
         }
     }
 

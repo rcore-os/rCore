@@ -25,8 +25,6 @@ use super::TrapFrame;
 
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
-    let mut rsp = tf as *const _ as usize;
-
     // Dispatch
     match tf.trap_num as u8 {
         T_BRKPT => breakpoint(),
@@ -36,7 +34,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
         T_IRQ0...64 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
             match irq {
-                IRQ_TIMER => timer(tf, &mut rsp),
+                IRQ_TIMER => timer(),
                 IRQ_KBD => keyboard(),
                 IRQ_COM1 => com1(),
                 IRQ_COM2 => com2(),
@@ -50,10 +48,14 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
         }
         T_SWITCH_TOK => to_kernel(tf),
         T_SWITCH_TOU => to_user(tf),
-        T_SYSCALL => syscall(tf, &mut rsp),
-        0x80 => syscall32(tf, &mut rsp),
+        T_SYSCALL => syscall(tf),
+        T_SYSCALL32 => syscall32(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
+
+    let mut rsp = tf as *const _ as usize;
+    use process::PROCESSOR;
+    PROCESSOR.try().unwrap().lock().schedule(&mut rsp);
 
     // Set return rsp if to user
     let tf = unsafe { &*(rsp as *const TrapFrame) };
@@ -115,9 +117,10 @@ fn com2() {
     COM2.lock().receive();
 }
 
-fn timer(tf: &mut TrapFrame, rsp: &mut usize) {
-    use process;
-    process::timer_handler(tf, rsp);
+fn timer() {
+    use process::PROCESSOR;
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    processor.tick();
 }
 
 fn to_user(tf: &mut TrapFrame) {
@@ -135,17 +138,17 @@ fn to_kernel(tf: &mut TrapFrame) {
     tf.ss = gdt::KDATA_SELECTOR.0 as usize;
 }
 
-fn syscall(tf: &mut TrapFrame, rsp: &mut usize) {
+fn syscall(tf: &mut TrapFrame) {
     info!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
-    let ret = syscall(tf, rsp, false);
+    let ret = syscall(tf, false);
     tf.rax = ret as usize;
 }
 
-fn syscall32(tf: &mut TrapFrame, rsp: &mut usize) {
+fn syscall32(tf: &mut TrapFrame) {
     //    info!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
-    let ret = syscall(tf, rsp, true);
+    let ret = syscall(tf, true);
     tf.rax = ret as usize;
 }
 

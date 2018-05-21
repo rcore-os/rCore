@@ -9,7 +9,7 @@ use util;
 /// 当发生系统调用中断时，中断服务例程将控制权转移到这里。
 /// 它从中断帧中提取参数，根据系统调用号分发执行具体操作。
 /// 它同时支持 xv6的64位程序 和 uCore的32位程序。
-pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
+pub fn syscall(tf: &TrapFrame, is32: bool) -> i32 {
     let id = match is32 {
         false => Syscall::Xv6(tf.rax),
         true => Syscall::Ucore(tf.rax),
@@ -29,19 +29,19 @@ pub fn syscall(tf: &TrapFrame, rsp: &mut usize, is32: bool) -> i32 {
         Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
             sys_close(args[0]),
         Syscall::Xv6(SYS_WAIT) | Syscall::Ucore(UCORE_SYS_WAIT) =>
-            sys_wait(rsp, args[0], args[1] as *mut i32),
+            sys_wait(args[0], args[1] as *mut i32),
         Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
             sys_fork(tf),
         Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
             sys_kill(args[0]),
         Syscall::Xv6(SYS_EXIT) | Syscall::Ucore(UCORE_SYS_EXIT) =>
-            sys_exit(rsp, args[0]),
+            sys_exit(args[0]),
         Syscall::Ucore(UCORE_SYS_YIELD) =>
-            sys_yield(rsp),
+            sys_yield(),
         Syscall::Ucore(UCORE_SYS_GETPID) =>
             sys_getpid(),
         Syscall::Ucore(UCORE_SYS_SLEEP) =>
-            sys_sleep(rsp, args[0]),
+            sys_sleep(args[0]),
         Syscall::Ucore(UCORE_SYS_GETTIME) =>
             sys_get_time(),
         Syscall::Ucore(UCORE_SYS_PUTC) =>
@@ -92,7 +92,7 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
-fn sys_wait(rsp: &mut usize, pid: usize, code: *mut i32) -> i32 {
+fn sys_wait(pid: usize, code: *mut i32) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let target = match pid {
         0 => WaitTarget::AnyChild,
@@ -105,18 +105,15 @@ fn sys_wait(rsp: &mut usize, pid: usize, code: *mut i32) -> i32 {
             }
             0 // pid as i32
         },
-        WaitResult::Blocked => {
-            processor.schedule(rsp);
-            0 /* unused */
-        },
+        WaitResult::Blocked => 0, // unused
         WaitResult::NotExist => -1,
     }
 }
 
-fn sys_yield(rsp: &mut usize) -> i32 {
+fn sys_yield() -> i32 {
     info!("yield:");
     let mut processor = PROCESSOR.try().unwrap().lock();
-    processor.schedule(rsp);
+    processor.set_reschedule();
     0
 }
 
@@ -132,19 +129,17 @@ fn sys_getpid() -> i32 {
 }
 
 /// Exit the current process
-fn sys_exit(rsp: &mut usize, error_code: usize) -> i32 {
+fn sys_exit(error_code: usize) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current_pid();
-    processor.schedule(rsp);
     processor.exit(pid, error_code);
     0
 }
 
-fn sys_sleep(rsp: &mut usize, time: usize) -> i32 {
+fn sys_sleep(time: usize) -> i32 {
     info!("sleep: {} ticks", time);
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current_pid();
-    processor.schedule(rsp);
     processor.sleep(pid, time);
     0
 }
