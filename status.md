@@ -2,7 +2,7 @@
 - [ ] badarg
 - [ ] badsegment
 - [x] divzero
-- [ ] exit
+- [x] exit
 - [x] faultread
 - [x] faultreadkernel
 - [x] forktest
@@ -13,10 +13,28 @@
 - [ ] pgdir
 - [ ] priority
 - [ ] sh
-- [ ] sleep
+- [x] sleep
 - [x] sleepkill
 - [x] softint
 - [x] spin
 - [x] testbss
 - [x] waitkill
 - [x] yield
+
+## xv6 64bit user programs pass status
+- [ ] cat
+- [ ] chmod
+- [ ] echo
+- [ ] forktest
+- [ ] grep
+- [ ] init
+- [ ] kill
+- [ ] ln
+- [ ] ls
+- [ ] mkdir
+- [ ] rm
+- [ ] sh
+- [ ] stressfs
+- [ ] usertests
+- [ ] wc
+- [ ] zombie

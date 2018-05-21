@@ -135,6 +135,10 @@ impl Processor {
             *from_pt = Some(old_table);
         }
 
+        if let Some((addr, value)) = to.set_value.take() {
+            unsafe { *(addr as *mut usize) = value; }
+        }
+
         info!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
     }
 
@@ -159,10 +163,13 @@ impl Processor {
         info!("Processor: {} exit, code: {}", pid, error_code);
         self.get_mut(pid).status = Status::Exited(error_code);
         if let Some(waiter) = self.find_waiter(pid) {
+            info!("  then wakeup {}", waiter);
+            self.next = Some(waiter);
             {
                 let p = self.get_mut(waiter);
+                p.set_value.as_mut().unwrap().1 = error_code;
                 p.status = Status::Ready;
-                p.set_return_value(error_code);
+                p.set_return_value(0);
             }
             // FIXME: remove this process
             self.get_mut(pid).parent = 0;
@@ -177,7 +184,7 @@ impl Processor {
     }
 
     /// Let current process wait for another
-    pub fn current_wait_for(&mut self, target: WaitTarget) -> WaitResult {
+    pub fn current_wait_for(&mut self, target: WaitTarget, code: *mut i32) -> WaitResult {
         info!("Processor: current {} wait for {:?}", self.current_pid, target);
         // Find one target process and it's exit code
         let (pid, exit_code) = match target {
@@ -197,11 +204,17 @@ impl Processor {
         if let Some(exit_code) = exit_code {
             info!("Processor: {} wait find and remove {}", self.current_pid, pid);
             self.procs.remove(&pid);
+            if !code.is_null() {
+                // WARNING: must be current! (page table)
+                unsafe { *code = exit_code as i32 };
+            }
             WaitResult::Ok(pid, exit_code)
         } else {
             info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
-            self.get_mut(current_pid).status = Status::Waiting(pid);
+            let p = self.get_mut(current_pid);
+            p.status = Status::Waiting(pid);
+            p.set_value = Some((code as usize, 0));
             WaitResult::Blocked
         }
     }

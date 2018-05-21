@@ -98,14 +98,9 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
         0 => WaitTarget::AnyChild,
         _ => WaitTarget::Proc(pid),
     };
-    match processor.current_wait_for(target) {
-        WaitResult::Ok(pid, error_code) => {
-            if !code.is_null() {
-                unsafe { *code = error_code as i32 };
-            }
-            0 // pid as i32
-        },
-        WaitResult::Blocked => 0, // unused
+    match processor.current_wait_for(target, code) {
+        WaitResult::Ok(pid, error_code) => 0,
+        WaitResult::Blocked => 0,
         WaitResult::NotExist => -1,
     }
 }

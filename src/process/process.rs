@@ -15,6 +15,9 @@ pub struct Process {
     pub(in process) status: Status,
     pub(in process) rsp: usize,
     pub(in process) is_user: bool,
+    /// Set (addr, value) after switch.
+    /// Used to set wait error code.
+    pub(in process) set_value: Option<(usize, usize)>,
 }
 
 pub type Pid = usize;
@@ -46,6 +49,7 @@ impl Process {
             status: Status::Ready,
             rsp,
             is_user: false,
+            set_value: None,
         }
     }
 
@@ -63,6 +67,7 @@ impl Process {
             status: Status::Running,
             rsp: 0, // will be set at first schedule
             is_user: false,
+            set_value: None,
         }
     }
 
@@ -133,6 +138,7 @@ impl Process {
             status: Status::Ready,
             rsp,
             is_user: true,
+            set_value: None,
         }
     }
 
@@ -173,6 +179,7 @@ impl Process {
             status: Status::Ready,
             rsp,
             is_user: true,
+            set_value: None,
         }
     }
 
