@@ -6,7 +6,14 @@ mod vga_writer;
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
-    log::set_max_level(LevelFilter::Debug);
+    log::set_max_level(match option_env!("LOG") {
+        Some("off") => LevelFilter::Off,
+        Some("error") => LevelFilter::Error,
+        Some("warn") => LevelFilter::Warn,
+        Some("info") => LevelFilter::Info,
+        Some("trace") => LevelFilter::Trace,
+        Some("debug") | _ => LevelFilter::Debug,
+    });
 }
 
 macro_rules! print {

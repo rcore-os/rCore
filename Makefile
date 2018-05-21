@@ -2,6 +2,8 @@
 # 	make run					Run in debug
 #	make run int=1				Run with interrupt info by QEMU
 # 	make run mode=release		Run in release
+#	make run LOG=error			Run with log level: error
+#									LOG = off | error | warn | info | debug | trace
 # 	make doc					Generate docs
 # 	make asm					Open the deassemble file of the last build
 # 	make clean					Clean
@@ -24,6 +26,7 @@ user_object_files := $(patsubst user/%.img, build/user/%.o, $(user_image_files))
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio
 features := use_apic
 
+LOG ?= debug
 link_user = 1
 
 ifdef link_user
