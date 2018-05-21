@@ -3,10 +3,10 @@ use alloc::boxed::Box;
 use process;
 
 extern {
-    fn _binary_user_sfs_img_start();
-    fn _binary_user_sfs_img_end();
-    fn _binary_user_forktest_start();
-    fn _binary_user_forktest_end();
+    fn _binary_user_ucore32_img_start();
+    fn _binary_user_ucore32_img_end();
+    fn _binary_user_xv6_64_img_start();
+    fn _binary_user_xv6_64_img_end();
 }
 
 struct MemBuf(&'static [u8]);
@@ -31,7 +31,7 @@ impl Device for MemBuf {
 }
 
 pub fn load_sfs() {
-    let slice = unsafe { MemBuf::new(_binary_user_sfs_img_start, _binary_user_sfs_img_end) };
+    let slice = unsafe { MemBuf::new(_binary_user_ucore32_img_start, _binary_user_ucore32_img_end) };
     let sfs = SimpleFileSystem::open(Box::new(slice)).unwrap();
     let root = sfs.root_inode();
     let files = root.borrow().list().unwrap();
@@ -44,8 +44,6 @@ pub fn load_sfs() {
         let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
         process::add_user_process(name, unsafe { &BUF[..len] });
     }
-
-//    process::add_user_process("forktest", unsafe { MemBuf::new(_binary_user_forktest_start, _binary_user_forktest_end).0 });
 
     process::print();
 }

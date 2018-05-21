@@ -10,7 +10,8 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
-user_object_files := $(wildcard user/*.o)
+user_image_files := $(wildcard user/*.img)
+user_object_files := $(patsubst user/%.img, build/user/%.o, $(user_image_files))
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio
 features := use_apic
 
@@ -94,6 +95,11 @@ kernel:
 build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
+
+# make .o from .img file
+build/user/%.o: user/%.img
+	@mkdir -p $(shell dirname $@)
+	@$(ld) -r -b binary $< -o $@
 
 # used by docker_* targets
 docker_image ?= blog_os
