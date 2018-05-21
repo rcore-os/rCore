@@ -127,7 +127,7 @@ pub extern "C" fn other_main() -> ! {
     loop {}
 }
 
-pub use arch::interrupt::handler::rust_trap;
+pub use arch::interrupt::rust_trap;
 
 use linked_list_allocator::LockedHeap;
 

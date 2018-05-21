@@ -7,7 +7,7 @@ pub fn init() {
 
 lazy_static! {
     static ref IDT: Idt = {
-        use arch::interrupt::{handler::*, consts::*};
+        use arch::interrupt::consts::*;
 		use arch::gdt::DOUBLE_FAULT_IST_INDEX;
         use x86_64::PrivilegeLevel;
         use core::mem::transmute;
@@ -19,7 +19,7 @@ lazy_static! {
         // * 某些保留中断号不允许设置，会触发panic
         // 于是下面用了一些trick绕过了它们
 
-        let ring3 = [T_SWITCH_TOK, T_SYSCALL, 0x80];
+        let ring3 = [T_SWITCH_TOK, T_SYSCALL, T_SYSCALL32];
 
         let mut idt = Idt::new();
         let entries = unsafe{ &mut *(&mut idt as *mut _ as *mut [IdtEntry<HandlerFunc>; 256]) };

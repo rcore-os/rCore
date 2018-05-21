@@ -53,12 +53,15 @@ ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
 
-.PHONY: all clean run iso kernel build debug_asm
+.PHONY: all clean run iso kernel build debug_asm doc
 
 all: $(kernel)
 
 clean:
 	@rm -r build target
+
+doc:
+	@cargo rustdoc -- --document-private-items
 
 run: $(iso)
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
