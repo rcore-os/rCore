@@ -1,8 +1,17 @@
+# Examples:
+# 	make run					Run in debug
+#	make run int=1				Run with interrupt info by QEMU
+# 	make run mode=release		Run in release
+# 	make doc					Generate docs
+# 	make asm					Open the deassemble file of the last build
+# 	make clean					Clean
+
 arch ?= x86_64
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
-rust_os := target/$(target)/debug/librust_ucore.a
+mode ?= debug
+rust_os := target/$(target)/$(mode)/librust_ucore.a
 
 boot_src := src/arch/$(arch)/boot
 linker_script := $(boot_src)/linker.ld
@@ -37,6 +46,12 @@ ifdef int
 qemu_opts := $(qemu_opts) -d int
 endif
 
+build_args := --target $(target) --features "$(features)"
+
+ifeq ($(mode), release)
+build_args := $(build_args) --release
+endif
+
 
 ifeq ($(OS),Windows_NT)
 uname := Win32
@@ -54,7 +69,7 @@ ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
 
-.PHONY: all clean run iso kernel build debug_asm doc
+.PHONY: all clean run iso kernel build asm doc
 
 all: $(kernel)
 
@@ -74,7 +89,7 @@ iso: $(iso)
 
 build: iso
 
-debug_asm:
+asm:
 	@$(objdump) -dS $(kernel) | less
 
 $(iso): $(kernel) $(grub_cfg)
@@ -89,7 +104,7 @@ $(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
 		$(assembly_object_files) $(rust_os)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build --target $(target) --features "$(features)"
+	@RUSTFLAGS=-g RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
 
 # compile assembly files
 build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm

@@ -1,5 +1,6 @@
 use arch::driver::{acpi::AcpiResult, apic::start_ap};
 use memory::{MemoryController, PhysAddr};
+use core::ptr::{read_volatile, write_volatile};
 
 extern {
     fn entryother_start();  // physical addr of entryother
@@ -29,7 +30,7 @@ pub fn start_other_cores(acpi: &AcpiResult, mc: &mut MemoryController) {
             stack: 0x8000, // just enough stack to get us to entry64mp
         };
         start_ap(apic_id, ENTRYOTHER_ADDR);
-        while unsafe{ !STARTED[i as usize] } {}
+        while unsafe { !read_volatile(&STARTED[i as usize]) } {}
     }
 }
 
@@ -54,5 +55,5 @@ use consts::MAX_CPU_NUM;
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 
 pub unsafe fn notify_started(cpu_id: u8) {
-    STARTED[cpu_id as usize] = true;
+    write_volatile(&mut STARTED[cpu_id as usize], true);
 }
