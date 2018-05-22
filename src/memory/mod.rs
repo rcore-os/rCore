@@ -81,8 +81,8 @@ pub fn remap_the_kernel(boot_info: BootInformation) -> Stack {
     let mut active_table = unsafe { ActivePageTable::new() };
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    memory_set.push(MemoryArea::new_identity(0xb8000, 0xb9000, EntryFlags::WRITABLE, "VGA"));
+    use consts::{KERNEL_OFFSET, KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+    memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xb8000, KERNEL_OFFSET + 0xb9000, EntryFlags::WRITABLE, "VGA"));
     memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, EntryFlags::WRITABLE, "kernel_heap"));
 
     let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);

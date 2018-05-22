@@ -2,9 +2,10 @@ use spin::Mutex;
 use core::ptr::Unique;
 use volatile::Volatile;
 use x86_64::instructions::port::{outw, outb};
+use consts::KERNEL_OFFSET;
 
-pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe{ 
-    Unique::new_unchecked(0xb8000 as *mut _) 
+pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe {
+    Unique::new_unchecked((KERNEL_OFFSET + 0xb8000) as *mut _)
 };
 
 #[allow(dead_code)]
