@@ -5,8 +5,8 @@ pub mod consts;
 mod handler;
 mod trapframe;
 
-pub use self::trapframe::TrapFrame;
-pub use self::handler::rust_trap;
+pub use self::trapframe::*;
+pub use self::handler::*;
 
 #[inline(always)]
 pub unsafe fn enable() {

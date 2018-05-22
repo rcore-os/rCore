@@ -59,6 +59,7 @@ mod arch;
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::cpu::init();
+    arch::idt::init();
     io::init();
 
     // ATTENTION: we have a very small stack and no guard page
@@ -70,7 +71,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     let mut memory_controller = memory::init(boot_info);
 
     arch::gdt::init();
-    arch::idt::init();
 
     test!(cow);
     test!(global_allocator);
@@ -127,7 +127,7 @@ pub extern "C" fn other_main() -> ! {
     loop {}
 }
 
-pub use arch::interrupt::rust_trap;
+pub use arch::interrupt::{rust_trap, set_return_rsp};
 
 use linked_list_allocator::LockedHeap;
 

@@ -19,12 +19,15 @@ __alltraps:
     push r15
 
     mov rdi, rsp
-
-    ; extern fn rust_trap(rsp) -> rsp
     extern rust_trap
     call rust_trap
 
-    mov rsp, rax
+global trap_ret
+trap_ret:
+
+    mov rdi, rsp
+    extern set_return_rsp
+    call set_return_rsp
 
     pop r15
     pop r14

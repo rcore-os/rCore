@@ -4,6 +4,7 @@ use super::process::*;
 use core::cell::RefCell;
 use core::fmt::{Debug, Formatter, Error};
 use util::{EventHub, GetMut2};
+use arch::interrupt::*;
 
 pub struct Processor {
     procs: BTreeMap<Pid, Process>,
@@ -81,12 +82,12 @@ impl Processor {
 
     /// Called every interrupt end
     /// Do schedule ONLY IF current status != Running
-    pub fn schedule(&mut self, rsp: &mut usize) {
+    pub fn schedule(&mut self) {
         if self.current().status == Status::Running {
             return;
         }
         let pid = self.next.take().unwrap_or_else(|| self.find_next());
-        self.switch_to(pid, rsp);
+        self.switch_to(pid);
     }
 
     fn find_next(&self) -> Pid {
@@ -99,10 +100,9 @@ impl Processor {
     /// Switch process to `pid`, switch page table if necessary.
     /// Store `rsp` and point it to target kernel stack.
     /// The current status must be set before, and not be `Running`.
-    fn switch_to(&mut self, pid: Pid, rsp: &mut usize) {
+    fn switch_to(&mut self, pid: Pid) {
         // for debug print
         let pid0 = self.current_pid;
-        let rsp0 = *rsp;
 
         if pid == self.current_pid {
             return;
@@ -111,14 +111,9 @@ impl Processor {
 
         let (from, to) = self.procs.get_mut2(pid0, pid);
 
-        // set `from`
         assert_ne!(from.status, Status::Running);
-        from.rsp = *rsp;
-
-        // set `to`
         assert_eq!(to.status, Status::Ready);
         to.status = Status::Running;
-        *rsp = to.rsp;
 
         // switch page table
         if from.is_user || to.is_user {
@@ -139,7 +134,11 @@ impl Processor {
             unsafe { *(addr as *mut usize) = value; }
         }
 
-        info!("Processor: switch from {} to {}\n  rsp: {:#x} -> {:#x}", pid0, pid, rsp0, rsp);
+        info!("Processor: switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
+        unsafe {
+            super::PROCESSOR.try().unwrap().force_unlock();
+            switch(&mut from.rsp, to.rsp);
+        }
     }
 
     fn get(&self, pid: Pid) -> &Process {

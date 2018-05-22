@@ -3,6 +3,7 @@ use memory::{self, Stack, InactivePageTable};
 use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
 use core::slice;
 use alloc::{rc::Rc, String};
+use arch::interrupt::*;
 
 #[derive(Debug)]
 pub struct Process {
@@ -34,10 +35,10 @@ pub enum Status {
 
 impl Process {
     /// Make a new kernel thread
-    pub fn new(name: &str, entry: extern fn(), mc: &mut MemoryController) -> Self {
+    pub fn new(name: &str, entry: extern fn() -> !, mc: &mut MemoryController) -> Self {
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = TrapFrame::new_kernel_thread(entry, kstack.top());
-        let rsp = kstack.push_at_top(tf);
+        let data = InitStack::new_kernel_thread(entry, kstack.top());
+        let rsp = kstack.push_at_top(data);
 
         Process {
             pid: 0,
@@ -124,7 +125,7 @@ impl Process {
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = TrapFrame::new_user_thread(entry_addr, user_stack_top - 8, is32);
+        let tf = InitStack::new_user_thread(entry_addr, user_stack_top - 8, is32);
         let rsp = kstack.push_at_top(tf);
         trace!("rsp = {:#x}", rsp);
 
@@ -165,9 +166,8 @@ impl Process {
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let mut tf = tf.clone();
-        tf.rax = 0; // sys_fork return 0 for child
-        let rsp = kstack.push_at_top(tf);
+        let data = InitStack::new_fork(tf);
+        let rsp = kstack.push_at_top(data);
 
         Process {
             pid: 0,

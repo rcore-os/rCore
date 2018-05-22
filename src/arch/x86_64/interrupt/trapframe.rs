@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Default)]
+#[repr(C)]
 pub struct TrapFrame {
     // Pushed by __alltraps at 'trap.asm'
     pub r15: usize,
@@ -34,7 +35,7 @@ pub struct TrapFrame {
 
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
-    pub fn new_kernel_thread(entry: extern fn(), rsp: usize) -> Self {
+    fn new_kernel_thread(entry: extern fn() -> !, rsp: usize) -> Self {
         use arch::gdt;
         let mut tf = TrapFrame::default();
         tf.cs = gdt::KCODE_SELECTOR.0 as usize;
@@ -44,7 +45,7 @@ impl TrapFrame {
         tf.rflags = 0x282;
         tf
     }
-    pub fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
+    fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
         use arch::gdt;
         let mut tf = TrapFrame::default();
         tf.cs = if is32 { gdt::UCODE32_SELECTOR.0 } else { gdt::UCODE_SELECTOR.0 } as usize;
@@ -54,4 +55,109 @@ impl TrapFrame {
         tf.rflags = 0x282;
         tf
     }
+}
+
+#[derive(Debug, Default)]
+#[repr(C)]
+struct Context {
+    r15: usize,
+    r14: usize,
+    r13: usize,
+    r12: usize,
+    rbp: usize,
+    rbx: usize,
+    rip: usize,
+}
+
+impl Context {
+    fn new() -> Self {
+        let mut context = Context::default();
+        context.rip = forkret as usize;
+        context
+    }
+}
+
+/// 新线程的内核栈初始内容
+#[derive(Debug)]
+#[repr(C)]
+pub struct InitStack {
+    context: Context,
+    trapret: usize,
+    tf: TrapFrame,
+}
+
+impl InitStack {
+    pub fn new_kernel_thread(entry: extern fn() -> !, rsp: usize) -> Self {
+        InitStack {
+            context: Context::new(),
+            trapret: trap_ret as usize,
+            tf: TrapFrame::new_kernel_thread(entry, rsp),
+        }
+    }
+    pub fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
+        InitStack {
+            context: Context::new(),
+            trapret: trap_ret as usize,
+            tf: TrapFrame::new_user_thread(entry_addr, rsp, is32),
+        }
+    }
+    pub fn new_fork(tf: &TrapFrame) -> Self {
+        InitStack {
+            context: Context::new(),
+            trapret: trap_ret as usize,
+            tf: {
+                let mut tf = tf.clone();
+                tf.rax = 0;
+                tf
+            },
+        }
+    }
+}
+
+extern {
+    fn trap_ret();
+}
+
+/// The entry point of new thread
+extern fn forkret() {
+    debug!("forkret");
+    // Will return to `trapret`
+}
+
+/// Switch to another kernel thread.
+///
+/// Defined in `trap.asm`.
+///
+/// Push all callee-saved registers at the current kernel stack.
+/// Store current rsp at `from_rsp`. Switch kernel stack to `to_rsp`.
+/// Pop all callee-saved registers, then return to the target.
+#[naked]
+pub unsafe extern fn switch(from_rsp: &mut usize, to_rsp: usize) {
+    asm!(
+    "
+    // push rip (by caller)
+
+    // Save old callee-save registers
+    push rbx
+    push rbp
+    push r12
+    push r13
+    push r14
+    push r15
+
+    // Switch stacks
+    mov [rdi], rsp      // rdi = from_rsp
+    mov rsp, rsi        // rsi = to_rsp
+
+    // Save old callee-save registers
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
+
+    // pop rip
+    ret"
+    : : : : "intel" "volatile" )
 }

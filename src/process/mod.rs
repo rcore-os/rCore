@@ -2,7 +2,6 @@ use memory::MemoryController;
 use spin::{Once, Mutex};
 use core::slice;
 use alloc::String;
-use arch::interrupt::TrapFrame;
 
 use self::process::*;
 pub use self::processor::*;
@@ -26,7 +25,7 @@ pub fn init(mut mc: MemoryController) {
 pub static PROCESSOR: Once<Mutex<Processor>> = Once::new();
 pub static MC: Once<Mutex<MemoryController>> = Once::new();
 
-extern fn idle_thread() {
+extern fn idle_thread() -> ! {
     loop {
         println!("idle ...");
         let mut i = 0;

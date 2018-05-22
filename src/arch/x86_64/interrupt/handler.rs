@@ -24,7 +24,8 @@
 use super::TrapFrame;
 
 #[no_mangle]
-pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
+pub extern fn rust_trap(tf: &mut TrapFrame) {
+    trace!("Interrupt: {:#x}", tf.trap_num);
     // Dispatch
     match tf.trap_num as u8 {
         T_BRKPT => breakpoint(),
@@ -53,15 +54,8 @@ pub extern fn rust_trap(tf: &mut TrapFrame) -> usize {
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 
-    let mut rsp = tf as *const _ as usize;
     use process::PROCESSOR;
-    PROCESSOR.try().unwrap().lock().schedule(&mut rsp);
-
-    // Set return rsp if to user
-    let tf = unsafe { &*(rsp as *const TrapFrame) };
-    set_return_rsp(tf);
-
-    rsp
+    PROCESSOR.try().unwrap().lock().schedule();
 }
 
 fn breakpoint() {
@@ -144,13 +138,19 @@ fn syscall32(tf: &mut TrapFrame) {
 
 fn error(tf: &TrapFrame) {
     use process::PROCESSOR;
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    let pid = processor.current_pid();
-    error!("Process {} error:\n{:#x?}", pid, tf);
-    processor.exit(pid, 0x100); // TODO: Exit code for error
+    if let Some(processor) = PROCESSOR.try() {
+        let mut processor = processor.lock();
+        let pid = processor.current_pid();
+        error!("Process {} error:\n{:#x?}", pid, tf);
+        processor.exit(pid, 0x100); // TODO: Exit code for error
+    } else {
+        error!("Exception {:#x} when processor not inited\n{:#x?}", tf.trap_num, tf);
+        loop {}
+    }
 }
 
-fn set_return_rsp(tf: &TrapFrame) {
+#[no_mangle]
+pub extern fn set_return_rsp(tf: &TrapFrame) {
     use arch::gdt::Cpu;
     use core::mem::size_of;
     if tf.cs & 0x3 == 3 {
