@@ -13,11 +13,10 @@
 //!     * 调用`rust_trap`，并把此时的rsp传过来，也就是`TrapFrame`的指针
 //! * `rust_trap`完成以下工作：
 //!     * 根据tf中的中断号，再次分发到具体的中断处理函数。
-//!       一些函数可能会修改rsp的值以完成进程切换。
-//!     * 在离开前，检查新的tf中的cs段，如果是用户态，向TSS中设置下一次中断时重置rsp的值，使其指向该用户线程的内核栈
-//!     * 返回新的rsp的值
+//!       一些函数可能会调用switch()，切换到其它线程执行，在某一时刻再切换回来。
+//!     * 如果需要，执行进程调度
 //! * `__alltraps`完成以下工作：
-//!     * 重置rsp
+//!     * 检查tf中的cs段，如果是用户态，向TSS中设置下一次中断时重置rsp的值，使其指向该用户线程的内核栈
 //!     * 从栈中pop全部寄存器的值，pop中断号和错误码
 //!     * 执行iret，CPU从栈中pop一些值（若其中的CS是Ring0，3项，否则5项），重置rip和rsp（Ring3时）
 
@@ -29,7 +28,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     // Dispatch
     match tf.trap_num as u8 {
         T_BRKPT => breakpoint(),
-        T_DBLFLT => double_fault(),
+        T_DBLFLT => double_fault(tf),
         T_PGFLT => page_fault(tf),
         T_IRQ0...64 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
@@ -62,8 +61,8 @@ fn breakpoint() {
     error!("\nEXCEPTION: Breakpoint");
 }
 
-fn double_fault() {
-    error!("\nEXCEPTION: Double Fault");
+fn double_fault(tf: &TrapFrame) {
+    error!("\nEXCEPTION: Double Fault\n{:#x?}", tf);
     loop {}
 }
 

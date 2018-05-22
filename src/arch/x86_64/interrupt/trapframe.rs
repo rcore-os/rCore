@@ -132,6 +132,7 @@ extern fn forkret() {
 /// Store current rsp at `from_rsp`. Switch kernel stack to `to_rsp`.
 /// Pop all callee-saved registers, then return to the target.
 #[naked]
+#[inline(never)]
 pub unsafe extern fn switch(from_rsp: &mut usize, to_rsp: usize) {
     asm!(
     "

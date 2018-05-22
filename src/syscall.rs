@@ -94,13 +94,13 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 /// Return the PID. Store exit code to `code` if it's not null.
 fn sys_wait(pid: usize, code: *mut i32) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
-    let target = match pid {
-        0 => WaitTarget::AnyChild,
-        _ => WaitTarget::Proc(pid),
-    };
-    match processor.current_wait_for(target, code) {
-        WaitResult::Ok(pid, error_code) => 0,
-        WaitResult::Blocked => 0,
+    match processor.current_wait_for(pid) {
+        WaitResult::Ok(pid, error_code) => {
+            if !code.is_null() {
+                unsafe { *code = error_code as i32 };
+            }
+            0
+        },
         WaitResult::NotExist => -1,
     }
 }
