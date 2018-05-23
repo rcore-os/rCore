@@ -8,6 +8,7 @@ pub use self::processor::*;
 
 mod process;
 mod processor;
+mod scheduler;
 
 
 pub fn init(mut mc: MemoryController) {

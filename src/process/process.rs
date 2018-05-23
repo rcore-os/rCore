@@ -21,7 +21,7 @@ pub struct Process {
 pub type Pid = usize;
 pub type ErrorCode = usize;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Status {
     Ready,
     Running,

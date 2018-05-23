@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 pub const MAX_CPU_NUM: usize = 8;
+pub const MAX_PROCESS_NUM: usize = 32;
 
 // Copy from Redox consts.rs:
 

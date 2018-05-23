@@ -1,6 +1,7 @@
 use alloc::BTreeMap;
 use memory::{ActivePageTable, InactivePageTable};
 use super::process::*;
+use super::scheduler::*;
 use core::cell::RefCell;
 use core::fmt::{Debug, Formatter, Error};
 use util::{EventHub, GetMut2};
@@ -15,6 +16,8 @@ pub struct Processor {
     kernel_page_table: Option<InactivePageTable>,
     /// Choose what on next schedule ?
     next: Option<Pid>,
+    // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
+    scheduler: RRScheduler,
 }
 
 impl Processor {
@@ -22,19 +25,16 @@ impl Processor {
         Processor {
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,
-            event_hub: {
-                let mut e = EventHub::new();
-                e.push(10, Event::Schedule);
-                e
-            },
+            event_hub: EventHub::new(),
             kernel_page_table: None,
             next: None,
+            scheduler: RRScheduler::new(100),
         }
     }
 
     pub fn set_reschedule(&mut self) {
         let pid = self.current_pid;
-        self.get_mut(pid).status = Status::Ready;
+        self.set_status(pid, Status::Ready);
     }
 
     fn alloc_pid(&self) -> Pid {
@@ -49,9 +49,25 @@ impl Processor {
         return next;
     }
 
+    fn set_status(&mut self, pid: Pid, status: Status) {
+        let status0 = self.get(pid).status.clone();
+        match (&status0, &status) {
+            (&Status::Ready, &Status::Ready) => return,
+            (&Status::Ready, _) => self.scheduler.remove(pid),
+            (_, &Status::Ready) => self.scheduler.insert(pid),
+            _ => {}
+        }
+        trace!("Processor: process {} {:?} -> {:?}", pid, status0, status);
+        self.get_mut(pid).status = status;
+    }
+
     /// Called by timer.
     /// Handle events.
     pub fn tick(&mut self) {
+        let current_pid = self.current_pid;
+        if self.scheduler.tick(current_pid) {
+            self.set_reschedule();
+        }
         self.event_hub.tick();
         while let Some(event) = self.event_hub.pop() {
             debug!("Processor: event {:?}", event);
@@ -61,7 +77,7 @@ impl Processor {
                     self.set_reschedule();
                 },
                 Event::Wakeup(pid) => {
-                    self.get_mut(pid).status = Status::Ready;
+                    self.set_status(pid, Status::Ready);
                     self.set_reschedule();
                     self.next = Some(pid);
                 },
@@ -76,6 +92,9 @@ impl Processor {
     pub fn add(&mut self, mut process: Process) -> Pid {
         let pid = self.alloc_pid();
         process.pid = pid;
+        if process.status == Status::Ready {
+            self.scheduler.insert(pid);
+        }
         self.procs.insert(pid, process);
         pid
     }
@@ -86,15 +105,8 @@ impl Processor {
         if self.current().status == Status::Running {
             return;
         }
-        let pid = self.next.take().unwrap_or_else(|| self.find_next());
+        let pid = self.next.take().unwrap_or_else(|| self.scheduler.select().unwrap());
         self.switch_to(pid);
-    }
-
-    fn find_next(&self) -> Pid {
-        *self.procs.keys()
-            .find(|&&i| i > self.current_pid
-                && self.get(i).status == Status::Ready)
-            .unwrap_or(self.procs.keys().next().unwrap())
     }
 
     /// Switch process to `pid`, switch page table if necessary.
@@ -105,6 +117,9 @@ impl Processor {
         let pid0 = self.current_pid;
 
         if pid == self.current_pid {
+            if self.current().status != Status::Running {
+                self.set_status(pid, Status::Running);
+            }
             return;
         }
         self.current_pid = pid;
@@ -114,6 +129,7 @@ impl Processor {
         assert_ne!(from.status, Status::Running);
         assert_eq!(to.status, Status::Ready);
         to.status = Status::Running;
+        self.scheduler.remove(pid);
 
         // switch page table
         if from.is_user || to.is_user {
@@ -132,8 +148,10 @@ impl Processor {
 
         info!("Processor: switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
         unsafe {
+            use core::mem::forget;
             super::PROCESSOR.try().unwrap().force_unlock();
             switch(&mut from.rsp, to.rsp);
+            forget(super::PROCESSOR.try().unwrap().lock());
         }
     }
 
@@ -156,16 +174,16 @@ impl Processor {
 
     pub fn exit(&mut self, pid: Pid, error_code: ErrorCode) {
         info!("Processor: {} exit, code: {}", pid, error_code);
-        self.get_mut(pid).status = Status::Exited(error_code);
+        self.set_status(pid, Status::Exited(error_code));
         if let Some(waiter) = self.find_waiter(pid) {
             info!("  then wakeup {}", waiter);
-            self.get_mut(waiter).status = Status::Ready;
+            self.set_status(waiter, Status::Ready);
             self.switch_to(waiter); // yield
         }
     }
 
     pub fn sleep(&mut self, pid: Pid, time: usize) {
-        self.get_mut(pid).status = Status::Sleeping;
+        self.set_status(pid, Status::Sleeping);
         self.event_hub.push(time, Event::Wakeup(pid));
     }
 
@@ -178,7 +196,7 @@ impl Processor {
         let pid = self.try_wait(pid).unwrap_or_else(|| {
             info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
-            self.get_mut(current_pid).status = Status::Waiting(pid);
+            self.set_status(current_pid, Status::Waiting(pid));
             self.schedule(); // yield
             self.try_wait(pid).unwrap()
         });
