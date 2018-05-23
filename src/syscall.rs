@@ -44,6 +44,8 @@ pub fn syscall(tf: &TrapFrame, is32: bool) -> i32 {
             sys_sleep(args[0]),
         Syscall::Ucore(UCORE_SYS_GETTIME) =>
             sys_get_time(),
+        Syscall::Ucore(UCORE_SYS_LAB6_SET_PRIORITY) =>
+            sys_lab6_set_priority(args[0]),
         Syscall::Ucore(UCORE_SYS_PUTC) =>
             {
                 print!("{}", args[0] as u8 as char);
@@ -144,6 +146,12 @@ fn sys_get_time() -> i32 {
     processor.get_time() as i32
 }
 
+fn sys_lab6_set_priority(priority: usize) -> i32 {
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    processor.lab6_set_priority(priority as u8);
+    0
+}
+
 
 #[derive(Debug)]
 enum Syscall {
@@ -199,3 +207,4 @@ const UCORE_SYS_FSYNC: usize = 111;
 const UCORE_SYS_GETCWD: usize = 121;
 const UCORE_SYS_GETDIRENTRY: usize = 128;
 const UCORE_SYS_DUP: usize = 130;
+const UCORE_SYS_LAB6_SET_PRIORITY: usize = 255;

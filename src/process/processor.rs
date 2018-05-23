@@ -17,7 +17,7 @@ pub struct Processor {
     /// Choose what on next schedule ?
     next: Option<Pid>,
     // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
-    scheduler: RRScheduler,
+    scheduler: StrideScheduler,
 }
 
 impl Processor {
@@ -28,8 +28,13 @@ impl Processor {
             event_hub: EventHub::new(),
             kernel_page_table: None,
             next: None,
-            scheduler: RRScheduler::new(100),
+            // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
+            scheduler: StrideScheduler::new(5),
         }
+    }
+
+    pub fn lab6_set_priority(&mut self, priority: u8) {
+        self.scheduler.set_priority(self.current_pid, priority);
     }
 
     pub fn set_reschedule(&mut self) {
@@ -194,14 +199,13 @@ impl Processor {
             return WaitResult::NotExist;
         }
         let pid = self.try_wait(pid).unwrap_or_else(|| {
-            info!("Processor: {} wait for {}", self.current_pid, pid);
             let current_pid = self.current_pid;
             self.set_status(current_pid, Status::Waiting(pid));
             self.schedule(); // yield
             self.try_wait(pid).unwrap()
         });
         let exit_code = self.get(pid).exit_code().unwrap();
-        info!("Processor: {} wait find and remove {}", self.current_pid, pid);
+        info!("Processor: {} wait end and remove {}", self.current_pid, pid);
         self.procs.remove(&pid);
         WaitResult::Ok(pid, exit_code)
     }

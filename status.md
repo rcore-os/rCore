@@ -11,7 +11,7 @@
 - [ ] ls
 - [x] matrix
 - [ ] pgdir
-- [ ] priority
+- [x] priority
 - [ ] sh
 - [x] sleep
 - [x] sleepkill
