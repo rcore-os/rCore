@@ -6,6 +6,7 @@ pub mod serial;
 pub mod pic;
 pub mod keyboard;
 pub mod pit;
+pub mod ide;
 
 pub fn init(mut page_map: impl FnMut(usize)) -> acpi::AcpiResult {
     assert_has_not_been_called!();

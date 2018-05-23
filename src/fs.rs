@@ -1,7 +1,28 @@
 use simple_filesystem::*;
 use alloc::boxed::Box;
+use arch::driver::ide;
+use spin::Mutex;
 use process;
 
+pub fn load_sfs() {
+//    let slice = unsafe { MemBuf::new(_binary_user_ucore32_img_start, _binary_user_ucore32_img_end) };
+    let sfs = SimpleFileSystem::open(Box::new(&ide::DISK0)).unwrap();
+    let root = sfs.root_inode();
+    let files = root.borrow().list().unwrap();
+    trace!("Loading programs: {:?}", files);
+
+//    for name in files.iter().filter(|&f| f != "." && f != "..") {
+    for name in files.iter().filter(|&f| f == "sleep") {
+        static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
+        let file = root.borrow().lookup(name.as_str()).unwrap();
+        let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
+        process::add_user_process(name, unsafe { &BUF[..len] });
+    }
+
+    process::print();
+}
+
+#[cfg(feature = "link_user_program")]
 extern {
     fn _binary_user_ucore32_img_start();
     fn _binary_user_ucore32_img_end();
@@ -30,20 +51,21 @@ impl Device for MemBuf {
     }
 }
 
-pub fn load_sfs() {
-    let slice = unsafe { MemBuf::new(_binary_user_ucore32_img_start, _binary_user_ucore32_img_end) };
-    let sfs = SimpleFileSystem::open(Box::new(slice)).unwrap();
-    let root = sfs.root_inode();
-    let files = root.borrow().list().unwrap();
-    trace!("Loading programs: {:?}", files);
+use core::slice;
 
-//    for name in files.iter().filter(|&f| f != "." && f != "..") {
-    for name in files.iter().filter(|&f| f == "sleep") {
-        static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
-        let file = root.borrow().lookup(name.as_str()).unwrap();
-        let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
-        process::add_user_process(name, unsafe { &BUF[..len] });
+impl BlockedDevice for &'static ide::DISK0 {
+    fn block_size_log2(&self) -> u8 {
+        debug_assert_eq!(ide::BLOCK_SIZE, 512);
+        9
     }
-
-    process::print();
+    fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
+        assert!(buf.len() >= ide::BLOCK_SIZE);
+        let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
+        self.0.lock().read(block_id as u64, 1, buf).is_ok()
+    }
+    fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
+        assert!(buf.len() >= ide::BLOCK_SIZE);
+        let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
+        self.0.lock().write(block_id as u64, 1, buf).is_ok()
+    }
 }

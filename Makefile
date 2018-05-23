@@ -23,11 +23,11 @@ assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
 user_image_files := $(wildcard user/*.img)
 user_object_files := $(patsubst user/%.img, build/user/%.o, $(user_image_files))
-qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio
+SFSIMG := user/ucore32.img
+qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
 features := use_apic
 
 LOG ?= debug
-link_user = 1
 
 ifdef link_user
 features := $(features) link_user_program
