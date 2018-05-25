@@ -6,6 +6,10 @@ A project of THU OS2018 spring.
 
 [Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
 
+[MidReport](./docs/MidReport.md)
+
+[FinalReport](./docs/FinalReport.md)
+
 The goal is to write a mini OS in Rust with multicore supporting.
 
 It will start from the post of the [Writing an OS in Rust](http://os.phil-opp.com) series. Then reimplement [xv6-x86_64](https://github.com/jserv/xv6-x86_64) in Rust style.

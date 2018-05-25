@@ -2,8 +2,7 @@
 #### lab1: 
 
 - [x] Basic init：LocalAPIC，IOAPIC，GDT，PIC
-- [x] Device：Keyboard，Serial，PIT
-- [ ] Device：IDE
+- [x] Device：Keyboard，Serial，PIT，IDE
 - [x] Interrupt & Trapframe
 - [x] ※ Muilt-core startup
 
