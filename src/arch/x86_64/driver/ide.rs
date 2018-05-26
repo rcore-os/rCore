@@ -107,7 +107,7 @@ impl DmaController
             }
             //println!("insl");
             for i in 0..4 {
-                println!("init:{}", buffer[i]);
+                info!("ide init: {}", buffer[i]);
             }
         }
         /* device is ok */
