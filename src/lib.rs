@@ -49,6 +49,7 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
+mod thread;
 mod sync;
 
 #[allow(dead_code)]

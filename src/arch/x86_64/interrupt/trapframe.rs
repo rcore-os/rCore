@@ -35,9 +35,10 @@ pub struct TrapFrame {
 
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
-    fn new_kernel_thread(entry: extern fn() -> !, rsp: usize) -> Self {
+    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
         use arch::gdt;
         let mut tf = TrapFrame::default();
+        tf.rdi = arg;
         tf.cs = gdt::KCODE_SELECTOR.0 as usize;
         tf.rip = entry as usize;
         tf.ss = gdt::KDATA_SELECTOR.0 as usize;
@@ -87,11 +88,11 @@ pub struct InitStack {
 }
 
 impl InitStack {
-    pub fn new_kernel_thread(entry: extern fn() -> !, rsp: usize) -> Self {
+    pub fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
         InitStack {
             context: Context::new(),
             trapret: trap_ret as usize,
-            tf: TrapFrame::new_kernel_thread(entry, rsp),
+            tf: TrapFrame::new_kernel_thread(entry, arg, rsp),
         }
     }
     pub fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {

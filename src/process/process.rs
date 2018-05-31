@@ -32,9 +32,9 @@ pub enum Status {
 
 impl Process {
     /// Make a new kernel thread
-    pub fn new(name: &str, entry: extern fn() -> !, mc: &mut MemoryController) -> Self {
+    pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize, mc: &mut MemoryController) -> Self {
         let kstack = mc.alloc_stack(7).unwrap();
-        let data = InitStack::new_kernel_thread(entry, kstack.top());
+        let data = InitStack::new_kernel_thread(entry, arg, kstack.top());
         let rsp = kstack.push_at_top(data);
 
         Process {

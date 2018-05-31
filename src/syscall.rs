@@ -2,6 +2,7 @@
 
 use arch::interrupt::TrapFrame;
 use process::*;
+use thread;
 use util;
 
 /// 系统调用入口点
@@ -108,9 +109,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
 }
 
 fn sys_yield() -> i32 {
-    info!("yield:");
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    processor.set_reschedule();
+    thread::yield_now();
     0
 }
 
@@ -122,7 +121,7 @@ fn sys_kill(pid: usize) -> i32 {
 
 /// Get the current process id
 fn sys_getpid() -> i32 {
-    PROCESSOR.try().unwrap().lock().current_pid() as i32
+    thread::current().id() as i32
 }
 
 /// Exit the current process
@@ -134,10 +133,7 @@ fn sys_exit(error_code: usize) -> i32 {
 }
 
 fn sys_sleep(time: usize) -> i32 {
-    info!("sleep: {} ticks", time);
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    let pid = processor.current_pid();
-    processor.sleep(pid, time);
+    thread::sleep(time);
     0
 }
 

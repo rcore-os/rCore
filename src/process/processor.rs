@@ -17,9 +17,10 @@ pub struct Processor {
     /// Choose what on next schedule ?
     next: Option<Pid>,
     // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
-    scheduler: StrideScheduler,
+    scheduler: RRScheduler,
 }
 
+// TODO: 除schedule()外的其它函数，应该只设置进程状态，不应调用schedule
 impl Processor {
     pub fn new() -> Self {
         Processor {
@@ -29,12 +30,13 @@ impl Processor {
             kernel_page_table: None,
             next: None,
             // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
-            scheduler: StrideScheduler::new(5),
+            scheduler: RRScheduler::new(100),
         }
     }
 
     pub fn lab6_set_priority(&mut self, priority: u8) {
-        self.scheduler.set_priority(self.current_pid, priority);
+        unimplemented!();
+//        self.scheduler.set_priority(self.current_pid, priority);
     }
 
     pub fn set_reschedule(&mut self) {
@@ -153,6 +155,7 @@ impl Processor {
 
         info!("Processor: switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
         unsafe {
+            // FIXME: safely pass MutexGuard
             use core::mem::forget;
             super::PROCESSOR.try().unwrap().force_unlock();
             switch(&mut from.rsp, to.rsp);
@@ -190,6 +193,12 @@ impl Processor {
     pub fn sleep(&mut self, pid: Pid, time: usize) {
         self.set_status(pid, Status::Sleeping);
         self.event_hub.push(time, Event::Wakeup(pid));
+    }
+    pub fn sleep_(&mut self, pid: Pid) {
+        self.set_status(pid, Status::Sleeping);
+    }
+    pub fn wakeup_(&mut self, pid: Pid) {
+        self.set_status(pid, Status::Ready);
     }
 
     /// Let current process wait for another
