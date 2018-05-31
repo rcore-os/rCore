@@ -31,6 +31,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         F: Send + 'static + FnOnce() -> T,
         T: Send + 'static,
 {
+    info!("spawn:");
     use process;
     let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, &f as *const _ as usize);
     return JoinHandle {
@@ -43,7 +44,6 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
             F: Send + 'static + FnOnce() -> T,
             T: Send + 'static,
     {
-        debug!("kernel_thread_entry");
         let f = unsafe { ptr::read(f as *mut F) };
         let ret = Box::new(f());
         let mut processor = PROCESSOR.try().unwrap().lock();
@@ -63,6 +63,7 @@ pub fn yield_now() {
 
 /// Blocks unless or until the current thread's token is made available.
 pub fn park() {
+    info!("park:");
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current_pid();
     processor.sleep_(pid);

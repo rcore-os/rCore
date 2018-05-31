@@ -64,7 +64,7 @@ impl Processor {
             (_, &Status::Ready) => self.scheduler.insert(pid),
             _ => {}
         }
-        trace!("Processor: process {} {:?} -> {:?}", pid, status0, status);
+        trace!("process {} {:?} -> {:?}", pid, status0, status);
         self.get_mut(pid).status = status;
     }
 
@@ -77,7 +77,7 @@ impl Processor {
         }
         self.event_hub.tick();
         while let Some(event) = self.event_hub.pop() {
-            debug!("Processor: event {:?}", event);
+            debug!("event {:?}", event);
             match event {
                 Event::Schedule => {
                     self.event_hub.push(10, Event::Schedule);
@@ -153,7 +153,7 @@ impl Processor {
             *from_pt = Some(old_table);
         }
 
-        info!("Processor: switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
+        info!("switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
         unsafe {
             // FIXME: safely pass MutexGuard
             use core::mem::forget;
@@ -181,7 +181,7 @@ impl Processor {
     }
 
     pub fn exit(&mut self, pid: Pid, error_code: ErrorCode) {
-        info!("Processor: {} exit, code: {}", pid, error_code);
+        info!("{} exit, code: {}", pid, error_code);
         self.set_status(pid, Status::Exited(error_code));
         if let Some(waiter) = self.find_waiter(pid) {
             info!("  then wakeup {}", waiter);
@@ -203,7 +203,7 @@ impl Processor {
 
     /// Let current process wait for another
     pub fn current_wait_for(&mut self, pid: Pid) -> WaitResult {
-        info!("Processor: current {} wait for {:?}", self.current_pid, pid);
+        info!("current {} wait for {:?}", self.current_pid, pid);
         if self.procs.values().filter(|&p| p.parent == self.current_pid).next().is_none() {
             return WaitResult::NotExist;
         }
@@ -214,7 +214,7 @@ impl Processor {
             self.try_wait(pid).unwrap()
         });
         let exit_code = self.get(pid).exit_code().unwrap();
-        info!("Processor: {} wait end and remove {}", self.current_pid, pid);
+        info!("{} wait end and remove {}", self.current_pid, pid);
         self.procs.remove(&pid);
         WaitResult::Ok(pid, exit_code)
     }

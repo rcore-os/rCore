@@ -69,7 +69,7 @@ impl Log for SimpleLogger {
     }
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            print_in_color(format_args!("{}\n", record.args()), Color::from(record.level()));
+            print_in_color(format_args!("[{}] {}\n", record.target(), record.args()), Color::from(record.level()));
         }
     }
     fn flush(&self) {}
