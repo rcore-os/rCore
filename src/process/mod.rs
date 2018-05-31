@@ -1,6 +1,6 @@
 use memory::MemoryController;
 use spin::Once;
-use sync::Mutex;
+use sync::SpinNoIrqLock;
 use core::slice;
 use alloc::String;
 
@@ -13,7 +13,8 @@ mod scheduler;
 
 
 pub fn init(mut mc: MemoryController) {
-    PROCESSOR.call_once(|| {Mutex::new({
+    PROCESSOR.call_once(|| {
+        SpinNoIrqLock::new({
         let initproc = Process::new_init(&mut mc);
         let idleproc = Process::new("idle", idle_thread, 0, &mut mc);
         let mut processor = Processor::new();
@@ -21,11 +22,11 @@ pub fn init(mut mc: MemoryController) {
         processor.add(idleproc);
         processor
     })});
-    MC.call_once(|| Mutex::new(mc));
+    MC.call_once(|| SpinNoIrqLock::new(mc));
 }
 
-pub static PROCESSOR: Once<Mutex<Processor>> = Once::new();
-pub static MC: Once<Mutex<MemoryController>> = Once::new();
+pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
+pub static MC: Once<SpinNoIrqLock<MemoryController>> = Once::new();
 
 extern fn idle_thread(arg: usize) -> ! {
     loop {
