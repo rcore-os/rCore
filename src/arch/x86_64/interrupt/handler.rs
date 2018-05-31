@@ -19,6 +19,50 @@
 //!     * 检查tf中的cs段，如果是用户态，向TSS中设置下一次中断时重置rsp的值，使其指向该用户线程的内核栈
 //!     * 从栈中pop全部寄存器的值，pop中断号和错误码
 //!     * 执行iret，CPU从栈中pop一些值（若其中的CS是Ring0，3项，否则5项），重置rip和rsp（Ring3时）
+//!
+//! ``` mermaid
+//! sequenceDiagram
+//!	activate CPU
+//!	Note right of CPU: set rsp (user)
+//!	Note right of CPU: push something
+//!	deactivate CPU
+//!
+//!	CPU ->> +ASM: jmp vector_i
+//!	Note right of ASM: push error_code & trap_num
+//!
+//!	ASM ->> ASM: jmp alltraps
+//!	Note right of ASM: push registers
+//!
+//!	ASM ->> +Rust: call rust_trap(rsp)
+//!    Note right of Rust: handle the trap
+//!
+//!	opt schedule
+//!	Rust ->> +NewThread: switch
+//!	Note left of NewThread: forkret:
+//!    NewThread -->> -ASM: ret
+//!    Note left of ASM: trapret:
+//!    ASM -->> +NewThread: from another trap
+//!    NewThread ->> -Rust: switch
+//!	end
+//!
+//!	Rust -->> -ASM: ret
+//!    Note left of ASM: trapret:
+//!
+//!    opt CS is user mode
+//!	ASM ->> +Rust: call set_return_rsp
+//!	Note right of Rust: set in TSS
+//!	Rust -->> -ASM: ret
+//!	end
+//!
+//!	Note right of ASM: pop registers
+//!	Note right of ASM: pop error_code & trap_num
+//!	ASM -->> -CPU: iret
+//!
+//!	activate CPU
+//!	Note right of CPU: pop something
+//!	Note right of CPU: set rsp (user)
+//!	deactivate CPU
+//! ```
 
 use super::TrapFrame;
 
