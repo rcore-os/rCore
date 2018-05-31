@@ -19,6 +19,25 @@ pub unsafe fn disable() {
 }
 
 #[inline(always)]
+pub unsafe fn disable_and_store() -> usize {
+    let r: usize;
+    asm!("pushfq; popq $0; cli" : "=r"(r) :: "memory");
+    r
+}
+
+#[inline(always)]
+pub unsafe fn restore(flags: usize) {
+    asm!("pushq $0; popfq" :: "r"(flags) : "memory" "flags");
+}
+
+#[inline(always)]
+pub fn no_interrupt(f: impl FnOnce()) {
+    let flags = unsafe { disable_and_store() };
+    f();
+    unsafe { restore(flags) };
+}
+
+#[inline(always)]
 pub fn enable_irq(irq: u8) {
     if cfg!(feature = "use_apic") {
         IOAPIC.lock().enable(irq, 0);

@@ -23,12 +23,3 @@ macro_rules! test {
 		}
 	)
 }
-
-macro_rules! no_interrupt {
-    {$func:block} => {
-        use arch::interrupt;
-        unsafe{ interrupt::disable(); }
-        $func;
-        unsafe{ interrupt::enable(); }
-    };
-}

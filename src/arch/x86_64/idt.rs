@@ -27,6 +27,7 @@ lazy_static! {
             let mut opt = entries[i].set_handler_fn(unsafe { transmute(__vectors[i]) });
             if ring3.contains(&(i as u8)) {
                 opt.set_privilege_level(PrivilegeLevel::Ring3);
+                opt.disable_interrupts(false);
             }
             if i == T_DBLFLT as usize {
                 unsafe{ opt.set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); }

@@ -1,5 +1,6 @@
 use memory::MemoryController;
-use spin::{Once, Mutex};
+use spin::Once;
+use sync::Mutex;
 use core::slice;
 use alloc::String;
 
