@@ -56,6 +56,9 @@ impl TrapFrame {
         tf.rflags = 0x282;
         tf
     }
+    pub fn is_user(&self) -> bool {
+        self.cs & 0x3 == 0x3
+    }
 }
 
 #[derive(Debug, Default)]

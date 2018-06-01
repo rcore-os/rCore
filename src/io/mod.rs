@@ -68,7 +68,10 @@ impl Log for SimpleLogger {
 //        metadata.level() <= Level::Info
     }
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
+        static DISABLED_TARGET: &[&str] = &[
+            "rust_ucore::process::scheduler::rr",
+        ];
+        if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
             print_in_color(format_args!("[{}] {}\n", record.target(), record.args()), Color::from(record.level()));
         }
     }
