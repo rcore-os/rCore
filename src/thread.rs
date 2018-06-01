@@ -6,6 +6,7 @@
 use process::*;
 use core::marker::PhantomData;
 use core::ptr;
+use core::time::Duration;
 use alloc::boxed::Box;
 
 /// Gets a handle to the thread that invokes it.
@@ -16,13 +17,16 @@ pub fn current() -> Thread {
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
-pub fn sleep(time: usize) {
-    // TODO: use core::time::Duration
-    info!("sleep: {} ticks", time);
+pub fn sleep(dur: Duration) {
+    info!("sleep: {:?}", dur);
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current_pid();
-    processor.sleep(pid, time);
+    processor.sleep(pid, dur_to_ticks(dur));
     processor.schedule();
+
+    fn dur_to_ticks(dur: Duration) -> usize {
+        return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
+    }
 }
 
 /// Spawns a new thread, returning a JoinHandle for it.
@@ -33,7 +37,8 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 {
     info!("spawn:");
     use process;
-    let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, &f as *const _ as usize);
+    let f = Box::leak(Box::new(f));
+    let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, f as *mut _ as usize);
     return JoinHandle {
         thread: Thread { pid },
         mark: PhantomData,
@@ -44,11 +49,12 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
             F: Send + 'static + FnOnce() -> T,
             T: Send + 'static,
     {
-        let f = unsafe { ptr::read(f as *mut F) };
+        let f = unsafe { Box::from_raw(f as *mut F) };
         let ret = Box::new(f());
         let mut processor = PROCESSOR.try().unwrap().lock();
         let pid = processor.current_pid();
         processor.exit(pid, Box::into_raw(ret) as usize);
+        processor.schedule();
         unreachable!()
     }
 }
@@ -115,6 +121,7 @@ impl<T> JoinHandle<T> {
 
 pub mod test {
     use thread;
+    use core::time::Duration;
 
     pub fn unpack() {
         let parked_thread = thread::spawn(|| {
@@ -125,7 +132,7 @@ pub mod test {
         });
 
         // Let some time pass for the thread to be spawned.
-        thread::sleep(200);
+        thread::sleep(Duration::from_secs(2));
 
         println!("Unpark the thread");
         parked_thread.thread().unpark();

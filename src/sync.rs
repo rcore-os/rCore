@@ -1,4 +1,4 @@
-//! Mutex (Spin, Spin-NoInterrupt, Yield)
+//! Mutex (Spin, SpinNoIrq, Thread)
 //!
 //! Modified from spin::mutex.
 
@@ -6,29 +6,28 @@ use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 use core::fmt;
-use core::marker::PhantomData;
 use arch::interrupt;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
-pub type YieldLock<T> = Mutex<T, Yield>;
+pub type ThreadLock<T> = Mutex<T, Thread>;
 
-/// Spin & no-interrupt lock
 pub struct Mutex<T: ?Sized, S: MutexSupport>
 {
     lock: AtomicBool,
-    support: PhantomData<S>,
+    support: S,
     data: UnsafeCell<T>,
 }
 
 /// A guard to which the protected data can be accessed
 ///
 /// When the guard falls out of scope it will release the lock.
-pub struct MutexGuard<'a, T: ?Sized + 'a, S: MutexSupport>
+pub struct MutexGuard<'a, T: ?Sized + 'a, S: MutexSupport + 'a>
 {
     lock: &'a AtomicBool,
     data: &'a mut T,
-    support: S,
+    support: &'a S,
+    support_guard: S::GuardData,
 }
 
 // Same unsafe impls as `std::sync::Mutex`
@@ -54,11 +53,11 @@ impl<T, S: MutexSupport> Mutex<T, S>
     ///     drop(lock);
     /// }
     /// ```
-    pub const fn new(user_data: T) -> Mutex<T, S> {
+    pub fn new(user_data: T) -> Mutex<T, S> {
         Mutex {
             lock: ATOMIC_BOOL_INIT,
             data: UnsafeCell::new(user_data),
-            support: PhantomData,
+            support: S::new(),
         }
     }
 
@@ -77,7 +76,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
         while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
             // Wait until the lock looks unlocked before retrying
             while self.lock.load(Ordering::Relaxed) {
-                S::cpu_relax();
+                self.support.cpu_relax();
             }
         }
     }
@@ -99,12 +98,13 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     /// ```
     pub fn lock(&self) -> MutexGuard<T, S>
     {
-        let support = S::before_lock();
+        let support_guard = S::before_lock();
         self.obtain_lock();
         MutexGuard {
             lock: &self.lock,
             data: unsafe { &mut *self.data.get() },
-            support,
+            support: &self.support,
+            support_guard,
         }
     }
 
@@ -122,26 +122,26 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     /// Tries to lock the mutex. If it is already locked, it will return None. Otherwise it returns
     /// a guard within Some.
     pub fn try_lock(&self) -> Option<MutexGuard<T, S>> {
-        let support = S::before_lock();
+        let support_guard = S::before_lock();
         if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
             Some(MutexGuard {
                 lock: &self.lock,
                 data: unsafe { &mut *self.data.get() },
-                support,
+                support: &self.support,
+                support_guard,
             })
         } else {
-            support.after_unlock();
             None
         }
     }
 }
 
-impl<T: ?Sized + fmt::Debug, S: MutexSupport> fmt::Debug for Mutex<T, S>
+impl<T: ?Sized + fmt::Debug, S: MutexSupport + fmt::Debug> fmt::Debug for Mutex<T, S>
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_lock() {
-            Some(guard) => write!(f, "Mutex<{:?}> {{ data: {:?} }}", self.support, &*guard),
-            None => write!(f, "Mutex<{:?}> {{ <locked> }}", self.support),
+            Some(guard) => write!(f, "Mutex {{ data: {:?}, support: {:?} }}", &*guard, self.support),
+            None => write!(f, "Mutex {{ <locked>, support: {:?} }}", self.support),
         }
     }
 }
@@ -174,58 +174,157 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>
 
 /// Low-level support for mutex
 pub trait MutexSupport {
+    type GuardData;
+    fn new() -> Self;
     /// Called when failing to acquire the lock
-    fn cpu_relax();
+    fn cpu_relax(&self);
     /// Called before lock() & try_lock()
-    fn before_lock() -> Self;
-    /// Called when MutexGuard dropping & try_lock() failed
+    fn before_lock() -> Self::GuardData;
+    /// Called when MutexGuard dropping
     fn after_unlock(&self);
 }
 
 /// Spin lock
+#[derive(Debug)]
 pub struct Spin;
 
 impl MutexSupport for Spin {
-    fn cpu_relax() {
+    type GuardData = ();
+
+    fn new() -> Self { Spin }
+    fn cpu_relax(&self) {
         unsafe { asm!("pause" :::: "volatile"); }
     }
-    fn before_lock() -> Self {
-        Spin
-    }
+    fn before_lock() -> Self::GuardData {}
     fn after_unlock(&self) {}
 }
 
 /// Spin & no-interrupt lock
-pub struct SpinNoIrq {
-    flags: usize,
+#[derive(Debug)]
+pub struct SpinNoIrq;
+
+/// Contains RFLAGS before disable interrupt, will auto restore it when dropping
+pub struct FlagsGuard(usize);
+
+impl Drop for FlagsGuard {
+    fn drop(&mut self) {
+        unsafe { interrupt::restore(self.0) };
+    }
 }
 
 impl MutexSupport for SpinNoIrq {
-    fn cpu_relax() {
+    type GuardData = FlagsGuard;
+    fn new() -> Self {
+        SpinNoIrq
+    }
+    fn cpu_relax(&self) {
         unsafe { asm!("pause" :::: "volatile"); }
     }
-    fn before_lock() -> Self {
-        SpinNoIrq {
-            flags: unsafe { interrupt::disable_and_store() },
-        }
+    fn before_lock() -> Self::GuardData {
+        FlagsGuard(unsafe { interrupt::disable_and_store() })
     }
+    fn after_unlock(&self) {}
+}
+
+use thread;
+use alloc::VecDeque;
+
+/// With thread support
+pub struct Thread {
+    wait_queue: SpinLock<VecDeque<thread::Thread>>,
+}
+
+impl MutexSupport for Thread {
+    type GuardData = ();
+    fn new() -> Self {
+        Thread { wait_queue: SpinLock::new(VecDeque::new()) }
+    }
+    fn cpu_relax(&self) {
+        self.wait_queue.lock().push_back(thread::current());
+        thread::park();
+    }
+    fn before_lock() -> Self::GuardData {}
     fn after_unlock(&self) {
-        unsafe { interrupt::restore(self.flags) };
+        if let Some(t) = self.wait_queue.lock().pop_front() {
+            t.unpark();
+        }
     }
 }
 
-/// With thread support
-pub struct Yield;
 
-impl MutexSupport for Yield {
-    fn cpu_relax() {
-        use thread;
-        thread::yield_now();
+pub mod philosopher {
+    use thread;
+    use core::time::Duration;
+    use alloc::{arc::Arc, Vec};
+    use super::ThreadLock as Mutex;
+
+    struct Philosopher {
+        name: &'static str,
+        left: usize,
+        right: usize,
     }
-    fn before_lock() -> Self {
-        unimplemented!()
+
+    impl Philosopher {
+        fn new(name: &'static str, left: usize, right: usize) -> Philosopher {
+            Philosopher {
+                name,
+                left,
+                right,
+            }
+        }
+
+        fn eat(&self, table: &Table) {
+            let _left = table.forks[self.left].lock();
+            let _right = table.forks[self.right].lock();
+
+            println!("{} is eating.", self.name);
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        fn think(&self) {
+            println!("{} is thinking.", self.name);
+            thread::sleep(Duration::from_secs(1));
+        }
     }
-    fn after_unlock(&self) {
-        unimplemented!()
+
+    struct Table {
+        forks: Vec<Mutex<()>>,
+    }
+
+    pub fn philosopher() {
+        let table = Arc::new(Table {
+            forks: vec![
+                Mutex::new(()),
+                Mutex::new(()),
+                Mutex::new(()),
+                Mutex::new(()),
+                Mutex::new(()),
+            ]
+        });
+
+        let philosophers = vec![
+            Philosopher::new("1", 0, 1),
+            Philosopher::new("2", 1, 2),
+            Philosopher::new("3", 2, 3),
+            Philosopher::new("4", 3, 4),
+            Philosopher::new("5", 0, 4),
+        ];
+
+        let handles: Vec<_> = philosophers.into_iter().map(|p| {
+            let table = table.clone();
+
+            thread::spawn(move || {
+                for i in 0..5 {
+                    p.think();
+                    p.eat(&table);
+                    println!("{} iter {} end.", p.name, i);
+                }
+            })
+        }).collect();
+
+        for h in handles {
+            h.join().unwrap();
+        }
+        println!("philosophers dining end");
     }
 }

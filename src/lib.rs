@@ -90,6 +90,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
     unsafe{ arch::interrupt::enable(); }
 
+//    thread::test::unpack();
+    sync::philosopher::philosopher();
+
     // 直接进入用户态暂不可用：内核代码用户不可访问
 //    unsafe{
 //        use arch::syscall;

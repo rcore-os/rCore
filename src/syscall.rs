@@ -133,7 +133,8 @@ fn sys_exit(error_code: usize) -> i32 {
 }
 
 fn sys_sleep(time: usize) -> i32 {
-    thread::sleep(time);
+    use core::time::Duration;
+    thread::sleep(Duration::from_millis(time as u64 * 10));
     0
 }
 
