@@ -1,6 +1,30 @@
 //! Mutex (Spin, SpinNoIrq, Thread)
 //!
 //! Modified from spin::mutex.
+//!
+//! 一个可替换底层支持的锁框架。
+//!
+//! # 在此框架下实现了以下几种锁
+//!
+//! * `SpinLock`: 自旋锁。
+//!     等价于`spin::Mutex`，相当于Linux中的`spin_lock`。
+//!     当获取锁失败时，忙等待。
+//!     由于没有禁用内核抢占和中断，在单处理器上使用可能发生死锁。
+//!
+//! * `SpinNoIrqLock`: 禁止中断的自旋锁。
+//!     相当于Linux中的`spin_lock_irqsave`。
+//!     在尝试获取锁之前禁用中断，在try_lock失败/解锁时恢复之前的中断状态。
+//!     可被用于中断处理中，不会发生死锁。
+//!
+//! * `ThreadLock`: 线程调度锁。
+//!     等价于`std::sync::Mutex`，依赖于`thread`模块提供线程调度支持。
+//!     在获取锁失败时，将自己加入等待队列，让出CPU；在解锁时，唤醒一个等待队列中的线程。
+//!
+//! # 实现方法
+//!
+//! 由一个struct提供底层支持，它impl trait `MutexSupport`，并嵌入`Mutex`中。
+//! `MutexSupport`提供了若干接口，它们会在操作锁的不同时间点被调用。
+//! 注意这个接口实际是取了几种实现的并集，并不是很通用。
 
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
 use core::cell::UnsafeCell;
@@ -253,6 +277,10 @@ impl MutexSupport for Thread {
 
 
 pub mod philosopher {
+    //! Dining philosophers problem
+    //!
+    //! The code is borrowed from [RustDoc - Dining Philosophers](https://doc.rust-lang.org/1.6.0/book/dining-philosophers.html)
+
     use thread;
     use core::time::Duration;
     use alloc::{arc::Arc, Vec};
