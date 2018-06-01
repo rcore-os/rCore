@@ -33,7 +33,7 @@ use core::fmt;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
-pub type ThreadLock<T> = Mutex<T, Thread>;
+pub type ThreadLock<T> = Mutex<T, Condvar>;
 
 pub struct Mutex<T: ?Sized, S: MutexSupport>
 {
@@ -253,25 +253,18 @@ impl MutexSupport for SpinNoIrq {
 
 use thread;
 use alloc::VecDeque;
+use super::Condvar;
 
-/// With thread support
-pub struct Thread {
-    wait_queue: SpinLock<VecDeque<thread::Thread>>,
-}
-
-impl MutexSupport for Thread {
+impl MutexSupport for Condvar {
     type GuardData = ();
     fn new() -> Self {
-        Thread { wait_queue: SpinLock::new(VecDeque::new()) }
+        Condvar::new()
     }
     fn cpu_relax(&self) {
-        self.wait_queue.lock().push_back(thread::current());
-        thread::park();
+        self.wait();
     }
     fn before_lock() -> Self::GuardData {}
     fn after_unlock(&self) {
-        if let Some(t) = self.wait_queue.lock().pop_front() {
-            t.unpark();
-        }
+        self.notify_one();
     }
 }
