@@ -30,7 +30,7 @@ impl Processor {
             kernel_page_table: None,
             next: None,
             // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
-            scheduler: RRScheduler::new(100),
+            scheduler: RRScheduler::new(5),
         }
     }
 
