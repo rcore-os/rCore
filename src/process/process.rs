@@ -1,5 +1,5 @@
 use super::*;
-use memory::{self, Stack, InactivePageTable};
+use memory::{self, Stack, InactivePageTable, MemoryAttr};
 use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
 use core::slice;
 use alloc::{rc::Rc, String};
@@ -10,9 +10,7 @@ pub struct Process {
     pub(in process) pid: Pid,
     pub(in process) parent: Pid,
     pub(in process) name: String,
-    kstack: Stack,
-    pub(in process) memory_set: Option<MemorySet>,
-    pub(in process) page_table: Option<InactivePageTable>,
+    pub(in process) memory_set: MemorySet,
     pub(in process) status: Status,
     pub(in process) context: Context,
     pub(in process) is_user: bool,
@@ -32,18 +30,16 @@ pub enum Status {
 
 impl Process {
     /// Make a new kernel thread
-    pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize, mc: &mut MemoryController) -> Self {
-        let kstack = mc.alloc_stack(7).unwrap();
-        let data = InitStack::new_kernel_thread(entry, arg, kstack.top());
-        let context = unsafe { data.push_at(kstack.top()) };
+    pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize) -> Self {
+        let ms = MemorySet::new(7);
+        let data = InitStack::new_kernel_thread(entry, arg, ms.kstack_top());
+        let context = unsafe { data.push_at(ms.kstack_top()) };
 
         Process {
             pid: 0,
             parent: 0,
             name: String::from(name),
-            kstack,
-            memory_set: None,
-            page_table: None,
+            memory_set: ms,
             status: Status::Ready,
             context,
             is_user: false,
@@ -52,15 +48,13 @@ impl Process {
 
     /// Make the first kernel thread `initproc`
     /// Should be called only once
-    pub fn new_init(mc: &mut MemoryController) -> Self {
+    pub fn new_init(ms: MemorySet) -> Self {
         assert_has_not_been_called!();
         Process {
             pid: 0,
             parent: 0,
             name: String::from("init"),
-            kstack: mc.kernel_stack.take().unwrap(),
-            memory_set: None,
-            page_table: None,
+            memory_set: ms,
             status: Status::Running,
             context: unsafe { Context::null() }, // will be set at first schedule
             is_user: false,
@@ -70,7 +64,7 @@ impl Process {
     /// Make a new user thread
     /// The program elf data is placed at [begin, end)
     /// uCore x86 32bit program is planned to be supported.
-    pub fn new_user(data: &[u8], mc: &mut MemoryController) -> Self {
+    pub fn new_user(data: &[u8]) -> Self {
         // Parse elf
         let begin = data.as_ptr() as usize;
         let elf = ElfFile::new(data).expect("failed to read elf");
@@ -88,9 +82,7 @@ impl Process {
 
         // Make page table
         let mut memory_set = MemorySet::from(&elf);
-        memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top,
-                                        EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::USER_ACCESSIBLE, "user_stack"));
-        let page_table = mc.make_page_table(&memory_set);
+        memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
 
         let entry_addr = match elf.header.pt2 {
@@ -99,7 +91,7 @@ impl Process {
         };
 
         // Temporary switch to it, in order to copy data
-        let page_table = mc.with(page_table, || {
+        memory_set.with(|| {
             for ph in elf.program_iter() {
                 let (virt_addr, offset, file_size) = match ph {
                     ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
@@ -119,17 +111,14 @@ impl Process {
 
 
         // Allocate kernel stack and push trap frame
-        let kstack = mc.alloc_stack(7).unwrap();
         let data = InitStack::new_user_thread(entry_addr, user_stack_top - 8, is32);
-        let context = unsafe { data.push_at(kstack.top()) };
+        let context = unsafe { data.push_at(memory_set.kstack_top()) };
 
         Process {
             pid: 0,
             parent: 0,
             name: String::new(),
-            kstack,
-            memory_set: Some(memory_set),
-            page_table: Some(page_table),
+            memory_set,
             status: Status::Ready,
             context,
             is_user: true,
@@ -137,12 +126,11 @@ impl Process {
     }
 
     /// Fork
-    pub fn fork(&self, tf: &TrapFrame, mc: &mut MemoryController) -> Self {
+    pub fn fork(&self, tf: &TrapFrame) -> Self {
         assert!(self.is_user);
 
         // Clone memory set, make a new page table
-        let memory_set = self.memory_set.as_ref().unwrap().clone();
-        let page_table = mc.make_page_table(&memory_set);
+        let memory_set = self.memory_set.clone(7);
 
         // Copy data to temp space
         use alloc::Vec;
@@ -151,24 +139,21 @@ impl Process {
         }).collect();
 
         // Temporary switch to it, in order to copy data
-        let page_table = mc.with(page_table, || {
+        memory_set.with(|| {
             for (area, data) in memory_set.iter().zip(datas.iter()) {
                 unsafe { area.as_slice_mut() }.copy_from_slice(data.as_slice())
             }
         });
 
         // Allocate kernel stack and push trap frame
-        let kstack = mc.alloc_stack(7).unwrap();
         let data = InitStack::new_fork(tf);
-        let context = unsafe { data.push_at(kstack.top()) };
+        let context = unsafe { data.push_at(memory_set.kstack_top()) };
 
         Process {
             pid: 0,
             parent: self.pid,
             name: self.name.clone() + "_fork",
-            kstack,
-            memory_set: Some(memory_set),
-            page_table: Some(page_table),
+            memory_set,
             status: Status::Ready,
             context,
             is_user: true,
@@ -187,29 +172,23 @@ use memory::{MemorySet, MemoryArea, PhysAddr, FromToVirtualAddress, EntryFlags};
 
 impl<'a> From<&'a ElfFile<'a>> for MemorySet {
     fn from(elf: &'a ElfFile<'a>) -> Self {
-        let mut set = MemorySet::new();
+        let mut set = MemorySet::new(7);
         for ph in elf.program_iter() {
             let (virt_addr, mem_size, flags) = match ph {
                 ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
                 ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
             };
-            set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, EntryFlags::from(flags), ""));
+            set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, MemoryAttr::from(flags), ""));
         }
         set
     }
 }
 
-impl From<Flags> for EntryFlags {
+impl From<Flags> for MemoryAttr {
     fn from(elf_flags: Flags) -> Self {
-        let mut flags = EntryFlags::PRESENT | EntryFlags::USER_ACCESSIBLE;
-//        if elf_flags.is_write() {
+        let mut flags = MemoryAttr::default().user();
         // TODO: handle readonly
-        if true {
-            flags = flags | EntryFlags::WRITABLE;
-        }
-        if !elf_flags.is_execute() {
-            flags = flags | EntryFlags::NO_EXECUTE;
-        }
+        if elf_flags.is_execute() { flags = flags.execute(); }
         flags
     }
 }

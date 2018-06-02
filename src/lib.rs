@@ -70,7 +70,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
 
     // set up guard page and map the heap pages
-    let mut memory_controller = memory::init(boot_info);
+    let mut kernel_memory = memory::init(boot_info);
 
     arch::gdt::init();
 
@@ -79,12 +79,14 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     test!(guard_page);
     test!(find_mp);
 
-    let acpi = arch::driver::init(
-        |addr: usize| memory_controller.map_page_identity(addr));
-    // memory_controller.print_page_table();
+    use memory::*;
+    let acpi = arch::driver::init(|addr: usize, count: usize| {
+        kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
+    });
 
-    arch::smp::start_other_cores(&acpi, &mut memory_controller);
-    process::init(memory_controller);
+    // FIXME: PageFault when SMP
+//    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
+    process::init(kernel_memory);
 
     fs::load_sfs();
 
@@ -127,7 +129,7 @@ pub extern "C" fn other_main() -> ! {
     arch::driver::apic::other_init();
     let cpu_id = arch::driver::apic::lapic_id();
     println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
-    unsafe{ arch::smp::notify_started(cpu_id); }
+    let ms = unsafe { arch::smp::notify_started(cpu_id) };
 //    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }

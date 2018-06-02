@@ -11,9 +11,6 @@ pub struct Processor {
     procs: BTreeMap<Pid, Process>,
     current_pid: Pid,
     event_hub: EventHub<Event>,
-    /// All kernel threads share one page table.
-    /// When running user process, it will be stored here.
-    kernel_page_table: Option<InactivePageTable>,
     /// Choose what on next schedule ?
     next: Option<Pid>,
     // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
@@ -27,7 +24,6 @@ impl Processor {
             procs: BTreeMap::<Pid, Process>::new(),
             current_pid: 0,
             event_hub: EventHub::new(),
-            kernel_page_table: None,
             next: None,
             // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
             scheduler: RRScheduler::new(5),
@@ -139,19 +135,7 @@ impl Processor {
         self.scheduler.remove(pid);
 
         // switch page table
-        if from.is_user || to.is_user {
-            let (from_pt, to_pt) = match (from.is_user, to.is_user) {
-                (true, true) => (&mut from.page_table, &mut to.page_table),
-                (true, false) => (&mut from.page_table, &mut self.kernel_page_table),
-                (false, true) => (&mut self.kernel_page_table, &mut to.page_table),
-                _ => panic!(),
-            };
-            assert!(from_pt.is_none());
-            assert!(to_pt.is_some());
-            let mut active_table = unsafe { ActivePageTable::new() };
-            let old_table = active_table.switch(to_pt.take().unwrap());
-            *from_pt = Some(old_table);
-        }
+        to.memory_set.switch();
 
         info!("switch from {} to {}\n  rsp: ??? -> {:?}", pid0, pid, to.context);
         unsafe {

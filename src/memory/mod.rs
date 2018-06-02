@@ -1,6 +1,6 @@
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use arch::paging::*;
-pub use self::stack_allocator::Stack;
+pub use self::stack_allocator::*;
 pub use self::address::*;
 pub use self::frame::*;
 pub use self::memory_set::*;
@@ -8,7 +8,7 @@ pub use self::memory_set::*;
 use multiboot2::BootInformation;
 use consts::KERNEL_OFFSET;
 use arch::paging;
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 
 mod memory_set;
@@ -19,6 +19,7 @@ mod address;
 mod frame;
 
 pub static FRAME_ALLOCATOR: Mutex<Option<AreaFrameAllocator>> = Mutex::new(None);
+pub static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Frame {
     FRAME_ALLOCATOR.lock()
@@ -26,18 +27,49 @@ pub fn alloc_frame() -> Frame {
         .allocate_frame().expect("no more frame")
 }
 
+fn alloc_stack(size_in_pages: usize) -> Stack {
+    let mut active_table = active_table();
+    STACK_ALLOCATOR.lock()
+        .as_mut().expect("stack allocator is not initialized")
+        .alloc_stack(&mut active_table, size_in_pages).expect("no more stack")
+}
+
+/// The only way to get active page table
+fn active_table() -> MutexGuard<'static, ActivePageTable> {
+    static ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe { ActivePageTable::new() });
+    ACTIVE_TABLE.lock()
+}
+
 // Return true to continue, false to halt
 pub fn page_fault_handler(addr: VirtAddr) -> bool {
     // Handle copy on write
-    let mut page_table = unsafe { ActivePageTable::new() };
-    page_table.try_copy_on_write(addr)
+    active_table().try_copy_on_write(addr)
 }
 
-pub fn init(boot_info: BootInformation) -> MemoryController {
+pub fn init(boot_info: BootInformation) -> MemorySet {
     assert_has_not_been_called!("memory::init must be called only once");
 
     info!("{:?}", boot_info);
 
+    init_frame_allocator(&boot_info);
+
+    let kernel_memory = remap_the_kernel(boot_info);
+
+    use self::paging::Page;
+    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+
+    unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
+
+    *STACK_ALLOCATOR.lock() = Some({
+        let stack_alloc_range = Page::range_of(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
+                                               KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE + 0x1000000);
+        stack_allocator::StackAllocator::new(stack_alloc_range)
+    });
+
+    kernel_memory
+}
+
+fn init_frame_allocator(boot_info: &BootInformation) {
     let memory_map_tag = boot_info.memory_map_tag().expect(
         "Memory map tag required");
     let elf_sections_tag = boot_info.elf_sections_tag().expect(
@@ -54,53 +86,40 @@ pub fn init(boot_info: BootInformation) -> MemoryController {
     *FRAME_ALLOCATOR.lock() = Some(AreaFrameAllocator::new(
         kernel_start, kernel_end,
         boot_info_start, boot_info_end,
-        memory_map_tag.memory_areas()
+        memory_map_tag.memory_areas(),
     ));
-
-    let kernel_stack = remap_the_kernel(boot_info);
-
-    use self::paging::Page;
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-
-    unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
-
-    let stack_allocator = {
-        let stack_alloc_range = Page::range_of(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE,
-                                               KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE + 0x1000000);
-        stack_allocator::StackAllocator::new(stack_alloc_range)
-    };
-    
-    MemoryController {
-        kernel_stack: Some(kernel_stack),
-        active_table: unsafe { ActivePageTable::new() },
-        stack_allocator,
-    }
 }
 
-pub fn remap_the_kernel(boot_info: BootInformation) -> Stack {
-    let mut active_table = unsafe { ActivePageTable::new() };
+fn remap_the_kernel(boot_info: BootInformation) -> MemorySet {
     let mut memory_set = MemorySet::from(boot_info.elf_sections_tag().unwrap());
 
     use consts::{KERNEL_OFFSET, KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xb8000, KERNEL_OFFSET + 0xb9000, EntryFlags::WRITABLE, "VGA"));
-    memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, EntryFlags::WRITABLE, "kernel_heap"));
+    memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xb8000, KERNEL_OFFSET + 0xb9000, MemoryAttr::default(), "VGA"));
+    memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
 
-    let mut page_table = InactivePageTable::new(alloc_frame(), &mut active_table);
-    active_table.with(&mut page_table, |pt| memory_set.map(pt));
     debug!("{:#x?}", memory_set);
 
-    let old_table = active_table.switch(page_table);
+    memory_set.switch();
     info!("NEW TABLE!!!");
 
-    // turn the stack bottom into a guard page
+    let kstack = get_init_kstack_and_set_guard_page();
+    memory_set.set_kstack(kstack);
+
+    memory_set
+}
+
+fn get_init_kstack_and_set_guard_page() -> Stack {
+    assert_has_not_been_called!();
+
     extern { fn stack_bottom(); }
     let stack_bottom = PhysAddr(stack_bottom as u64).to_kernel_virtual();
     let stack_bottom_page = Page::of_addr(stack_bottom);
-    active_table.unmap(stack_bottom_page);
-    let kernel_stack = Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE);
+
+    // turn the stack bottom into a guard page
+    active_table().unmap(stack_bottom_page);
     debug!("guard page at {:#x}", stack_bottom_page.start_address());
 
-    kernel_stack
+    Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE)
 }
 
 use multiboot2::{ElfSectionsTag, ElfSection, ElfSectionFlags};
@@ -111,11 +130,7 @@ impl From<ElfSectionsTag> for MemorySet {
         // WARNING: must ensure it's large enough
         static mut SPACE: [u8; 0x1000] = [0; 0x1000];
         let mut set = unsafe { MemorySet::new_from_raw_space(&mut SPACE) };
-        for section in sections.sections() {
-            if !section.is_allocated() {
-                // section is not loaded to memory
-                continue;
-            }
+        for section in sections.sections().filter(|s| s.is_allocated()) {
             set.push(MemoryArea::from(section));
         }
         set
@@ -133,76 +148,17 @@ impl From<ElfSection> for MemoryArea {
             start_addr += KERNEL_OFFSET;
             end_addr += KERNEL_OFFSET;
         }
-        MemoryArea::new_kernel(start_addr, end_addr, EntryFlags::from(section.flags()), name)
+        MemoryArea::new_kernel(start_addr, end_addr, MemoryAttr::from(section.flags()), name)
     }
 }
 
-impl From<ElfSectionFlags> for EntryFlags {
+impl From<ElfSectionFlags> for MemoryAttr {
     fn from(elf_flags: ElfSectionFlags) -> Self {
-        let mut flags = EntryFlags::empty();
+        let mut flags = MemoryAttr::default();
 
-        if elf_flags.contains(ElfSectionFlags::ALLOCATED) {
-            // section is loaded to memory
-            flags = flags | EntryFlags::PRESENT;
-        }
-        if elf_flags.contains(ElfSectionFlags::WRITABLE) {
-            flags = flags | EntryFlags::WRITABLE;
-        }
-        if !elf_flags.contains(ElfSectionFlags::EXECUTABLE) {
-            flags = flags | EntryFlags::NO_EXECUTE;
-        }
+        if !elf_flags.contains(ElfSectionFlags::ALLOCATED) { flags = flags.hide(); }
+        if !elf_flags.contains(ElfSectionFlags::WRITABLE) { flags = flags.readonly(); }
+        if elf_flags.contains(ElfSectionFlags::EXECUTABLE) { flags = flags.execute(); }
         flags
-    }
-}
-
-pub struct MemoryController {
-    pub kernel_stack: Option<Stack>,
-    active_table: paging::ActivePageTable,
-    stack_allocator: stack_allocator::StackAllocator,
-}
-
-impl MemoryController {
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        let &mut MemoryController { ref mut kernel_stack,
-                                    ref mut active_table,
-                                    ref mut stack_allocator } = self;
-        stack_allocator.alloc_stack(active_table, size_in_pages)
-    }
-    pub fn new_page_table(&mut self) -> InactivePageTable {
-        let frame = alloc_frame();
-        let page_table = InactivePageTable::new(frame, &mut self.active_table);
-        page_table
-    }
-    pub fn map_page_identity(&mut self, addr: usize) {
-        let frame = Frame::of_addr(addr);
-        let flags = EntryFlags::WRITABLE;
-        self.active_table.identity_map(frame, flags);
-    }
-    pub fn map_page_p2v(&mut self, addr: PhysAddr) {
-        let page = Page::of_addr(addr.to_kernel_virtual());
-        let frame = Frame::of_addr(addr.get());
-        let flags = EntryFlags::WRITABLE;
-        self.active_table.map_to(page, frame, flags);
-    }
-    pub fn make_page_table(&mut self, set: &MemorySet) -> InactivePageTable {
-        let mut page_table = InactivePageTable::new(alloc_frame(), &mut self.active_table);
-
-        use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};
-        let e510 = self.active_table.p4()[KERNEL_PML4].clone();
-        let e509 = self.active_table.p4()[KERNEL_HEAP_PML4].clone();
-
-        self.active_table.with(&mut page_table, |pt: &mut Mapper| {
-            set.map(pt);
-
-            pt.p4_mut()[KERNEL_PML4] = e510;
-            pt.p4_mut()[KERNEL_HEAP_PML4] = e509;
-            pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::WRITABLE); // LAPIC
-        });
-        page_table
-    }
-    pub fn with(&mut self, page_table: InactivePageTable, mut f: impl FnMut()) -> InactivePageTable {
-        let backup = self.active_table.switch(page_table);
-        f();
-        self.active_table.switch(backup)
     }
 }

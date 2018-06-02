@@ -86,8 +86,7 @@ fn sys_close(fd: usize) -> i32 {
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut processor = PROCESSOR.try().unwrap().lock();
-    let mut mc = MC.try().unwrap().lock();
-    let new = processor.current().fork(tf, &mut mc);
+    let new = processor.current().fork(tf);
     let pid = processor.add(new);
     info!("fork: {} -> {}", processor.current_pid(), pid);
     pid as i32

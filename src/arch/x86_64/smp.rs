@@ -1,6 +1,7 @@
 use arch::driver::{acpi::AcpiResult, apic::start_ap};
-use memory::{MemoryController, PhysAddr};
+use memory::*;
 use core::ptr::{read_volatile, write_volatile};
+use x86_64::registers::control_regs::cr3;
 
 extern {
     fn entryother_start();  // physical addr of entryother
@@ -9,26 +10,23 @@ extern {
 
 const ENTRYOTHER_ADDR: u32 = 0x7000;
 
-pub fn start_other_cores(acpi: &AcpiResult, mc: &mut MemoryController) {
-    mc.map_page_identity(ENTRYOTHER_ADDR as usize - 1);
-    mc.map_page_identity(ENTRYOTHER_ADDR as usize);
-    mc.map_page_identity(entryother_start as usize);
-    mc.map_page_p2v(PhysAddr(0));
+pub fn start_other_cores(acpi: &AcpiResult, ms: &mut MemorySet) {
+    use consts::KERNEL_OFFSET;
+    ms.push(MemoryArea::new_identity(ENTRYOTHER_ADDR as usize - 1, ENTRYOTHER_ADDR as usize + 1, MemoryAttr::default(), "entry_other"));
+    ms.push(MemoryArea::new_identity(entryother_start as usize, entryother_start as usize + 1, MemoryAttr::default(), "entry_other"));
+    ms.push(MemoryArea::new_kernel(KERNEL_OFFSET, KERNEL_OFFSET + 1, MemoryAttr::default(), "entry_other3"));
     copy_entryother();
 
     let args = unsafe{ &mut *(ENTRYOTHER_ADDR as *mut EntryArgs).offset(-1) };
-    let page_table = unsafe{ *(0xFFFF_FFFF_FFFF_FFF8 as *const u32) } & 0xFFFF_F000;
     for i in 1 .. acpi.cpu_num {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
-        let kstack = mc.alloc_stack(7).unwrap();
-        let kstack_top = kstack.top() as u64;
-        use core::mem::forget;
-        forget(kstack);  // TODO pass this kstack to new AP
+        let ms = MemorySet::new(7);
         *args = EntryArgs {
-            kstack: kstack_top,
-            page_table: page_table,
+            kstack: ms.kstack_top() as u64,
+            page_table: ms._page_table_addr().0 as u32,
             stack: 0x8000, // just enough stack to get us to entry64mp
         };
+        unsafe { MS = Some(ms); }
         start_ap(apic_id, ENTRYOTHER_ADDR);
         while unsafe { !read_volatile(&STARTED[i as usize]) } {}
     }
@@ -45,6 +43,7 @@ fn copy_entryother() {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 struct EntryArgs {
     kstack: u64,
     page_table: u32,
@@ -53,7 +52,9 @@ struct EntryArgs {
 
 use consts::MAX_CPU_NUM;
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
+static mut MS: Option<MemorySet> = None;
 
-pub unsafe fn notify_started(cpu_id: u8) {
+pub unsafe fn notify_started(cpu_id: u8) -> MemorySet {
     write_volatile(&mut STARTED[cpu_id as usize], true);
+    MS.take().unwrap()
 }

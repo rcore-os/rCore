@@ -9,38 +9,38 @@ pub struct MemoryArea {
     start_addr: VirtAddr,
     end_addr: VirtAddr,
     phys_start_addr: Option<PhysAddr>,
-    flags: u64,
+    flags: MemoryAttr,
     name: &'static str,
 }
 
 impl MemoryArea {
-    pub fn new(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+    pub fn new(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
         MemoryArea {
             start_addr,
             end_addr,
             phys_start_addr: None,
-            flags: flags.bits(),
+            flags,
             name,
         }
     }
-    pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+    pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
         MemoryArea {
             start_addr,
             end_addr,
             phys_start_addr: Some(PhysAddr(start_addr as u64)),
-            flags: flags.bits(),
+            flags,
             name,
         }
     }
-    pub fn new_kernel(start_addr: VirtAddr, end_addr: VirtAddr, flags: EntryFlags, name: &'static str) -> Self {
+    pub fn new_kernel(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
         MemoryArea {
             start_addr,
             end_addr,
             phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
-            flags: flags.bits(),
+            flags,
             name,
         }
     }
@@ -62,21 +62,70 @@ impl MemoryArea {
         let p3 = Page::of_addr(other.end_addr - 1) + 1;
         !(p1 <= p2 || p0 >= p3)
     }
+    fn map(&self, pt: &mut Mapper) {
+        match self.phys_start_addr {
+            Some(phys_start) => {
+                for page in Page::range_of(self.start_addr, self.end_addr) {
+                    let frame = Frame::of_addr(phys_start.get() + page.start_address() - self.start_addr);
+                    pt.map_to(page, frame.clone(), self.flags.0);
+                }
+            }
+            None => {
+                for page in Page::range_of(self.start_addr, self.end_addr) {
+                    pt.map(page, self.flags.0);
+                }
+            }
+        }
+    }
+    fn unmap(&self, pt: &mut Mapper) {
+        for page in Page::range_of(self.start_addr, self.end_addr) {
+            pt.unmap(page);
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct MemoryAttr(EntryFlags);
+
+impl Default for MemoryAttr {
+    fn default() -> Self {
+        MemoryAttr(EntryFlags::PRESENT | EntryFlags::NO_EXECUTE | EntryFlags::WRITABLE)
+    }
+}
+
+impl MemoryAttr {
+    pub fn user(mut self) -> Self {
+        self.0 |= EntryFlags::USER_ACCESSIBLE;
+        self
+    }
+    pub fn readonly(mut self) -> Self {
+        self.0.remove(EntryFlags::WRITABLE);
+        self
+    }
+    pub fn execute(mut self) -> Self {
+        self.0.remove(EntryFlags::NO_EXECUTE);
+        self
+    }
+    pub fn hide(mut self) -> Self {
+        self.0.remove(EntryFlags::PRESENT);
+        self
+    }
 }
 
 /// 内存空间集合，包含若干段连续空间
 /// 对应ucore中 `mm_struct`
-#[derive(Clone)]
 pub struct MemorySet {
     areas: Vec<MemoryArea>,
-//    page_table: Option<InactivePageTable>,
+    page_table: InactivePageTable,
+    kstack: Option<Stack>,
 }
 
 impl MemorySet {
-    pub fn new() -> Self {
+    pub fn new(stack_size_in_pages: usize) -> Self {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
-//            page_table: None,
+            page_table: new_page_table_with_kernel(),
+            kstack: Some(alloc_stack(stack_size_in_pages)),
         }
     }
     /// Used for remap_kernel() where heap alloc is unavailable
@@ -85,7 +134,8 @@ impl MemorySet {
         let cap = slice.len() / size_of::<MemoryArea>();
         MemorySet {
             areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
-//            page_table: None,
+            page_table: new_page_table(),
+            kstack: None,
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -93,36 +143,65 @@ impl MemorySet {
     }
     pub fn push(&mut self, area: MemoryArea) {
         assert!(self.areas.iter()
-            .find(|other| area.is_overlap_with(other))
+                    .find(|other| area.is_overlap_with(other))
                     .is_none(), "memory area overlap");
+
+        active_table().with(&mut self.page_table, |mapper| area.map(mapper));
+
         self.areas.push(area);
-    }
-    pub fn map(&self, pt: &mut Mapper) {
-        for area in self.areas.iter() {
-            match area.phys_start_addr {
-                Some(phys_start) => {
-                    for page in Page::range_of(area.start_addr, area.end_addr) {
-                        let frame = Frame::of_addr(phys_start.get() + page.start_address() - area.start_addr);
-                        pt.map_to(page, frame.clone(), EntryFlags::from_bits(area.flags.into()).unwrap());
-                    }
-                },
-                None => {
-                    for page in Page::range_of(area.start_addr, area.end_addr) {
-                        pt.map(page, EntryFlags::from_bits(area.flags.into()).unwrap());
-                    }
-                },
-            }
-        }
-    }
-    pub fn unmap(&self, pt: &mut Mapper) {
-        for area in self.areas.iter() {
-            for page in Page::range_of(area.start_addr, area.end_addr) {
-                pt.unmap(page);
-            }
-        }
     }
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
+    }
+    pub fn with(&self, mut f: impl FnMut()) {
+        use core::{ptr, mem};
+        let page_table = unsafe { ptr::read(&self.page_table as *const InactivePageTable) };
+        let mut active_table = active_table();
+        let backup = active_table.switch(page_table);
+        f();
+        mem::forget(active_table.switch(backup));
+    }
+    pub fn switch(&self) {
+        use core::{ptr, mem};
+        let page_table = unsafe { ptr::read(&self.page_table as *const InactivePageTable) };
+        mem::forget(active_table().switch(page_table));
+    }
+    pub fn set_kstack(&mut self, stack: Stack) {
+        assert!(self.kstack.is_none());
+        self.kstack = Some(stack);
+    }
+    pub fn kstack_top(&self) -> usize {
+        self.kstack.as_ref().unwrap().top()
+    }
+    pub fn clone(&self, stack_size_in_pages: usize) -> Self {
+        let mut page_table = new_page_table_with_kernel();
+        active_table().with(&mut page_table, |mapper| {
+            for area in self.areas.iter() {
+                area.map(mapper);
+            }
+        });
+        MemorySet {
+            areas: self.areas.clone(),
+            page_table,
+            kstack: Some(alloc_stack(stack_size_in_pages)),
+        }
+    }
+    /// Only for SMP
+    pub fn _page_table_addr(&self) -> PhysAddr {
+        use core::mem;
+        unsafe { mem::transmute_copy::<_, Frame>(&self.page_table) }.start_address()
+    }
+}
+
+impl Drop for MemorySet {
+    fn drop(&mut self) {
+        debug!("MemorySet dropping");
+        let Self { ref mut page_table, ref areas, .. } = self;
+        active_table().with(page_table, |mapper| {
+            for area in areas.iter() {
+                area.unmap(mapper);
+            }
+        })
     }
 }
 
@@ -134,44 +213,25 @@ impl Debug for MemorySet {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+fn new_page_table() -> InactivePageTable {
+    let frame = alloc_frame();
+    let mut active_table = active_table();
+    InactivePageTable::new(frame, &mut active_table)
+}
 
-    #[test]
-    fn push_and_find() {
-        let mut ms = MemorySet::new();
-        ms.push(MemoryArea {
-            start_addr: 0x0,
-            end_addr: 0x8,
-            flags: 0x0,
-            name: "code",
-        });
-        ms.push(MemoryArea {
-            start_addr: 0x8,
-            end_addr: 0x10,
-            flags: 0x1,
-            name: "data",
-        });
-        assert_eq!(ms.find_area(0x6).unwrap().name, "code");
-        assert_eq!(ms.find_area(0x11), None);
-    }
+fn new_page_table_with_kernel() -> InactivePageTable {
+    let frame = alloc_frame();
+    let mut active_table = active_table();
+    let mut page_table = InactivePageTable::new(frame, &mut active_table);
 
-    #[test]
-    #[should_panic]
-    fn push_overlap() {
-        let mut ms = MemorySet::new();
-        ms.push(MemoryArea {
-            start_addr: 0x0,
-            end_addr: 0x8,
-            flags: 0x0,
-            name: "code",
-        });
-        ms.push(MemoryArea {
-            start_addr: 0x4,
-            end_addr: 0x10,
-            flags: 0x1,
-            name: "data",
-        });
-    }
+    use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};
+    let e510 = active_table.p4()[KERNEL_PML4].clone();
+    let e509 = active_table.p4()[KERNEL_HEAP_PML4].clone();
+
+    active_table.with(&mut page_table, |pt: &mut Mapper| {
+        pt.p4_mut()[KERNEL_PML4] = e510;
+        pt.p4_mut()[KERNEL_HEAP_PML4] = e509;
+        pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::WRITABLE); // LAPIC
+    });
+    page_table
 }
