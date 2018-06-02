@@ -153,12 +153,12 @@ impl Processor {
             *from_pt = Some(old_table);
         }
 
-        info!("switch from {} to {}\n  rsp: ??? -> {:#x}", pid0, pid, to.rsp);
+        info!("switch from {} to {}\n  rsp: ??? -> {:?}", pid0, pid, to.context);
         unsafe {
             // FIXME: safely pass MutexGuard
             use core::mem::forget;
             super::PROCESSOR.try().unwrap().force_unlock();
-            switch(&mut from.rsp, to.rsp);
+            from.context.switch(&mut to.context);
             forget(super::PROCESSOR.try().unwrap().lock());
         }
     }

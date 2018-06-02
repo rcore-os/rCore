@@ -63,7 +63,7 @@ impl TrapFrame {
 
 #[derive(Debug, Default)]
 #[repr(C)]
-struct Context {
+struct ContextData {
     r15: usize,
     r14: usize,
     r13: usize,
@@ -73,9 +73,9 @@ struct Context {
     rip: usize,
 }
 
-impl Context {
+impl ContextData {
     fn new() -> Self {
-        let mut context = Context::default();
+        let mut context = ContextData::default();
         context.rip = forkret as usize;
         context
     }
@@ -85,7 +85,7 @@ impl Context {
 #[derive(Debug)]
 #[repr(C)]
 pub struct InitStack {
-    context: Context,
+    context: ContextData,
     trapret: usize,
     tf: TrapFrame,
 }
@@ -93,21 +93,21 @@ pub struct InitStack {
 impl InitStack {
     pub fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
         InitStack {
-            context: Context::new(),
+            context: ContextData::new(),
             trapret: trap_ret as usize,
             tf: TrapFrame::new_kernel_thread(entry, arg, rsp),
         }
     }
     pub fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
         InitStack {
-            context: Context::new(),
+            context: ContextData::new(),
             trapret: trap_ret as usize,
             tf: TrapFrame::new_user_thread(entry_addr, rsp, is32),
         }
     }
     pub fn new_fork(tf: &TrapFrame) -> Self {
         InitStack {
-            context: Context::new(),
+            context: ContextData::new(),
             trapret: trap_ret as usize,
             tf: {
                 let mut tf = tf.clone();
@@ -115,6 +115,11 @@ impl InitStack {
                 tf
             },
         }
+    }
+    pub unsafe fn push_at(self, stack_top: usize) -> Context {
+        let ptr = (stack_top as *mut Self).offset(-1);
+        *ptr = self;
+        Context(ptr as usize)
     }
 }
 
@@ -128,41 +133,50 @@ extern fn forkret() {
     // Will return to `trapret`
 }
 
-/// Switch to another kernel thread.
-///
-/// Defined in `trap.asm`.
-///
-/// Push all callee-saved registers at the current kernel stack.
-/// Store current rsp at `from_rsp`. Switch kernel stack to `to_rsp`.
-/// Pop all callee-saved registers, then return to the target.
-#[naked]
-#[inline(never)]
-pub unsafe extern fn switch(from_rsp: &mut usize, to_rsp: usize) {
-    asm!(
-    "
-    // push rip (by caller)
+#[derive(Debug)]
+pub struct Context(usize);
 
-    // Save old callee-save registers
-    push rbx
-    push rbp
-    push r12
-    push r13
-    push r14
-    push r15
+impl Context {
+    /// Switch to another kernel thread.
+    ///
+    /// Defined in `trap.asm`.
+    ///
+    /// Push all callee-saved registers at the current kernel stack.
+    /// Store current rsp, switch to target.
+    /// Pop all callee-saved registers, then return to the target.
+    #[naked]
+    #[inline(never)]
+    pub unsafe extern fn switch(&mut self, target: &mut Self) {
+        asm!(
+        "
+        // push rip (by caller)
 
-    // Switch stacks
-    mov [rdi], rsp      // rdi = from_rsp
-    mov rsp, rsi        // rsi = to_rsp
+        // Save old callee-save registers
+        push rbx
+        push rbp
+        push r12
+        push r13
+        push r14
+        push r15
 
-    // Save old callee-save registers
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
+        // Switch stacks
+        mov [rdi], rsp      // rdi = from_rsp
+        mov rsp, [rsi]      // rsi = to_rsp
 
-    // pop rip
-    ret"
-    : : : : "intel" "volatile" )
+        // Save old callee-save registers
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rbp
+        pop rbx
+
+        // pop rip
+        ret"
+        : : : : "intel" "volatile" )
+    }
+
+    pub unsafe fn null() -> Self {
+        Context(0)
+    }
 }

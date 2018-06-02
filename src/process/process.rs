@@ -10,11 +10,11 @@ pub struct Process {
     pub(in process) pid: Pid,
     pub(in process) parent: Pid,
     pub(in process) name: String,
-                    kstack: Stack,
+    kstack: Stack,
     pub(in process) memory_set: Option<MemorySet>,
     pub(in process) page_table: Option<InactivePageTable>,
     pub(in process) status: Status,
-    pub(in process) rsp: usize,
+    pub(in process) context: Context,
     pub(in process) is_user: bool,
 }
 
@@ -35,7 +35,7 @@ impl Process {
     pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize, mc: &mut MemoryController) -> Self {
         let kstack = mc.alloc_stack(7).unwrap();
         let data = InitStack::new_kernel_thread(entry, arg, kstack.top());
-        let rsp = kstack.push_at_top(data);
+        let context = unsafe { data.push_at(kstack.top()) };
 
         Process {
             pid: 0,
@@ -45,7 +45,7 @@ impl Process {
             memory_set: None,
             page_table: None,
             status: Status::Ready,
-            rsp,
+            context,
             is_user: false,
         }
     }
@@ -62,7 +62,7 @@ impl Process {
             memory_set: None,
             page_table: None,
             status: Status::Running,
-            rsp: 0, // will be set at first schedule
+            context: unsafe { Context::null() }, // will be set at first schedule
             is_user: false,
         }
     }
@@ -120,9 +120,8 @@ impl Process {
 
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
-        let tf = InitStack::new_user_thread(entry_addr, user_stack_top - 8, is32);
-        let rsp = kstack.push_at_top(tf);
-        trace!("rsp = {:#x}", rsp);
+        let data = InitStack::new_user_thread(entry_addr, user_stack_top - 8, is32);
+        let context = unsafe { data.push_at(kstack.top()) };
 
         Process {
             pid: 0,
@@ -132,7 +131,7 @@ impl Process {
             memory_set: Some(memory_set),
             page_table: Some(page_table),
             status: Status::Ready,
-            rsp,
+            context,
             is_user: true,
         }
     }
@@ -161,7 +160,7 @@ impl Process {
         // Allocate kernel stack and push trap frame
         let kstack = mc.alloc_stack(7).unwrap();
         let data = InitStack::new_fork(tf);
-        let rsp = kstack.push_at_top(data);
+        let context = unsafe { data.push_at(kstack.top()) };
 
         Process {
             pid: 0,
@@ -171,7 +170,7 @@ impl Process {
             memory_set: Some(memory_set),
             page_table: Some(page_table),
             status: Status::Ready,
-            rsp,
+            context,
             is_user: true,
         }
     }
