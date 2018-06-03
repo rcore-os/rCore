@@ -1,24 +1,23 @@
-use core::fmt;
-use core::fmt::Debug;
-use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::gdt::SegmentSelector;
-use x86_64::{PrivilegeLevel, VirtualAddress};
-use spin::{Once, Mutex, MutexGuard};
 use alloc::boxed::Box;
 use arch::driver::apic::lapic_id;
 use consts::MAX_CPU_NUM;
+use core::fmt;
+use core::fmt::Debug;
+use spin::{Mutex, MutexGuard, Once};
+use x86_64::{PrivilegeLevel, VirtualAddress};
+use x86_64::structures::gdt::SegmentSelector;
+use x86_64::structures::tss::TaskStateSegment;
 
 /// Alloc TSS & GDT at kernel heap, then init and load it.
 /// The double fault stack will be allocated at kernel heap too.
 pub fn init() {
-    use x86_64::structures::gdt::SegmentSelector;
     use x86_64::instructions::segmentation::set_cs;
     use x86_64::instructions::tables::load_tss;
 
     let double_fault_stack_top = Box::into_raw(Box::new([0u8; 4096])) as usize + 4096;
     debug!("Double fault stack top @ {:#x}", double_fault_stack_top);
 
-    let mut tss = Box::new({
+    let tss = Box::new({
         let mut tss = TaskStateSegment::new();
 
         // 设置 Double Fault 时，自动切换栈的地址
@@ -75,9 +74,7 @@ impl Cpu {
     /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
     pub fn set_ring0_rsp(&mut self, rsp: usize) {
         trace!("gdt.set_ring0_rsp: {:#x}", rsp);
-        unsafe {
-            self.tss.privilege_stack_table[0] = VirtualAddress(rsp);
-        }
+        self.tss.privilege_stack_table[0] = VirtualAddress(rsp);
     }
 }
 

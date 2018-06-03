@@ -1,8 +1,8 @@
 // Copy from Redox
 
 use core::fmt::{self, Write};
+use redox_syscall::io::{Io, Mmio, Pio, ReadOnly};
 use spin::Mutex;
-use redox_syscall::io::{Io, Pio, Mmio, ReadOnly};
 
 pub static COM1: Mutex<Serial> = Mutex::new(Serial::new(0x3F8));
 pub static COM2: Mutex<Serial> = Mutex::new(Serial::new(0x2F8));
@@ -85,7 +85,7 @@ impl<T: Io<Value = u8>> SerialPort<T> {
     pub fn receive(&mut self) {
         while self.line_sts().contains(LineStsFlags::INPUT_FULL) {
             let data = self.data.read();
-            write!(self, "serial receive {}", data);
+            write!(self, "serial receive {}", data).unwrap();
             // TODO handle received data
         }
     }

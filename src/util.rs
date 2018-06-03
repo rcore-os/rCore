@@ -1,3 +1,6 @@
+use core::fmt::Debug;
+pub use self::event::EventHub;
+
 pub fn bytes_sum<T>(p: &T) -> u8 {
 	use core::mem::size_of_val;
 	let len = size_of_val(p);
@@ -26,9 +29,6 @@ pub unsafe fn from_cstr(s: *const u8) -> &'static str {
     str::from_utf8(slice::from_raw_parts(s, len)).unwrap()
 }
 
-use core::ops::IndexMut;
-use core::fmt::Debug;
-
 /// Get values by 2 diff keys at the same time
 pub trait GetMut2<Idx: Debug + Eq> {
     type Output;
@@ -43,8 +43,6 @@ pub trait GetMut2<Idx: Debug + Eq> {
     }
 }
 
-
-pub use self::event::EventHub;
 
 mod event {
     use alloc::BinaryHeap;

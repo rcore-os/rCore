@@ -1,18 +1,16 @@
-use memory::MemorySet;
-use spin::Once;
-use sync::SpinNoIrqLock;
-use core::slice;
 use alloc::String;
-
+use memory::MemorySet;
 use self::process::*;
 pub use self::processor::*;
+use spin::Once;
+use sync::SpinNoIrqLock;
 
 mod process;
 mod processor;
 mod scheduler;
 
 
-pub fn init(mut ms: MemorySet) {
+pub fn init(ms: MemorySet) {
     PROCESSOR.call_once(|| {
         SpinNoIrqLock::new({
             let initproc = Process::new_init(ms);
@@ -26,7 +24,7 @@ pub fn init(mut ms: MemorySet) {
 
 pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
 
-extern fn idle_thread(arg: usize) -> ! {
+extern fn idle_thread(_arg: usize) -> ! {
     loop {}
 }
 
@@ -39,7 +37,7 @@ pub fn add_user_process(name: impl AsRef<str>, data: &[u8]) {
 
 pub fn add_kernel_process(entry: extern fn(usize) -> !, arg: usize) -> Pid {
     let mut processor = PROCESSOR.try().unwrap().lock();
-    let mut new = Process::new("", entry, arg);
+    let new = Process::new("", entry, arg);
     processor.add(new)
 }
 

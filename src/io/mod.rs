@@ -1,5 +1,8 @@
-use core::fmt;
 use arch::driver::serial::COM1;
+use arch::driver::vga::Color;
+use core::fmt;
+use log;
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 mod vga_writer;
 
@@ -35,11 +38,9 @@ macro_rules! with_color {
     }};
 }
 
-use arch::driver::vga::Color;
-
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use core::fmt::Write;
-    use arch::driver::vga::*;
+//    use arch::driver::vga::*;
 //    {
 //        let mut writer = vga_writer::VGA_WRITER.lock();
 //        writer.set_color(color);
@@ -56,9 +57,6 @@ pub fn print(args: fmt::Arguments) {
     unsafe { COM1.force_unlock(); }
     COM1.lock().write_fmt(args).unwrap();
 }
-
-use log;
-use log::{Record, Level, Metadata, Log, SetLoggerError, LevelFilter};
 
 struct SimpleLogger;
 

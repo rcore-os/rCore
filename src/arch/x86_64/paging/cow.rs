@@ -34,10 +34,10 @@
 //!
 //! * 为了维护引用计数，开一个全局映射 `RC_MAP`: Frame -> (read_count, write_count)
 
-use super::*;
-use alloc::rc::Rc;
 use alloc::BTreeMap;
-use spin::{Once, Mutex};
+pub use self::test::test_cow;
+use spin::Mutex;
+use super::*;
 use x86_64::instructions::tlb;
 use x86_64::VirtualAddress;
 
@@ -162,8 +162,6 @@ impl FrameRcMap {
         map.get_mut(frame).unwrap().1 -= 1;
     }
 }
-
-pub use self::test::test_cow;
 
 mod test {
     use super::*;

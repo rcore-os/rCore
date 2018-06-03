@@ -1,5 +1,7 @@
 //! 系统调用解析执行模块
 
+#![allow(unused)]
+
 use arch::interrupt::TrapFrame;
 use process::*;
 use thread;

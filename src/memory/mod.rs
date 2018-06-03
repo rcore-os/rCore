@@ -1,17 +1,17 @@
 pub use arch::paging::*;
-pub use self::stack_allocator::*;
+use arch::paging;
+use bit_allocator::{BitAlloc, BitAlloc64K};
+use consts::KERNEL_OFFSET;
+use multiboot2::{ElfSection, ElfSectionFlags, ElfSectionsTag};
+use multiboot2::BootInformation;
 pub use self::address::*;
 pub use self::frame::*;
 pub use self::memory_set::*;
-
-use multiboot2::BootInformation;
-use consts::KERNEL_OFFSET;
-use arch::paging;
+pub use self::stack_allocator::*;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 
 mod memory_set;
-pub mod heap_allocator;
 mod stack_allocator;
 mod address;
 mod frame;
@@ -73,8 +73,6 @@ pub fn init(boot_info: BootInformation) -> MemorySet {
 
     kernel_memory
 }
-
-use bit_allocator::{BitAlloc64K, BitAlloc};
 
 impl FrameAllocator for BitAlloc64K {
     fn allocate_frame(&mut self) -> Option<Frame> {
@@ -150,8 +148,6 @@ fn get_init_kstack_and_set_guard_page() -> Stack {
     Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE)
 }
 
-use multiboot2::{ElfSectionsTag, ElfSection, ElfSectionFlags};
-
 impl From<ElfSectionsTag> for MemorySet {
     fn from(sections: ElfSectionsTag) -> Self {
         assert_has_not_been_called!();
@@ -167,7 +163,6 @@ impl From<ElfSectionsTag> for MemorySet {
 
 impl From<ElfSection> for MemoryArea {
     fn from(section: ElfSection) -> Self {
-        use self::address::FromToVirtualAddress;
         let mut start_addr = section.start_address() as usize;
         let mut end_addr = section.end_address() as usize;
         assert_eq!(start_addr % PAGE_SIZE, 0, "sections need to be page aligned");

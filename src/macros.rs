@@ -17,7 +17,6 @@ macro_rules! test {
 	($func:ident) => (
 		if cfg!(feature = "test") {
 			println!("Testing: {}", stringify!($func));
-			use self::test::$func;
 			test::$func();
 			println!("Success: {}", stringify!($func));
 		}

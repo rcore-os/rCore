@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use x86_64::structures::idt::*;
 
 pub fn init() {

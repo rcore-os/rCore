@@ -26,10 +26,12 @@
 //! `MutexSupport`提供了若干接口，它们会在操作锁的不同时间点被调用。
 //! 注意这个接口实际是取了几种实现的并集，并不是很通用。
 
-use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+use arch::interrupt;
 use core::cell::UnsafeCell;
-use core::ops::{Deref, DerefMut};
 use core::fmt;
+use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{ATOMIC_BOOL_INIT, AtomicBool, Ordering};
+use super::Condvar;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
@@ -89,7 +91,7 @@ impl<T, S: MutexSupport> Mutex<T, S>
         // We know statically that there are no outstanding references to
         // `self` so there's no need to lock.
         let Mutex { data, .. } = self;
-        unsafe { data.into_inner() }
+        data.into_inner()
     }
 }
 
@@ -222,8 +224,6 @@ impl MutexSupport for Spin {
     fn after_unlock(&self) {}
 }
 
-use arch::interrupt;
-
 /// Spin & no-interrupt lock
 #[derive(Debug)]
 pub struct SpinNoIrq;
@@ -250,10 +250,6 @@ impl MutexSupport for SpinNoIrq {
     }
     fn after_unlock(&self) {}
 }
-
-use thread;
-use alloc::VecDeque;
-use super::Condvar;
 
 impl MutexSupport for Condvar {
     type GuardData = ();

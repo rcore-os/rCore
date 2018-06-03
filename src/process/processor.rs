@@ -1,11 +1,8 @@
 use alloc::BTreeMap;
-use memory::{ActivePageTable, InactivePageTable};
+use core::fmt::{Debug, Error, Formatter};
 use super::process::*;
 use super::scheduler::*;
-use core::cell::RefCell;
-use core::fmt::{Debug, Formatter, Error};
 use util::{EventHub, GetMut2};
-use arch::interrupt::*;
 
 pub struct Processor {
     procs: BTreeMap<Pid, Process>,

@@ -64,6 +64,7 @@
 //!	deactivate CPU
 //! ```
 
+use super::consts::*;
 use super::TrapFrame;
 
 #[no_mangle]
@@ -74,7 +75,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_BRKPT => breakpoint(),
         T_DBLFLT => double_fault(tf),
         T_PGFLT => page_fault(tf),
-        T_IRQ0...64 => {
+        T_IRQ0...63 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
             match irq {
                 IRQ_TIMER => timer(),
@@ -122,8 +123,6 @@ fn page_fault(tf: &mut TrapFrame) {
 
     error(tf);
 }
-
-use super::consts::*;
 
 fn keyboard() {
     use arch::driver::keyboard;

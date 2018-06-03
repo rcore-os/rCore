@@ -1,21 +1,18 @@
-use super::{Page, ActivePageTable};
-use super::table::{Table, Level1};
-use memory::{Frame, FrameAllocator, VirtAddr};
+use super::*;
+use super::table::{Level1, Table};
 
 pub struct TemporaryPage {
     page: Page,
 }
 
 impl TemporaryPage {
-    pub fn new(page: Page) -> TemporaryPage {
-        TemporaryPage { page }
+    pub fn new() -> TemporaryPage {
+        TemporaryPage { page: Page::of_addr(0xcafebabe) }
     }
 
     /// Maps the temporary page to the given frame in the active table.
     /// Returns the start address of the temporary page.
-    pub fn map(&self, frame: Frame, active_table: &mut ActivePageTable)
-        -> VirtAddr
-    {
+    pub fn map(&self, frame: Frame, active_table: &mut ActivePageTable) -> VirtAddr {
         use super::entry::EntryFlags;
 
         assert!(active_table.translate_page(self.page).is_none(),
@@ -31,10 +28,7 @@ impl TemporaryPage {
 
     /// Maps the temporary page to the given page table frame in the active
     /// table. Returns a reference to the now mapped table.
-    pub fn map_table_frame(&self,
-                        frame: Frame,
-                        active_table: &mut ActivePageTable)
-                        -> &mut Table<Level1> {
+    pub fn map_table_frame(&self, frame: Frame, active_table: &mut ActivePageTable) -> &mut Table<Level1> {
         unsafe { &mut *(self.map(frame, active_table) as *mut Table<Level1>) }
     }
 }

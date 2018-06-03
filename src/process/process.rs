@@ -1,9 +1,7 @@
-use super::*;
-use memory::{self, Stack, InactivePageTable, MemoryAttr};
-use xmas_elf::{ElfFile, program::{Flags, ProgramHeader}, header::HeaderPt2};
-use core::slice;
-use alloc::{rc::Rc, String};
+use alloc::String;
 use arch::interrupt::*;
+use memory::{MemoryArea, MemoryAttr, MemorySet};
+use xmas_elf::{ElfFile, header::HeaderPt2, program::{Flags, ProgramHeader}};
 
 #[derive(Debug)]
 pub struct Process {
@@ -66,7 +64,6 @@ impl Process {
     /// uCore x86 32bit program is planned to be supported.
     pub fn new_user(data: &[u8]) -> Self {
         // Parse elf
-        let begin = data.as_ptr() as usize;
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
             HeaderPt2::Header32(_) => true,
@@ -97,6 +94,7 @@ impl Process {
                     ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
                     ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
                 };
+                use core::slice;
                 let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
                 target.copy_from_slice(&data[offset..offset + file_size]);
             }
@@ -167,8 +165,6 @@ impl Process {
         }
     }
 }
-
-use memory::{MemorySet, MemoryArea, PhysAddr, FromToVirtualAddress, EntryFlags};
 
 impl<'a> From<&'a ElfFile<'a>> for MemorySet {
     fn from(elf: &'a ElfFile<'a>) -> Self {

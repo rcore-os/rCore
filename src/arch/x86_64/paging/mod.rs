@@ -1,9 +1,9 @@
+use core::ops::{Add, Deref, DerefMut};
+use memory::*;
+pub use self::cow::*;
 pub use self::entry::*;
 pub use self::mapper::Mapper;
-use core::ops::{Deref, DerefMut, Add};
-use memory::*;
 pub use self::temporary_page::TemporaryPage;
-pub use self::cow::*;
 
 mod entry;
 mod table;
@@ -118,7 +118,7 @@ impl ActivePageTable {
         use x86_64::instructions::tlb;
         use x86_64::registers::control_regs;
 
-        let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
+        let temporary_page = TemporaryPage::new();
         {
             let backup = Frame::of_addr(
                 control_regs::cr3().0 as usize);
@@ -142,7 +142,6 @@ impl ActivePageTable {
     }
 
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
-        use x86_64::PhysicalAddress;
         use x86_64::registers::control_regs;
         debug!("switch table {:?} -> {:?}", Frame::of_addr(control_regs::cr3().0 as usize), new_table.p4_frame);
         if new_table.p4_frame.start_address() == control_regs::cr3() {
@@ -168,7 +167,7 @@ pub struct InactivePageTable {
 
 impl InactivePageTable {
     pub fn new(frame: Frame, active_table: &mut ActivePageTable) -> InactivePageTable {
-        let mut temporary_page = TemporaryPage::new(Page::of_addr(0xcafebabe));
+        let temporary_page = TemporaryPage::new();
         {
             let table = temporary_page.map_table_frame(frame.clone(),
                 active_table);
