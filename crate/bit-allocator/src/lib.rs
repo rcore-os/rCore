@@ -10,6 +10,7 @@ pub trait BitAlloc: Default {
     const CAP: usize;
     fn alloc(&mut self) -> Option<usize>;
     fn dealloc(&mut self, key: usize);
+    fn insert(&mut self, range: Range<usize>);
     fn remove(&mut self, range: Range<usize>);
     fn any(&self) -> bool;
     fn test(&self, key: usize) -> bool;
@@ -22,18 +23,10 @@ pub type BitAlloc1M = BitAllocCascade16<BitAlloc64K>;
 pub type BitAlloc16M = BitAllocCascade16<BitAlloc1M>;
 pub type BitAlloc256M = BitAllocCascade16<BitAlloc16M>;
 
+#[derive(Default)]
 pub struct BitAllocCascade16<T: BitAlloc> {
     bitset: u16,
     sub: [T; 16],
-}
-
-impl<T: BitAlloc> Default for BitAllocCascade16<T> {
-    fn default() -> Self {
-        Self {
-            bitset: 0xffff,
-            sub: <[T; 16]>::default(),
-        }
-    }
 }
 
 impl<T: BitAlloc> BitAlloc for BitAllocCascade16<T> {
@@ -54,15 +47,11 @@ impl<T: BitAlloc> BitAlloc for BitAllocCascade16<T> {
         self.sub[i].dealloc(key % T::CAP);
         self.bitset.set_bit(i, true);
     }
+    fn insert(&mut self, range: Range<usize>) {
+        self.for_range(range, |sub: &mut T, range| sub.insert(range));
+    }
     fn remove(&mut self, range: Range<usize>) {
-        let Range { start, end } = range;
-        assert!(end <= Self::CAP);
-        for i in start / T::CAP..=(end - 1) / T::CAP {
-            let begin = if start / T::CAP == i { start % T::CAP } else { 0 };
-            let end = if end / T::CAP == i { end % T::CAP } else { T::CAP };
-            self.sub[i].remove(begin..end);
-            self.bitset.set_bit(i, self.sub[i].any());
-        }
+        self.for_range(range, |sub: &mut T, range| sub.remove(range));
     }
     fn any(&self) -> bool {
         self.bitset != 0
@@ -72,13 +61,21 @@ impl<T: BitAlloc> BitAlloc for BitAllocCascade16<T> {
     }
 }
 
-pub struct BitAlloc16(u16);
-
-impl Default for BitAlloc16 {
-    fn default() -> Self {
-        BitAlloc16(0xffff)
+impl<T: BitAlloc> BitAllocCascade16<T> {
+    fn for_range(&mut self, range: Range<usize>, f: impl Fn(&mut T, Range<usize>)) {
+        let Range { start, end } = range;
+        assert!(end <= Self::CAP);
+        for i in start / T::CAP..=(end - 1) / T::CAP {
+            let begin = if start / T::CAP == i { start % T::CAP } else { 0 };
+            let end = if end / T::CAP == i { end % T::CAP } else { T::CAP };
+            f(&mut self.sub[i], begin..end);
+            self.bitset.set_bit(i, self.sub[i].any());
+        }
     }
 }
+
+#[derive(Default)]
+pub struct BitAlloc16(u16);
 
 impl BitAlloc for BitAlloc16 {
     const CAP: usize = 16;
@@ -95,6 +92,9 @@ impl BitAlloc for BitAlloc16 {
     fn dealloc(&mut self, key: usize) {
         assert!(!self.test(key));
         self.0.set_bit(key, true);
+    }
+    fn insert(&mut self, range: Range<usize>) {
+        self.0.set_bits(range.clone(), 0xffff.get_bits(range));
     }
     fn remove(&mut self, range: Range<usize>) {
         self.0.set_bits(range, 0);
@@ -141,6 +141,7 @@ mod tests {
     fn bitalloc16() {
         let mut ba = BitAlloc16::default();
         assert_eq!(BitAlloc16::CAP, 16);
+        ba.insert(0..16);
         for i in 0..16 {
             assert_eq!(ba.test(i), true);
         }
@@ -163,6 +164,7 @@ mod tests {
     fn bitalloc4k() {
         let mut ba = BitAlloc4K::default();
         assert_eq!(BitAlloc4K::CAP, 4096);
+        ba.insert(0..4096);
         for i in 0..4096 {
             assert_eq!(ba.test(i), true);
         }

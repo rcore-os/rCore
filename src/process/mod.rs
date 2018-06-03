@@ -27,13 +27,7 @@ pub fn init(mut ms: MemorySet) {
 pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
 
 extern fn idle_thread(arg: usize) -> ! {
-    loop {
-        println!("idle ...");
-        let mut i = 0;
-        while i < 1 << 22 {
-            i += 1;
-        }
-    }
+    loop {}
 }
 
 pub fn add_user_process(name: impl AsRef<str>, data: &[u8]) {

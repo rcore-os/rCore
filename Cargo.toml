@@ -12,6 +12,10 @@ test = []
 qemu_auto_exit = []
 link_user_program = []
 
+[profile.dev]
+# enable RVO to avoid stack overflow
+opt-level = 1
+
 [profile.release]
 debug = true
 
@@ -31,6 +35,7 @@ arrayvec = { version = "0.4.7", default-features = false }
 log = "0.4"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
+bit-allocator = { path = "crate/bit-allocator" }
 
 [build-dependencies]
 cc = "1.0"

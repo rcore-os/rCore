@@ -1,4 +1,3 @@
-pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use arch::paging::*;
 pub use self::stack_allocator::*;
 pub use self::address::*;
@@ -12,18 +11,18 @@ use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 
 mod memory_set;
-mod area_frame_allocator;
 pub mod heap_allocator;
 mod stack_allocator;
 mod address;
 mod frame;
 
-pub static FRAME_ALLOCATOR: Mutex<Option<AreaFrameAllocator>> = Mutex::new(None);
-pub static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
+lazy_static! {
+    static ref FRAME_ALLOCATOR: Mutex<BitAlloc64K> = Mutex::new(BitAlloc64K::default());
+}
+static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Frame {
     FRAME_ALLOCATOR.lock()
-        .as_mut().expect("frame allocator is not initialized")
         .allocate_frame().expect("no more frame")
 }
 
@@ -69,25 +68,49 @@ pub fn init(boot_info: BootInformation) -> MemorySet {
     kernel_memory
 }
 
+use bit_allocator::{BitAlloc64K, BitAlloc};
+
+impl FrameAllocator for BitAlloc64K {
+    fn allocate_frame(&mut self) -> Option<Frame> {
+        self.alloc().map(|x| Frame { number: x })
+    }
+    fn deallocate_frame(&mut self, frame: Frame) {
+        self.dealloc(frame.number);
+    }
+}
+
 fn init_frame_allocator(boot_info: &BootInformation) {
-    let memory_map_tag = boot_info.memory_map_tag().expect(
-        "Memory map tag required");
-    let elf_sections_tag = boot_info.elf_sections_tag().expect(
-        "Elf sections tag required");
+    let memory_areas = boot_info.memory_map_tag().expect("Memory map tag required")
+        .memory_areas();
+    let elf_sections = boot_info.elf_sections_tag().expect("Elf sections tag required")
+        .sections().filter(|s| s.is_allocated());
 
-    let kernel_start = PhysAddr(elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.start_address()).min().unwrap());
-    let kernel_end = PhysAddr::from_kernel_virtual(elf_sections_tag.sections()
-        .filter(|s| s.is_allocated()).map(|s| s.end_address()).max().unwrap() as usize);
+    let mut ba = FRAME_ALLOCATOR.lock();
+    for area in memory_areas {
+        ba.insert(to_range(area.start_address(), area.end_address()));
+    }
+    for section in elf_sections {
+        ba.remove(to_range(section.start_address() as usize, section.end_address() as usize));
+    }
+    ba.remove(to_range(boot_info.start_address(), boot_info.end_address()));
 
-    let boot_info_start = PhysAddr(boot_info.start_address() as u64);
-    let boot_info_end = PhysAddr(boot_info.end_address() as u64);
-
-    *FRAME_ALLOCATOR.lock() = Some(AreaFrameAllocator::new(
-        kernel_start, kernel_end,
-        boot_info_start, boot_info_end,
-        memory_map_tag.memory_areas(),
-    ));
+    use core::ops::Range;
+    fn to_range(mut start_addr: usize, mut end_addr: usize) -> Range<usize> {
+        use consts::KERNEL_OFFSET;
+        if start_addr >= KERNEL_OFFSET {
+            start_addr -= KERNEL_OFFSET;
+        }
+        if end_addr >= KERNEL_OFFSET {
+            end_addr -= KERNEL_OFFSET;
+        }
+        let page_start = start_addr / PAGE_SIZE;
+        let mut page_end = (end_addr - 1) / PAGE_SIZE + 1;
+        if page_end >= BitAlloc64K::CAP {
+            warn!("page num {:#x} out of range {:#x}", page_end, BitAlloc64K::CAP);
+            page_end = BitAlloc64K::CAP;
+        }
+        page_start..page_end
+    }
 }
 
 fn remap_the_kernel(boot_info: BootInformation) -> MemorySet {
@@ -96,7 +119,6 @@ fn remap_the_kernel(boot_info: BootInformation) -> MemorySet {
     use consts::{KERNEL_OFFSET, KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xb8000, KERNEL_OFFSET + 0xb9000, MemoryAttr::default(), "VGA"));
     memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
-
     debug!("{:#x?}", memory_set);
 
     memory_set.switch();

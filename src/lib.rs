@@ -37,6 +37,7 @@ extern crate arrayvec;
 #[macro_use]
 extern crate log;
 extern crate simple_filesystem;
+extern crate bit_allocator;
 
 #[macro_use]    // print!
 mod io;
@@ -107,13 +108,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 //        });
 //    }
 
-    loop{
-        println!("init ...");
-        let mut i = 0;
-        while i < 1 << 22 {
-            i += 1;
-        }
-    }
+    loop {}
 
     test_end!();
     unreachable!();
