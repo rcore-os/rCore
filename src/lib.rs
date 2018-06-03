@@ -84,8 +84,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
         kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
     });
 
-    // FIXME: PageFault when SMP
-//    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
+    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
     process::init(kernel_memory);
 
     fs::load_sfs();
@@ -128,8 +127,9 @@ pub extern "C" fn other_main() -> ! {
     arch::idt::init();
     arch::driver::apic::other_init();
     let cpu_id = arch::driver::apic::lapic_id();
-    println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
     let ms = unsafe { arch::smp::notify_started(cpu_id) };
+    ms.switch();
+    println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
 //    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }

@@ -6,14 +6,29 @@ KERNEL_OFFSET = 0xffffff0000000000;
 
 SECTIONS {
 
+  /* ensure that the multiboot header is at the beginning */
+
+  .multiboot_header :
+  {
+      KEEP(*(.multiboot_header))
+  }
+
+  /* bootloader for other processors */
+
+  . = OTHER_OFFSET;
+
+  .text.other : AT(OTHER_OFFSET)
+  {
+    KEEP(*/entryother.o (.text))
+    . = ALIGN(4K);
+  }
+
   /* bootloader for first processor */
 
   . = BOOT_OFFSET;
 
   .rodata.32 :
   {
-    /* ensure that the multiboot header is at the beginning */
-    KEEP(*(.multiboot_header))
     */boot.o (.rodata)
     . = ALIGN(4K);
   }
@@ -28,18 +43,6 @@ SECTIONS {
     */boot.o (.bss)
     . = ALIGN(4K);
   }
-
-  /* bootloader for other processors */
-
-  entryother_start = .;         /* backup va */
-  . = OTHER_OFFSET;
-  .text.other : AT(entryother_start)
-  {
-    KEEP(*/entryother.o (.text))
-    . = ALIGN(4K);
-  }
-  entryother_end = . - OTHER_OFFSET + entryother_start;
-  . = entryother_end;           /* recover va */
 
   /* kernel */
 

@@ -57,7 +57,7 @@ start32:
     mov     gs, ax
 
     ; Switch to the stack allocated by startothers()
-    mov     esp, [start-4]
+    mov     esp, [top - 4]
 
     call    enable_paging
 
@@ -77,7 +77,7 @@ spin:
 
 enable_paging:
     ; load P4 to cr3 register (cpu uses this to access the P4 table)
-    mov     eax, [start-8]
+    mov     eax, [top - 8]
     mov     cr3, eax
 
     ; enable PAE-flag in cr4 (Physical Address Extension)
@@ -109,7 +109,7 @@ start64:
     mov     gs, ax
 
     ; obtain kstack from data block before entryother
-    mov     rsp, [0x7000 - 16]
+    mov     rsp, [top - 16]
 
     mov     rax, other_main
     call    rax
@@ -137,3 +137,5 @@ gdt64:
 .pointer:
     dw  $ - gdt64 - 1
     dq  gdt64
+
+top: equ start + 0x1000
