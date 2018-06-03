@@ -94,7 +94,7 @@ impl Mapper {
         self.map_to(page, frame, flags)
     }
 
-    pub fn unmap(&mut self, page: Page)
+    pub fn unmap(&mut self, page: Page) -> Frame
     {
         use x86_64::instructions::tlb;
         use x86_64::VirtualAddress;
@@ -110,5 +110,6 @@ impl Mapper {
         p1[page.p1_index()].set_unused();
         tlb::flush(VirtualAddress(page.start_address()));
         // TODO free p(1,2,3) table if empty
+        frame
     }
 }

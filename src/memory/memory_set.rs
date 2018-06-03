@@ -67,7 +67,7 @@ impl MemoryArea {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let frame = Frame::of_addr(phys_start.get() + page.start_address() - self.start_addr);
-                    pt.map_to(page, frame.clone(), self.flags.0);
+                    pt.map_to(page, frame, self.flags.0);
                 }
             }
             None => {
@@ -79,7 +79,10 @@ impl MemoryArea {
     }
     fn unmap(&self, pt: &mut Mapper) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            pt.unmap(page);
+            let frame = pt.unmap(page);
+            if self.phys_start_addr.is_none() {
+                dealloc_frame(frame);
+            }
         }
     }
 }

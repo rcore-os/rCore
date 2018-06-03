@@ -22,8 +22,14 @@ lazy_static! {
 static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Frame {
-    FRAME_ALLOCATOR.lock()
-        .allocate_frame().expect("no more frame")
+    let frame = FRAME_ALLOCATOR.lock().allocate_frame().expect("no more frame");
+    trace!("alloc: {:?}", frame);
+    frame
+}
+
+pub fn dealloc_frame(frame: Frame) {
+    trace!("dealloc: {:?}", frame);
+    FRAME_ALLOCATOR.lock().deallocate_frame(frame);
 }
 
 fn alloc_stack(size_in_pages: usize) -> Stack {

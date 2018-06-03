@@ -185,6 +185,7 @@ impl InactivePageTable {
 
 impl Drop for InactivePageTable {
     fn drop(&mut self) {
-        warn!("PageTable dropped: {:?}", self);
+        info!("PageTable dropping: {:?}", self);
+        dealloc_frame(self.p4_frame.clone());
     }
 }
