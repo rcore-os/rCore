@@ -82,12 +82,12 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     (sender, receiver)
 }
 
-use alloc::boxed::Box;
-use super::*;
-use thread;
-
 pub mod test {
     //! Copied from std::mpsc::test
+
+    use alloc::boxed::Box;
+    use super::*;
+    use thread;
 
     fn smoke() {
         let (tx, rx) = channel::<i32>();
