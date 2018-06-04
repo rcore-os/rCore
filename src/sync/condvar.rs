@@ -2,13 +2,14 @@ use alloc::VecDeque;
 use super::*;
 use thread;
 
+#[derive(Default)]
 pub struct Condvar {
     wait_queue: SpinNoIrqLock<VecDeque<thread::Thread>>,
 }
 
 impl Condvar {
     pub fn new() -> Self {
-        Condvar { wait_queue: SpinNoIrqLock::new(VecDeque::new()) }
+        Condvar::default()
     }
     pub fn _wait(&self) {
         self.wait_queue.lock().push_back(thread::current());

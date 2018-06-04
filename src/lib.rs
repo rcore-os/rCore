@@ -11,6 +11,7 @@
 #![feature(unboxed_closures)]
 #![feature(naked_functions)]
 #![feature(asm)]
+#![feature(optin_builtin_traits)]
 #![no_std]
 
 
@@ -95,8 +96,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     unsafe{ arch::interrupt::enable(); }
 
 //    thread::test::unpack();
-    sync::test::philosopher_using_mutex();
-    sync::test::philosopher_using_monitor();
+//    sync::test::philosopher_using_mutex();
+//    sync::test::philosopher_using_monitor();
+    sync::mpsc::test::test_all();
 
     // 直接进入用户态暂不可用：内核代码用户不可访问
 //    unsafe{
