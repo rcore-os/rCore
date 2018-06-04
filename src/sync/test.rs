@@ -2,10 +2,11 @@
 //!
 //! The code is borrowed from [RustDoc - Dining Philosophers](https://doc.rust-lang.org/1.6.0/book/dining-philosophers.html)
 
-use thread;
-use core::time::Duration;
 use alloc::{arc::Arc, Vec};
+use core::time::Duration;
+use sync::Condvar;
 use sync::ThreadLock as Mutex;
+use thread;
 
 struct Philosopher {
     name: &'static str,
@@ -22,12 +23,8 @@ impl Philosopher {
         }
     }
 
-    fn eat(&self, table: &Table) {
-        let _left = table.forks[self.left].lock();
-        let _right = table.forks[self.right].lock();
-
-        println!("{} is eating.", self.name);
-        thread::sleep(Duration::from_secs(1));
+    fn eat(&self, table: &Arc<Table>) {
+        table.eat(self.name, self.left, self.right);
     }
 
     fn think(&self) {
@@ -36,21 +33,55 @@ impl Philosopher {
     }
 }
 
-struct Table {
+trait Table: Send + Sync {
+    fn eat(&self, name: &str, left: usize, right: usize);
+}
+
+struct MutexTable {
     forks: Vec<Mutex<()>>,
 }
 
-pub fn philosopher() {
-    let table = Arc::new(Table {
-        forks: vec![
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-        ]
-    });
+impl Table for MutexTable {
+    fn eat(&self, name: &str, left: usize, right: usize) {
+        let _left = self.forks[left].lock();
+        let _right = self.forks[right].lock();
 
+        println!("{} is eating.", name);
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
+struct MonitorTable {
+    fork_status: Mutex<Vec<bool>>,
+    fork_condvar: Vec<Condvar>,
+}
+
+impl Table for MonitorTable {
+    fn eat(&self, name: &str, left: usize, right: usize) {
+        {
+            let mut fork_status = self.fork_status.lock();
+            if fork_status[left] {
+                fork_status = self.fork_condvar[left].wait(fork_status);
+            }
+            fork_status[left] = true;
+            if fork_status[right] {
+                fork_status = self.fork_condvar[right].wait(fork_status);
+            }
+            fork_status[right] = true;
+        }
+        println!("{} is eating.", name);
+        thread::sleep(Duration::from_secs(1));
+        {
+            let mut fork_status = self.fork_status.lock();
+            fork_status[left] = false;
+            fork_status[right] = false;
+            self.fork_condvar[left].notify_one();
+            self.fork_condvar[right].notify_one();
+        }
+    }
+}
+
+fn philosopher(table: Arc<Table>) {
     let philosophers = vec![
         Philosopher::new("1", 0, 1),
         Philosopher::new("2", 1, 2),
@@ -75,4 +106,23 @@ pub fn philosopher() {
         h.join().unwrap();
     }
     println!("philosophers dining end");
+}
+
+pub fn philosopher_using_mutex() {
+    println!("philosophers using mutex");
+
+    let table = Arc::new(MutexTable {
+        forks: vec![Mutex::new(()), Mutex::new(()), Mutex::new(()), Mutex::new(()), Mutex::new(())]
+    });
+    philosopher(table);
+}
+
+pub fn philosopher_using_monitor() {
+    println!("philosophers using monitor");
+
+    let table = Arc::new(MonitorTable {
+        fork_status: Mutex::new(vec![false; 5]),
+        fork_condvar: vec![Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new()],
+    });
+    philosopher(table);
 }

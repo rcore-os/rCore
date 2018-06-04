@@ -16,28 +16,30 @@
 
 #[macro_use]
 extern crate alloc;
-
-extern crate rlibc;
-extern crate volatile;
-extern crate spin;
-extern crate multiboot2;
+extern crate arrayvec;
+extern crate bit_allocator;
+extern crate bit_field;
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
-extern crate x86_64;
-#[macro_use]
-extern crate once;
+extern crate lazy_static;
 extern crate linked_list_allocator;
 #[macro_use]
-extern crate lazy_static;
-extern crate bit_field;
-extern crate syscall as redox_syscall;
-extern crate xmas_elf;
-extern crate arrayvec;
-#[macro_use]
 extern crate log;
+extern crate multiboot2;
+#[macro_use]
+extern crate once;
+extern crate rlibc;
 extern crate simple_filesystem;
-extern crate bit_allocator;
+extern crate spin;
+extern crate syscall as redox_syscall;
+extern crate volatile;
+#[macro_use]
+extern crate x86_64;
+extern crate xmas_elf;
+
+pub use arch::interrupt::{rust_trap, set_return_rsp};
+use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
 mod io;
@@ -93,7 +95,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     unsafe{ arch::interrupt::enable(); }
 
 //    thread::test::unpack();
-    sync::test::philosopher();
+    sync::test::philosopher_using_mutex();
+    sync::test::philosopher_using_monitor();
 
     // 直接进入用户态暂不可用：内核代码用户不可访问
 //    unsafe{
@@ -128,10 +131,6 @@ pub extern "C" fn other_main() -> ! {
 //    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }
-
-pub use arch::interrupt::{rust_trap, set_return_rsp};
-
-use linked_list_allocator::LockedHeap;
 
 /// Global heap allocator
 ///

@@ -49,9 +49,7 @@ pub struct Mutex<T: ?Sized, S: MutexSupport>
 /// When the guard falls out of scope it will release the lock.
 pub struct MutexGuard<'a, T: ?Sized + 'a, S: MutexSupport + 'a>
 {
-    lock: &'a AtomicBool,
-    data: &'a mut T,
-    support: &'a S,
+    pub(super) mutex: &'a Mutex<T, S>,
     support_guard: S::GuardData,
 }
 
@@ -126,9 +124,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
         let support_guard = S::before_lock();
         self.obtain_lock();
         MutexGuard {
-            lock: &self.lock,
-            data: unsafe { &mut *self.data.get() },
-            support: &self.support,
+            mutex: self,
             support_guard,
         }
     }
@@ -150,9 +146,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
         let support_guard = S::before_lock();
         if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
             Some(MutexGuard {
-                lock: &self.lock,
-                data: unsafe { &mut *self.data.get() },
-                support: &self.support,
+                mutex: self,
                 support_guard,
             })
         } else {
@@ -180,20 +174,20 @@ impl<T: ?Sized + Default, S: MutexSupport> Default for Mutex<T, S> {
 impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S>
 {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { &*self.data }
+    fn deref<'b>(&'b self) -> &'b T { unsafe { &*self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S>
 {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self.data }
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T { unsafe { &mut *self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>
 {
     /// The dropping of the MutexGuard will release the lock it was created from.
     fn drop(&mut self) {
-        self.lock.store(false, Ordering::Release);
-        self.support.after_unlock();
+        self.mutex.lock.store(false, Ordering::Release);
+        self.mutex.support.after_unlock();
     }
 }
 
@@ -257,7 +251,7 @@ impl MutexSupport for Condvar {
         Condvar::new()
     }
     fn cpu_relax(&self) {
-        self.wait();
+        self._wait();
     }
     fn before_lock() -> Self::GuardData {}
     fn after_unlock(&self) {

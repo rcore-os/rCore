@@ -1,9 +1,9 @@
 //! A counting, blocking, semaphore.
 //!
-//! Borrowed from std at rust 1.7.0
+//! Same as [std::sync::Semaphore at rust 1.7.0](https://docs.rs/std-semaphore/0.1.0/std_semaphore/)
 
-use super::SpinNoIrqLock as Mutex;
 use super::Condvar;
+use super::SpinNoIrqLock as Mutex;
 
 /// A counting, blocking, semaphore.
 pub struct Semaphore {
@@ -38,10 +38,7 @@ impl Semaphore {
     pub fn acquire(&self) {
         let mut count = self.lock.lock();
         while *count <= 0 {
-            // TODO: -> cvar.wait(count)
-            drop(count);
-            self.cvar.wait();
-            count = self.lock.lock();
+            count = self.cvar.wait(count);
         }
         *count -= 1;
     }
