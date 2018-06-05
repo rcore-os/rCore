@@ -1,6 +1,6 @@
 use alloc::{arc::Arc, arc::Weak, VecDeque};
 use super::Condvar;
-use super::ThreadLock as Mutex;
+use super::SpinLock as Mutex;
 
 struct Channel<T> {
     deque: Mutex<VecDeque<T>>,
@@ -68,6 +68,7 @@ impl<T> Sender<T> {
             Some(inner) => {
                 let mut deque = inner.deque.lock();
                 deque.push_back(t);
+                inner.pushed.notify_one();
                 Ok(())
             }
         }
@@ -135,7 +136,7 @@ pub mod test {
         drop_full();
         drop_full_shared();
         smoke_shared();
-//        smoke_threads(); // FIXME: deadlock
+        smoke_threads();
         smoke_port_gone();
         println!("mpsc test end");
     }
