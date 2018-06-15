@@ -4,7 +4,7 @@
 
 计53 王润基 2015011279
 
-2018.05.25
+2018.05.25 + 06.15
 
 ## 摘要
 
@@ -48,6 +48,8 @@
 * 进程管理：近乎完成，可以正常运行大部分用户程序
 * 同步互斥：没写
 * 文件系统：SFS和VFS作为单独模块实现完毕，还没对接到进程中
+
+到第16周，完成了同步互斥部分，并对内存管理进行了整合优化。
 
 具体完成过程和内容参见下文，各部分完成情况清单参见[status.md](../status.md)。
 
@@ -227,6 +229,37 @@ CLion配合gdb调试的方法：详见日志2018.05.18的记录
 #### 5.6 日志模块和彩色输出
 
 Log模块是软件开发中一种常用的库，它可以支持在程序各处记录不同等级的日志，汇总到一起统一输出。我在RustOS中引入了这个库，并实现了根据不同日志等级以不同的颜色进行输出，还支持在运行前对指定等级的日志进行过滤，方便debug。
+
+### 6. 同步互斥
+
+在内核线程调度的基础上，实现了用于内核态的同步互斥工具。这部分参考了spin模块和Rust标准库中的sync模块，并提供和std::sync完全相同的接口。作为测试，仿照uCore，用这些工具在OS内实现了哲学家就餐问题。
+
+各模块依赖关系如下：
+
+```mermaid
+graph TB
+   subgraph dependence
+       interrupt
+       thread
+   end
+   subgraph sync
+       SpinLock --> interrupt
+       Condvar --> SpinLock
+    Condvar --> thread
+    Mutex --> Condvar
+       Monitor --> Condvar
+       Semaphore --> Condvar
+       Semaphore --> SpinLock
+       mpsc --> SpinLock
+    mpsc --> Condvar
+   end
+subgraph test
+       Dining_Philosophers --> Mutex
+       Dining_Philosophers --> Monitor
+   end
+```
+
+Rust中提供同步互斥的最底层支撑是核心库中的原子变量`AtomicBool`，用它即可实现最简单的自旋锁`spin::Mutex`。自旋锁已经可以满足OS内核中的大部分需求，但如果在中断和非中断态都访问同一个锁，就可能造成死锁问题，这就需要在上锁期间关闭中断。此外，还要实现支持线程调度的锁，在无法获得锁时，将当前线程加入等待队列并放弃CPU，在用锁完毕时唤醒一个等待的线程。我通过将`spin::Mutex`修改为一个可替换底层支持的锁框架，实现了上述两个需求。在此基础上，又实现了信号量、条件变量、信息传递通道，形成了比较完善的同步互斥工具组。这部分共计约400行代码。
 
 ## 实验总结
 

@@ -42,10 +42,10 @@
 
 #### lab7: Synchronization 
 
-- [x] Mutex：Rust core lib built-in
-- [ ] Semaphore
-- [ ] Monitor
-- [ ] Dinning Philosophers Problem
+- [x] Mutex
+- [x] Semaphore
+- [x] Monitor
+- [x] Dinning Philosophers Problem
 
 #### lab8: File system
 
