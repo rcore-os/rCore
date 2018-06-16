@@ -25,7 +25,7 @@ impl Mapper {
     pub fn translate(&self, virtual_address: VirtAddr) -> Option<PhysAddr> {
         let offset = virtual_address % PAGE_SIZE;
         self.translate_page(Page::of_addr(virtual_address))
-            .map(|frame| PhysAddr((frame.start_address().get() + offset) as u64))
+            .map(|frame| PhysAddr::new((frame.start_address().get() + offset) as u64))
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
@@ -97,7 +97,7 @@ impl Mapper {
     pub fn unmap(&mut self, page: Page) -> Frame
     {
         use x86_64::instructions::tlb;
-        use x86_64::VirtualAddress;
+        use x86_64::VirtAddr;
 
         assert!(self.translate(page.start_address()).is_some());
 
@@ -108,7 +108,7 @@ impl Mapper {
             .expect("mapping code does not support huge pages");
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(VirtAddr::new(page.start_address() as u64));
         // TODO free p(1,2,3) table if empty
         frame
     }

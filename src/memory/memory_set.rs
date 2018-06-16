@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
+use core::fmt::{Debug, Error, Formatter};
 use super::*;
-use core::fmt::{Debug, Formatter, Error};
 
 /// 一片连续内存空间，有相同的访问权限
 /// 对应ucore中 `vma_struct`
@@ -29,7 +29,7 @@ impl MemoryArea {
         MemoryArea {
             start_addr,
             end_addr,
-            phys_start_addr: Some(PhysAddr(start_addr as u64)),
+            phys_start_addr: Some(PhysAddr::new(start_addr as u64)),
             flags,
             name,
         }

@@ -1,7 +1,8 @@
 use arch::driver::{acpi::AcpiResult, apic::start_ap};
-use memory::*;
+use consts::MAX_CPU_NUM;
 use core::ptr::{read_volatile, write_volatile};
-use x86_64::registers::control_regs::cr3;
+use memory::*;
+use x86_64::registers::control::Cr3;
 
 const ENTRYOTHER_ADDR: u32 = 0x7000;
 
@@ -16,7 +17,7 @@ pub fn start_other_cores(acpi: &AcpiResult, ms: &mut MemorySet) {
         let ms = MemorySet::new(7);
         *args = EntryArgs {
             kstack: ms.kstack_top() as u64,
-            page_table: cr3().0 as u32,
+            page_table: Cr3::read().0.start_address().as_u64() as u32,
             stack: args as *const _ as u32, // just enough stack to get us to entry64mp
         };
         unsafe { MS = Some(ms); }
@@ -33,7 +34,6 @@ struct EntryArgs {
     stack: u32,
 }
 
-use consts::MAX_CPU_NUM;
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 static mut MS: Option<MemorySet> = None;
 

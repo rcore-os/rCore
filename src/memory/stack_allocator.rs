@@ -1,12 +1,13 @@
-use memory::paging::{Page, PageIter, ActivePageTable, EntryFlags};
+use arch::paging::{ActivePageTable, EntryFlags, Page, PageRange};
 use memory::PAGE_SIZE;
 
+// TODO: use BitAllocator & alloc fixed size stack
 pub struct StackAllocator {
-    range: PageIter,
+    range: PageRange,
 }
 
 impl StackAllocator {
-    pub fn new(page_range: PageIter) -> StackAllocator {
+    pub fn new(page_range: PageRange) -> StackAllocator {
         StackAllocator { range: page_range }
     }
 }

@@ -112,8 +112,8 @@ fn double_fault(tf: &TrapFrame) {
 }
 
 fn page_fault(tf: &mut TrapFrame) {
-    use x86_64::registers::control_regs::cr2;
-    let addr = cr2().0;
+    let addr: usize;
+    unsafe { asm!("mov %cr2, $0" : "=r" (addr)); }
     error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
 
     use memory::page_fault_handler;

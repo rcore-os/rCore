@@ -5,24 +5,14 @@ pub fn init() {
 
 /// Enable 'No-Execute' bit in page entry
 pub fn enable_nxe_bit() {
-    use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
-
-    let nxe_bit = 1 << 11;
-    // The EFER register is only allowed in kernel mode
-    // But we are in kernel mode. So it's safe.
-    unsafe {
-        let efer = rdmsr(IA32_EFER);
-        wrmsr(IA32_EFER, efer | nxe_bit);
-    }
+    use x86_64::registers::model_specific::*;
+    unsafe { Efer::update(|flags| flags.insert(EferFlags::NO_EXECUTE_ENABLE)); }
 }
 
 /// Enable write protection in kernel mode
 pub fn enable_write_protect_bit() {
-    use x86_64::registers::control_regs::{cr0, cr0_write, Cr0};
-
-    // The CR0 register is only allowed in kernel mode
-    // But we are in kernel mode. So it's safe.
-    unsafe { cr0_write(cr0() | Cr0::WRITE_PROTECT) };
+    use x86_64::registers::control::*;
+    unsafe { Cr0::update(|flags| flags.insert(Cr0Flags::WRITE_PROTECT)); }
 }
 
 /// Exit qemu
@@ -30,8 +20,8 @@ pub fn enable_write_protect_bit() {
 /// Must run qemu with `-device isa-debug-exit`
 /// The error code is `value written to 0x501` *2 +1, so it should be odd
 pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
-    use x86_64::instructions::port::outb;
+    use x86_64::instructions::port::Port;
     assert_eq!(error_code & 1, 1, "error code should be odd");
-    outb(0x501, (error_code - 1) / 2);
+    Port::new(0x501).write((error_code - 1) / 2);
     unreachable!()
 }

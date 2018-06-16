@@ -4,7 +4,7 @@ use consts::MAX_CPU_NUM;
 use core::fmt;
 use core::fmt::Debug;
 use spin::{Mutex, MutexGuard, Once};
-use x86_64::{PrivilegeLevel, VirtualAddress};
+use x86_64::{PrivilegeLevel, VirtAddr};
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::tss::TaskStateSegment;
 
@@ -22,7 +22,7 @@ pub fn init() {
 
         // 设置 Double Fault 时，自动切换栈的地址
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX]
-            = VirtualAddress(double_fault_stack_top);
+            = VirtAddr::new(double_fault_stack_top as u64);
 
         tss
     });
@@ -74,7 +74,7 @@ impl Cpu {
     /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
     pub fn set_ring0_rsp(&mut self, rsp: usize) {
         trace!("gdt.set_ring0_rsp: {:#x}", rsp);
-        self.tss.privilege_stack_table[0] = VirtualAddress(rsp);
+        self.tss.privilege_stack_table[0] = VirtAddr::new(rsp as u64);
     }
 }
 

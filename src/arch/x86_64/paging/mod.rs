@@ -43,16 +43,16 @@ impl Page {
         (self.number >> 0) & 0o777
     }
 
-    pub fn range_inclusive(start: Page, end: Page) -> PageIter {
-        PageIter {
+    pub fn range_inclusive(start: Page, end: Page) -> PageRange {
+        PageRange {
             start,
             end,
         }
     }
 
     /// Iterate pages of address [begin, end)
-    pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageIter {
-        PageIter {
+    pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange {
+        PageRange {
             start: Page::of_addr(begin),
             end: Page::of_addr(end - 1),
         }
@@ -69,12 +69,12 @@ impl Add<usize> for Page {
 
 
 #[derive(Clone)]
-pub struct PageIter {
+pub struct PageRange {
     start: Page,
     end: Page,
 }
 
-impl Iterator for PageIter {
+impl Iterator for PageRange {
     type Item = Page;
 
     fn next(&mut self) -> Option<Page> {
@@ -116,12 +116,11 @@ impl ActivePageTable {
     pub fn with(&mut self, table: &mut InactivePageTable, f: impl FnOnce(&mut Mapper))
     {
         use x86_64::instructions::tlb;
-        use x86_64::registers::control_regs;
+        use x86_64::registers::control;
 
         let temporary_page = TemporaryPage::new();
         {
-            let backup = Frame::of_addr(
-                control_regs::cr3().0 as usize);
+            let backup = Frame::of_addr(control::Cr3::read().0.start_address().get());
 
             // map temporary_page to current p4 table
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
@@ -142,17 +141,19 @@ impl ActivePageTable {
     }
 
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
-        use x86_64::registers::control_regs;
-        debug!("switch table {:?} -> {:?}", Frame::of_addr(control_regs::cr3().0 as usize), new_table.p4_frame);
-        if new_table.p4_frame.start_address() == control_regs::cr3() {
+        use x86_64::structures::paging::PhysFrame;
+        use x86_64::registers::control::{Cr3, Cr3Flags};
+        debug!("switch table {:?} -> {:?}", Frame::of_addr(Cr3::read().0.start_address().get()), new_table.p4_frame);
+        if new_table.p4_frame.start_address() == Cr3::read().0.start_address() {
             return new_table;
         }
 
         let old_table = InactivePageTable {
-            p4_frame: Frame::of_addr(control_regs::cr3().0 as usize),
+            p4_frame: Frame::of_addr(Cr3::read().0.start_address().get()),
         };
         unsafe {
-            control_regs::cr3_write(new_table.p4_frame.start_address());
+            Cr3::write(PhysFrame::containing_address(new_table.p4_frame.start_address()),
+                       Cr3Flags::empty());
         }
         use core::mem::forget;
         forget(new_table);

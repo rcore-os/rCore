@@ -2,7 +2,6 @@
 //!
 //! Borrow from Rucore project. Thanks GWord!
 //! Port from ucore C code.
-use x86_64::instructions::port;
 use spin::Mutex;
 
 lazy_static! {
@@ -315,3 +314,15 @@ const CHANNELS: [(u16, u16); 2] = [(IO_BASE0, IO_CTRL0), (IO_BASE1, IO_CTRL1)];
 
 //const IO_BASE(ideno)          (CHANNELS[(ideno) >> 1].base)
 //const IO_CTRL(ideno)          (CHANNELS[(ideno) >> 1].ctrl)
+
+mod port {
+    use x86_64::instructions::port::Port;
+
+    pub unsafe fn inb(port: u16) -> u8 {
+        Port::new(port).read()
+    }
+
+    pub unsafe fn outb(port: u16, value: u8) {
+        Port::new(port).write(value)
+    }
+}

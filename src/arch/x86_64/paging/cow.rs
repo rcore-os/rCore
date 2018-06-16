@@ -39,7 +39,7 @@ pub use self::test::test_cow;
 use spin::Mutex;
 use super::*;
 use x86_64::instructions::tlb;
-use x86_64::VirtualAddress;
+use x86_64::VirtAddr;
 
 trait EntryCowExt {
     fn is_shared(&self) -> bool;
@@ -52,7 +52,7 @@ trait EntryCowExt {
 pub trait PageTableCowExt {
     fn map_to_shared(&mut self, page: Page, frame: Frame, flags: EntryFlags);
     fn unmap_shared(&mut self, page: Page);
-    fn try_copy_on_write(&mut self, addr: VirtAddr) -> bool;
+    fn try_copy_on_write(&mut self, addr: usize) -> bool;
 }
 
 impl EntryCowExt for Entry {
@@ -101,9 +101,9 @@ impl PageTableCowExt for ActivePageTable {
     }
     fn unmap_shared(&mut self, page: Page) {
         self.entry_mut(page).reset();
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(VirtAddr::new(page.start_address() as u64));
     }
-    fn try_copy_on_write(&mut self, addr: VirtAddr) -> bool {
+    fn try_copy_on_write(&mut self, addr: usize) -> bool {
         let page = Page::of_addr(addr);
         let entry = self.entry_mut(page);
         if !entry.is_cow() {
@@ -119,7 +119,7 @@ impl PageTableCowExt for ActivePageTable {
             temp_data.copy_from_slice(page_data);
 
             entry.copy_on_write(Some(alloc_frame()));
-            tlb::flush(VirtualAddress(page.start_address()));
+            tlb::flush(VirtAddr::new(page.start_address() as u64));
 
             page_data.copy_from_slice(&temp_data);
         }

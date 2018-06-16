@@ -1,8 +1,8 @@
-use spin::Mutex;
-use core::ptr::Unique;
-use volatile::Volatile;
-use x86_64::instructions::port::{outw, outb};
 use consts::KERNEL_OFFSET;
+use core::ptr::Unique;
+use spin::Mutex;
+use volatile::Volatile;
+use x86_64::instructions::port::Port;
 
 pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe {
     Unique::new_unchecked((KERNEL_OFFSET + 0xb8000) as *mut _)
@@ -82,10 +82,10 @@ impl VgaBuffer {
         let pos = row * BUFFER_WIDTH + col;
         unsafe {
             // Reference: Rustboot project
-            outw(0x3D4, 15u16); // WARNING verify should be u16
-            outb(0x3D5, pos as u8);
-            outw(0x3D4, 14u16);
-            outb(0x3D5, (pos >> 8) as u8);
+            Port::new(0x3d4).write(15u16);
+            Port::new(0x3d5).write(pos as u8);
+            Port::new(0x3d4).write(14u16);
+            Port::new(0x3d5).write((pos >> 8) as u8);
         }
     }
 }

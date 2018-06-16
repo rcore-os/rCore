@@ -13,7 +13,7 @@ impl Frame {
     }
     //TODO: Set private
     pub fn start_address(&self) -> PhysAddr {
-        PhysAddr((self.number * PAGE_SIZE) as u64)
+        PhysAddr::new((self.number * PAGE_SIZE) as u64)
     }
 
     pub fn clone(&self) -> Frame {

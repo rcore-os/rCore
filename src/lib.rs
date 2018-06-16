@@ -88,7 +88,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
         kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
     });
 
-    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
+    // FIXME: page fault in SMP
+//    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
     process::init(kernel_memory);
 
     fs::load_sfs();
@@ -156,7 +157,7 @@ mod test {
     pub fn guard_page() {
         use x86_64;
         // invoke a breakpoint exception
-        x86_64::instructions::interrupts::int3();
+        unsafe { asm!("int 3"::::"intel" "volatile"); }
 
         fn stack_overflow() {
             stack_overflow(); // for each recursion, the return address is pushed

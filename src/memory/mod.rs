@@ -138,7 +138,7 @@ fn get_init_kstack_and_set_guard_page() -> Stack {
     assert_has_not_been_called!();
 
     extern { fn stack_bottom(); }
-    let stack_bottom = PhysAddr(stack_bottom as u64).to_kernel_virtual();
+    let stack_bottom = PhysAddr::new(stack_bottom as u64).to_kernel_virtual();
     let stack_bottom_page = Page::of_addr(stack_bottom);
 
     // turn the stack bottom into a guard page
