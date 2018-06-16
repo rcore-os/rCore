@@ -64,7 +64,6 @@ mod arch;
 /// The entry point of Rust kernel
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
-    arch::cpu::init();
     arch::idt::init();
     io::init();
 
@@ -88,8 +87,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
         kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
     });
 
-    // FIXME: page fault in SMP
-//    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
+    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
     process::init(kernel_memory);
 
     fs::load_sfs();
@@ -123,7 +121,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 /// The entry point for another processors
 #[no_mangle]
 pub extern "C" fn other_main() -> ! {
-    arch::cpu::init();
     arch::gdt::init();
     arch::idt::init();
     arch::driver::apic::other_init();

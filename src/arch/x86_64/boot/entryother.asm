@@ -85,15 +85,15 @@ enable_paging:
     or      eax, 1 << 5
     mov     cr4, eax
 
-    ; set the long mode bit in the EFER MSR (model specific register)
+    ; set the long mode bit & no execute bit in the EFER MSR (model specific register)
     mov     ecx, 0xC0000080
     rdmsr
-    or      eax, 1 << 8
+    or      eax, 1 << 8 | 1 << 11
     wrmsr
 
-    ; enable paging in the cr0 register
+    ; enable paging & write protect in the cr0 register
     mov     eax, cr0
-    or      eax, 1 << 31
+    or      eax, 1 << 31 | 1 << 16
     mov     cr0, eax
 
     ret
