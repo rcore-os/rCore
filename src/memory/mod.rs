@@ -135,6 +135,7 @@ fn remap_the_kernel(boot_info: BootInformation) -> MemorySet {
 
     use consts::{KERNEL_OFFSET, KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xb8000, KERNEL_OFFSET + 0xb9000, MemoryAttr::default(), "VGA"));
+    memory_set.push(MemoryArea::new_kernel(KERNEL_OFFSET + 0xfee00000, KERNEL_OFFSET + 0xfee01000, MemoryAttr::default(), "LAPIC"));
     memory_set.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
     debug!("{:#x?}", memory_set);
 

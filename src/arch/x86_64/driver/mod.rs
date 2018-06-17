@@ -14,7 +14,6 @@ pub fn init(mut page_map: impl FnMut(usize, usize)) -> acpi::AcpiResult {
     page_map(0, 1); // EBDA
     page_map(0xe0_000, 0x100 - 0xe0);
     page_map(0x07fe1000, 1); // RSDT
-    page_map(0xfee00000, 1);  // LAPIC
     page_map(0xfec00000, 1);  // IOAPIC
 
     let acpi = acpi::init().expect("Failed to init ACPI");
@@ -23,7 +22,8 @@ pub fn init(mut page_map: impl FnMut(usize, usize)) -> acpi::AcpiResult {
 
     if cfg!(feature = "use_apic") {
         pic::disable();
-        apic::init(acpi.lapic_addr, acpi.ioapic_id);
+        use consts::KERNEL_OFFSET;
+        apic::init((KERNEL_OFFSET + 0xfee00000) as *const (), acpi.ioapic_id);
     } else {
         pic::init();
     }

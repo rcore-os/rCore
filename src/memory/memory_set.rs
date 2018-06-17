@@ -235,7 +235,6 @@ fn new_page_table_with_kernel() -> InactivePageTable {
     active_table.with(&mut page_table, |pt: &mut ActivePageTable| {
         table[KERNEL_PML4] = e510;
         table[KERNEL_HEAP_PML4] = e509;
-        pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::PRESENT | EntryFlags::WRITABLE, &mut frame_allocator()).unwrap().flush(); // LAPIC
     });
     page_table
 }
