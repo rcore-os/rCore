@@ -1,11 +1,9 @@
 pub use arch::paging::*;
-use arch::paging;
 use bit_allocator::{BitAlloc, BitAlloc64K};
 use consts::KERNEL_OFFSET;
 use multiboot2::{ElfSection, ElfSectionFlags, ElfSectionsTag};
 use multiboot2::BootInformation;
 pub use self::address::*;
-pub use self::frame::*;
 pub use self::memory_set::*;
 pub use self::stack_allocator::*;
 use spin::{Mutex, MutexGuard};
@@ -14,7 +12,8 @@ use super::HEAP_ALLOCATOR;
 mod memory_set;
 mod stack_allocator;
 mod address;
-mod frame;
+
+const PAGE_SIZE: usize = 1 << 12;
 
 lazy_static! {
     static ref FRAME_ALLOCATOR: Mutex<BitAlloc64K> = Mutex::new(BitAlloc64K::default());
@@ -22,14 +21,14 @@ lazy_static! {
 static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Frame {
-    let frame = FRAME_ALLOCATOR.lock().allocate_frame().expect("no more frame");
+    let frame = frame_allocator().alloc().expect("no more frame");
     trace!("alloc: {:?}", frame);
     frame
 }
 
 pub fn dealloc_frame(frame: Frame) {
     trace!("dealloc: {:?}", frame);
-    FRAME_ALLOCATOR.lock().deallocate_frame(frame);
+    frame_allocator().dealloc(frame);
 }
 
 fn alloc_stack(size_in_pages: usize) -> Stack {
@@ -41,14 +40,24 @@ fn alloc_stack(size_in_pages: usize) -> Stack {
 
 /// The only way to get active page table
 fn active_table() -> MutexGuard<'static, ActivePageTable> {
-    static ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe { ActivePageTable::new() });
+    lazy_static! {
+        static ref ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe {
+            ActivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap()
+        });
+    }
     ACTIVE_TABLE.lock()
+}
+
+pub fn frame_allocator() -> BitAllocGuard {
+    BitAllocGuard(FRAME_ALLOCATOR.lock())
 }
 
 // Return true to continue, false to halt
 pub fn page_fault_handler(addr: VirtAddr) -> bool {
     // Handle copy on write
-    active_table().try_copy_on_write(addr)
+    false
+    // FIXME: enable cow
+//    active_table().try_copy_on_write(addr)
 }
 
 pub fn init(boot_info: BootInformation) -> MemorySet {
@@ -60,7 +69,6 @@ pub fn init(boot_info: BootInformation) -> MemorySet {
 
     let kernel_memory = remap_the_kernel(boot_info);
 
-    use self::paging::Page;
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
 
     unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
@@ -74,12 +82,17 @@ pub fn init(boot_info: BootInformation) -> MemorySet {
     kernel_memory
 }
 
-impl FrameAllocator for BitAlloc64K {
-    fn allocate_frame(&mut self) -> Option<Frame> {
-        self.alloc().map(|x| Frame { number: x })
+pub struct BitAllocGuard(MutexGuard<'static, BitAlloc64K>);
+
+impl FrameAllocator<Size4KiB> for BitAllocGuard {
+    fn alloc(&mut self) -> Option<Frame> {
+        self.0.alloc().map(|x| Frame::of_addr(x * PAGE_SIZE))
     }
-    fn deallocate_frame(&mut self, frame: Frame) {
-        self.dealloc(frame.number);
+}
+
+impl FrameDeallocator<Size4KiB> for BitAllocGuard {
+    fn dealloc(&mut self, frame: Frame) {
+        self.0.dealloc(frame.start_address().as_u64() as usize / PAGE_SIZE);
     }
 }
 
@@ -143,7 +156,7 @@ fn get_init_kstack_and_set_guard_page() -> Stack {
 
     // turn the stack bottom into a guard page
     active_table().unmap(stack_bottom_page);
-    debug!("guard page at {:#x}", stack_bottom_page.start_address());
+    debug!("guard page at {:?}", stack_bottom_page.start_address());
 
     Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE)
 }

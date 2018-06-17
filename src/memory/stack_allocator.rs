@@ -1,4 +1,4 @@
-use arch::paging::{ActivePageTable, EntryFlags, Page, PageRange};
+use super::*;
 use memory::PAGE_SIZE;
 
 // TODO: use BitAllocator & alloc fixed size stack
@@ -40,12 +40,13 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 for page in Page::range_inclusive(start, end) {
-                    active_table.map(page, EntryFlags::WRITABLE);
+                    let frame = alloc_frame();
+                    active_table.map_to_(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
                 }
 
                 // create a new stack
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some(Stack::new(top_of_stack, start.start_address()))
+                Some(Stack::new(top_of_stack.as_u64() as usize, start.start_address().as_u64() as usize))
             }
             _ => None, /* not enough pages */
         }

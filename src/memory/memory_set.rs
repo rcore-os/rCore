@@ -62,24 +62,26 @@ impl MemoryArea {
         let p3 = Page::of_addr(other.end_addr - 1) + 1;
         !(p1 <= p2 || p0 >= p3)
     }
-    fn map(&self, pt: &mut Mapper) {
+    fn map(&self, pt: &mut ActivePageTable) {
         match self.phys_start_addr {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
-                    let frame = Frame::of_addr(phys_start.get() + page.start_address() - self.start_addr);
-                    pt.map_to(page, frame, self.flags.0);
+                    let frame = Frame::of_addr(phys_start.get() + page.start_address().as_u64() as usize - self.start_addr);
+                    pt.map_to_(page, frame, self.flags.0);
                 }
             }
             None => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
-                    pt.map(page, self.flags.0);
+                    let frame = alloc_frame();
+                    pt.map_to_(page, frame, self.flags.0);
                 }
             }
         }
     }
-    fn unmap(&self, pt: &mut Mapper) {
+    fn unmap(&self, pt: &mut ActivePageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            let frame = pt.unmap(page);
+            let (frame, flush) = pt.unmap(page).unwrap();
+            flush.flush();
             if self.phys_start_addr.is_none() {
                 dealloc_frame(frame);
             }
@@ -156,18 +158,16 @@ impl MemorySet {
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
     }
-    pub fn with(&self, mut f: impl FnMut()) {
-        use core::{ptr, mem};
-        let page_table = unsafe { ptr::read(&self.page_table as *const InactivePageTable) };
-        let mut active_table = active_table();
-        let backup = active_table.switch(page_table);
+    pub fn with(&self, f: impl FnOnce()) {
+        let current = unsafe { InactivePageTable::from_cr3() };
+        self.page_table.switch();
         f();
-        mem::forget(active_table.switch(backup));
+        current.switch();
+        use core::mem;
+        mem::forget(current);
     }
     pub fn switch(&self) {
-        use core::{ptr, mem};
-        let page_table = unsafe { ptr::read(&self.page_table as *const InactivePageTable) };
-        mem::forget(active_table().switch(page_table));
+        self.page_table.switch();
     }
     pub fn set_kstack(&mut self, stack: Stack) {
         assert!(self.kstack.is_none());
@@ -228,13 +228,14 @@ fn new_page_table_with_kernel() -> InactivePageTable {
     let mut page_table = InactivePageTable::new(frame, &mut active_table);
 
     use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};
-    let e510 = active_table.p4()[KERNEL_PML4].clone();
-    let e509 = active_table.p4()[KERNEL_HEAP_PML4].clone();
+    let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut PageTable) };
+    let e510 = table[KERNEL_PML4].clone();
+    let e509 = table[KERNEL_HEAP_PML4].clone();
 
-    active_table.with(&mut page_table, |pt: &mut Mapper| {
-        pt.p4_mut()[KERNEL_PML4] = e510;
-        pt.p4_mut()[KERNEL_HEAP_PML4] = e509;
-        pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::WRITABLE); // LAPIC
+    active_table.with(&mut page_table, |pt: &mut ActivePageTable| {
+        table[KERNEL_PML4] = e510;
+        table[KERNEL_HEAP_PML4] = e509;
+        pt.identity_map(Frame::of_addr(0xfee00000), EntryFlags::PRESENT | EntryFlags::WRITABLE, &mut frame_allocator()).unwrap().flush(); // LAPIC
     });
     page_table
 }

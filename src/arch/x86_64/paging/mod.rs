@@ -1,163 +1,80 @@
-use core::ops::{Add, Deref, DerefMut};
 use memory::*;
-pub use self::cow::*;
-pub use self::entry::*;
-pub use self::mapper::Mapper;
-pub use self::temporary_page::TemporaryPage;
+//pub use self::cow::*;
+use x86_64::structures::paging::*;
+use x86_64::registers::control::{Cr3, Cr3Flags};
+use x86_64::instructions::tlb;
+use x86_64::ux::u9;
 
-mod entry;
-mod table;
-mod temporary_page;
-mod mapper;
-mod cow;
+pub type Frame = PhysFrame;
+pub type EntryFlags = PageTableFlags;
+pub type ActivePageTable = RecursivePageTable<'static>;
+
+pub use x86_64::structures::paging::{Page, PageRange, Mapper, FrameAllocator, FrameDeallocator, Size4KiB, PageTable};
+
+//mod cow;
 
 const ENTRY_COUNT: usize = 512;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Page {
-   number: usize,
+pub trait PageExt {
+    fn of_addr(address: VirtAddr) -> Self;
+    fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange;
 }
 
-impl Page {
-    pub fn of_addr(address: VirtAddr) -> Page {
-        assert!(address < 0x0000_8000_0000_0000 ||
-            address >= 0xffff_8000_0000_0000,
-            "invalid address: 0x{:x}", address);
-        Page { number: address / PAGE_SIZE }
+impl PageExt for Page {
+    fn of_addr(address: usize) -> Self {
+        use x86_64;
+        Page::containing_address(x86_64::VirtAddr::new(address as u64))
     }
-
-    pub fn start_address(&self) -> usize {
-        self.number * PAGE_SIZE
-    }
-
-    fn p4_index(&self) -> usize {
-        (self.number >> 27) & 0o777
-    }
-    fn p3_index(&self) -> usize {
-        (self.number >> 18) & 0o777
-    }
-    fn p2_index(&self) -> usize {
-        (self.number >> 9) & 0o777
-    }
-    fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0o777
-    }
-
-    pub fn range_inclusive(start: Page, end: Page) -> PageRange {
-        PageRange {
-            start,
-            end,
-        }
-    }
-
-    /// Iterate pages of address [begin, end)
-    pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange {
-        PageRange {
-            start: Page::of_addr(begin),
-            end: Page::of_addr(end - 1),
-        }
+    fn range_of(begin: usize, end: usize) -> PageRange<Size4KiB> {
+        Page::range(Page::of_addr(begin), Page::of_addr(end - 1) + 1)
     }
 }
 
-impl Add<usize> for Page {
-    type Output = Page;
+pub trait FrameExt {
+    fn of_addr(address: usize) -> Self;
+}
 
-    fn add(self, rhs: usize) -> Page {
-        Page { number: self.number + rhs }
+impl FrameExt for Frame {
+    fn of_addr(address: usize) -> Self {
+        Frame::containing_address(PhysAddr::new(address as u64))
     }
 }
 
-
-#[derive(Clone)]
-pub struct PageRange {
-    start: Page,
-    end: Page,
+pub trait ActiveTableExt {
+    fn with(&mut self, table: &mut InactivePageTable, f: impl FnOnce(&mut ActivePageTable));
+    fn map_to_(&mut self, page: Page, frame: Frame, flags: EntryFlags);
 }
 
-impl Iterator for PageRange {
-    type Item = Page;
-
-    fn next(&mut self) -> Option<Page> {
-        if self.start <= self.end {
-            let page = self.start;
-            self.start.number += 1;
-            Some(page)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct ActivePageTable {
-    mapper: Mapper,
-}
-
-impl Deref for ActivePageTable {
-    type Target = Mapper;
-
-    fn deref(&self) -> &Mapper {
-        &self.mapper
-    }
-}
-
-impl DerefMut for ActivePageTable {
-    fn deref_mut(&mut self) -> &mut Mapper {
-        &mut self.mapper
-    }
-}
-
-impl ActivePageTable {
-    pub const unsafe fn new() -> ActivePageTable {
-        ActivePageTable {
-            mapper: Mapper::new(),
-        }
-    }
-
-    pub fn with(&mut self, table: &mut InactivePageTable, f: impl FnOnce(&mut Mapper))
-    {
-        use x86_64::instructions::tlb;
-        use x86_64::registers::control;
-
-        let temporary_page = TemporaryPage::new();
-        {
-            let backup = Frame::of_addr(control::Cr3::read().0.start_address().get());
-
-            // map temporary_page to current p4 table
-            let p4_table = temporary_page.map_table_frame(backup.clone(), self);
+impl ActiveTableExt for ActivePageTable {
+    fn with(&mut self, table: &mut InactivePageTable, f: impl FnOnce(&mut ActivePageTable)) {
+        with_temporary_map(self, &Cr3::read().0, |active_table, p4_table: &mut PageTable| {
+            let backup = p4_table[0o777].clone();
 
             // overwrite recursive mapping
-            self.p4_mut()[511].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[0o777].set_frame(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
             tlb::flush_all();
 
             // execute f in the new context
-            f(self);
+            f(active_table);
 
             // restore recursive mapping to original p4 table
-            p4_table[511].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[0o777] = backup;
             tlb::flush_all();
-        }
-
-        temporary_page.unmap(self);
+        });
     }
+    fn map_to_(&mut self, page: Page<Size4KiB>, frame: PhysFrame<Size4KiB>, flags: EntryFlags) {
+        self.map_to(page, frame, flags, &mut frame_allocator()).unwrap().flush();
 
-    pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
-        use x86_64::structures::paging::PhysFrame;
-        use x86_64::registers::control::{Cr3, Cr3Flags};
-        debug!("switch table {:?} -> {:?}", Frame::of_addr(Cr3::read().0.start_address().get()), new_table.p4_frame);
-        if new_table.p4_frame.start_address() == Cr3::read().0.start_address() {
-            return new_table;
+        // Set user bit for p1-p4 entry
+        // It's a workaround since x86_64 PageTable do not set user bit.
+        if flags.contains(EntryFlags::USER_ACCESSIBLE) {
+            let mut addr = page.start_address().as_u64();
+            for _ in 0..4 {
+                addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
+                // set USER_ACCESSIBLE
+                unsafe { (*(addr as *mut EntryFlags)).insert(EntryFlags::USER_ACCESSIBLE) };
+            }
         }
-
-        let old_table = InactivePageTable {
-            p4_frame: Frame::of_addr(Cr3::read().0.start_address().get()),
-        };
-        unsafe {
-            Cr3::write(PhysFrame::containing_address(new_table.p4_frame.start_address()),
-                       Cr3Flags::empty());
-        }
-        use core::mem::forget;
-        forget(new_table);
-        old_table
     }
 }
 
@@ -168,18 +85,23 @@ pub struct InactivePageTable {
 
 impl InactivePageTable {
     pub fn new(frame: Frame, active_table: &mut ActivePageTable) -> InactivePageTable {
-        let temporary_page = TemporaryPage::new();
-        {
-            let table = temporary_page.map_table_frame(frame.clone(),
-                active_table);
-            // now we are able to zero the table
+        with_temporary_map(active_table, &frame, |_, table: &mut PageTable| {
             table.zero();
             // set up recursive mapping for the table
-            table[511].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
-        }
-        temporary_page.unmap(active_table);
-
+            table[511].set_frame(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        });
         InactivePageTable { p4_frame: frame }
+    }
+    pub fn switch(&self) {
+        let old_frame = Cr3::read().0;
+        let new_frame = self.p4_frame.clone();
+        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
+        if old_frame != new_frame {
+            unsafe { Cr3::write(new_frame, Cr3Flags::empty()); }
+        }
+    }
+    pub unsafe fn from_cr3() -> Self {
+        InactivePageTable { p4_frame: Cr3::read().0 }
     }
 }
 
@@ -188,4 +110,17 @@ impl Drop for InactivePageTable {
         info!("PageTable dropping: {:?}", self);
         dealloc_frame(self.p4_frame.clone());
     }
+}
+
+fn with_temporary_map(active_table: &mut ActivePageTable, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut PageTable)) {
+    // Create a temporary page
+    let page = Page::of_addr(0xcafebabe);
+    assert!(active_table.translate_page(page).is_none(), "temporary page is already mapped");
+    // Map it to table
+    active_table.map_to_(page, frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+    // Call f
+    let table = unsafe { &mut *page.start_address().as_mut_ptr() };
+    f(active_table, table);
+    // Unmap the page
+    active_table.unmap(page).unwrap().1.flush();
 }

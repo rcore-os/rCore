@@ -168,6 +168,6 @@ mod test {
 
     pub fn cow() {
         use arch;
-        arch::paging::test_cow();
+//        arch::paging::test_cow();
     }
 }
