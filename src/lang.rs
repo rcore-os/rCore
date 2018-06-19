@@ -1,19 +1,27 @@
 // Rust language features implementions
 
-use core;
+use core::panic::PanicInfo;
 use arch::cpu;
 
 #[lang = "eh_personality"] 
 extern fn eh_personality() {
 }
 
-#[lang = "panic_fmt"]
+#[panic_implementation]
 #[no_mangle]
-pub extern fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    error!("\n\nPANIC in {} at line {}\n    {}", file, line, fmt);
+pub fn panic(info: &PanicInfo) -> ! {
+    let location = info.location().unwrap();
+    let message = info.message().unwrap();
+    error!("\n\nPANIC in {} at line {}\n    {}", location.file(), location.line(), message);
     if cfg!(feature = "qemu_auto_exit") {
         unsafe{ cpu::exit_in_qemu(3) }
     } else {
         loop { }
     }
+}
+
+#[lang = "oom"]
+#[no_mangle]
+fn oom() -> ! {
+    panic!("out of memory");
 }

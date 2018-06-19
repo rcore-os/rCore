@@ -12,12 +12,13 @@
 #![feature(naked_functions)]
 #![feature(asm)]
 #![feature(optin_builtin_traits)]
+#![feature(panic_implementation)]
+#![feature(panic_info_message)]
 #![no_std]
 
 
 #[macro_use]
 extern crate alloc;
-extern crate arrayvec;
 extern crate bit_allocator;
 extern crate bit_field;
 #[macro_use]
