@@ -32,6 +32,7 @@ linked_list_allocator = "0.6"
 redox_syscall = "0.1"
 xmas-elf = "0.6"
 log = "0.4"
+uart_16550 = "0.1"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 bit-allocator = { path = "crate/bit-allocator" }

@@ -132,13 +132,13 @@ fn keyboard() {
 }
 
 fn com1() {
-    use arch::driver::serial::COM1;
+    use arch::driver::serial::*;
     info!("\nInterupt: COM1");
     COM1.lock().receive();
 }
 
 fn com2() {
-    use arch::driver::serial::COM2;
+    use arch::driver::serial::*;
     info!("\nInterupt: COM2");
     COM2.lock().receive();
 }
