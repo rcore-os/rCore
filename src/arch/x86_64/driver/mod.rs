@@ -8,15 +8,13 @@ pub mod keyboard;
 pub mod pit;
 pub mod ide;
 
-pub fn init(mut page_map: impl FnMut(usize, usize)) -> acpi::AcpiResult {
+pub fn init(rsdt_addr: usize, mut page_map: impl FnMut(usize, usize)) -> acpi::AcpiResult {
     assert_has_not_been_called!();
 
-    page_map(0, 1); // EBDA
-    page_map(0xe0_000, 0x100 - 0xe0);
     page_map(0x07fe1000, 1); // RSDT
     page_map(0xfec00000, 1);  // IOAPIC
 
-    let acpi = acpi::init().expect("Failed to init ACPI");
+    let acpi = acpi::init(rsdt_addr).expect("Failed to init ACPI");
     assert_eq!(acpi.lapic_addr as usize, 0xfee00000);
     trace!("acpi = {:?}", acpi);
 

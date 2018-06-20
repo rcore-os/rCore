@@ -4,19 +4,11 @@ mod structs;
 use self::structs::*;
 use consts::*;
 
-pub fn init() -> Result<AcpiResult, AcpiError> {
-	let rsdp = find_rsdp().expect("acpi: rsdp not found.");
-	if rsdp.rsdt_physical_address > PHYSICAL_MEMORY_LIMIT {
-		return Err(AcpiError::NotMapped);
-	}
-    trace!("RSDT at {:#x}", rsdp.rsdt_physical_address);
-	let rsdt = unsafe{ &*(rsdp.rsdt_physical_address as *const Rsdt) };
+pub fn init(rsdt_addr: usize) -> Result<AcpiResult, AcpiError> {
+	let rsdt = unsafe { &*(rsdt_addr as *const Rsdt) };
 	let mut madt: Option<&'static Madt> = None;
 	for i in 0 .. rsdt.entry_count() {
 		let entry = rsdt.entry_at(i);
-		if entry > PHYSICAL_MEMORY_LIMIT {
-			return Err(AcpiError::NotMapped);
-		}
 		let header = unsafe{ &*(entry as *const Header) };
         trace!("{:?}", header);
 		if &header.signature == b"APIC" {
@@ -26,11 +18,6 @@ pub fn init() -> Result<AcpiResult, AcpiError> {
     trace!("{:?}", madt);
 	config_smp(madt.expect("acpi: madt not found."))
 }
-
-#[cfg(target_arch="x86")]
-const PHYSICAL_MEMORY_LIMIT: u32 = 0x0E000000;
-#[cfg(target_arch="x86_64")]
-const PHYSICAL_MEMORY_LIMIT: u32 = 0x80000000;
 
 #[derive(Debug)]
 pub struct AcpiResult {
@@ -72,24 +59,3 @@ fn config_smp(madt: &'static Madt) -> Result<AcpiResult, AcpiError> {
 	let ioapic_id = ioapic_id.unwrap();
 	Ok(AcpiResult { cpu_num, cpu_acpi_ids, ioapic_id, lapic_addr })
 }
-
-/// See https://wiki.osdev.org/RSDP -- Detecting the RSDP
-fn find_rsdp() -> Option<&'static Rsdp> {
-	use util::{Checkable, find_in_memory};
-	let ebda = unsafe { *(0x40E as *const u16) as usize } << 4;
-    trace!("EBDA at {:#x}", ebda);
-
-	macro_rules! return_if_find_in {
-		($begin:expr, $end:expr) => (
-			if let Some(addr) = unsafe{ find_in_memory::<Rsdp>($begin, $end, 4) } {
-				return Some(unsafe{ &*(addr as *const Rsdp) });
-			}
-		)
-	}
-	
-	if ebda != 0 {
-		return_if_find_in!(ebda as usize, 1024);
-	}
-	return_if_find_in!(0xE0000, 0x20000);
-	None
-} 

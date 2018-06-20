@@ -73,6 +73,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     println!("Hello World{}", "!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    let rsdt_addr = boot_info.rsdp_v1_tag().unwrap().rsdt_address();
 
     // set up guard page and map the heap pages
     let mut kernel_memory = memory::init(boot_info);
@@ -85,7 +86,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     test!(find_mp);
 
     use memory::*;
-    let acpi = arch::driver::init(|addr: usize, count: usize| {
+    let acpi = arch::driver::init(rsdt_addr, |addr: usize, count: usize| {
         kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
     });
 
