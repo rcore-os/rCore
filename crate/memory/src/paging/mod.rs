@@ -11,13 +11,14 @@ pub trait PageTable {
 }
 
 pub trait Entry {
+    /// Will be set when accessed
     fn accessed(&self) -> bool;
-    // Will be set when accessed
+    /// Will be set when written
     fn dirty(&self) -> bool;
-    // Will be set when written
+    /// Will PageFault when try to write page where writable=0
     fn writable(&self) -> bool;
-    // Will PageFault when try to write page where writable=0
-    fn present(&self) -> bool;      // Will PageFault when try to access page where present=0
+    /// Will PageFault when try to access page where present=0
+    fn present(&self) -> bool;
 
     fn clear_accessed(&mut self);
     fn clear_dirty(&mut self);

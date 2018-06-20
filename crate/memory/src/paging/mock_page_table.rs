@@ -41,6 +41,7 @@ impl PageTable for MockPageTable {
         let entry = &mut self.entries[addr / PAGE_SIZE];
         assert!(!entry.present);
         entry.present = true;
+        entry.writable = true;
         entry.target = target & !(PAGE_SIZE - 1);
         entry
     }
@@ -79,13 +80,18 @@ impl MockPageTable {
         assert!(entry.present);
         (entry.target & !(PAGE_SIZE - 1)) | (addr & (PAGE_SIZE - 1))
     }
+    fn get_data_mut(&mut self, addr: VirtAddr) -> &mut u8 {
+        let pa = self.translate(addr);
+        assert!(pa < self.data.len(), "Physical memory access out of range");
+        &mut self.data[pa]
+    }
     /// Read memory, mark accessed, trigger page fault if not present
     pub fn read(&mut self, addr: VirtAddr) -> u8 {
         while !self.entries[addr / PAGE_SIZE].present {
             self.trigger_page_fault(addr);
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
-        self.data[self.translate(addr)]
+        *self.get_data_mut(addr)
     }
     /// Write memory, mark accessed and dirty, trigger page fault if not present
     pub fn write(&mut self, addr: VirtAddr, data: u8) {
@@ -94,7 +100,7 @@ impl MockPageTable {
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
         self.entries[addr / PAGE_SIZE].dirty = true;
-        self.data[self.translate(addr)] = data;
+        *self.get_data_mut(addr) = data;
     }
 }
 
@@ -105,7 +111,57 @@ mod test {
     use core::cell::RefCell;
 
     #[test]
-    fn test() {
+    fn read_write() {
+        let mut pt = MockPageTable::new();
+        pt.map(0x0, 0x0);
+        pt.map(0x1000, 0x1000);
+        pt.map(0x2000, 0x1000);
+
+        pt.write(0x0, 1);
+        pt.write(0x1, 2);
+        pt.write(0x1000, 3);
+        assert_eq!(pt.read(0x0), 1);
+        assert_eq!(pt.read(0x1), 2);
+        assert_eq!(pt.read(0x1000), 3);
+        assert_eq!(pt.read(0x2000), 3);
+    }
+
+    #[test]
+    fn entry() {
+        let mut pt = MockPageTable::new();
+        pt.map(0x0, 0x1000);
+        {
+            let entry = pt.get_entry(0);
+            assert!(entry.present());
+            assert!(entry.writable());
+            assert!(!entry.accessed());
+            assert!(!entry.dirty());
+            assert_eq!(entry.target(), 0x1000);
+        }
+
+        pt.read(0x0);
+        assert!(pt.get_entry(0).accessed());
+        assert!(!pt.get_entry(0).dirty());
+
+        pt.get_entry(0).clear_accessed();
+        assert!(!pt.get_entry(0).accessed());
+
+        pt.write(0x1, 1);
+        assert!(pt.get_entry(0).accessed());
+        assert!(pt.get_entry(0).dirty());
+
+        pt.get_entry(0).clear_dirty();
+        assert!(!pt.get_entry(0).dirty());
+
+        pt.get_entry(0).set_writable(false);
+        assert!(!pt.get_entry(0).writable());
+
+        pt.get_entry(0).set_present(false);
+        assert!(!pt.get_entry(0).present());
+    }
+
+    #[test]
+    fn page_fault() {
         let page_fault_count = Arc::new(RefCell::new(0usize));
 
         let mut pt = MockPageTable::new();
@@ -113,31 +169,16 @@ mod test {
             let page_fault_count1 = page_fault_count.clone();
             move |pt: &mut MockPageTable, addr: VirtAddr| {
                 *page_fault_count1.borrow_mut() += 1;
-                pt.map(addr, addr).set_writable(true);
+                pt.map(addr, addr);
             }
         }));
 
         pt.map(0, 0);
         pt.read(0);
         assert_eq!(*page_fault_count.borrow(), 0);
-        assert!(pt.get_entry(0).accessed());
-        assert!(!pt.get_entry(0).dirty());
-
-        pt.get_entry(0).clear_accessed();
-        assert!(!pt.get_entry(0).accessed());
-
-        pt.read(1);
-        assert_eq!(*page_fault_count.borrow(), 0);
-        assert!(pt.get_entry(0).accessed());
 
         pt.write(0x1000, 0xff);
         assert_eq!(*page_fault_count.borrow(), 1);
-        assert!(pt.get_entry(0x1000).accessed());
-        assert!(pt.get_entry(0x1000).dirty());
-        assert_eq!(pt.read(0x1000), 0xff);
-
-        pt.get_entry(0x1000).clear_dirty();
-        assert!(!pt.get_entry(0x1000).dirty());
 
         pt.unmap(0);
         pt.read(0);
