@@ -29,17 +29,15 @@ impl<T: 'static + SwappablePageTable> SwapManager for EnhancedClockSwapManager<T
     fn pop(&mut self) -> Option<usize> {
         loop {
             let addr = self.deque[self.clock_ptr];
-            let accessed = self.page_table.accessed(addr);
-            let dirty = self.page_table.dirty(addr);
+            let entry = self.page_table.get_entry(addr);
 
-            match (accessed, dirty) {
+            match (entry.accessed(), entry.dirty()) {
                 (true, _) => {
-                    self.page_table.clear_accessed(addr);
-
+                    entry.clear_accessed();
                 },
                 (false, true) => {
                     if self.page_table.swap_out(addr).is_ok() {
-                        self.page_table.clear_dirty(addr);
+                        entry.clear_dirty();
                     }
                 },
                 _ => {
