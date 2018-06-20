@@ -17,6 +17,8 @@ pub struct MockEntry {
     writable: bool,
     accessed: bool,
     dirty: bool,
+    writable_shared: bool,
+    readonly_shared: bool,
 }
 
 impl Entry for MockEntry {
@@ -29,6 +31,17 @@ impl Entry for MockEntry {
     fn set_writable(&mut self, value: bool) { self.writable = value; }
     fn set_present(&mut self, value: bool) { self.present = value; }
     fn target(&self) -> usize { self.target }
+
+    fn writable_shared(&self) -> bool { self.writable_shared }
+    fn readonly_shared(&self) -> bool { self.readonly_shared }
+    fn set_shared(&mut self, writable: bool) {
+        self.writable_shared = writable;
+        self.readonly_shared = !writable;
+    }
+    fn clear_shared(&mut self) {
+        self.writable_shared = false;
+        self.readonly_shared = false;
+    }
 }
 
 type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
@@ -50,9 +63,18 @@ impl PageTable for MockPageTable {
         assert!(entry.present);
         entry.present = false;
     }
-
     fn get_entry(&mut self, addr: VirtAddr) -> &mut <Self as PageTable>::Entry {
         &mut self.entries[addr / PAGE_SIZE]
+    }
+    fn read_page(&mut self, addr: usize, data: &mut [u8]) {
+        self._read(addr);
+        let pa = self.translate(addr) & !(PAGE_SIZE - 1);
+        data.copy_from_slice(&self.data[pa..pa + PAGE_SIZE]);
+    }
+    fn write_page(&mut self, addr: usize, data: &[u8]) {
+        self._write(addr);
+        let pa = self.translate(addr) & !(PAGE_SIZE - 1);
+        self.data[pa..pa + PAGE_SIZE].copy_from_slice(data);
     }
 }
 
@@ -78,29 +100,32 @@ impl MockPageTable {
     fn translate(&self, addr: VirtAddr) -> PhysAddr {
         let entry = &self.entries[addr / PAGE_SIZE];
         assert!(entry.present);
-        (entry.target & !(PAGE_SIZE - 1)) | (addr & (PAGE_SIZE - 1))
-    }
-    fn get_data_mut(&mut self, addr: VirtAddr) -> &mut u8 {
-        let pa = self.translate(addr);
+        let pa = (entry.target & !(PAGE_SIZE - 1)) | (addr & (PAGE_SIZE - 1));
         assert!(pa < self.data.len(), "Physical memory access out of range");
-        &mut self.data[pa]
+        pa
     }
-    /// Read memory, mark accessed, trigger page fault if not present
-    pub fn read(&mut self, addr: VirtAddr) -> u8 {
+    fn _read(&mut self, addr: VirtAddr) {
         while !self.entries[addr / PAGE_SIZE].present {
             self.trigger_page_fault(addr);
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
-        *self.get_data_mut(addr)
     }
-    /// Write memory, mark accessed and dirty, trigger page fault if not present
-    pub fn write(&mut self, addr: VirtAddr, data: u8) {
+    fn _write(&mut self, addr: VirtAddr) {
         while !(self.entries[addr / PAGE_SIZE].present && self.entries[addr / PAGE_SIZE].writable) {
             self.trigger_page_fault(addr);
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
         self.entries[addr / PAGE_SIZE].dirty = true;
-        *self.get_data_mut(addr) = data;
+    }
+    /// Read memory, mark accessed, trigger page fault if not present
+    pub fn read(&mut self, addr: VirtAddr) -> u8 {
+        self._read(addr);
+        self.data[self.translate(addr)]
+    }
+    /// Write memory, mark accessed and dirty, trigger page fault if not present
+    pub fn write(&mut self, addr: VirtAddr, data: u8) {
+        self._write(addr);
+        self.data[self.translate(addr)] = data;
     }
 }
 

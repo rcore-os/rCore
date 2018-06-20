@@ -8,6 +8,8 @@ pub trait PageTable {
     fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Self::Entry;
     fn unmap(&mut self, addr: VirtAddr);
     fn get_entry(&mut self, addr: VirtAddr) -> &mut Self::Entry;
+    fn read_page(&mut self, addr: VirtAddr, data: &mut [u8]);
+    fn write_page(&mut self, addr: VirtAddr, data: &[u8]);
 }
 
 pub trait Entry {
@@ -26,4 +28,10 @@ pub trait Entry {
     fn set_present(&mut self, value: bool);
 
     fn target(&self) -> PhysAddr;
+
+    // For Copy-on-write extension
+    fn writable_shared(&self) -> bool;
+    fn readonly_shared(&self) -> bool;
+    fn set_shared(&mut self, writable: bool);
+    fn clear_shared(&mut self);
 }

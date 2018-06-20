@@ -4,6 +4,7 @@
 extern crate alloc;
 
 pub mod paging;
+pub mod cow;
 //pub mod swap;
 
 type VirtAddr = usize;
