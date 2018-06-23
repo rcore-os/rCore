@@ -36,6 +36,7 @@ extern crate simple_filesystem;
 extern crate spin;
 extern crate syscall as redox_syscall;
 extern crate uart_16550;
+extern crate ucore_memory;
 extern crate volatile;
 #[macro_use]
 extern crate x86_64;

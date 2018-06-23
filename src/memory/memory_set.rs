@@ -67,53 +67,60 @@ impl MemoryArea {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let frame = Frame::of_addr(phys_start.get() + page.start_address().as_u64() as usize - self.start_addr);
-                    pt.map_to_(page, frame, self.flags.0);
+                    self.flags.apply(pt.map_to(page, frame));
                 }
             }
             None => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let frame = alloc_frame();
-                    pt.map_to_(page, frame, self.flags.0);
+                    self.flags.apply(pt.map_to(page, frame));
                 }
             }
         }
     }
     fn unmap(&self, pt: &mut ActivePageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            let (frame, flush) = pt.unmap(page).unwrap();
-            flush.flush();
+            let addr = page.start_address().as_u64() as usize;
             if self.phys_start_addr.is_none() {
+                let frame = Frame::of_addr(pt.get_entry(addr).target());
                 dealloc_frame(frame);
             }
+            pt.unmap(addr);
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct MemoryAttr(EntryFlags);
-
-impl Default for MemoryAttr {
-    fn default() -> Self {
-        MemoryAttr(EntryFlags::PRESENT | EntryFlags::NO_EXECUTE | EntryFlags::WRITABLE)
-    }
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+pub struct MemoryAttr {
+    user: bool,
+    readonly: bool,
+    execute: bool,
+    hide: bool,
 }
 
 impl MemoryAttr {
     pub fn user(mut self) -> Self {
-        self.0 |= EntryFlags::USER_ACCESSIBLE;
+        self.user = true;
         self
     }
     pub fn readonly(mut self) -> Self {
-        self.0.remove(EntryFlags::WRITABLE);
+        self.readonly = true;
         self
     }
     pub fn execute(mut self) -> Self {
-        self.0.remove(EntryFlags::NO_EXECUTE);
+        self.execute = true;
         self
     }
     pub fn hide(mut self) -> Self {
-        self.0.remove(EntryFlags::PRESENT);
+        self.hide = true;
         self
+    }
+    fn apply(&self, entry: &mut impl Entry) {
+        if self.user { entry.set_user(true); }
+        if self.readonly { entry.set_writable(false); }
+        if self.execute { entry.set_execute(true); }
+        if self.hide { entry.set_present(false); }
+        if self.user || self.readonly || self.execute || self.hide { entry.update(); }
     }
 }
 
@@ -226,15 +233,6 @@ fn new_page_table_with_kernel() -> InactivePageTable {
     let frame = alloc_frame();
     let mut active_table = active_table();
     let mut page_table = InactivePageTable::new(frame, &mut active_table);
-
-    use consts::{KERNEL_HEAP_PML4, KERNEL_PML4};
-    let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut PageTable) };
-    let e510 = table[KERNEL_PML4].clone();
-    let e509 = table[KERNEL_HEAP_PML4].clone();
-
-    active_table.with(&mut page_table, |pt: &mut ActivePageTable| {
-        table[KERNEL_PML4] = e510;
-        table[KERNEL_HEAP_PML4] = e509;
-    });
+    page_table.map_kernel(&mut active_table);
     page_table
 }

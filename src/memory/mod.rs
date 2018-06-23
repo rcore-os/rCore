@@ -8,6 +8,7 @@ pub use self::memory_set::*;
 pub use self::stack_allocator::*;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
+use ucore_memory::paging::PageTable;
 
 mod memory_set;
 mod stack_allocator;
@@ -42,7 +43,7 @@ fn alloc_stack(size_in_pages: usize) -> Stack {
 fn active_table() -> MutexGuard<'static, ActivePageTable> {
     lazy_static! {
         static ref ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe {
-            ActivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap()
+            ActivePageTable::new()
         });
     }
     ACTIVE_TABLE.lock()
@@ -153,11 +154,10 @@ fn get_init_kstack_and_set_guard_page() -> Stack {
 
     extern { fn stack_bottom(); }
     let stack_bottom = PhysAddr::new(stack_bottom as u64).to_kernel_virtual();
-    let stack_bottom_page = Page::of_addr(stack_bottom);
 
     // turn the stack bottom into a guard page
-    active_table().unmap(stack_bottom_page);
-    debug!("guard page at {:?}", stack_bottom_page.start_address());
+    active_table().unmap(stack_bottom);
+    debug!("guard page at {:?}", stack_bottom);
 
     Stack::new(stack_bottom + 8 * PAGE_SIZE, stack_bottom + 1 * PAGE_SIZE)
 }

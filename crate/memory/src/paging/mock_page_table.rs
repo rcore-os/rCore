@@ -22,6 +22,7 @@ pub struct MockEntry {
 }
 
 impl Entry for MockEntry {
+    fn update(&mut self) {}
     fn accessed(&self) -> bool { self.accessed }
     fn dirty(&self) -> bool { self.dirty }
     fn writable(&self) -> bool { self.writable }
@@ -42,6 +43,11 @@ impl Entry for MockEntry {
         self.writable_shared = false;
         self.readonly_shared = false;
     }
+
+    fn user(&self) -> bool { unimplemented!() }
+    fn set_user(&mut self, value: bool) { unimplemented!() }
+    fn execute(&self) -> bool { unimplemented!() }
+    fn set_execute(&mut self, value: bool) { unimplemented!() }
 }
 
 type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
@@ -49,7 +55,6 @@ type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
 impl PageTable for MockPageTable {
     type Entry = MockEntry;
 
-    /// Map a page, return false if no more space
     fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Self::Entry {
         let entry = &mut self.entries[addr / PAGE_SIZE];
         assert!(!entry.present);

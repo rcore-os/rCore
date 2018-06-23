@@ -22,6 +22,7 @@ impl<T: PageTable> CowExt<T> {
         let entry = self.page_table.map(addr, target);
         entry.set_writable(false);
         entry.set_shared(writable);
+        entry.update();
         let frame = target / PAGE_SIZE;
         match writable {
             true => self.rc_map.write_increase(&frame),
@@ -52,6 +53,7 @@ impl<T: PageTable> CowExt<T> {
             if self.rc_map.read_count(&frame) == 0 && self.rc_map.write_count(&frame) == 1 {
                 entry.clear_shared();
                 entry.set_writable(true);
+                entry.update();
                 self.rc_map.write_decrease(&frame);
                 return true;
             }

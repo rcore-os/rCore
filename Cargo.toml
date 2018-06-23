@@ -36,6 +36,7 @@ uart_16550 = "0.1"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 bit-allocator = { path = "crate/bit-allocator" }
+ucore-memory = { path = "crate/memory" }
 
 [build-dependencies]
 cc = "1.0"

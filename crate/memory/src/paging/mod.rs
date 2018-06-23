@@ -1,6 +1,12 @@
+//! Generic page table interface
+//!
+//! Implemented for every architecture, used by OS.
+
 use super::*;
+#[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
 
+#[cfg(test)]
 mod mock_page_table;
 
 pub trait PageTable {
@@ -13,6 +19,11 @@ pub trait PageTable {
 }
 
 pub trait Entry {
+    /// IMPORTANT!
+    /// This must be called after any change to ensure it become effective.
+    /// Usually this will make a flush to TLB/MMU.
+    fn update(&mut self);
+
     /// Will be set when accessed
     fn accessed(&self) -> bool;
     /// Will be set when written
@@ -34,4 +45,9 @@ pub trait Entry {
     fn readonly_shared(&self) -> bool;
     fn set_shared(&mut self, writable: bool);
     fn clear_shared(&mut self);
+
+    fn user(&self) -> bool;
+    fn set_user(&mut self, value: bool);
+    fn execute(&self) -> bool;
+    fn set_execute(&mut self, value: bool);
 }

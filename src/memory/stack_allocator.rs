@@ -1,5 +1,5 @@
-use super::*;
 use memory::PAGE_SIZE;
+use super::*;
 
 // TODO: use BitAllocator & alloc fixed size stack
 pub struct StackAllocator {
@@ -41,7 +41,7 @@ impl StackAllocator {
                 // map stack pages to physical frames
                 for page in Page::range_inclusive(start, end) {
                     let frame = alloc_frame();
-                    active_table.map_to_(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+                    active_table.map_to(page, frame);
                 }
 
                 // create a new stack
