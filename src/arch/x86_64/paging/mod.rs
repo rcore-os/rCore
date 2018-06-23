@@ -1,4 +1,5 @@
 use memory::*;
+pub use ucore_memory::cow::CowExt;
 pub use ucore_memory::paging::{Entry, PageTable};
 use x86_64::instructions::tlb;
 use x86_64::registers::control::{Cr3, Cr3Flags};
@@ -51,6 +52,8 @@ impl PageTable for ActivePageTable {
     }
 
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
+        assert!(self.0.translate_page(Page::of_addr(addr)).is_some(),
+                "page table entry not exist");
         let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }
@@ -65,6 +68,14 @@ impl PageTable for ActivePageTable {
         use core::slice;
         let mem = unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, 4096) };
         mem.copy_from_slice(data);
+    }
+
+    fn read(&mut self, addr: usize) -> u8 {
+        unsafe { *(addr as *const u8) }
+    }
+
+    fn write(&mut self, addr: usize, data: u8) {
+        unsafe { *(addr as *mut u8) = data; }
     }
 }
 

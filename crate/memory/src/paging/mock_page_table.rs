@@ -81,6 +81,14 @@ impl PageTable for MockPageTable {
         let pa = self.translate(addr) & !(PAGE_SIZE - 1);
         self.data[pa..pa + PAGE_SIZE].copy_from_slice(data);
     }
+    fn read(&mut self, addr: usize) -> u8 {
+        self._read(addr);
+        self.data[self.translate(addr)]
+    }
+    fn write(&mut self, addr: usize, data: u8) {
+        self._write(addr);
+        self.data[self.translate(addr)] = data;
+    }
 }
 
 impl MockPageTable {
@@ -121,16 +129,6 @@ impl MockPageTable {
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
         self.entries[addr / PAGE_SIZE].dirty = true;
-    }
-    /// Read memory, mark accessed, trigger page fault if not present
-    pub fn read(&mut self, addr: VirtAddr) -> u8 {
-        self._read(addr);
-        self.data[self.translate(addr)]
-    }
-    /// Write memory, mark accessed and dirty, trigger page fault if not present
-    pub fn write(&mut self, addr: VirtAddr, data: u8) {
-        self._write(addr);
-        self.data[self.translate(addr)] = data;
     }
 }
 

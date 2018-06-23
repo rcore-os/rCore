@@ -99,7 +99,9 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     }
 
     use process::PROCESSOR;
-    PROCESSOR.try().unwrap().lock().schedule();
+    if let Some(processor) = PROCESSOR.try() {
+        processor.lock().schedule();
+    }
 }
 
 fn breakpoint() {

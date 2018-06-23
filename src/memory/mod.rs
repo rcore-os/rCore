@@ -39,13 +39,14 @@ fn alloc_stack(size_in_pages: usize) -> Stack {
         .alloc_stack(&mut active_table, size_in_pages).expect("no more stack")
 }
 
+lazy_static! {
+    static ref ACTIVE_TABLE: Mutex<CowExt<ActivePageTable>> = Mutex::new(unsafe {
+        CowExt::new(ActivePageTable::new())
+    });
+}
+
 /// The only way to get active page table
-fn active_table() -> MutexGuard<'static, ActivePageTable> {
-    lazy_static! {
-        static ref ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe {
-            ActivePageTable::new()
-        });
-    }
+fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 
@@ -56,9 +57,8 @@ pub fn frame_allocator() -> BitAllocGuard {
 // Return true to continue, false to halt
 pub fn page_fault_handler(addr: VirtAddr) -> bool {
     // Handle copy on write
-    false
-    // FIXME: enable cow
-//    active_table().try_copy_on_write(addr)
+    unsafe { ACTIVE_TABLE.force_unlock(); }
+    active_table().page_fault_handler(addr, || alloc_frame().start_address().as_u64() as usize)
 }
 
 pub fn init(boot_info: BootInformation) -> MemorySet {
@@ -197,5 +197,14 @@ impl From<ElfSectionFlags> for MemoryAttr {
         if !elf_flags.contains(ElfSectionFlags::WRITABLE) { flags = flags.readonly(); }
         if elf_flags.contains(ElfSectionFlags::EXECUTABLE) { flags = flags.execute(); }
         flags
+    }
+}
+
+use super::*;
+
+pub mod test {
+    pub fn cow() {
+        use ucore_memory::cow::test::test_with;
+        test_with(&mut active_table());
     }
 }

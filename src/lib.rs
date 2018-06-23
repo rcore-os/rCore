@@ -81,13 +81,13 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
     arch::gdt::init();
 
-    test!(cow);
+    memory::test::cow();
     test!(global_allocator);
     test!(guard_page);
     test!(find_mp);
 
-    use memory::*;
     let acpi = arch::driver::init(rsdt_addr, |addr: usize, count: usize| {
+        use memory::*;
         kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
     });
 
@@ -168,10 +168,5 @@ mod test {
         stack_overflow();
 
         println!("It did not crash!");
-    }
-
-    pub fn cow() {
-        use arch;
-//        arch::paging::test_cow();
     }
 }
