@@ -200,10 +200,9 @@ impl From<ElfSectionFlags> for MemoryAttr {
     }
 }
 
-use super::*;
-
 pub mod test {
     pub fn cow() {
+        use super::*;
         use ucore_memory::cow::test::test_with;
         test_with(&mut active_table());
     }
