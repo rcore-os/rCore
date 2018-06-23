@@ -14,7 +14,7 @@ mod memory_set;
 mod stack_allocator;
 mod address;
 
-const PAGE_SIZE: usize = 1 << 12;
+pub const PAGE_SIZE: usize = 1 << 12;
 
 lazy_static! {
     static ref FRAME_ALLOCATOR: Mutex<BitAlloc64K> = Mutex::new(BitAlloc64K::default());

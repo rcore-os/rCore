@@ -19,6 +19,7 @@ pub struct MockEntry {
     dirty: bool,
     writable_shared: bool,
     readonly_shared: bool,
+    swapped: bool,
 }
 
 impl Entry for MockEntry {
@@ -32,7 +33,7 @@ impl Entry for MockEntry {
     fn set_writable(&mut self, value: bool) { self.writable = value; }
     fn set_present(&mut self, value: bool) { self.present = value; }
     fn target(&self) -> usize { self.target }
-
+    fn set_target(&mut self, target: usize) { self.target = target; }
     fn writable_shared(&self) -> bool { self.writable_shared }
     fn readonly_shared(&self) -> bool { self.readonly_shared }
     fn set_shared(&mut self, writable: bool) {
@@ -43,7 +44,8 @@ impl Entry for MockEntry {
         self.writable_shared = false;
         self.readonly_shared = false;
     }
-
+    fn swapped(&self) -> bool { self.swapped }
+    fn set_swapped(&mut self, value: bool) { self.swapped = value; }
     fn user(&self) -> bool { unimplemented!() }
     fn set_user(&mut self, value: bool) { unimplemented!() }
     fn execute(&self) -> bool { unimplemented!() }
@@ -71,15 +73,11 @@ impl PageTable for MockPageTable {
     fn get_entry(&mut self, addr: VirtAddr) -> &mut <Self as PageTable>::Entry {
         &mut self.entries[addr / PAGE_SIZE]
     }
-    fn read_page(&mut self, addr: usize, data: &mut [u8]) {
+    fn get_page_slice_mut<'a,'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8] {
         self._read(addr);
         let pa = self.translate(addr) & !(PAGE_SIZE - 1);
-        data.copy_from_slice(&self.data[pa..pa + PAGE_SIZE]);
-    }
-    fn write_page(&mut self, addr: usize, data: &[u8]) {
-        self._write(addr);
-        let pa = self.translate(addr) & !(PAGE_SIZE - 1);
-        self.data[pa..pa + PAGE_SIZE].copy_from_slice(data);
+        let data = unsafe{ &mut *(&mut self.data as *mut [u8; PAGE_SIZE * PAGE_COUNT])};
+        &mut data[pa..pa + PAGE_SIZE]
     }
     fn read(&mut self, addr: usize) -> u8 {
         self._read(addr);

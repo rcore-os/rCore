@@ -78,12 +78,12 @@ impl<T: PageTable> CowExt<T> {
         }
         use core::mem::uninitialized;
         let mut temp_data: [u8; PAGE_SIZE] = unsafe { uninitialized() };
-        self.read_page(addr, &mut temp_data[..]);
+        temp_data[..].copy_from_slice(self.get_page_slice_mut(addr));
 
         self.unmap_shared(addr);
         self.map(addr, alloc_frame());
 
-        self.write_page(addr, &temp_data[..]);
+        self.get_page_slice_mut(addr).copy_from_slice(&temp_data[..]);
         true
     }
 }

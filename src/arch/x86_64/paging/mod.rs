@@ -58,16 +58,9 @@ impl PageTable for ActivePageTable {
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }
 
-    fn read_page(&mut self, addr: usize, data: &mut [u8]) {
+    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8] {
         use core::slice;
-        let mem = unsafe { slice::from_raw_parts((addr & !0xfffusize) as *const u8, 4096) };
-        data.copy_from_slice(mem);
-    }
-
-    fn write_page(&mut self, addr: usize, data: &[u8]) {
-        use core::slice;
-        let mem = unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, 4096) };
-        mem.copy_from_slice(data);
+        unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, PAGE_SIZE) }
     }
 
     fn read(&mut self, addr: usize) -> u8 {
@@ -119,6 +112,10 @@ impl Entry for PageEntry {
     fn set_writable(&mut self, value: bool) { self.as_flags().set(EF::WRITABLE, value); }
     fn set_present(&mut self, value: bool) { self.as_flags().set(EF::PRESENT, value); }
     fn target(&self) -> usize { self.0.addr().as_u64() as usize }
+    fn set_target(&mut self, target: usize) {
+        let flags = self.0.flags();
+        self.0.set_addr(PhysAddr::new(target as u64), flags);
+    }
     fn writable_shared(&self) -> bool { self.0.flags().contains(EF::BIT_10) }
     fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::BIT_9) }
     fn set_shared(&mut self, writable: bool) {
@@ -127,6 +124,8 @@ impl Entry for PageEntry {
         flags.set(EF::BIT_9, !writable);
     }
     fn clear_shared(&mut self) { self.as_flags().remove(EF::BIT_9 | EF::BIT_10); }
+    fn swapped(&self) -> bool { self.0.flags().contains(EF::BIT_11) }
+    fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::BIT_11, value); }
     fn user(&self) -> bool { self.0.flags().contains(EF::USER_ACCESSIBLE) }
     fn set_user(&mut self, value: bool) {
         self.as_flags().set(EF::USER_ACCESSIBLE, value);
