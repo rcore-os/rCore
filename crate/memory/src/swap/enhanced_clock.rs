@@ -1,13 +1,15 @@
 use alloc::vec_deque::VecDeque;
 use super::*;
+use paging::Entry;
 
-pub struct EnhancedClockSwapManager<T: 'static + SwappablePageTable> {
-    page_table: &'static mut T,
+#[derive(Default)]
+pub struct EnhancedClockSwapManager {
     clock_ptr: usize,
     deque: VecDeque<VirtAddr>,
 }
 
-impl<T: 'static + SwappablePageTable> SwapManager for EnhancedClockSwapManager<T> {
+// FIXME: It's unusable. But can pass a simple test.
+impl SwapManager for EnhancedClockSwapManager {
     fn tick(&mut self) {
     }
 
@@ -26,19 +28,28 @@ impl<T: 'static + SwappablePageTable> SwapManager for EnhancedClockSwapManager<T
         self.deque.remove(id);
     }
 
-    fn pop(&mut self) -> Option<usize> {
+    fn pop<T, S>(&mut self, page_table: &mut T, _swapper: &mut S) -> Option<VirtAddr>
+        where T: PageTable, S: Swapper
+    {
         loop {
             let addr = self.deque[self.clock_ptr];
-            let entry = self.page_table.get_entry(addr);
+            // FIXME: Once define `slice`, all modifies of `entry` below will fail.
+            //        Then the loop will never stop.
+            //        The reason may be `get_page_slice_mut()` contains unsafe operation,
+            //        which lead the compiler to do a wrong optimization.
+//            let slice = page_table.get_page_slice_mut(addr);
+            let entry = page_table.get_entry(addr);
+//            println!("{:#x} , {}, {}", addr, entry.accessed(), entry.dirty());
 
             match (entry.accessed(), entry.dirty()) {
                 (true, _) => {
                     entry.clear_accessed();
                 },
                 (false, true) => {
-                    if self.page_table.swap_out(addr).is_ok() {
-                        entry.clear_dirty();
-                    }
+                    // FIXME:
+//                    if let Ok(token) = swapper.swap_out(slice) {
+//                        entry.clear_dirty();
+//                    }
                 },
                 _ => {
                     return self.remove_current();
@@ -50,14 +61,7 @@ impl<T: 'static + SwappablePageTable> SwapManager for EnhancedClockSwapManager<T
 }
 
 
-impl<T: 'static + SwappablePageTable> EnhancedClockSwapManager<T> {
-    pub fn new(page_table: &'static mut T) -> Self {
-        EnhancedClockSwapManager {
-            page_table,
-            clock_ptr: 0,
-            deque: VecDeque::<VirtAddr>::new()
-        }
-    }
+impl EnhancedClockSwapManager {
     fn remove_current(&mut self) -> Option<VirtAddr> {
         let addr = self.deque.remove(self.clock_ptr);
         if self.clock_ptr == self.deque.len() {
@@ -76,45 +80,12 @@ impl<T: 'static + SwappablePageTable> EnhancedClockSwapManager<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloc::{arc::Arc, boxed::Box};
-    use core::mem::uninitialized;
-    use core::cell::RefCell;
-    use paging::MockPageTable;
-
-    impl SwappablePageTable for MockPageTable {
-        fn swap_out(&mut self, addr: usize) -> Result<(), ()> {
-            Ok(())
-        }
-    }
-
-    enum MemOp {
-        R(usize), W(usize)
-    }
+    use swap::test::*;
 
     #[test]
     fn test() {
         use self::MemOp::{R, W};
-        let page_fault_count = Arc::new(RefCell::new(0usize));
-
-        let mut pt = Box::new(MockPageTable::new(4));
-        let static_pt = unsafe{ &mut *(pt.as_mut() as *mut MockPageTable) };
-        pt.set_handler(Box::new({
-            let page_fault_count1 = page_fault_count.clone();
-            let mut clock = EnhancedClockSwapManager::new(static_pt);
-
-            move |pt: &mut MockPageTable, addr: VirtAddr| {
-                *page_fault_count1.borrow_mut() += 1;
-
-                if !pt.map(addr) {  // is full?
-                    pt.unmap(clock.pop().unwrap());
-                    pt.map(addr);
-                }
-                clock.push(addr);
-            }
-        }));
-
-
-        let op_seq = [
+        let ops = [
             R(0x1000), R(0x2000), R(0x3000), R(0x4000),
             R(0x3000), W(0x1000), R(0x4000), W(0x2000), R(0x5000),
             R(0x2000), W(0x1000), R(0x2000), R(0x3000), R(0x4000)];
@@ -122,12 +93,6 @@ mod test {
             1, 2, 3, 4,
             4, 4, 4, 4, 5,
             5, 5, 5, 6, 7];
-        for (op, &count) in op_seq.iter().zip(pgfault_count.iter()) {
-            match op {
-                R(addr) => {pt.read(*addr);},
-                W(addr) => pt.write(*addr, 0),
-            }
-            assert_eq!(*(*page_fault_count).borrow(), count);
-        }
+        test_manager(EnhancedClockSwapManager::default(), &ops, &pgfault_count);
     }
 }

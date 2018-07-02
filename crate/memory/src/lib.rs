@@ -3,6 +3,11 @@
 
 extern crate alloc;
 
+// To use `println!` in test
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 pub mod paging;
 pub mod cow;
 pub mod swap;
