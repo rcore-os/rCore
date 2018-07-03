@@ -14,49 +14,79 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_implementation)]
 #![feature(panic_info_message)]
+#![feature(universal_impl_trait)]
 #![no_std]
 
 
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate alloc;
+#[cfg(target_arch = "x86_64")]
 extern crate bit_allocator;
+#[cfg(target_arch = "x86_64")]
 extern crate bit_field;
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate bitflags;
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate lazy_static;
+#[cfg(target_arch = "x86_64")]
 extern crate linked_list_allocator;
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate log;
+#[cfg(target_arch = "x86_64")]
 extern crate multiboot2;
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate once;
+#[cfg(target_arch = "x86_64")]
 extern crate rlibc;
+#[cfg(target_arch = "x86_64")]
 extern crate simple_filesystem;
+#[cfg(target_arch = "x86_64")]
 extern crate spin;
+#[cfg(target_arch = "x86_64")]
 extern crate syscall as redox_syscall;
+#[cfg(target_arch = "x86_64")]
 extern crate uart_16550;
+#[cfg(target_arch = "x86_64")]
 extern crate ucore_memory;
+#[cfg(target_arch = "x86_64")]
 extern crate volatile;
 #[macro_use]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
+#[cfg(target_arch = "x86_64")]
 extern crate xmas_elf;
 
+#[cfg(target_arch = "x86_64")]
 pub use arch::interrupt::{rust_trap, set_return_rsp};
+#[cfg(target_arch = "x86_64")]
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
+#[cfg(target_arch = "x86_64")]
 mod io;
+#[cfg(target_arch = "x86_64")]
 mod memory;
 mod lang;
+#[cfg(target_arch = "x86_64")]
 mod util;
 #[macro_use]
 mod macros;
+#[cfg(target_arch = "x86_64")]
 mod consts;
+#[cfg(target_arch = "x86_64")]
 mod process;
+#[cfg(target_arch = "x86_64")]
 mod syscall;
+#[cfg(target_arch = "x86_64")]
 mod fs;
+#[cfg(target_arch = "x86_64")]
 mod thread;
+#[cfg(target_arch = "x86_64")]
 mod sync;
 
 #[allow(dead_code)]
@@ -66,6 +96,7 @@ mod arch;
 
 /// The entry point of Rust kernel
 #[no_mangle]
+#[cfg(target_arch = "x86_64")]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::idt::init();
     io::init();
@@ -124,6 +155,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
 /// The entry point for another processors
 #[no_mangle]
+#[cfg(target_arch = "x86_64")]
 pub extern "C" fn other_main() -> ! {
     arch::gdt::init();
     arch::idt::init();
@@ -142,8 +174,10 @@ pub extern "C" fn other_main() -> ! {
 ///
 /// It should be defined in memory mod, but in Rust `global_allocator` must be in root mod.
 #[global_allocator]
+#[cfg(target_arch = "x86_64")]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
+#[cfg(target_arch = "x86_64")]
 mod test {
     pub fn global_allocator() {
         for i in 0..10000 {

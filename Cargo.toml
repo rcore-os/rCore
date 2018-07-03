@@ -19,7 +19,7 @@ opt-level = 1
 [profile.release]
 debug = true
 
-[dependencies]
+[target.x86_64-blog_os.dependencies]
 bit_field = "0.9.0"
 rlibc = "1.0"
 volatile = "0.1.0"

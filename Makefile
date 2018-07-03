@@ -8,10 +8,13 @@
 # 	make asm					Open the deassemble file of the last build
 # 	make clean					Clean
 
-arch ?= x86_64
+arch ?= riscv
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
+ifeq ($(arch), riscv)
+target := riscv32i-unknown-none
+endif
 mode ?= debug
 rust_os := target/$(target)/$(mode)/librust_ucore.a
 
@@ -153,3 +156,6 @@ docker_interactive:
 
 docker_clean:
 	@docker volume rm $(docker_clean_args)
+
+docker_riscv:
+	@docker run -it --rm $(docker_args) riscv-rust
