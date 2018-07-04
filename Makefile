@@ -1,5 +1,6 @@
 # Examples:
 # 	make run					Run in debug
+# 	make justrun				Run in debug without build
 #	make run int=1				Run with interrupt info by QEMU
 # 	make run mode=release		Run in release
 #	make run LOG=error			Run with log level: error
@@ -8,15 +9,15 @@
 # 	make asm					Open the deassemble file of the last build
 # 	make clean					Clean
 
-arch ?= riscv
+arch ?= riscv32
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
-ifeq ($(arch), riscv)
+ifeq ($(arch), riscv32)
 target := riscv32i-unknown-none
 endif
 mode ?= debug
-rust_os := target/$(target)/$(mode)/librust_ucore.a
+rust_lib := target/$(target)/$(mode)/librust_ucore.a
 
 boot_src := src/arch/$(arch)/boot
 linker_script := $(boot_src)/linker.ld
@@ -28,6 +29,9 @@ user_image_files := $(wildcard user/*.img)
 user_object_files := $(patsubst user/%.img, build/user/%.o, $(user_image_files))
 SFSIMG := user/ucore32.img
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
+ifeq ($(arch), riscv32)
+qemu_opts := -machine virt -kernel $(iso) -nographic
+endif
 features := use_apic
 
 LOG ?= debug
@@ -65,17 +69,18 @@ else
 uname := $(shell uname)
 endif
 
-ifeq ($(uname), Linux)
-prefix :=
-else
+ifeq ($(uname), Darwin)
 prefix := x86_64-elf-
+endif
+ifeq ($(arch), riscv32)
+prefix := riscv32-unknown-elf-
 endif
 
 ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
 
-.PHONY: all clean run iso kernel build asm doc
+.PHONY: all clean run iso build asm doc justrun
 
 all: $(kernel)
 
@@ -85,7 +90,9 @@ clean:
 doc:
 	@cargo rustdoc -- --document-private-items
 
-run: $(iso)
+run: $(iso) justrun
+
+justrun:
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
 debug: $(iso)
@@ -98,22 +105,35 @@ build: iso
 asm:
 	@$(objdump) -dS $(kernel) | less
 
-$(iso): $(kernel) $(grub_cfg)
+build/os-x86_64.iso: $(kernel) $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
 	@cp $(grub_cfg) build/isofiles/boot/grub
 	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
 	@rm -r build/isofiles
 
-$(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
-	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
-		$(assembly_object_files) $(rust_os)
+build/os-riscv32.iso: $(kernel)
+	@cd riscv-pk && \
+	 mkdir -p build && \
+	 cd build && \
+	 ../configure \
+	 	--enable-logo \
+	 	--prefix=$(RISCV) \
+	 	--disable-fp-emulation \
+	 	--host=riscv32-unknown-elf \
+	 	--with-payload=../../build/kernel-riscv32.bin && \
+	 make && \
+	 cp bbl ../../$@
 
-kernel:
+$(kernel): $(rust_lib) $(assembly_object_files) $(linker_script)
+	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
+		$(assembly_object_files) $(rust_lib)
+
+$(rust_lib):
 	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
 
 # compile assembly files
-build/arch/$(arch)/boot/%.o: $(boot_src)/%.asm
+build/arch/x86_64/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 

@@ -38,5 +38,8 @@ simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-R
 bit-allocator = { path = "crate/bit-allocator" }
 ucore-memory = { path = "crate/memory" }
 
+[target.riscv32i-unknown-none.dependencies]
+riscv = { git = "https://github.com/riscv-rust/riscv" }
+
 [build-dependencies]
 cc = "1.0"

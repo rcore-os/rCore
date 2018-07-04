@@ -1,5 +1,15 @@
 # RustOS for x86_64 SMP
 
+## Port to RISCV (WIP)
+
+2018年计算机系统综合实验
+
+[Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
+
+[Documents](./docs/RISCV.md)
+
+## Summary
+
 [![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/wangrunji0408/RustOS)
 
 A project of THU OS2018 spring.

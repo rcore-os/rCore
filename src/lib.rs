@@ -15,6 +15,7 @@
 #![feature(panic_implementation)]
 #![feature(panic_info_message)]
 #![feature(universal_impl_trait)]
+#![feature(global_asm)]
 #![no_std]
 
 
@@ -93,6 +94,16 @@ mod sync;
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86_64/mod.rs"]
 mod arch;
+
+#[cfg(target_arch = "riscv")]
+#[path = "arch/riscv32/mod.rs"]
+mod arch;
+
+#[no_mangle]
+#[cfg(target_arch = "riscv")]
+pub extern fn rust_main() -> ! {
+    loop {}
+}
 
 /// The entry point of Rust kernel
 #[no_mangle]
