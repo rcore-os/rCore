@@ -80,7 +80,7 @@ ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
 
-.PHONY: all clean run iso build asm doc justrun
+.PHONY: all clean run iso build asm doc justrun kernel
 
 all: $(kernel)
 
@@ -125,11 +125,11 @@ build/os-riscv32.iso: $(kernel)
 	 make && \
 	 cp bbl ../../$@
 
-$(kernel): $(rust_lib) $(assembly_object_files) $(linker_script)
+$(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
 		$(assembly_object_files) $(rust_lib)
 
-$(rust_lib):
+kernel:
 	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
 
 # compile assembly files

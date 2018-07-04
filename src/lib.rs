@@ -102,6 +102,7 @@ mod arch;
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
+    arch::test();
     loop {}
 }
 
