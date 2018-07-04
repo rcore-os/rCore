@@ -79,6 +79,7 @@ endif
 ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
+as := $(prefix)as
 
 .PHONY: all clean run iso build asm doc justrun kernel
 
@@ -136,6 +137,10 @@ kernel:
 build/arch/x86_64/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
+
+build/arch/riscv32/boot/%.o: $(boot_src)/%.asm
+	@mkdir -p $(shell dirname $@)
+	@$(as) -march=rv32i $< -o $@
 
 # make .o from .img file
 build/user/%.o: user/%.img
