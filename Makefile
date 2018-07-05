@@ -13,9 +13,6 @@ arch ?= riscv32
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 target ?= $(arch)-blog_os
-ifeq ($(arch), riscv32)
-target := riscv32i-unknown-none
-endif
 mode ?= debug
 rust_lib := target/$(target)/$(mode)/librust_ucore.a
 

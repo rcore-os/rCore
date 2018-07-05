@@ -1,0 +1,30 @@
+{
+  "llvm-target": "riscv32",
+  "data-layout": "e-m:e-p:32:32-i64:64-n32-S128",
+  "target-endian": "little",
+  "target-pointer-width": "32",
+  "target-c-int-width": "32",
+  "os": "none",
+  "arch": "riscv",
+  "cpu": "generic-rv32",
+  "features": "+a",
+  "max-atomic-width": "32",
+  "linker": "ld.lld",
+  "linker-flavor": "ld",
+  "executables": true,
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "abi-blacklist": [
+    "cdecl",
+    "stdcall",
+    "fastcall",
+    "vectorcall",
+    "thiscall",
+    "aapcs",
+    "win64",
+    "sysv64",
+    "ptx-kernel",
+    "msp430-interrupt",
+    "x86-interrupt"
+  ]
+}
