@@ -39,7 +39,7 @@ bit-allocator = { path = "crate/bit-allocator" }
 ucore-memory = { path = "crate/memory" }
 
 [target.riscv32i-unknown-none.dependencies]
-riscv = { git = "https://github.com/riscv-rust/riscv" }
+riscv = { path = "crate/riscv" }
 bbl = { path = "crate/bbl" }
 
 [build-dependencies]
