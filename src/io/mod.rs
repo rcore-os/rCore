@@ -1,10 +1,7 @@
 use arch::driver::serial::COM1;
-use arch::driver::vga::Color;
 use core::fmt;
 use log;
 use log::{Level, LevelFilter, Log, Metadata, Record};
-
-mod vga_writer;
 
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
@@ -107,4 +104,26 @@ fn color_to_console_code(color: Color) -> (u8, u8) {
         Color::Yellow => (1, 3),
         Color::White => (1, 0),
     }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[repr(u8)]
+pub enum Color {
+    Black = 0,
+    Blue = 1,
+    Green = 2,
+    Cyan = 3,
+    Red = 4,
+    Magenta = 5,
+    Brown = 6,
+    LightGray = 7,
+    DarkGray = 8,
+    LightBlue = 9,
+    LightGreen = 10,
+    LightCyan = 11,
+    LightRed = 12,
+    Pink = 13,
+    Yellow = 14,
+    White = 15,
 }

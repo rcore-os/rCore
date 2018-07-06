@@ -1,34 +1,14 @@
 use consts::KERNEL_OFFSET;
 use core::ptr::Unique;
+use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
 use x86_64::instructions::port::Port;
+use io::Color;
 
 pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe {
     Unique::new_unchecked((KERNEL_OFFSET + 0xb8000) as *mut _)
 };
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[repr(u8)]
-pub enum Color {
-    Black      = 0,
-    Blue       = 1,
-    Green      = 2,
-    Cyan       = 3,
-    Red        = 4,
-    Magenta    = 5,
-    Brown      = 6,
-    LightGray  = 7,
-    DarkGray   = 8,
-    LightBlue  = 9,
-    LightGreen = 10,
-    LightCyan  = 11,
-    LightRed   = 12,
-    Pink       = 13,
-    Yellow     = 14,
-    White      = 15,
-}
 
 #[derive(Debug, Clone, Copy)]
 struct ColorCode(u8);
@@ -90,12 +70,72 @@ impl VgaBuffer {
     }
 }
 
-#[cfg(test)]
-mod test {
-    #[test]
-    fn print_something() {
-        let vga = unsafe {&mut *VGA_BUFFER};
-        vga.clear();
-        vga.write(0, 0, ScreenChar::new('h', Color::LightGray, Color::Black));
+lazy_static! {
+	pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
+		// It is the only user of VGA_BUFFER. So it's safe.
+		VgaWriter::new(unsafe{ &mut *VGA_BUFFER.as_ptr() })
+	);
+}
+
+pub struct VgaWriter {
+    column_position: usize,
+    color: Color,
+    buffer: &'static mut VgaBuffer,
+}
+
+impl VgaWriter {
+    fn new(buffer: &'static mut VgaBuffer) -> Self {
+        buffer.clear();
+        VgaWriter {
+            column_position: 0,
+            color: Color::LightGray,
+            buffer,
+        }
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                self.buffer.write(row, col, ScreenChar::new(byte, self.color, Color::Black));
+                self.column_position += 1;
+                self.buffer.set_cursor_at(row, col);
+            }
+        }
+    }
+
+    fn new_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let screen_char = self.buffer.read(row, col);
+                self.buffer.write(row - 1, col, screen_char);
+            }
+        }
+        let blank = ScreenChar::new(b' ', self.color, Color::Black);
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.write(BUFFER_HEIGHT - 1, col, blank);
+        }
+        self.column_position = 0;
+        self.buffer.set_cursor_at(BUFFER_HEIGHT - 1, 0);
+    }
+}
+
+impl fmt::Write for VgaWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for byte in s.bytes() {
+            self.write_byte(byte)
+        }
+        Ok(())
     }
 }

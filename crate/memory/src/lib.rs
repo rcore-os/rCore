@@ -1,5 +1,7 @@
 #![no_std]
 #![feature(alloc)]
+#![feature(universal_impl_trait)]
+#![feature(match_default_bindings)]
 
 extern crate alloc;
 

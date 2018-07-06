@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(asm)]
+#![feature(universal_impl_trait)]
 
 extern crate bit_field;
 
@@ -108,6 +109,7 @@ impl BitAlloc for BitAlloc16 {
 }
 
 #[inline(always)]
+#[cfg(target_arch = "x86_64")]
 fn log2(x: u16) -> usize {
     assert_ne!(x, 0);
     let pos: u16;
@@ -115,20 +117,26 @@ fn log2(x: u16) -> usize {
     pos as usize
 }
 
+#[inline(always)]
+#[cfg(not(target_arch = "x86_64"))]
+fn log2(x: u16) -> usize {
+    log2_naive(x)
+}
+
+#[inline(always)]
+fn log2_naive(mut x: u16) -> usize {
+    assert_ne!(x, 0);
+    let mut pos = -1;
+    while x != 0 {
+        pos += 1;
+        x >>= 1;
+    }
+    pos as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[inline(always)]
-    fn log2_naive(mut x: u16) -> usize {
-        assert_ne!(x, 0);
-        let mut pos = -1;
-        while x != 0 {
-            pos += 1;
-            x >>= 1;
-        }
-        pos as usize
-    }
 
     #[test]
     fn log2_() {

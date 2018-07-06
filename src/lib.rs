@@ -42,11 +42,9 @@ extern crate multiboot2;
 #[macro_use]
 #[cfg(target_arch = "x86_64")]
 extern crate once;
-#[cfg(target_arch = "x86_64")]
 extern crate rlibc;
 #[cfg(target_arch = "x86_64")]
 extern crate simple_filesystem;
-#[cfg(target_arch = "x86_64")]
 extern crate spin;
 #[cfg(target_arch = "x86_64")]
 extern crate syscall as redox_syscall;
@@ -70,6 +68,12 @@ use linked_list_allocator::LockedHeap;
 #[macro_use]    // print!
 #[cfg(target_arch = "x86_64")]
 mod io;
+
+#[macro_use]    // print!
+#[cfg(target_arch = "riscv")]
+#[path = "io/riscv_io.rs"]
+mod io;
+
 #[cfg(target_arch = "x86_64")]
 mod memory;
 mod lang;
