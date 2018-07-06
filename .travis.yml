@@ -1,33 +1,14 @@
+sudo: required
+
 language: rust
 
-rust:
-    - nightly-2018-04-01
+services:
+  - docker
 
-cache: 
-  cargo: true
-
-before_script:
-  - rustup component add rust-src
-  - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)
-  - (test -x $HOME/.cargo/bin/xargo || cargo install xargo)
-  - cargo install-update -a
-
-sudo: false
-
-notifications:
-    email:
-        on_failure: change
-
-addons:
-  apt:
-    packages:
-      - nasm
-      - qemu
-
-env:
-  matrix:
-    - TASK="build"
-#    - TASK="run travis=1"
+before_install:
+  - docker pull wangrunji0408/riscv-rust
+  - docker run -d -v $(pwd):$(pwd) -w $(pwd) wangrunji0408/riscv-rust \
+    /bin/sh -c "make build arch=riscv32"
 
 script:
-  - make ${TASK}
+- bundle exec rake test
