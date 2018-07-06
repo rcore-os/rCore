@@ -168,7 +168,7 @@ docker_build:
 	@docker build docker/ -t $(docker_image):$(tag)
 
 docker_iso:
-	docker run --rm $(docker_args) $(docker_image):$(tag) make iso
+	@docker run --rm $(docker_args) $(docker_image):$(tag) make iso
 
 docker_run: docker_iso
 	@qemu-system-$(arch) -cdrom $(iso) -s
@@ -180,4 +180,4 @@ docker_clean:
 	@docker volume rm $(docker_clean_args)
 
 docker_riscv:
-	@docker run -it --rm $(docker_args) riscv-rust
+	@docker run -it --rm $(docker_args) wangrunji0408/riscv-rust

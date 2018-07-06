@@ -1,12 +1,30 @@
-# RustOS for x86_64 SMP
+# RustOS
 
 ## Port to RISCV (WIP)
 
-2018年计算机系统综合实验
+2018年THU计算机系统综合实验
 
 [Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
 
 [Documents](./docs/RISCV.md)
+
+### Environment
+
+[Dockerfile](./riscv-env/Dockerfile) (Can not build directly. Just for reference)
+
+Available on DockerHub: `wangrunji0408/riscv-rust`
+
+### How to run
+
+```bash
+git clone https://github.com/wangrunji0408/RustOS.git -b riscv --recursive
+cd RustOS
+# Pull docker image and enter docker interactive shell
+make docker_riscv
+# Inside docker ...
+make build
+make justrun
+```
 
 ## Summary
 
