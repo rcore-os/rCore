@@ -23,7 +23,9 @@ pub fn panic(info: &PanicInfo) -> ! {
 
 #[cfg(target_arch = "riscv")]
 #[lang = "panic_fmt"]
-unsafe extern "C" fn panic_fmt(_fmt: ::core::fmt::Arguments, _file: &'static str, _line: u32, _col: u32) -> ! {
+#[no_mangle]
+pub fn panic_fmt(fmt: ::core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
+    println!("\n\nPANIC in {} at {}:{}\n    {}", file, line, col, fmt);
     loop {}
 }
 

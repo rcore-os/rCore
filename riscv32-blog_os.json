@@ -7,7 +7,7 @@
   "os": "none",
   "arch": "riscv",
   "cpu": "generic-rv32",
-  "features": "+a",
+  "features": "+m,+a",
   "max-atomic-width": "32",
   "linker": "ld.lld",
   "linker-flavor": "ld",
