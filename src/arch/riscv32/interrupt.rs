@@ -7,12 +7,27 @@ pub fn init() {
         // Enable interrupt
         sstatus::set_sie();
     }
+    println!("interrupt: init end");
 }
 
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    println!("Trap:\n{:#x?}", tf);
-    loop {}
+    use super::riscv::register::scause::{Trap, Interrupt, Exception};
+    match tf.scause.cause() {
+        Trap::Interrupt(SupervisorTimer) => timer(),
+        _ => panic!("Unhandled interrupt: {:?}\n{:#x?}", tf.scause.cause(), tf),
+    }
+}
+
+fn timer() {
+    static mut TICK: usize = 0;
+    unsafe {
+        TICK += 1;
+        if TICK % 100 == 0 {
+            println!("timer");
+        }
+    }
+    super::timer::set_next();
 }
 
 #[derive(Debug, Clone)]
