@@ -6,7 +6,7 @@ pub struct SerialPort;
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.bytes() {
-            sbi::console_putchar(c as u32);
+            sbi::console_putchar(c as usize);
         }
         Ok(())
     }
