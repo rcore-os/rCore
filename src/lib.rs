@@ -60,8 +60,9 @@ extern crate x86_64;
 #[cfg(target_arch = "x86_64")]
 extern crate xmas_elf;
 
+pub use arch::interrupt::rust_trap;
 #[cfg(target_arch = "x86_64")]
-pub use arch::interrupt::{rust_trap, set_return_rsp};
+pub use arch::interrupt::set_return_rsp;
 #[cfg(target_arch = "x86_64")]
 use linked_list_allocator::LockedHeap;
 
@@ -106,7 +107,7 @@ mod arch;
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
-    arch::test();
+    arch::init();
     loop {}
 }
 
