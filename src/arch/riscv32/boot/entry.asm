@@ -1,10 +1,10 @@
-    .section .text,"ax",%progbits
+    .section .entry
     .globl kern_entry
 kern_entry:
     la sp, bootstacktop
     tail rust_main
 
-.section .data
+    .section .data
     .align 12  #PGSHIFT
     .global bootstack
 bootstack:
