@@ -41,5 +41,44 @@ bbl-ucore使用RISCV1.9的bbl，ucore_os_lab使用RISCV1.10的bbl。后者相比
 
 注：事实上ucore_os_lab中的虚实地址并不一致，且没有内存映射，但依然能够运行，应该是由于编译器生成的所有跳转都使用相对偏移。而Rust编译器会生成绝对地址跳转，因此若虚实不一致会导致非法访存。
 
+## Trap
+
+参考资料：
+
+* [bbl-ucore lab1文档](https://ring00.github.io/bbl-ucore/#/lab1)
+* [RISCV官方slice](https://riscv.org/wp-content/uploads/2016/07/Tue0900_RISCV-20160712-InterruptsV2.pdf)
+
+### Trap
+
+* 中断帧：32个整数寄存器 + 4个S-Mode状态寄存器
+* 开启中断：
+  * stvec：设置中断处理函数地址
+  * sstatus：SIE bit 开启中断
+
+### Timer
+
+* 开启时钟中断：
+
+  * sie：STIE bit 开启时钟中断
+  * sbi::set_timer：设置下次中断时间
+
+* 读取时间：
+
+  * mtime：可读出当前时间（低32bit）
+
+  * mtimeh：当前时间（高32bit），仅RV32有效
+
+    因此RV32下要读取完整时间u64，需循环读取判等，因为指令之间可能被中断，要保证原子性。详见`get_cycle()`。
+
+* 触发中断：
+
+  * mtimecmp(h)：下次触发时钟中断的时间
+
+    当time>=timecmp时，触发中断
+
+    可通过sbi::set_timer设置
+
+
+
 
 
