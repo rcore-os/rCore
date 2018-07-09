@@ -144,6 +144,10 @@ build/user/%.o: user/%.img
 	@mkdir -p $(shell dirname $@)
 	@$(ld) -r -b binary $< -o $@
 
+# patch Rust core for RISCV32I atomic
+patch-core:
+	@patch -p0 /rust/rust-riscv-rust-1.26.0-1-dev/src/libcore/sync/atomic.rs src/arch/riscv32/atomic.patch
+
 # used by docker_* targets
 docker_image ?= blog_os
 tag ?= 0.1

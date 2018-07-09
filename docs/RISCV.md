@@ -9,27 +9,39 @@
 
 ## Rust-RISCV
 
-### 目标指令集：RISCV32IMA
+### 目标指令集：RISCV32IM
 
-target: riscv32ima_unknown_none
+target: riscv32im_unknown_none
 
 由于工具链二进制版本尚未内置此target，因此需提供配置文件：`riscv32-blog_os.json`。
 
 理想情况下，目标指令集应为RISCV32G，即使用全部扩展。但考虑到要把它跑在我们自己实现的CPU上，指令集应该尽量精简，即最好是RISCV32I。此外：
-
-* 为什么用原子指令扩展？
-
-  RustOS依赖的库中，大部分都使用了Rust核心库的原子操作（core::sync::atomic）。
-
-  如果目标指令集不支持原子操作，会导致无法编译。
-
-  然而LLVM后端尚不完全支持原子指令扩展，因此这条路可能走不通，需要魔改Rust标准库。
 
 * 为什么用乘除指令扩展？
 
   Rust核心库中fmt模块会使用乘除运算，若不使用乘除指令，则会依赖LLVM提供的内置函数进行软计算，导致链接错误。这一问题理论上可以通过在xargo中设置依赖compiler-builtin解决。但如此操作后，仍有一个函数`__mulsi3`缺失（32×32）。经查，compiler-builtin中实现了类似的`__muldi3`函数（64×64)，所以理论上可以用它手动实现前者。但如此操作后，还是不对，实验表明`__muldi3`本身也是不正确的。
 
   总之，没有成功配置不使用M扩展的编译环境，不过日后解决这一问题并不困难。
+  
+### 原子操作支持
+
+配置文件中与原子操作相关的有两处：
+
+* `feature`中`+a`：使用A指令扩展
+* `max-atomic-width`：决定能否使用core中的atomic模块，设为0不可以，设为32可以
+
+二者是否相关，还不能确定。
+
+* 一方面，`riscv-rust/rust`官方配置中，二者是相关的。
+* 另一方面，即使不使用A指令扩展，设置`max-atomic-width=32`，也可以编译通过。经检查生成的代码中包含了fence指令。这说明RISCV32I也可以用实现基本同步操作（？）
+
+然而由于LLVM后端对RISCV原子操作支持不完善，无论是否`+a`，当使用Mutex时，它会调用core中的`atomic_compare_exchange`函数，LLVM会发生错误。
+
+鉴于更改上层实现（替换Mutex）工程难度较大，我尝试直接修改core代码，将上述问题函数手动实现。
+
+思路是在关中断环境下，用多条指令完成目标功能。这对于单核环境应该是正确的。
+
+我做了个[补丁](../src/arch/riscv32/atomic.patch)，在进入docker环境后，可运行`make patch-core`应用补丁，确保clear后，再build。
 
 ## BootLoader
 

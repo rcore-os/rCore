@@ -1,0 +1,52 @@
+--- atomic_backup.rs	2018-07-10 00:29:48.000000000 +0800
++++ atomic.rs	2018-07-10 00:49:04.000000000 +0800
+@@ -1618,29 +1618,29 @@
+ }
+ 
+ #[inline]
+-unsafe fn atomic_compare_exchange<T>(dst: *mut T,
++#[cfg(target_arch = "riscv")]
++unsafe fn atomic_compare_exchange<T: PartialEq>(dst: *mut T,
+                                      old: T,
+                                      new: T,
+-                                     success: Ordering,
+-                                     failure: Ordering)
++                                     _success: Ordering,
++                                     _failure: Ordering)
+                                      -> Result<T, T> {
+-    let (val, ok) = match (success, failure) {
+-        (Acquire, Acquire) => intrinsics::atomic_cxchg_acq(dst, old, new),
+-        (Release, Relaxed) => intrinsics::atomic_cxchg_rel(dst, old, new),
+-        (AcqRel, Acquire) => intrinsics::atomic_cxchg_acqrel(dst, old, new),
+-        (Relaxed, Relaxed) => intrinsics::atomic_cxchg_relaxed(dst, old, new),
+-        (SeqCst, SeqCst) => intrinsics::atomic_cxchg(dst, old, new),
+-        (Acquire, Relaxed) => intrinsics::atomic_cxchg_acq_failrelaxed(dst, old, new),
+-        (AcqRel, Relaxed) => intrinsics::atomic_cxchg_acqrel_failrelaxed(dst, old, new),
+-        (SeqCst, Relaxed) => intrinsics::atomic_cxchg_failrelaxed(dst, old, new),
+-        (SeqCst, Acquire) => intrinsics::atomic_cxchg_failacq(dst, old, new),
+-        (__Nonexhaustive, _) => panic!("invalid memory ordering"),
+-        (_, __Nonexhaustive) => panic!("invalid memory ordering"),
+-        (_, AcqRel) => panic!("there is no such thing as an acquire/release failure ordering"),
+-        (_, Release) => panic!("there is no such thing as a release failure ordering"),
+-        _ => panic!("a failure ordering can't be stronger than a success ordering"),
+-    };
+-    if ok { Ok(val) } else { Err(val) }
++    let sstatus: usize;
++    asm!("csrrs $0, 0x100, x0" : "=r"(sstatus) ::: "volatile");
++    // Disable interrupt: sstatus::clear_sie()
++    asm!("csrrc x0, 0x100, $0" :: "r"(1) :: "volatile");
++
++    let ret = atomic_load(dst, Ordering::Relaxed);
++    if ret == old {
++        atomic_store(dst, new, Ordering::Relaxed);
++    }
++
++    let sie = sstatus & 1 != 0;
++    if sie {
++        // Enable interrupt: sstatus::set_sie()
++        asm!("csrrs x0, 0x100, $0" :: "r"(1) :: "volatile");
++    }
++    Ok(ret)
+ }
+ 
+ #[inline]
