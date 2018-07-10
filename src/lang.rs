@@ -32,6 +32,6 @@ pub fn panic_fmt(fmt: ::core::fmt::Arguments, file: &'static str, line: u32, col
 #[cfg(target_arch = "x86_64")]
 #[lang = "oom"]
 #[no_mangle]
-fn oom() -> ! {
+pub fn oom() -> ! {
     panic!("out of memory");
 }

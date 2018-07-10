@@ -20,19 +20,13 @@
 
 
 #[macro_use]
-#[cfg(target_arch = "x86_64")]
 extern crate alloc;
-#[cfg(target_arch = "x86_64")]
 extern crate bit_allocator;
-#[cfg(target_arch = "x86_64")]
 extern crate bit_field;
 #[macro_use]
-#[cfg(target_arch = "x86_64")]
 extern crate bitflags;
 #[macro_use]
-#[cfg(target_arch = "x86_64")]
 extern crate lazy_static;
-#[cfg(target_arch = "x86_64")]
 extern crate linked_list_allocator;
 #[macro_use]
 #[cfg(target_arch = "x86_64")]
@@ -40,7 +34,6 @@ extern crate log;
 #[cfg(target_arch = "x86_64")]
 extern crate multiboot2;
 #[macro_use]
-#[cfg(target_arch = "x86_64")]
 extern crate once;
 extern crate rlibc;
 #[cfg(target_arch = "x86_64")]
@@ -50,20 +43,16 @@ extern crate spin;
 extern crate syscall as redox_syscall;
 #[cfg(target_arch = "x86_64")]
 extern crate uart_16550;
-#[cfg(target_arch = "x86_64")]
 extern crate ucore_memory;
-#[cfg(target_arch = "x86_64")]
 extern crate volatile;
 #[macro_use]
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(target_arch = "x86_64")]
 extern crate xmas_elf;
 
 pub use arch::interrupt::rust_trap;
 #[cfg(target_arch = "x86_64")]
 pub use arch::interrupt::set_return_rsp;
-#[cfg(target_arch = "x86_64")]
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
@@ -78,11 +67,7 @@ mod io;
 #[cfg(target_arch = "x86_64")]
 mod memory;
 mod lang;
-#[cfg(target_arch = "x86_64")]
 mod util;
-#[macro_use]
-mod macros;
-#[cfg(target_arch = "x86_64")]
 mod consts;
 #[cfg(target_arch = "x86_64")]
 mod process;
@@ -130,9 +115,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     arch::gdt::init();
 
     memory::test::cow();
-    test!(global_allocator);
-    test!(guard_page);
-    test!(find_mp);
 
     let acpi = arch::driver::init(rsdt_addr, |addr: usize, count: usize| {
         use memory::*;
@@ -151,23 +133,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 //    sync::test::philosopher_using_monitor();
     sync::mpsc::test::test_all();
 
-    // 直接进入用户态暂不可用：内核代码用户不可访问
-//    unsafe{
-//        use arch::syscall;
-//        // 在用户模式下触发时钟中断，会导致GPF
-//        // （可能是由于没有合理分离栈）
-//        no_interrupt!({
-//            syscall::switch_to_user();
-//            println!("Now in user mode");
-//            syscall::switch_to_kernel();
-//            println!("Now in kernel mode");
-//        });
-//    }
-
     loop {}
-
-    test_end!();
-    unreachable!();
 }
 
 /// The entry point for another processors
@@ -191,33 +157,4 @@ pub extern "C" fn other_main() -> ! {
 ///
 /// It should be defined in memory mod, but in Rust `global_allocator` must be in root mod.
 #[global_allocator]
-#[cfg(target_arch = "x86_64")]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-#[cfg(target_arch = "x86_64")]
-mod test {
-    pub fn global_allocator() {
-        for i in 0..10000 {
-            format!("Some String");
-        }
-    }
-    pub fn find_mp() {
-        use arch;
-        let mp = arch::driver::mp::find_mp();
-        assert!(mp.is_some());
-    }
-    pub fn guard_page() {
-        use x86_64;
-        // invoke a breakpoint exception
-        unsafe { asm!("int 3"::::"intel" "volatile"); }
-
-        fn stack_overflow() {
-            stack_overflow(); // for each recursion, the return address is pushed
-        }
-
-        // trigger a stack overflow
-        stack_overflow();
-
-        println!("It did not crash!");
-    }
-}

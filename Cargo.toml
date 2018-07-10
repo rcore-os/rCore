@@ -29,6 +29,7 @@ bit_field = "0.9.0"
 volatile = "0.1.0"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 bit-allocator = { path = "crate/bit-allocator" }
+ucore-memory = { path = "crate/memory" }
 
 
 [target.x86_64-blog_os.dependencies]
@@ -39,10 +40,9 @@ redox_syscall = "0.1"
 log = "0.4"
 uart_16550 = "0.1"
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
-ucore-memory = { path = "crate/memory" }
 
 [target.riscv32-blog_os.dependencies]
-linked_list_allocator = { version = "0.5", default-features = false } # due to rust version
+linked_list_allocator = "0.5" # due to rust version
 riscv = { path = "crate/riscv" }
 bbl = { path = "crate/bbl" }
 
