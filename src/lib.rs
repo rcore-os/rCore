@@ -145,7 +145,7 @@ pub extern "C" fn other_main() -> ! {
     arch::driver::apic::other_init();
     let cpu_id = arch::driver::apic::lapic_id();
     let ms = unsafe { arch::smp::notify_started(cpu_id) };
-    ms.switch();
+    unsafe { ms.activate(); }
     println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
 //    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}

@@ -1,5 +1,7 @@
-use memory::PAGE_SIZE;
-use super::*;
+use ucore_memory::*;
+use ucore_memory::paging::PageTable;
+use ucore_memory::memory_set::Stack;
+use memory::{alloc_frame, active_table};
 
 // TODO: use BitAllocator & alloc fixed size stack
 pub struct StackAllocator {
@@ -13,8 +15,7 @@ impl StackAllocator {
 }
 
 impl StackAllocator {
-    pub fn alloc_stack(&mut self, active_table: &mut ActivePageTable,
-                       size_in_pages: usize) -> Option<Stack> {
+    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         if size_in_pages == 0 {
             return None; /* a zero sized stack makes no sense */
         }
@@ -39,46 +40,19 @@ impl StackAllocator {
                 self.range = range;
 
                 // map stack pages to physical frames
-                for page in Page::range_inclusive(start, end) {
-                    let frame = alloc_frame();
-                    active_table.map_to(page, frame);
+                for page in Page::range_of(start.start_address(), end.start_address() + PAGE_SIZE) {
+                    let frame = alloc_frame().unwrap();
+                    active_table().map(page.start_address(), frame);
                 }
 
                 // create a new stack
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some(Stack::new(top_of_stack.as_u64() as usize, start.start_address().as_u64() as usize))
+                Some(Stack {
+                    top: top_of_stack,
+                    bottom: start.start_address(),
+                })
             }
             _ => None, /* not enough pages */
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct Stack {
-    top: usize,
-    bottom: usize,
-}
-
-impl Stack {
-    pub(super) fn new(top: usize, bottom: usize) -> Stack {
-        assert!(top > bottom);
-        Stack {
-            top,
-            bottom,
-        }
-    }
-
-    pub fn top(&self) -> usize {
-        self.top
-    }
-
-    pub fn bottom(&self) -> usize {
-        self.bottom
-    }
-}
-
-impl Drop for Stack {
-    fn drop(&mut self) {
-        warn!("stack leak: {:x?}", self);
     }
 }

@@ -29,7 +29,7 @@ pub enum Status {
 impl Process {
     /// Make a new kernel thread
     pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize) -> Self {
-        let ms = MemorySet::new(7);
+        let ms = MemorySet::new();
         let data = InitStack::new_kernel_thread(entry, arg, ms.kstack_top());
         let context = unsafe { data.push_at(ms.kstack_top()) };
 
@@ -78,7 +78,7 @@ impl Process {
         };
 
         // Make page table
-        let mut memory_set = MemorySet::from(&elf);
+        let mut memory_set = memory_set_from(&elf);
         memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
 
@@ -88,24 +88,26 @@ impl Process {
         };
 
         // Temporary switch to it, in order to copy data
-        memory_set.with(|| {
-            for ph in elf.program_iter() {
-                let (virt_addr, offset, file_size) = match ph {
-                    ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
-                    ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
-                };
-                use core::slice;
-                let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
-                target.copy_from_slice(&data[offset..offset + file_size]);
-            }
-            if is32 {
-                unsafe {
-                    // TODO: full argc & argv
-                    *(user_stack_top as *mut u32).offset(-1) = 0; // argv
-                    *(user_stack_top as *mut u32).offset(-2) = 0; // argc
+        unsafe {
+            memory_set.with(|| {
+                for ph in elf.program_iter() {
+                    let (virt_addr, offset, file_size) = match ph {
+                        ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
+                        ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.offset as usize, ph.file_size as usize),
+                    };
+                    use core::slice;
+                    let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
+                    target.copy_from_slice(&data[offset..offset + file_size]);
                 }
-            }
-        });
+                if is32 {
+                    unsafe {
+                        // TODO: full argc & argv
+                        *(user_stack_top as *mut u32).offset(-1) = 0; // argv
+                        *(user_stack_top as *mut u32).offset(-2) = 0; // argc
+                    }
+                }
+            });
+        }
 
 
         // Allocate kernel stack and push trap frame
@@ -128,7 +130,7 @@ impl Process {
         assert!(self.is_user);
 
         // Clone memory set, make a new page table
-        let memory_set = self.memory_set.clone(7);
+        let memory_set = self.memory_set.clone();
 
         // Copy data to temp space
         use alloc::Vec;
@@ -137,11 +139,13 @@ impl Process {
         }).collect();
 
         // Temporary switch to it, in order to copy data
-        memory_set.with(|| {
-            for (area, data) in memory_set.iter().zip(datas.iter()) {
-                unsafe { area.as_slice_mut() }.copy_from_slice(data.as_slice())
-            }
-        });
+        unsafe {
+            memory_set.with(|| {
+                for (area, data) in memory_set.iter().zip(datas.iter()) {
+                    unsafe { area.as_slice_mut() }.copy_from_slice(data.as_slice())
+                }
+            });
+        }
 
         // Allocate kernel stack and push trap frame
         let data = InitStack::new_fork(tf);
@@ -166,25 +170,21 @@ impl Process {
     }
 }
 
-impl<'a> From<&'a ElfFile<'a>> for MemorySet {
-    fn from(elf: &'a ElfFile<'a>) -> Self {
-        let mut set = MemorySet::new(7);
-        for ph in elf.program_iter() {
-            let (virt_addr, mem_size, flags) = match ph {
-                ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-                ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-            };
-            set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, MemoryAttr::from(flags), ""));
-        }
-        set
+fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
+    let mut set = MemorySet::new();
+    for ph in elf.program_iter() {
+        let (virt_addr, mem_size, flags) = match ph {
+            ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
+            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
+        };
+        set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
     }
+    set
 }
 
-impl From<Flags> for MemoryAttr {
-    fn from(elf_flags: Flags) -> Self {
-        let mut flags = MemoryAttr::default().user();
-        // TODO: handle readonly
-        if elf_flags.is_execute() { flags = flags.execute(); }
-        flags
-    }
+fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
+    let mut flags = MemoryAttr::default().user();
+    // TODO: handle readonly
+    if elf_flags.is_execute() { flags = flags.execute(); }
+    flags
 }

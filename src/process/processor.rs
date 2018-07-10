@@ -131,11 +131,10 @@ impl Processor {
         to.status = Status::Running;
         self.scheduler.remove(pid);
 
-        // switch page table
-        to.memory_set.switch();
-
         info!("switch from {} to {}\n  rsp: ??? -> {:?}", pid0, pid, to.context);
         unsafe {
+            // switch page table
+            to.memory_set.activate();
             // FIXME: safely pass MutexGuard
             use core::mem::forget;
             super::PROCESSOR.try().unwrap().force_unlock();

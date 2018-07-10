@@ -9,12 +9,12 @@ const ENTRYOTHER_ADDR: u32 = 0x7000;
 pub fn start_other_cores(acpi: &AcpiResult, ms: &mut MemorySet) {
     use consts::KERNEL_OFFSET;
     ms.push(MemoryArea::new_identity(ENTRYOTHER_ADDR as usize, ENTRYOTHER_ADDR as usize + 1, MemoryAttr::default().execute(), "entry_other.text"));
-    ms.push(MemoryArea::new_kernel(KERNEL_OFFSET, KERNEL_OFFSET + 1, MemoryAttr::default(), "entry_other.ctrl"));
+    ms.push(MemoryArea::new_physical(0, 4096, KERNEL_OFFSET, MemoryAttr::default(), "entry_other.ctrl"));
 
     let args = unsafe { &mut *(0x8000 as *mut EntryArgs).offset(-1) };
     for i in 1 .. acpi.cpu_num {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
-        let ms = MemorySet::new(7);
+        let ms = MemorySet::new();
         *args = EntryArgs {
             kstack: ms.kstack_top() as u64,
             page_table: Cr3::read().0.start_address().as_u64() as u32,

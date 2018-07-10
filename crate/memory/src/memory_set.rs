@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use core::fmt::{Debug, Error, Formatter};
-use core::marker::PhantomData;
 use super::*;
 use paging::*;
 
@@ -8,11 +7,14 @@ pub trait InactivePageTable {
     type Active: PageTable;
 
     fn new() -> Self;
+    fn new_bare() -> Self;
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active));
-    unsafe fn activate(&self) -> Self;
+    unsafe fn activate(&self);
+    unsafe fn with(&self, f: impl FnOnce());
 
     fn alloc_frame() -> Option<PhysAddr>;
     fn dealloc_frame(target: PhysAddr);
+    fn alloc_stack(size_in_pages: usize) -> Stack;
 }
 
 /// 一片连续内存空间，有相同的访问权限
@@ -35,9 +37,11 @@ impl MemoryArea {
         assert!(start_addr <= end_addr, "invalid memory area");
         MemoryArea { start_addr, end_addr, phys_start_addr: Some(start_addr), flags, name }
     }
-    pub fn new_offset(start_addr: VirtAddr, end_addr: VirtAddr, offset: isize, flags: MemoryAttr, name: &'static str) -> Self {
+    pub fn new_physical(phys_start_addr: PhysAddr, phys_end_addr: PhysAddr, offset: usize, flags: MemoryAttr, name: &'static str) -> Self {
+        let start_addr = phys_start_addr + offset;
+        let end_addr = phys_end_addr + offset;
         assert!(start_addr <= end_addr, "invalid memory area");
-        let phys_start_addr = Some((start_addr as isize + offset) as usize);
+        let phys_start_addr = Some(phys_start_addr);
         MemoryArea { start_addr, end_addr, phys_start_addr, flags, name }
     }
     pub unsafe fn as_slice(&self) -> &[u8] {
@@ -127,6 +131,7 @@ impl MemoryAttr {
 pub struct MemorySet<T: InactivePageTable> {
     areas: Vec<MemoryArea>,
     page_table: T,
+    kstack: Stack,
 }
 
 impl<T: InactivePageTable> MemorySet<T> {
@@ -134,15 +139,17 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
             page_table: T::new(),
+            kstack: T::alloc_stack(7),
         }
     }
     /// Used for remap_kernel() where heap alloc is unavailable
-    pub unsafe fn new_from_raw_space(slice: &mut [u8]) -> Self {
+    pub unsafe fn new_from_raw_space(slice: &mut [u8], kstack: Stack) -> Self {
         use core::mem::size_of;
         let cap = slice.len() / size_of::<MemoryArea>();
         MemorySet {
             areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
-            page_table: T::new(),
+            page_table: T::new_bare(),
+            kstack,
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -159,12 +166,13 @@ impl<T: InactivePageTable> MemorySet<T> {
         self.areas.iter()
     }
     pub unsafe fn with(&self, f: impl FnOnce()) {
-        let old = self.page_table.activate();
-        f();
-        old.activate();
+        self.page_table.with(f);
     }
     pub unsafe fn activate(&self) {
         self.page_table.activate();
+    }
+    pub fn kstack_top(&self) -> usize {
+        self.kstack.top
     }
     pub fn clone(&self) -> Self {
         let mut page_table = T::new();
@@ -176,6 +184,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: self.areas.clone(),
             page_table,
+            kstack: T::alloc_stack(7),
         }
     }
     pub fn clear(&mut self) {
@@ -187,4 +196,24 @@ impl<T: InactivePageTable> MemorySet<T> {
         });
         areas.clear();
     }
+}
+
+impl<T: InactivePageTable> Drop for MemorySet<T> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+impl<T: InactivePageTable> Debug for MemorySet<T> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.debug_list()
+            .entries(self.areas.iter())
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct Stack {
+    pub top: usize,
+    pub bottom: usize,
 }
