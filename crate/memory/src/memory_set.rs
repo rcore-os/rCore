@@ -1,6 +1,19 @@
 use alloc::vec::Vec;
 use core::fmt::{Debug, Error, Formatter};
+use core::marker::PhantomData;
 use super::*;
+use paging::*;
+
+pub trait InactivePageTable {
+    type Active: PageTable;
+
+    fn new() -> Self;
+    fn edit(&mut self, f: impl FnOnce(&mut Self::Active));
+    unsafe fn activate(&self) -> Self;
+
+    fn alloc_frame() -> Option<PhysAddr>;
+    fn dealloc_frame(target: PhysAddr);
+}
 
 /// 一片连续内存空间，有相同的访问权限
 /// 对应ucore中 `vma_struct`
@@ -16,33 +29,16 @@ pub struct MemoryArea {
 impl MemoryArea {
     pub fn new(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
-        MemoryArea {
-            start_addr,
-            end_addr,
-            phys_start_addr: None,
-            flags,
-            name,
-        }
+        MemoryArea { start_addr, end_addr, phys_start_addr: None, flags, name }
     }
     pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
-        MemoryArea {
-            start_addr,
-            end_addr,
-            phys_start_addr: Some(PhysAddr::new(start_addr as u64)),
-            flags,
-            name,
-        }
+        MemoryArea { start_addr, end_addr, phys_start_addr: Some(start_addr), flags, name }
     }
-    pub fn new_kernel(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
+    pub fn new_offset(start_addr: VirtAddr, end_addr: VirtAddr, offset: isize, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
-        MemoryArea {
-            start_addr,
-            end_addr,
-            phys_start_addr: Some(PhysAddr::from_kernel_virtual(start_addr)),
-            flags,
-            name,
-        }
+        let phys_start_addr = Some((start_addr as isize + offset) as usize);
+        MemoryArea { start_addr, end_addr, phys_start_addr, flags, name }
     }
     pub unsafe fn as_slice(&self) -> &[u8] {
         use core::slice;
@@ -62,28 +58,30 @@ impl MemoryArea {
         let p3 = Page::of_addr(other.end_addr - 1) + 1;
         !(p1 <= p2 || p0 >= p3)
     }
-    fn map(&self, pt: &mut ActivePageTable) {
+    fn map<T: InactivePageTable>(&self, pt: &mut T::Active) {
         match self.phys_start_addr {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
-                    let frame = Frame::of_addr(phys_start.get() + page.start_address().as_u64() as usize - self.start_addr);
-                    self.flags.apply(pt.map_to(page, frame));
+                    let addr = page.start_address();
+                    let target = phys_start + page.start_address() - self.start_addr;
+                    self.flags.apply(pt.map(addr, target));
                 }
             }
             None => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
-                    let frame = alloc_frame();
-                    self.flags.apply(pt.map_to(page, frame));
+                    let addr = page.start_address();
+                    let target = T::alloc_frame().expect("failed to allocate frame");
+                    self.flags.apply(pt.map(addr, target));
                 }
             }
         }
     }
-    fn unmap(&self, pt: &mut ActivePageTable) {
+    fn unmap<T: InactivePageTable>(&self, pt: &mut T::Active) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            let addr = page.start_address().as_u64() as usize;
+            let addr = page.start_address();
             if self.phys_start_addr.is_none() {
-                let frame = Frame::of_addr(pt.get_entry(addr).target());
-                dealloc_frame(frame);
+                let target = pt.get_entry(addr).target();
+                T::dealloc_frame(target);
             }
             pt.unmap(addr);
         }
@@ -126,18 +124,16 @@ impl MemoryAttr {
 
 /// 内存空间集合，包含若干段连续空间
 /// 对应ucore中 `mm_struct`
-pub struct MemorySet {
+pub struct MemorySet<T: InactivePageTable> {
     areas: Vec<MemoryArea>,
-    page_table: InactivePageTable,
-    kstack: Option<Stack>,
+    page_table: T,
 }
 
-impl MemorySet {
-    pub fn new(stack_size_in_pages: usize) -> Self {
+impl<T: InactivePageTable> MemorySet<T> {
+    pub fn new() -> Self {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
-            page_table: new_page_table_with_kernel(),
-            kstack: Some(alloc_stack(stack_size_in_pages)),
+            page_table: T::new(),
         }
     }
     /// Used for remap_kernel() where heap alloc is unavailable
@@ -146,8 +142,7 @@ impl MemorySet {
         let cap = slice.len() / size_of::<MemoryArea>();
         MemorySet {
             areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
-            page_table: new_page_table(),
-            kstack: None,
+            page_table: T::new(),
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -157,82 +152,39 @@ impl MemorySet {
         assert!(self.areas.iter()
                     .find(|other| area.is_overlap_with(other))
                     .is_none(), "memory area overlap");
-
-        active_table().with(&mut self.page_table, |mapper| area.map(mapper));
-
+        self.page_table.edit(|pt| area.map::<T>(pt));
         self.areas.push(area);
     }
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
     }
-    pub fn with(&self, f: impl FnOnce()) {
-        let current = unsafe { InactivePageTable::from_cr3() };
-        self.page_table.switch();
+    pub unsafe fn with(&self, f: impl FnOnce()) {
+        let old = self.page_table.activate();
         f();
-        current.switch();
-        use core::mem;
-        mem::forget(current);
+        old.activate();
     }
-    pub fn switch(&self) {
-        self.page_table.switch();
+    pub unsafe fn activate(&self) {
+        self.page_table.activate();
     }
-    pub fn set_kstack(&mut self, stack: Stack) {
-        assert!(self.kstack.is_none());
-        self.kstack = Some(stack);
-    }
-    pub fn kstack_top(&self) -> usize {
-        self.kstack.as_ref().unwrap().top()
-    }
-    pub fn clone(&self, stack_size_in_pages: usize) -> Self {
-        let mut page_table = new_page_table_with_kernel();
-        active_table().with(&mut page_table, |mapper| {
+    pub fn clone(&self) -> Self {
+        let mut page_table = T::new();
+        page_table.edit(|pt| {
             for area in self.areas.iter() {
-                area.map(mapper);
+                area.map::<T>(pt);
             }
         });
         MemorySet {
             areas: self.areas.clone(),
             page_table,
-            kstack: Some(alloc_stack(stack_size_in_pages)),
         }
     }
-    /// Only for SMP
-    pub fn _page_table_addr(&self) -> PhysAddr {
-        use core::mem;
-        unsafe { mem::transmute_copy::<_, Frame>(&self.page_table) }.start_address()
-    }
-}
-
-impl Drop for MemorySet {
-    fn drop(&mut self) {
-        debug!("MemorySet dropping");
-        let Self { ref mut page_table, ref areas, .. } = self;
-        active_table().with(page_table, |mapper| {
+    pub fn clear(&mut self) {
+        let Self { ref mut page_table, ref mut areas, .. } = self;
+        page_table.edit(|pt| {
             for area in areas.iter() {
-                area.unmap(mapper);
+                area.unmap::<T>(pt);
             }
-        })
+        });
+        areas.clear();
     }
-}
-
-impl Debug for MemorySet {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        f.debug_list()
-            .entries(self.areas.iter())
-            .finish()
-    }
-}
-
-fn new_page_table() -> InactivePageTable {
-    let frame = alloc_frame();
-    let mut active_table = active_table();
-    InactivePageTable::new(frame, &mut active_table)
-}
-
-fn new_page_table_with_kernel() -> InactivePageTable {
-    let frame = alloc_frame();
-    let mut active_table = active_table();
-    let mut page_table = InactivePageTable::new(frame, &mut active_table);
-    page_table.map_kernel(&mut active_table);
-    page_table
 }

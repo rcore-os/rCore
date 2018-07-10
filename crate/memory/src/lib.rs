@@ -15,7 +15,7 @@ pub mod paging;
 #[cfg(target_arch = "x86_64")]
 pub mod cow;
 pub mod swap;
+pub mod memory_set;
+mod addr;
 
-type VirtAddr = usize;
-type PhysAddr = usize;
-const PAGE_SIZE: usize = 4096;
+pub use addr::*;
