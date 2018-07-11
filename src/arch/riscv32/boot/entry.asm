@@ -8,6 +8,6 @@ kern_entry:
     .align 12  #PGSHIFT
     .global bootstack
 bootstack:
-    .space 4096 * 8  #KSTACKSIZE
+    .space 4096 * 16  #KSTACKSIZE
     .global bootstacktop
 bootstacktop:

@@ -11,6 +11,5 @@ pub fn init() {
     println!("Hello RISCV! {}", 123);
     interrupt::init();
     memory::init();
-//    timer::init();
-    loop {}
+    timer::init();
 }

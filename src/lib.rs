@@ -95,7 +95,7 @@ mod arch;
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
     arch::init();
-    memory::init_heap();
+    println!("RISCV init end");
     loop {}
 }
 

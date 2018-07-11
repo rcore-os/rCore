@@ -69,11 +69,12 @@ impl PageTable for ActivePageTable {
     }
 }
 
+const ROOT_PAGE_TABLE: *mut RvPageTable =
+    (((RECURSIVE_PAGE_PML4 << 10) | (RECURSIVE_PAGE_PML4 + 1)) << 12) as *mut RvPageTable;
+
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        let root_addr = ((RECURSIVE_PAGE_PML4 << 10) | (RECURSIVE_PAGE_PML4 + 1)) << 12;
-        println!("{:x?}", &*(root_addr as *const RvPageTable));
-        ActivePageTable(RecursivePageTable::new(&mut *(root_addr as *mut _)).unwrap())
+        ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap())
     }
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
         // Create a temporary page
@@ -177,6 +178,7 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, new_frame);
+            sfence_vma_all();
         }
     }
 
@@ -186,11 +188,13 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, new_frame);
+            sfence_vma_all();
         }
         f();
         debug!("switch table {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, old_frame);
+            sfence_vma_all();
         }
     }
 
@@ -209,7 +213,7 @@ impl InactivePageTable for InactivePageTable0 {
 
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
-        let mut table = unsafe { &mut *(0xfffff000 as *mut RvPageTable) };
+        let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e1 = table[KERNEL_PML4].clone();
         let e2 = table[KERNEL_PML4 + 1].clone();
         self.edit(|_| {
