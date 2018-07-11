@@ -1,12 +1,12 @@
 #![allow(dead_code)]
-pub const MAX_CPU_NUM: usize = 8;
-pub const MAX_PROCESS_NUM: usize = 32;
 
 #[cfg(target_arch = "riscv")]
 pub use self::riscv::*;
-
 #[cfg(target_arch = "x86_64")]
 pub use self::x86_64::*;
+
+pub const MAX_CPU_NUM: usize = 8;
+pub const MAX_PROCESS_NUM: usize = 32;
 
 #[cfg(target_arch = "riscv")]
 mod riscv {
@@ -49,6 +49,9 @@ mod x86_64 {
     pub const KERNEL_HEAP_PML4: usize = (KERNEL_HEAP_OFFSET & PML4_MASK) / PML4_SIZE;
     /// Size of kernel heap
     pub const KERNEL_HEAP_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+
+    pub const KERNEL_STACK_OFFSET: usize = KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE;
+    pub const KERNEL_STACK_SIZE: usize = 1 * 1024 * 1024; // 8 MB
 
     /// Offset to kernel percpu variables
     //TODO: Use 64-bit fs offset to enable this pub const KERNEL_PERCPU_OFFSET: usize = KERNEL_HEAP_OFFSET - PML4_SIZE;

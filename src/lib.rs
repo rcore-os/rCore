@@ -50,9 +50,12 @@ extern crate volatile;
 extern crate x86_64;
 extern crate xmas_elf;
 
+// Export to asm
 pub use arch::interrupt::rust_trap;
 #[cfg(target_arch = "x86_64")]
 pub use arch::interrupt::set_return_rsp;
+#[cfg(target_arch = "x86_64")]
+pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
@@ -93,6 +96,7 @@ mod arch;
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
     arch::init();
+    memory::init_heap();
     loop {}
 }
 
@@ -100,54 +104,23 @@ pub extern fn rust_main() -> ! {
 #[no_mangle]
 #[cfg(target_arch = "x86_64")]
 pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
-    arch::idt::init();
-    io::init();
-
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
 
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
-    let rsdt_addr = boot_info.rsdp_v1_tag().unwrap().rsdt_address();
+    io::init();
+    let ms = arch::init(multiboot_information_address);
 
-    // set up guard page and map the heap pages
-    let mut kernel_memory = memory::init(boot_info);
-
-    arch::gdt::init();
-
-    memory::test::cow();
-
-    let acpi = arch::driver::init(rsdt_addr, |addr: usize, count: usize| {
-        use memory::*;
-        kernel_memory.push(MemoryArea::new_identity(addr, addr + count * 0x1000, MemoryAttr::default(), "acpi"))
-    });
-
-    arch::smp::start_other_cores(&acpi, &mut kernel_memory);
-    process::init(kernel_memory);
+    process::init(ms);
 
     fs::load_sfs();
 
-    unsafe{ arch::interrupt::enable(); }
+    unsafe { arch::interrupt::enable(); }
 
 //    thread::test::unpack();
 //    sync::test::philosopher_using_mutex();
 //    sync::test::philosopher_using_monitor();
-    sync::mpsc::test::test_all();
+//    sync::mpsc::test::test_all();
 
-    loop {}
-}
-
-/// The entry point for another processors
-#[no_mangle]
-#[cfg(target_arch = "x86_64")]
-pub extern "C" fn other_main() -> ! {
-    arch::gdt::init();
-    arch::idt::init();
-    arch::driver::apic::other_init();
-    let cpu_id = arch::driver::apic::lapic_id();
-    let ms = unsafe { arch::smp::notify_started(cpu_id) };
-    unsafe { ms.activate(); }
-    println!("Hello world! from CPU {}!", arch::driver::apic::lapic_id());
-//    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
     loop {}
 }
 

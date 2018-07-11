@@ -4,13 +4,9 @@ use core::ptr::{read_volatile, write_volatile};
 use memory::*;
 use x86_64::registers::control::Cr3;
 
-const ENTRYOTHER_ADDR: u32 = 0x7000;
+pub const ENTRYOTHER_ADDR: usize = 0x7000;
 
-pub fn start_other_cores(acpi: &AcpiResult, ms: &mut MemorySet) {
-    use consts::KERNEL_OFFSET;
-    ms.push(MemoryArea::new_identity(ENTRYOTHER_ADDR as usize, ENTRYOTHER_ADDR as usize + 1, MemoryAttr::default().execute(), "entry_other.text"));
-    ms.push(MemoryArea::new_physical(0, 4096, KERNEL_OFFSET, MemoryAttr::default(), "entry_other.ctrl"));
-
+pub fn start_other_cores(acpi: &AcpiResult) {
     let args = unsafe { &mut *(0x8000 as *mut EntryArgs).offset(-1) };
     for i in 1 .. acpi.cpu_num {
         let apic_id = acpi.cpu_acpi_ids[i as usize];
@@ -21,7 +17,7 @@ pub fn start_other_cores(acpi: &AcpiResult, ms: &mut MemorySet) {
             stack: args as *const _ as u32, // just enough stack to get us to entry64mp
         };
         unsafe { MS = Some(ms); }
-        start_ap(apic_id, ENTRYOTHER_ADDR);
+        start_ap(apic_id, ENTRYOTHER_ADDR as u32);
         while unsafe { !read_volatile(&STARTED[i as usize]) } {}
     }
 }
@@ -39,5 +35,7 @@ static mut MS: Option<MemorySet> = None;
 
 pub unsafe fn notify_started(cpu_id: u8) -> MemorySet {
     write_volatile(&mut STARTED[cpu_id as usize], true);
-    MS.take().unwrap()
+    let ms = MS.take().unwrap();
+    ms.activate();
+    ms
 }
