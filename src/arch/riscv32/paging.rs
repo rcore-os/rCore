@@ -147,13 +147,9 @@ impl InactivePageTable for InactivePageTable0 {
     fn new_bare() -> Self {
         let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
             .expect("failed to allocate frame");
-        debug!("begin");
         active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
-            debug!("begin1");
-
             table.zero();
             table.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
-            debug!("begin2");
         });
         InactivePageTable0 { p2_frame: frame }
     }

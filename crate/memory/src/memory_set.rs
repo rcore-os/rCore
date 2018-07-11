@@ -67,7 +67,7 @@ impl MemoryArea {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let addr = page.start_address();
-                    let target = phys_start + page.start_address() - self.start_addr;
+                    let target = page.start_address() - self.start_addr + phys_start;
                     self.flags.apply(pt.map(addr, target));
                 }
             }
