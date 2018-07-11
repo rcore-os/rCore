@@ -1,6 +1,25 @@
 --- atomic_backup.rs	2018-07-10 00:29:48.000000000 +0800
-+++ atomic.rs	2018-07-10 00:49:04.000000000 +0800
-@@ -1618,29 +1618,29 @@
++++ atomic.rs	2018-07-11 14:48:10.000000000 +0800
+@@ -1556,15 +1556,9 @@
+ }
+ 
+ #[inline]
+-unsafe fn atomic_store<T>(dst: *mut T, val: T, order: Ordering) {
+-    match order {
+-        Release => intrinsics::atomic_store_rel(dst, val),
+-        Relaxed => intrinsics::atomic_store_relaxed(dst, val),
+-        SeqCst => intrinsics::atomic_store(dst, val),
+-        Acquire => panic!("there is no such thing as an acquire store"),
+-        AcqRel => panic!("there is no such thing as an acquire/release store"),
+-        __Nonexhaustive => panic!("invalid memory ordering"),
+-    }
++unsafe fn atomic_store<T>(dst: *mut T, val: T, _order: Ordering) {
++    use ptr::write;
++    write(dst, val);
+ }
+ 
+ #[inline]
+@@ -1618,29 +1612,30 @@
  }
  
  #[inline]
@@ -36,9 +55,10 @@
 +    // Disable interrupt: sstatus::clear_sie()
 +    asm!("csrrc x0, 0x100, $0" :: "r"(1) :: "volatile");
 +
-+    let ret = atomic_load(dst, Ordering::Relaxed);
++    use ptr::{read, write};
++    let ret = read(dst);
 +    if ret == old {
-+        atomic_store(dst, new, Ordering::Relaxed);
++        write(dst, new);
 +    }
 +
 +    let sie = sstatus & 1 != 0;
