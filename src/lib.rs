@@ -67,7 +67,6 @@ mod io;
 #[path = "io/riscv_io.rs"]
 mod io;
 
-#[cfg(target_arch = "x86_64")]
 mod memory;
 mod lang;
 mod util;

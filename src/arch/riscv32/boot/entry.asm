@@ -4,7 +4,7 @@ kern_entry:
     la sp, bootstacktop
     tail rust_main
 
-    .section .data
+    .section .bss
     .align 12  #PGSHIFT
     .global bootstack
 bootstack:

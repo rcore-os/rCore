@@ -12,43 +12,41 @@ SECTIONS
 {
     /* Load the kernel at this address: "." means the current address */
     . = BASE_ADDRESS;
+    start = .;
 
     .text : {
+        stext = .;
         *(.entry)
         *(.text .stub .text.* .gnu.linkonce.t.*)
+        . = ALIGN(4K);
+        etext = .;
     }
-
-    PROVIDE(etext = .); /* Define the 'etext' symbol to this value */
 
     .rodata : {
+        srodata = .;
         *(.rodata .rodata.* .gnu.linkonce.r.*)
+        . = ALIGN(4K);
+        erodata = .;
     }
 
-    /* Adjust the address for the data segment to the next page */
-    . = ALIGN(0x1000);
-
-    /* The data segment */
     .data : {
-        *(.data)
-        *(.data.*)
+        sdata = .;
+        *(.data .data.*)
+        . = ALIGN(4K);
+        edata = .;
     }
-
-    .sdata : {
-        *(.sdata)
-        *(.sdata.*)
-    }
-
-    PROVIDE(edata = .);
 
     .bss : {
-        *(.bss)
-        *(.bss.*)
-        *(.sbss*)
+        sbss = .;
+        *(.bss .bss.* .sbss*)
+        . = ALIGN(4K);
+        ebss = .;
+    }
+
+    .got : {
+        *(.got .got.*)
+        . = ALIGN(4K);
     }
 
     PROVIDE(end = .);
-
-    /DISCARD/ : {
-        *(.eh_frame .note.GNU-stack)
-    }
 }
