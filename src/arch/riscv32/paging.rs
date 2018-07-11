@@ -202,8 +202,8 @@ impl InactivePageTable for InactivePageTable0 {
         dealloc_frame(target)
     }
 
-    fn alloc_stack(size_in_pages: usize) -> Stack {
-        alloc_stack(size_in_pages)
+    fn alloc_stack() -> Stack {
+        alloc_stack()
     }
 }
 

@@ -1,22 +1,18 @@
 pub use arch::paging::*;
 use bit_allocator::{BitAlloc, BitAlloc64K};
 use consts::MEMORY_OFFSET;
-use self::stack_allocator::*;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 #[cfg(target_arch = "x86_64")]
-use ucore_memory::paging::CowExt;
+use ucore_memory::cow::CowExt;
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
-
-mod stack_allocator;
 
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: Mutex<BitAlloc64K> = Mutex::new(BitAlloc64K::default());
 }
-pub static STACK_ALLOCATOR: Mutex<Option<StackAllocator>> = Mutex::new(None);
 
 pub fn alloc_frame() -> Option<usize> {
     FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET)
@@ -26,10 +22,16 @@ pub fn dealloc_frame(target: usize) {
     FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
 }
 
-pub fn alloc_stack(size_in_pages: usize) -> Stack {
-    STACK_ALLOCATOR.lock()
-        .as_mut().expect("stack allocator is not initialized")
-        .alloc_stack(size_in_pages).expect("no more stack")
+// alloc from heap
+pub fn alloc_stack() -> Stack {
+    use alloc::boxed::Box;
+    const STACK_SIZE: usize = 8 * 4096;
+    #[repr(align(4096))]
+    struct StackData([u8; STACK_SIZE]);
+    let data = Box::new(StackData([0; STACK_SIZE]));
+    let bottom = Box::into_raw(data) as usize;
+    let top = bottom + STACK_SIZE;
+    Stack { top, bottom }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -71,14 +73,9 @@ pub fn page_fault_handler(addr: usize) -> bool {
 }
 
 pub fn init_heap() {
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE, KERNEL_STACK_OFFSET, KERNEL_STACK_SIZE};
-
+    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
-
-    *STACK_ALLOCATOR.lock() = Some({
-        use ucore_memory::Page;
-        StackAllocator::new(Page::range_of(KERNEL_STACK_OFFSET, KERNEL_STACK_OFFSET + KERNEL_STACK_SIZE))
-    });
+    info!("heap init end");
 }
 
 //pub mod test {

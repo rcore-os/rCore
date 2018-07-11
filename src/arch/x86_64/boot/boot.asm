@@ -1,5 +1,6 @@
 global start
 global stack_bottom
+global stack_top
 extern long_mode_start
 
 section .text

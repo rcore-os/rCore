@@ -19,10 +19,6 @@ mod riscv {
     pub const KERNEL_PML4: usize = 0x8040_0000 >> 22;
     pub const KERNEL_HEAP_OFFSET: usize = 0x8050_0000;
     pub const KERNEL_HEAP_SIZE: usize = 1 * 1024 * 1024;
-    // 1 MB
-    pub const KERNEL_STACK_OFFSET: usize = KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE;
-    pub const KERNEL_STACK_SIZE: usize = 64 * 1024;
-    // 64 KB
     pub const MEMORY_OFFSET: usize = 0x8000_0000;
     pub const MEMORY_END: usize = 0x8080_0000;
 }
@@ -55,9 +51,6 @@ mod x86_64 {
     pub const KERNEL_HEAP_PML4: usize = (KERNEL_HEAP_OFFSET & PML4_MASK) / PML4_SIZE;
     /// Size of kernel heap
     pub const KERNEL_HEAP_SIZE: usize = 8 * 1024 * 1024; // 8 MB
-
-    pub const KERNEL_STACK_OFFSET: usize = KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE;
-    pub const KERNEL_STACK_SIZE: usize = 1 * 1024 * 1024; // 1 MB
 
     pub const MEMORY_OFFSET: usize = 0;
 

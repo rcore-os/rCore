@@ -54,10 +54,10 @@ fn init_frame_allocator(boot_info: &BootInformation) {
 
 fn remap_the_kernel(boot_info: &BootInformation) -> MemorySet {
     extern { fn stack_bottom(); }
-    let stack_bottom = stack_bottom as usize + KERNEL_OFFSET;
+    extern { fn stack_top(); }
     let kstack = Stack {
-        top: stack_bottom + 8 * PAGE_SIZE,
-        bottom: stack_bottom + 1 * PAGE_SIZE,
+        top: stack_top as usize + KERNEL_OFFSET,
+        bottom: stack_bottom as usize + PAGE_SIZE + KERNEL_OFFSET,
     };
 
     let mut memory_set = memory_set_from(boot_info.elf_sections_tag().unwrap(), kstack);
@@ -75,10 +75,6 @@ fn remap_the_kernel(boot_info: &BootInformation) -> MemorySet {
 
     unsafe { memory_set.activate(); }
     info!("NEW TABLE!!!");
-
-    // turn the stack bottom into a guard page
-    active_table().unmap(stack_bottom);
-    debug!("guard page at {:x?}", stack_bottom);
 
     memory_set
 }

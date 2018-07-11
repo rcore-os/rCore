@@ -1,20 +1,17 @@
-use ucore_memory::PAGE_SIZE;
+use bit_allocator::{BitAlloc, BitAlloc64K};
+// Depends on kernel
+use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
+use spin::{Mutex, MutexGuard};
 use ucore_memory::cow::CowExt;
-use ucore_memory::paging::*;
 use ucore_memory::memory_set::*;
-
+use ucore_memory::PAGE_SIZE;
+use ucore_memory::paging::*;
 use x86_64::instructions::tlb;
+use x86_64::PhysAddr;
 use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::{Mapper, PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
 use x86_64::ux::u9;
-use x86_64::PhysAddr;
-
-use bit_allocator::{BitAlloc, BitAlloc64K};
-use spin::{Mutex, MutexGuard};
-
-// Depends on kernel
-use memory::{active_table, alloc_frame, dealloc_frame, alloc_stack};
 
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;
@@ -224,8 +221,8 @@ impl InactivePageTable for InactivePageTable0 {
         dealloc_frame(target)
     }
 
-    fn alloc_stack(size_in_pages: usize) -> Stack {
-        alloc_stack(size_in_pages)
+    fn alloc_stack() -> Stack {
+        alloc_stack()
     }
 }
 

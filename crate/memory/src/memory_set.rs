@@ -14,7 +14,7 @@ pub trait InactivePageTable {
 
     fn alloc_frame() -> Option<PhysAddr>;
     fn dealloc_frame(target: PhysAddr);
-    fn alloc_stack(size_in_pages: usize) -> Stack;
+    fn alloc_stack() -> Stack;
 }
 
 /// 一片连续内存空间，有相同的访问权限
@@ -139,7 +139,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
             page_table: T::new(),
-            kstack: T::alloc_stack(7),
+            kstack: T::alloc_stack(),
         }
     }
     /// Used for remap_kernel() where heap alloc is unavailable
@@ -184,7 +184,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: self.areas.clone(),
             page_table,
-            kstack: T::alloc_stack(7),
+            kstack: T::alloc_stack(),
         }
     }
     pub fn clear(&mut self) {
