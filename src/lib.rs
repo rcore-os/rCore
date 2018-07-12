@@ -115,6 +115,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
 
     unsafe { arch::interrupt::enable(); }
 
+//    thread::test::local_key();
 //    thread::test::unpack();
 //    sync::test::philosopher_using_mutex();
 //    sync::test::philosopher_using_monitor();

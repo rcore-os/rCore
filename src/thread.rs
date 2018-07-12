@@ -53,6 +53,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
     {
         let f = unsafe { Box::from_raw(f as *mut F) };
         let ret = Box::new(f());
+        unsafe { LocalKey::<usize>::get_map() }.clear();
         let mut processor = PROCESSOR.try().unwrap().lock();
         let pid = processor.current_pid();
         processor.exit(pid, Box::into_raw(ret) as usize);
@@ -121,28 +122,28 @@ impl<T> JoinHandle<T> {
     }
 }
 
-pub struct LocalKey<T: 'static + Default> {
+pub struct LocalKey<T: 'static> {
     init: fn() -> T,
 }
 
-impl<T: 'static + Default> LocalKey<T> {
+impl<T: 'static> LocalKey<T> {
     pub fn with<F, R>(&'static self, f: F) -> R
         where F: FnOnce(&T) -> R
     {
-        let (map, key) = self.get_map_key();
+        let map = unsafe { Self::get_map() };
+        let key = self as *const _ as usize;
         if !map.contains_key(&key) {
             map.insert(key, Box::new((self.init)()));
         }
         let value = map.get(&key).unwrap().downcast_ref::<T>().expect("type error");
         f(value)
     }
-    pub const fn new() -> Self {
-        LocalKey { init: Self::_init }
+    pub const fn new(init: fn() -> T) -> Self {
+        LocalKey { init }
     }
-    fn _init() -> T { T::default() }
-    /// A `BTreeMap<usize, Box<Any>>` at kernel stack bottom
+    /// Get `BTreeMap<usize, Box<Any>>` at the current kernel stack bottom
     /// The stack must be aligned with 0x8000
-    fn get_map_key(&self) -> (&mut BTreeMap<usize, Box<Any>>, usize) {
+    unsafe fn get_map() -> &'static mut BTreeMap<usize, Box<Any>> {
         const STACK_SIZE: usize = 0x8000;
         let stack_var = 0usize;
         let ptr = (&stack_var as *const _ as usize) / STACK_SIZE * STACK_SIZE;
@@ -150,9 +151,7 @@ impl<T: 'static + Default> LocalKey<T> {
         if map.is_none() {
             *map = Some(BTreeMap::new());
         }
-        let map = map.as_mut().unwrap();
-        let key = self as *const _ as usize;
-        (map, key)
+        map.as_mut().unwrap()
     }
 }
 
@@ -180,17 +179,17 @@ pub mod test {
     }
 
     pub fn local_key() {
-        static FOO: thread::LocalKey<RefCell<usize>> = thread::LocalKey::new();
+        static FOO: thread::LocalKey<RefCell<usize>> = thread::LocalKey::new(|| RefCell::new(1));
 
         FOO.with(|f| {
-            assert_eq!(*f.borrow(), 0);
+            assert_eq!(*f.borrow(), 1);
             *f.borrow_mut() = 2;
         });
 
         // each thread starts out with the initial value of 1
         thread::spawn(move || {
             FOO.with(|f| {
-                assert_eq!(*f.borrow(), 0);
+                assert_eq!(*f.borrow(), 1);
                 *f.borrow_mut() = 3;
             });
         }).join();
