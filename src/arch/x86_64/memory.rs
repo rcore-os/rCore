@@ -9,13 +9,12 @@ use ucore_memory::paging::PageTable;
 
 // BootInformation may trigger page fault after kernel remap
 // So just take its ownership
-pub fn init(boot_info: BootInformation) -> MemorySet {
+pub fn init(boot_info: BootInformation) {
     assert_has_not_been_called!("memory::init must be called only once");
     info!("{:?}", boot_info);
     init_frame_allocator(&boot_info);
-    let ms = remap_the_kernel(&boot_info);
+    remap_the_kernel(&boot_info);
     init_heap();
-    ms
 }
 
 fn init_frame_allocator(boot_info: &BootInformation) {
@@ -52,7 +51,7 @@ fn init_frame_allocator(boot_info: &BootInformation) {
     }
 }
 
-fn remap_the_kernel(boot_info: &BootInformation) -> MemorySet {
+fn remap_the_kernel(boot_info: &BootInformation) {
     extern { fn stack_bottom(); }
     extern { fn stack_top(); }
     let kstack = Stack {
@@ -76,7 +75,8 @@ fn remap_the_kernel(boot_info: &BootInformation) -> MemorySet {
     unsafe { memory_set.activate(); }
     info!("NEW TABLE!!!");
 
-    memory_set
+    use core::mem::forget;
+    forget(memory_set);
 }
 
 fn memory_set_from(sections: ElfSectionsTag, kstack: Stack) -> MemorySet {

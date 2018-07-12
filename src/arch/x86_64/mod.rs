@@ -10,16 +10,15 @@ pub mod idt;
 pub mod smp;
 pub mod memory;
 
-pub fn init(multiboot_information_address: usize) -> MemorySet {
+pub fn init(multiboot_information_address: usize) {
     idt::init();
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     let rsdt_addr = boot_info.rsdp_v1_tag().unwrap().rsdt_address();
-    let ms = memory::init(boot_info);
+    memory::init(boot_info);
     // Now heap is available
     gdt::init();
     let acpi = driver::init(rsdt_addr);
     smp::start_other_cores(&acpi);
-    ms
 }
 
 /// The entry point for another processors

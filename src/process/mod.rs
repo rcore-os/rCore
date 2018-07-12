@@ -10,10 +10,10 @@ mod processor;
 mod scheduler;
 
 
-pub fn init(ms: MemorySet) {
+pub fn init() {
     PROCESSOR.call_once(|| {
         SpinNoIrqLock::new({
-            let initproc = Process::new_init(ms);
+            let initproc = Process::new_init();
             let idleproc = Process::new("idle", idle_thread, 0);
         let mut processor = Processor::new();
         processor.add(initproc);

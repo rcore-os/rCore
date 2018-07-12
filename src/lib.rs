@@ -107,9 +107,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     println!("Hello World{}", "!");
 
     io::init();
-    let ms = arch::init(multiboot_information_address);
+    arch::init(multiboot_information_address);
 
-    process::init(ms);
+    process::init();
 
     fs::load_sfs();
 

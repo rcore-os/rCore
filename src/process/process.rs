@@ -46,13 +46,13 @@ impl Process {
 
     /// Make the first kernel thread `initproc`
     /// Should be called only once
-    pub fn new_init(ms: MemorySet) -> Self {
+    pub fn new_init() -> Self {
         assert_has_not_been_called!();
         Process {
             pid: 0,
             parent: 0,
             name: String::from("init"),
-            memory_set: ms,
+            memory_set: MemorySet::new(),
             status: Status::Running,
             context: unsafe { Context::null() }, // will be set at first schedule
             is_user: false,
