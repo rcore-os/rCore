@@ -232,8 +232,8 @@ impl InactivePageTable0 {
         let e510 = table[510].clone();
         let e509 = table[509].clone();
         self.edit(|_| {
-            table[510] = e510;
-            table[509] = e509;
+            table[510].set_addr(e510.addr(), e510.flags() | EF::GLOBAL);
+            table[509].set_addr(e509.addr(), e509.flags() | EF::GLOBAL);
         });
     }
 }
