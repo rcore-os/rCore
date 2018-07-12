@@ -25,8 +25,8 @@ pub fn dealloc_frame(target: usize) {
 // alloc from heap
 pub fn alloc_stack() -> Stack {
     use alloc::boxed::Box;
-    const STACK_SIZE: usize = 8 * 4096;
-    #[repr(align(4096))]
+    const STACK_SIZE: usize = 0x8000;
+    #[repr(align(0x8000))]
     struct StackData([u8; STACK_SIZE]);
     let data = Box::new(StackData([0; STACK_SIZE]));
     let bottom = Box::into_raw(data) as usize;

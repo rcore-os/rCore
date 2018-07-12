@@ -3,11 +3,13 @@
 //! Based on process mod.
 //! Used in the kernel.
 
-use process::*;
+use alloc::boxed::Box;
+use alloc::BTreeMap;
+use core::any::Any;
 use core::marker::PhantomData;
 use core::ptr;
 use core::time::Duration;
-use alloc::boxed::Box;
+use process::*;
 
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
@@ -37,8 +39,8 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 {
     info!("spawn:");
     use process;
-    let f = Box::leak(Box::new(f));
-    let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, f as *mut _ as usize);
+    let f = Box::into_raw(Box::new(f));
+    let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, f as usize);
     return JoinHandle {
         thread: Thread { pid },
         mark: PhantomData,

@@ -11,7 +11,6 @@ pub struct Process {
     pub(in process) memory_set: MemorySet,
     pub(in process) status: Status,
     pub(in process) context: Context,
-    pub(in process) is_user: bool,
 }
 
 pub type Pid = usize;
@@ -30,8 +29,7 @@ impl Process {
     /// Make a new kernel thread
     pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize) -> Self {
         let ms = MemorySet::new();
-        let data = InitStack::new_kernel_thread(entry, arg, ms.kstack_top());
-        let context = unsafe { data.push_at(ms.kstack_top()) };
+        let context = unsafe { Context::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) };
 
         Process {
             pid: 0,
@@ -40,7 +38,6 @@ impl Process {
             memory_set: ms,
             status: Status::Ready,
             context,
-            is_user: false,
         }
     }
 
@@ -55,7 +52,6 @@ impl Process {
             memory_set: MemorySet::new(),
             status: Status::Running,
             context: unsafe { Context::null() }, // will be set at first schedule
-            is_user: false,
         }
     }
 
@@ -111,8 +107,10 @@ impl Process {
 
 
         // Allocate kernel stack and push trap frame
-        let data = InitStack::new_user_thread(entry_addr, user_stack_top - 8, is32);
-        let context = unsafe { data.push_at(memory_set.kstack_top()) };
+        let context = unsafe {
+            Context::new_user_thread(
+                entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
+        };
 
         Process {
             pid: 0,
@@ -121,14 +119,11 @@ impl Process {
             memory_set,
             status: Status::Ready,
             context,
-            is_user: true,
         }
     }
 
     /// Fork
     pub fn fork(&self, tf: &TrapFrame) -> Self {
-        assert!(self.is_user);
-
         // Clone memory set, make a new page table
         let memory_set = self.memory_set.clone();
 
@@ -147,9 +142,8 @@ impl Process {
             });
         }
 
-        // Allocate kernel stack and push trap frame
-        let data = InitStack::new_fork(tf);
-        let context = unsafe { data.push_at(memory_set.kstack_top()) };
+        // Push context at kstack top
+        let context = unsafe { Context::new_fork(tf, memory_set.kstack_top(), memory_set.token()) };
 
         Process {
             pid: 0,
@@ -158,7 +152,6 @@ impl Process {
             memory_set,
             status: Status::Ready,
             context,
-            is_user: true,
         }
     }
 

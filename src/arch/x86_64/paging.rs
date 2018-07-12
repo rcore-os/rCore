@@ -213,6 +213,10 @@ impl InactivePageTable for InactivePageTable0 {
         }
     }
 
+    fn token(&self) -> usize {
+        self.p4_frame.start_address().as_u64() as usize // as CR3
+    }
+
     fn alloc_frame() -> Option<usize> {
         alloc_frame()
     }

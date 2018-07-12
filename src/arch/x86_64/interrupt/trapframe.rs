@@ -64,6 +64,7 @@ impl TrapFrame {
 #[derive(Debug, Default)]
 #[repr(C)]
 struct ContextData {
+    cr3: usize,
     r15: usize,
     r14: usize,
     r13: usize,
@@ -74,49 +75,22 @@ struct ContextData {
 }
 
 impl ContextData {
-    fn new() -> Self {
-        let mut context = ContextData::default();
-        context.rip = forkret as usize;
-        context
+    fn new(cr3: usize) -> Self {
+        ContextData { rip: forkret as usize, cr3, ..ContextData::default() }
     }
 }
 
 /// 新线程的内核栈初始内容
 #[derive(Debug)]
 #[repr(C)]
-pub struct InitStack {
+struct InitStack {
     context: ContextData,
     trapret: usize,
     tf: TrapFrame,
 }
 
 impl InitStack {
-    pub fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
-        InitStack {
-            context: ContextData::new(),
-            trapret: trap_ret as usize,
-            tf: TrapFrame::new_kernel_thread(entry, arg, rsp),
-        }
-    }
-    pub fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
-        InitStack {
-            context: ContextData::new(),
-            trapret: trap_ret as usize,
-            tf: TrapFrame::new_user_thread(entry_addr, rsp, is32),
-        }
-    }
-    pub fn new_fork(tf: &TrapFrame) -> Self {
-        InitStack {
-            context: ContextData::new(),
-            trapret: trap_ret as usize,
-            tf: {
-                let mut tf = tf.clone();
-                tf.rax = 0;
-                tf
-            },
-        }
-    }
-    pub unsafe fn push_at(self, stack_top: usize) -> Context {
+    unsafe fn push_at(self, stack_top: usize) -> Context {
         let ptr = (stack_top as *mut Self).offset(-1);
         *ptr = self;
         Context(ptr as usize)
@@ -158,12 +132,16 @@ impl Context {
         push r13
         push r14
         push r15
+        mov r15, cr3
+        push r15
 
         // Switch stacks
         mov [rdi], rsp      // rdi = from_rsp
         mov rsp, [rsi]      // rsi = to_rsp
 
         // Save old callee-save registers
+        pop r15
+        mov cr3, r15
         pop r15
         pop r14
         pop r13
@@ -178,5 +156,31 @@ impl Context {
 
     pub unsafe fn null() -> Self {
         Context(0)
+    }
+
+    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
+        InitStack {
+            context: ContextData::new(cr3),
+            trapret: trap_ret as usize,
+            tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
+        }.push_at(kstack_top)
+    }
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
+        InitStack {
+            context: ContextData::new(cr3),
+            trapret: trap_ret as usize,
+            tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
+        }.push_at(kstack_top)
+    }
+    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
+        InitStack {
+            context: ContextData::new(cr3),
+            trapret: trap_ret as usize,
+            tf: {
+                let mut tf = tf.clone();
+                tf.rax = 0;
+                tf
+            },
+        }.push_at(kstack_top)
     }
 }

@@ -11,6 +11,7 @@ pub trait InactivePageTable {
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active));
     unsafe fn activate(&self);
     unsafe fn with(&self, f: impl FnOnce());
+    fn token(&self) -> usize;
 
     fn alloc_frame() -> Option<PhysAddr>;
     fn dealloc_frame(target: PhysAddr);
@@ -171,21 +172,11 @@ impl<T: InactivePageTable> MemorySet<T> {
     pub unsafe fn activate(&self) {
         self.page_table.activate();
     }
+    pub fn token(&self) -> usize {
+        self.page_table.token()
+    }
     pub fn kstack_top(&self) -> usize {
         self.kstack.top
-    }
-    pub fn clone(&self) -> Self {
-        let mut page_table = T::new();
-        page_table.edit(|pt| {
-            for area in self.areas.iter() {
-                area.map::<T>(pt);
-            }
-        });
-        MemorySet {
-            areas: self.areas.clone(),
-            page_table,
-            kstack: T::alloc_stack(),
-        }
     }
     pub fn clear(&mut self) {
         let Self { ref mut page_table, ref mut areas, .. } = self;
@@ -198,9 +189,19 @@ impl<T: InactivePageTable> MemorySet<T> {
     }
 }
 
-impl<T: InactivePageTable> Drop for MemorySet<T> {
-    fn drop(&mut self) {
-        self.clear();
+impl<T: InactivePageTable> Clone for MemorySet<T> {
+    fn clone(&self) -> Self {
+        let mut page_table = T::new();
+        page_table.edit(|pt| {
+            for area in self.areas.iter() {
+                area.map::<T>(pt);
+            }
+        });
+        MemorySet {
+            areas: self.areas.clone(),
+            page_table,
+            kstack: T::alloc_stack(),
+        }
     }
 }
 
