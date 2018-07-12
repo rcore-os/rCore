@@ -4,7 +4,6 @@ use consts::MEMORY_OFFSET;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
-#[cfg(target_arch = "x86_64")]
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 
@@ -34,42 +33,22 @@ pub fn alloc_stack() -> Stack {
     Stack { top, bottom }
 }
 
-#[cfg(target_arch = "x86_64")]
 lazy_static! {
     static ref ACTIVE_TABLE: Mutex<CowExt<ActivePageTable>> = Mutex::new(unsafe {
         CowExt::new(ActivePageTable::new())
     });
 }
 
-#[cfg(target_arch = "riscv")]
-lazy_static! {
-    static ref ACTIVE_TABLE: Mutex<ActivePageTable> = Mutex::new(unsafe {
-        ActivePageTable::new()
-    });
-}
-
 /// The only way to get active page table
-#[cfg(target_arch = "x86_64")]
 pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 
-#[cfg(target_arch = "riscv")]
-pub fn active_table() -> MutexGuard<'static, ActivePageTable> {
-    ACTIVE_TABLE.lock()
-}
-
 // Return true to continue, false to halt
-#[cfg(target_arch = "x86_64")]
 pub fn page_fault_handler(addr: usize) -> bool {
     // Handle copy on write
     unsafe { ACTIVE_TABLE.force_unlock(); }
     active_table().page_fault_handler(addr, || alloc_frame().unwrap())
-}
-
-#[cfg(target_arch = "riscv")]
-pub fn page_fault_handler(addr: usize) -> bool {
-    false
 }
 
 pub fn init_heap() {

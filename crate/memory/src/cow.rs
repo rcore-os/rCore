@@ -103,31 +103,39 @@ impl<T: PageTable> DerefMut for CowExt<T> {
 }
 
 /// A map contains reference count for shared frame
+///
+/// It will lazily construct the `BTreeMap`, to avoid heap alloc when heap is unavailable.
 #[derive(Default)]
-struct FrameRcMap(BTreeMap<Frame, (u16, u16)>);
+struct FrameRcMap(Option<BTreeMap<Frame, (u16, u16)>>);
 
 type Frame = usize;
 
 impl FrameRcMap {
     fn read_count(&mut self, frame: &Frame) -> u16 {
-        self.0.get(frame).unwrap_or(&(0, 0)).0
+        self.map().get(frame).unwrap_or(&(0, 0)).0
     }
     fn write_count(&mut self, frame: &Frame) -> u16 {
-        self.0.get(frame).unwrap_or(&(0, 0)).1
+        self.map().get(frame).unwrap_or(&(0, 0)).1
     }
     fn read_increase(&mut self, frame: &Frame) {
-        let (r, w) = self.0.get(&frame).unwrap_or(&(0, 0)).clone();
-        self.0.insert(frame.clone(), (r + 1, w));
+        let (r, w) = self.map().get(&frame).unwrap_or(&(0, 0)).clone();
+        self.map().insert(frame.clone(), (r + 1, w));
     }
     fn read_decrease(&mut self, frame: &Frame) {
-        self.0.get_mut(frame).unwrap().0 -= 1;
+        self.map().get_mut(frame).unwrap().0 -= 1;
     }
     fn write_increase(&mut self, frame: &Frame) {
-        let (r, w) = self.0.get(&frame).unwrap_or(&(0, 0)).clone();
-        self.0.insert(frame.clone(), (r, w + 1));
+        let (r, w) = self.map().get(&frame).unwrap_or(&(0, 0)).clone();
+        self.map().insert(frame.clone(), (r, w + 1));
     }
     fn write_decrease(&mut self, frame: &Frame) {
-        self.0.get_mut(frame).unwrap().1 -= 1;
+        self.map().get_mut(frame).unwrap().1 -= 1;
+    }
+    fn map(&mut self) -> &mut BTreeMap<Frame, (u16, u16)> {
+        if self.0.is_none() {
+            self.0 = Some(BTreeMap::new());
+        }
+        self.0.as_mut().unwrap()
     }
 }
 
