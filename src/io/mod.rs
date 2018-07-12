@@ -1,4 +1,3 @@
-use arch::driver::serial::COM1;
 use core::fmt;
 use log;
 use log::{Level, LevelFilter, Log, Metadata, Record};
@@ -35,8 +34,10 @@ macro_rules! with_color {
     }};
 }
 
+#[cfg(target_arch = "x86_64")]
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use core::fmt::Write;
+    use arch::driver::serial::COM1;
 //    use arch::driver::vga::*;
 //    {
 //        let mut writer = vga_writer::VGA_WRITER.lock();
@@ -49,10 +50,26 @@ fn print_in_color(args: fmt::Arguments, color: Color) {
     COM1.lock().write_fmt(with_color!(args, color)).unwrap();
 }
 
+#[cfg(target_arch = "riscv")]
+fn print_in_color(args: fmt::Arguments, color: Color) {
+    use arch::serial::SerialPort;
+    use core::fmt::Write;
+    SerialPort.write_fmt(with_color!(args, color)).unwrap();
+}
+
+#[cfg(target_arch = "x86_64")]
 pub fn print(args: fmt::Arguments) {
     use core::fmt::Write;
+    use arch::driver::serial::COM1;
     unsafe { COM1.force_unlock(); }
     COM1.lock().write_fmt(args).unwrap();
+}
+
+#[cfg(target_arch = "riscv")]
+pub fn print(args: fmt::Arguments) {
+    use arch::serial::SerialPort;
+    use core::fmt::Write;
+    SerialPort.write_fmt(args).unwrap();
 }
 
 struct SimpleLogger;

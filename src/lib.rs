@@ -29,7 +29,6 @@ extern crate bitflags;
 extern crate lazy_static;
 extern crate linked_list_allocator;
 #[macro_use]
-#[cfg(target_arch = "x86_64")]
 extern crate log;
 #[cfg(target_arch = "x86_64")]
 extern crate multiboot2;
@@ -59,14 +58,7 @@ pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
-#[cfg(target_arch = "x86_64")]
 mod io;
-
-#[macro_use]    // print!
-#[cfg(target_arch = "riscv")]
-#[path = "io/riscv_io.rs"]
-mod io;
-
 mod memory;
 mod lang;
 mod util;
@@ -97,6 +89,7 @@ fn timer_interrupt() {
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
+    io::init();
     arch::init();
     process::init();
     info!("RISCV init end");

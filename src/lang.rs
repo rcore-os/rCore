@@ -25,7 +25,7 @@ pub fn panic(info: &PanicInfo) -> ! {
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub fn panic_fmt(fmt: ::core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
-    println!("\n\nPANIC in {} at {}:{}\n    {}", file, line, col, fmt);
+    error!("\n\nPANIC in {} at {}:{}\n    {}", file, line, col, fmt);
     loop {}
 }
 
