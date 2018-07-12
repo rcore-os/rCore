@@ -20,10 +20,11 @@ pub fn current() -> Thread {
 
 /// Puts the current thread to sleep for the specified amount of time.
 pub fn sleep(dur: Duration) {
-    info!("sleep: {:?}", dur);
+    let time = dur_to_ticks(dur);
+    info!("sleep: {:?} ticks", time);
     let mut processor = PROCESSOR.try().unwrap().lock();
     let pid = processor.current_pid();
-    processor.sleep(pid, dur_to_ticks(dur));
+    processor.sleep(pid, time);
     processor.schedule();
 
     fn dur_to_ticks(dur: Duration) -> usize {

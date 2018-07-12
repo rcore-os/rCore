@@ -175,7 +175,7 @@ impl InactivePageTable for InactivePageTable0 {
     unsafe fn activate(&self) {
         let old_frame = satp::read().frame();
         let new_frame = self.p2_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
+        debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, new_frame);
             sfence_vma_all();
@@ -185,13 +185,13 @@ impl InactivePageTable for InactivePageTable0 {
     unsafe fn with(&self, f: impl FnOnce()) {
         let old_frame = satp::read().frame();
         let new_frame = self.p2_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
+        debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, new_frame);
             sfence_vma_all();
         }
         f();
-        debug!("switch table {:?} -> {:?}", new_frame, old_frame);
+        debug!("switch table {:x?} -> {:x?}", new_frame, old_frame);
         if old_frame != new_frame {
             satp::set(satp::Mode::Sv32, 0, old_frame);
             sfence_vma_all();

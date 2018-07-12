@@ -131,7 +131,7 @@ impl Processor {
         to.status = Status::Running;
         self.scheduler.remove(pid);
 
-        info!("switch from {} to {}\n  rsp: ??? -> {:?}", pid0, pid, to.context);
+        info!("switch from {} to {} {:x?}", pid0, pid, to.context);
         unsafe {
             // FIXME: safely pass MutexGuard
             use core::mem::forget;

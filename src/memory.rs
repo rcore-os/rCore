@@ -14,10 +14,13 @@ lazy_static! {
 }
 
 pub fn alloc_frame() -> Option<usize> {
-    FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET)
+    let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+    trace!("Allocate frame: {:x?}", ret);
+    ret
 }
 
 pub fn dealloc_frame(target: usize) {
+    trace!("Deallocate frame: {:x}", target);
     FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
 }
 
