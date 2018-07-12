@@ -218,11 +218,11 @@ impl InactivePageTable for InactivePageTable0 {
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e1 = table[KERNEL_PML4].clone();
-        let e2 = table[KERNEL_PML4 + 1].clone();
+        let e1 = table[KERNEL_PML4];
+        assert!(!e1.is_unused());
+
         self.edit(|_| {
-            table[KERNEL_PML4] = e1;
-            table[KERNEL_PML4 + 1] = e2;
+            table[KERNEL_PML4].set(e1.frame(), EF::VALID | EF::GLOBAL);
         });
     }
 }

@@ -12,11 +12,16 @@ pub struct TrapFrame {
 
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
-    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
+    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[10] = arg; // a0
+        tf.x[2] = sp;
         tf.sepc = entry as usize;
+        tf.sstatus = sstatus::read();
+        tf.sstatus.set_spie(true);
+        tf.sstatus.set_sie(false);
+        tf.sstatus.set_spp(sstatus::SPP::Supervisor);
         tf
     }
     fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {

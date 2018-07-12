@@ -11,10 +11,8 @@ pub fn init() {
     let frame = Frame::of_addr(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as u32));
     super::paging::setup_page_table(frame);
     init_frame_allocator();
-    let ms = remap_the_kernel();
+    remap_the_kernel();
     init_heap();
-    use core::mem::forget;
-    forget(ms);
 }
 
 fn init_frame_allocator() {
@@ -34,7 +32,7 @@ fn init_frame_allocator() {
     }
 }
 
-fn remap_the_kernel() -> MemorySet {
+fn remap_the_kernel() {
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     let kstack = Stack {
         top: bootstacktop as usize,
@@ -48,8 +46,9 @@ fn remap_the_kernel() -> MemorySet {
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
     ms.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
     unsafe { ms.activate(); }
+    use core::mem::forget;
+    forget(ms);
     info!("kernel remap end");
-    ms
 }
 
 // Symbols provided by linker script

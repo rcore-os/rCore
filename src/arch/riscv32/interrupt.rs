@@ -19,7 +19,9 @@ pub unsafe fn enable() {
 
 #[inline(always)]
 pub unsafe fn disable_and_store() -> usize {
-    sstatus::read().sie() as usize
+    let e = sstatus::read().sie() as usize;
+    sstatus::clear_sie();
+    e
 }
 
 #[inline(always)]
@@ -35,9 +37,10 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     trace!("Interrupt: {:?}", tf.scause.cause());
     match tf.scause.cause() {
         Trap::Interrupt(SupervisorTimer) => timer(),
-        _ => panic!("Unhandled interrupt: {:?}\n{:#x?}", tf.scause.cause(), tf),
+        _ => panic!("Unhandled interrupt: {:?}\n{:#010x?}", tf.scause.cause(), tf),
     }
     ::trap::before_return();
+    trace!("Interrupt end");
 }
 
 fn timer() {
