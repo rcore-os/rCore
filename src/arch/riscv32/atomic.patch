@@ -1,5 +1,5 @@
 --- atomic_backup.rs	2018-07-10 00:29:48.000000000 +0800
-+++ atomic.rs	2018-07-11 14:48:10.000000000 +0800
++++ atomic.rs	2018-07-12 18:32:26.000000000 +0800
 @@ -1556,15 +1556,9 @@
  }
  
@@ -19,7 +19,38 @@
  }
  
  #[inline]
-@@ -1618,29 +1612,30 @@
+@@ -1580,15 +1574,22 @@
+ }
+ 
+ #[inline]
+-unsafe fn atomic_swap<T>(dst: *mut T, val: T, order: Ordering) -> T {
+-    match order {
+-        Acquire => intrinsics::atomic_xchg_acq(dst, val),
+-        Release => intrinsics::atomic_xchg_rel(dst, val),
+-        AcqRel => intrinsics::atomic_xchg_acqrel(dst, val),
+-        Relaxed => intrinsics::atomic_xchg_relaxed(dst, val),
+-        SeqCst => intrinsics::atomic_xchg(dst, val),
+-        __Nonexhaustive => panic!("invalid memory ordering"),
++unsafe fn atomic_swap<T>(dst: *mut T, val: T, _order: Ordering) -> T {
++    let sstatus: usize;
++    asm!("csrrs $0, 0x100, x0" : "=r"(sstatus) ::: "volatile");
++    // Disable interrupt: sstatus::clear_sie()
++    asm!("csrrc x0, 0x100, $0" :: "r"(1) :: "volatile");
++
++    use ptr::{read, write};
++    let ret = read(dst);
++    write(dst, val);
++
++    let sie = sstatus & 1 != 0;
++    if sie {
++        // Enable interrupt: sstatus::set_sie()
++        asm!("csrrs x0, 0x100, $0" :: "r"(1) :: "volatile");
+     }
++    ret
+ }
+ 
+ /// Returns the previous value (like __sync_fetch_and_add).
+@@ -1618,29 +1619,30 @@
  }
  
  #[inline]
