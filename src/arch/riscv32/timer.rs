@@ -23,7 +23,7 @@ pub fn init() {
     unsafe { sie::set_stimer(); }
 
     set_next();
-    println!("timer: init end");
+    info!("timer: init end");
 }
 
 pub fn set_next() {

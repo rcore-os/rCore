@@ -146,9 +146,7 @@ fn com2() {
 }
 
 fn timer() {
-    use process::PROCESSOR;
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    processor.tick();
+    ::timer_interrupt();
 }
 
 fn to_user(tf: &mut TrapFrame) {

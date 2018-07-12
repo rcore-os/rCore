@@ -1,13 +1,32 @@
 use super::riscv::register::*;
+pub use self::context::*;
+
+#[path = "context.rs"]
+mod context;
 
 pub fn init() {
     unsafe {
         // Set the exception vector address
         stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
-        // Enable interrupt
+    }
+    info!("stvec: init end");
+}
+
+#[inline(always)]
+pub unsafe fn enable() {
+    sstatus::set_sie();
+}
+
+#[inline(always)]
+pub unsafe fn disable_and_store() -> usize {
+    sstatus::read().sie() as usize
+}
+
+#[inline(always)]
+pub unsafe fn restore(flags: usize) {
+    if flags != 0 {
         sstatus::set_sie();
     }
-    println!("interrupt: init end");
 }
 
 #[no_mangle]
@@ -20,24 +39,8 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 }
 
 fn timer() {
-    static mut TICK: usize = 0;
-    unsafe {
-        TICK += 1;
-        if TICK % 100 == 0 {
-            println!("timer");
-        }
-    }
+    ::timer_interrupt();
     super::timer::set_next();
-}
-
-#[derive(Debug, Clone)]
-#[repr(C)]
-pub struct TrapFrame {
-    x: [usize; 32],
-    sstatus: sstatus::Sstatus,
-    sepc: usize,
-    sbadaddr: usize,
-    scause: scause::Scause,
 }
 
 extern {

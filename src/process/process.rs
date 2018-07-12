@@ -67,9 +67,9 @@ impl Process {
         };
 
         // User stack
-        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER_TCB_OFFSET};
+        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
         let (user_stack_buttom, user_stack_top) = match is32 {
-            true => (USER_TCB_OFFSET, USER_TCB_OFFSET + USER_STACK_SIZE),
+            true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
             false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
         };
 

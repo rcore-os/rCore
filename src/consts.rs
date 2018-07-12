@@ -21,6 +21,10 @@ mod riscv {
     pub const KERNEL_HEAP_SIZE: usize = 1 * 1024 * 1024;
     pub const MEMORY_OFFSET: usize = 0x8000_0000;
     pub const MEMORY_END: usize = 0x8080_0000;
+    pub const USER_STACK_OFFSET: usize = 0x70000000;
+    pub const USER_STACK_SIZE: usize = 1024 * 1024;
+    // 1 MB
+    pub const USER32_STACK_OFFSET: usize = USER_STACK_OFFSET;
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -80,6 +84,7 @@ mod x86_64 {
 
     /// Offset to user stack
     pub const USER_STACK_OFFSET: usize = USER_GRANT_OFFSET + PML4_SIZE;
+    pub const USER32_STACK_OFFSET: usize = 0xB000_0000;
     pub const USER_STACK_PML4: usize = (USER_STACK_OFFSET & PML4_MASK) / PML4_SIZE;
     /// Size of user stack
     pub const USER_STACK_SIZE: usize = 1024 * 1024; // 1 MB

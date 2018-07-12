@@ -198,6 +198,10 @@ impl InactivePageTable for InactivePageTable0 {
         }
     }
 
+    fn token(&self) -> usize {
+        self.p2_frame.number() | (1 << 31) // as satp
+    }
+
     fn alloc_frame() -> Option<usize> {
         alloc_frame()
     }

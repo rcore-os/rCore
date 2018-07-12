@@ -71,15 +71,12 @@ mod memory;
 mod lang;
 mod util;
 mod consts;
-#[cfg(target_arch = "x86_64")]
 mod process;
 #[cfg(target_arch = "x86_64")]
 mod syscall;
 #[cfg(target_arch = "x86_64")]
 mod fs;
-#[cfg(target_arch = "x86_64")]
 mod thread;
-#[cfg(target_arch = "x86_64")]
 mod sync;
 
 #[allow(dead_code)]
@@ -91,11 +88,19 @@ mod arch;
 #[path = "arch/riscv32/mod.rs"]
 mod arch;
 
+fn timer_interrupt() {
+    use process::PROCESSOR;
+    let mut processor = PROCESSOR.try().unwrap().lock();
+    processor.tick();
+}
+
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
     arch::init();
-    println!("RISCV init end");
+    process::init();
+    info!("RISCV init end");
+    unsafe { arch::interrupt::enable(); }
     loop {}
 }
 
