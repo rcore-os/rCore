@@ -17,7 +17,7 @@ pub fn init() {
 
 macro_rules! print {
     ($($arg:tt)*) => ({
-        $crate::io::print(format_args!($($arg)*));
+        $crate::logging::print(format_args!($($arg)*));
     });
 }
 
@@ -84,7 +84,9 @@ impl Log for SimpleLogger {
             "rust_ucore::process::scheduler::rr",
         ];
         if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
-            print_in_color(format_args!("[{}] {}\n", record.target(), record.args()), Color::from(record.level()));
+//            let target = record.target();
+//            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
+            print_in_color(format_args!("[{:>5}] {}\n", record.level(), record.args()), Color::from(record.level()));
         }
     }
     fn flush(&self) {}

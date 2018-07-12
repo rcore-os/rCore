@@ -58,7 +58,7 @@ pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
-mod io;
+mod logging;
 mod memory;
 mod lang;
 mod util;
@@ -89,7 +89,7 @@ fn timer_interrupt() {
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
 pub extern fn rust_main() -> ! {
-    io::init();
+    logging::init();
     arch::init();
     process::init();
     info!("RISCV init end");
@@ -104,7 +104,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
 
-    io::init();
+    logging::init();
     arch::init(multiboot_information_address);
 
     process::init();
