@@ -121,8 +121,44 @@ impl<T> JoinHandle<T> {
     }
 }
 
+pub struct LocalKey<T: 'static + Default> {
+    init: fn() -> T,
+}
+
+impl<T: 'static + Default> LocalKey<T> {
+    pub fn with<F, R>(&'static self, f: F) -> R
+        where F: FnOnce(&T) -> R
+    {
+        let (map, key) = self.get_map_key();
+        if !map.contains_key(&key) {
+            map.insert(key, Box::new((self.init)()));
+        }
+        let value = map.get(&key).unwrap().downcast_ref::<T>().expect("type error");
+        f(value)
+    }
+    pub const fn new() -> Self {
+        LocalKey { init: Self::_init }
+    }
+    fn _init() -> T { T::default() }
+    /// A `BTreeMap<usize, Box<Any>>` at kernel stack bottom
+    /// The stack must be aligned with 0x8000
+    fn get_map_key(&self) -> (&mut BTreeMap<usize, Box<Any>>, usize) {
+        const STACK_SIZE: usize = 0x8000;
+        let stack_var = 0usize;
+        let ptr = (&stack_var as *const _ as usize) / STACK_SIZE * STACK_SIZE;
+        let map = unsafe { &mut *(ptr as *mut Option<BTreeMap<usize, Box<Any>>>) };
+        if map.is_none() {
+            *map = Some(BTreeMap::new());
+        }
+        let map = map.as_mut().unwrap();
+        let key = self as *const _ as usize;
+        (map, key)
+    }
+}
+
 pub mod test {
     use thread;
+    use core::cell::RefCell;
     use core::time::Duration;
 
     pub fn unpack() {
@@ -141,5 +177,28 @@ pub mod test {
 
         let ret = parked_thread.join().unwrap();
         assert_eq!(ret, 5);
+    }
+
+    pub fn local_key() {
+        static FOO: thread::LocalKey<RefCell<usize>> = thread::LocalKey::new();
+
+        FOO.with(|f| {
+            assert_eq!(*f.borrow(), 0);
+            *f.borrow_mut() = 2;
+        });
+
+        // each thread starts out with the initial value of 1
+        thread::spawn(move || {
+            FOO.with(|f| {
+                assert_eq!(*f.borrow(), 0);
+                *f.borrow_mut() = 3;
+            });
+        }).join();
+
+        // we retain our original value of 2 despite the child thread
+        FOO.with(|f| {
+            assert_eq!(*f.borrow(), 2);
+        });
+        println!("local key success");
     }
 }
