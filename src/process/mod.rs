@@ -15,16 +15,18 @@ pub fn init() {
         SpinNoIrqLock::new({
             let initproc = Process::new_init();
             let idleproc = Process::new("idle", idle_thread, 0);
-        let mut processor = Processor::new();
-        processor.add(initproc);
-        processor.add(idleproc);
-        processor
-    })});
+            let mut processor = Processor::new();
+            processor.add(initproc);
+            processor.add(idleproc);
+            processor
+        })
+    });
 }
 
 pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
 
 extern fn idle_thread(_arg: usize) -> ! {
+    println!("Hello, I'm idle.");
     loop {}
 }
 

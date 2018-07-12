@@ -44,13 +44,7 @@ impl InitStack {
 }
 
 extern {
-    fn trap_ret();
-}
-
-/// The entry point of new thread
-extern fn forkret() {
-    debug!("forkret");
-    // Will return to `trapret`
+    fn __trapret();
 }
 
 #[derive(Debug, Default)]
@@ -63,7 +57,7 @@ struct ContextData {
 
 impl ContextData {
     fn new(satp: usize) -> Self {
-        ContextData { ra: forkret as usize, satp, ..ContextData::default() }
+        ContextData { ra: __trapret as usize, satp, ..ContextData::default() }
     }
 }
 
@@ -84,8 +78,8 @@ impl Context {
         asm!(
         "
         // save from's registers
-        sub sp, -14*4
-        sw sp, (a0)
+        addi sp, sp, -4*14
+        sw sp, 0(a0)
         sw ra, 0*4(sp)
         sw s0, 2*4(sp)
         sw s1, 3*4(sp)
@@ -103,7 +97,7 @@ impl Context {
         sw s11, 1*4(sp)
 
         // restore to's registers
-        lw sp, (a1)
+        lw sp, 0(a1)
         lw s11, 1*4(sp)
         csrrw x0, 0x180, s11 // satp
         lw ra, 0*4(sp)
@@ -119,11 +113,11 @@ impl Context {
         lw s9, 11*4(sp)
         lw s10, 12*4(sp)
         lw s11, 13*4(sp)
-        add sp, 14*4
+        addi sp, sp, 4*14
 
-        sw zero, (a1)
+        sw zero, 0(a1)
         ret"
-        : : : : "intel" "volatile" )
+        : : : : "volatile" )
     }
 
     pub unsafe fn null() -> Self {

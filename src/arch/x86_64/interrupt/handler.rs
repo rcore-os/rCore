@@ -78,7 +78,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_IRQ0...63 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
             match irq {
-                IRQ_TIMER => timer(),
+                IRQ_TIMER => ::trap::timer(),
                 IRQ_KBD => keyboard(),
                 IRQ_COM1 => com1(),
                 IRQ_COM2 => com2(),
@@ -97,11 +97,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_DIVIDE | T_GPFLT | T_ILLOP => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
-
-    use process::PROCESSOR;
-    if let Some(processor) = PROCESSOR.try() {
-        processor.lock().schedule();
-    }
+    ::trap::before_return();
 }
 
 fn breakpoint() {
@@ -143,10 +139,6 @@ fn com2() {
     use arch::driver::serial::*;
     info!("\nInterupt: COM2");
     COM2.lock().receive();
-}
-
-fn timer() {
-    ::timer_interrupt();
 }
 
 fn to_user(tf: &mut TrapFrame) {

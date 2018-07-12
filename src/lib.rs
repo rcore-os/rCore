@@ -70,6 +70,7 @@ mod syscall;
 mod fs;
 mod thread;
 mod sync;
+mod trap;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -79,12 +80,6 @@ mod arch;
 #[cfg(target_arch = "riscv")]
 #[path = "arch/riscv32/mod.rs"]
 mod arch;
-
-fn timer_interrupt() {
-    use process::PROCESSOR;
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    processor.tick();
-}
 
 #[no_mangle]
 #[cfg(target_arch = "riscv")]
