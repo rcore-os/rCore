@@ -6,7 +6,7 @@
 OUTPUT_ARCH(riscv)
 ENTRY(kern_entry)
 
-BASE_ADDRESS = 0x80400000;  /* equal to payload address in bbl */
+BASE_ADDRESS = 0x80020000;  /* equal to payload address in bbl */
 
 SECTIONS
 {

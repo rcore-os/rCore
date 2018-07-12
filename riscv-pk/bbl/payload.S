@@ -1,7 +1,7 @@
 #include "encoding.h"
 
   .section ".payload","a",@progbits
-  .align RISCV_PGSHIFT + RISCV_PGLEVEL_BITS
+  .align 17
 
   .globl _payload_start, _payload_end
 _payload_start:
