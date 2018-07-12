@@ -14,28 +14,28 @@ macro_rules! println {
 }
 
 macro_rules! trace {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!("[trace] ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!("[trace] ", $fmt, "\n"), $($arg)*));
 }
 
 macro_rules! debug {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!("[debug] ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!("[debug] ", $fmt, "\n"), $($arg)*));
 }
 
 macro_rules! info {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!("[ info] ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!("[ info] ", $fmt, "\n"), $($arg)*));
 }
 
 macro_rules! warn {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!("[ warn] ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!("[ warn] ", $fmt, "\n"), $($arg)*));
 }
 
 macro_rules! error {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!("[error] ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!("[error] ", $fmt, "\n"), $($arg)*));
 }
 
 pub fn print(args: fmt::Arguments) {
