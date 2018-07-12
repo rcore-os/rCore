@@ -104,15 +104,15 @@ impl<T: PageTable> DerefMut for CowExt<T> {
 
 /// A map contains reference count for shared frame
 #[derive(Default)]
-struct FrameRcMap(BTreeMap<Frame, (u8, u8)>);
+struct FrameRcMap(BTreeMap<Frame, (u16, u16)>);
 
 type Frame = usize;
 
 impl FrameRcMap {
-    fn read_count(&mut self, frame: &Frame) -> u8 {
+    fn read_count(&mut self, frame: &Frame) -> u16 {
         self.0.get(frame).unwrap_or(&(0, 0)).0
     }
-    fn write_count(&mut self, frame: &Frame) -> u8 {
+    fn write_count(&mut self, frame: &Frame) -> u16 {
         self.0.get(frame).unwrap_or(&(0, 0)).1
     }
     fn read_increase(&mut self, frame: &Frame) {
