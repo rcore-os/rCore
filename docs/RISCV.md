@@ -41,7 +41,17 @@ target: riscv32im_unknown_none
 
 思路是在关中断环境下，用多条指令完成目标功能。这对于单核环境应该是正确的。
 
-我做了个[补丁](../src/arch/riscv32/atomic.patch)，在进入docker环境后，可运行`make patch-core`应用补丁，确保clear后，再build。
+我做了个[补丁](../src/arch/riscv32/atomic.patch)，在进入docker环境后，可运行`make patch-core`应用补丁，确保clean后，再build。
+
+### LLVM Bug
+
+当使用`(u8,u8)`类型时，会触发LLVM Error：
+
+```
+llvm::MVT llvm::EVT::getSimpleVT() const: Assertion `isSimple() && "Expected a SimpleValueType!"' failed.
+```
+
+在开发过程中，有两个地方遇到了这个错误，一是`log`库，二是`memory::cow`模块。后者修改为`(u16,u16)`就解决了问题，前者在Github上fork了一版，换了一种实现。
 
 ## BootLoader
 
@@ -90,7 +100,41 @@ bbl-ucore使用RISCV1.9的bbl，ucore_os_lab使用RISCV1.10的bbl。后者相比
 
     可通过sbi::set_timer设置
 
+## Memory
 
+### 自映射
 
+原x86_64版本使用页表自映射完成修改页表本身的操作。但**RISCV下的页表规范阻碍了自映射的实现**。原因是RISCV页表项中的flags，明确表示它指向的是数据页（VRW），还是下层页表（V）。假如把一个二级页表项，当做一级页表项来解读，就会触发异常。而这是自映射机制中必须的操作。
 
+为了绕开这个问题，就要求**在访问一级页表虚地址期间，将它所对应的二级页表项flags置为VRW**。此外，为了访问二级页表本身，还需要再加一个自映射的二级页表项，其flags为VRW。
+
+制作一个自映射的二级页表过程示意如下：
+
+```rust
+fn set_recursive(self: &mut PageTable, recursive_index: usize, frame: Frame) {
+    type EF = PageTableFlags;
+    self[recursive_index].set(frame.clone(), EF::VALID);
+    self[recursive_index + 1].set(frame.clone(), EF::VALID | EF::READABLE | EF::WRITABLE);
+}
+```
+
+在自映射页表生效后，可用地址：
+
+* (R, R+1, 0) 访问二级页表
+* (R, P2, 0) 访问一级页表
+
+*注：地址格式为（P2, P1, Offset），R为自映射下标*
+
+一个值得注意的现象是：在编辑完一级页表、并将其对应的二级页表项flags恢复为V之后，一级页表虚地址还是可以照常访问的，这应该是TLB缓存未失效的缘故。
+
+### 获取内存信息
+
+原x86_64版本使用GRUB进行boot，可通过Multiboot2获取内核段和可用空间的信息。RISCV下bbl无法提供这些信息，只能在linker script中定义各段的起始位置符号，然后在Rust中extern导入。
+
+为了将来适配自己造的CPU（8M RAM），暂时规定内存划分如下：
+
+* 0x80000000 - 0x80020000：BootLoader
+* 0x80020000 - 0x80100000：Kernel
+* 0x80100000 - 0x80200000：Kernel heap
+* 0x80200000 - 0x80800000：对应物理空间用于用户程序
 

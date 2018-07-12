@@ -22,6 +22,8 @@ cd RustOS
 # Pull docker image and enter docker interactive shell
 make docker_riscv
 # Inside docker ...
+# Patch the atomic mod of core lib
+make patch-core
 make build
 make justrun
 ```
