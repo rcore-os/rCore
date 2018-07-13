@@ -2,8 +2,8 @@ use bit_allocator::{BitAlloc, BitAlloc64K};
 use consts::KERNEL_OFFSET;
 // Depends on kernel
 use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Stack};
-use multiboot2::{ElfSection, ElfSectionFlags, ElfSectionsTag};
-use multiboot2::BootInformation;
+use super::multiboot2::{ElfSection, ElfSectionFlags, ElfSectionsTag};
+use super::multiboot2::BootInformation;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::PageTable;
 

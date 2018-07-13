@@ -1,4 +1,4 @@
-use redox_syscall::io::{Io, Pio};
+use super::redox_syscall::io::{Io, Pio};
 
 static mut PIT: Pit = Pit::new(0x40);
 

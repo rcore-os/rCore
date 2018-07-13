@@ -1,9 +1,10 @@
 // Copy from Redox
+extern crate uart_16550;
 
 use core::fmt::{self, Write};
-use redox_syscall::io::{Io, Pio};
+use super::redox_syscall::io::{Io, Pio};
 use spin::Mutex;
-use uart_16550::SerialPort;
+use self::uart_16550::SerialPort;
 
 pub static COM1: Mutex<SerialPort> = Mutex::new(SerialPort::new(0x3F8));
 pub static COM2: Mutex<SerialPort> = Mutex::new(SerialPort::new(0x2F8));

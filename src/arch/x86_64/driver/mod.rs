@@ -1,3 +1,5 @@
+extern crate syscall as redox_syscall;
+
 pub mod vga;
 pub mod acpi;
 pub mod apic;

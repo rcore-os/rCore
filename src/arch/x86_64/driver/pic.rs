@@ -1,6 +1,6 @@
 // Copy from Redox
 
-use redox_syscall::io::*;
+use super::redox_syscall::io::*;
 use spin::Mutex;
 
 static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));

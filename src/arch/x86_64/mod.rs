@@ -1,5 +1,6 @@
+extern crate multiboot2;
+
 use memory::MemorySet;
-use multiboot2;
 
 pub mod driver;
 pub mod cpu;

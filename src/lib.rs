@@ -30,18 +30,12 @@ extern crate lazy_static;
 extern crate linked_list_allocator;
 #[macro_use]
 extern crate log;
-#[cfg(target_arch = "x86_64")]
-extern crate multiboot2;
 #[macro_use]
 extern crate once;
 extern crate rlibc;
 #[cfg(target_arch = "x86_64")]
 extern crate simple_filesystem;
 extern crate spin;
-#[cfg(target_arch = "x86_64")]
-extern crate syscall as redox_syscall;
-#[cfg(target_arch = "x86_64")]
-extern crate uart_16550;
 extern crate ucore_memory;
 extern crate volatile;
 #[macro_use]
