@@ -22,9 +22,9 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
-user_image_files := $(wildcard user/*.img)
-user_object_files := $(patsubst user/%.img, build/user/%.o, $(user_image_files))
-SFSIMG := user/ucore32.img
+user_image_files := $(wildcard ../user/*.img)
+user_object_files := $(patsubst ../user/%.img, build/user/%.o, $(user_image_files))
+SFSIMG := ../user/ucore32.img
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
 ifeq ($(arch), riscv32)
 qemu_opts := -machine virt -kernel $(iso) -nographic
@@ -111,7 +111,7 @@ build/os-x86_64.iso: $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 build/os-riscv32.iso: $(kernel)
-	@cd riscv-pk && \
+	@cd ../riscv-pk && \
 	 mkdir -p build && \
 	 cd build && \
 	 ../configure \
@@ -119,9 +119,9 @@ build/os-riscv32.iso: $(kernel)
 	 	--prefix=$(RISCV) \
 	 	--disable-fp-emulation \
 	 	--host=riscv32-unknown-elf \
-	 	--with-payload=../../build/kernel-riscv32.bin && \
+	 	--with-payload=../../kernel/build/kernel-riscv32.bin && \
 	 make && \
-	 cp bbl ../../$@
+	 cp bbl ../../kernel/$@
 
 $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
@@ -140,7 +140,7 @@ build/arch/riscv32/boot/%.o: $(boot_src)/%.asm
 	@$(as) -march=rv32i $< -o $@
 
 # make .o from .img file
-build/user/%.o: user/%.img
+build/user/%.o: ../user/%.img
 	@mkdir -p $(shell dirname $@)
 	@$(ld) -r -b binary $< -o $@
 

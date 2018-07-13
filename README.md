@@ -18,7 +18,7 @@ Available on DockerHub: `wangrunji0408/riscv-rust`
 
 ```bash
 git clone https://github.com/wangrunji0408/RustOS.git -b riscv --recursive
-cd RustOS
+cd RustOS/kernel
 # Pull docker image and enter docker interactive shell
 make docker_riscv
 # Inside docker ...
