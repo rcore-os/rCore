@@ -39,7 +39,7 @@ fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4:
             : "memory"
             : "volatile");
         #[cfg(target_arch = "x86_64")]
-            asm!("int 0x80"
+            asm!("int 0x40"
             : "={rax}" (ret)
             : "{rax}" (id), "{rdi}" (arg0), "{rsi}" (arg1), "{rdx}" (arg2), "{rcx}" (arg3), "{r8}" (arg4), "{r9}" (arg5)
             : "memory"

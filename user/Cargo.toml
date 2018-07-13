@@ -1,6 +1,7 @@
-[workspace]
+[package]
+name = "ucore-user-programs"
+version = "0.1.0"
+authors = ["Runji Wang <wangrunji0408@163.com>"]
 
-members = [
-    "ucore-ulib",
-    "hello",
-]
+[dependencies]
+"ucore-ulib" = { path = "ucore-ulib" }

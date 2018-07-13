@@ -1,2 +1,5 @@
+# arch = {riscv32, x86_64}
+arch := riscv32
+
 all:
-	@RUST_TARGET_PATH=$(pwd) xargo build --target x86_64-blog_os
+	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(arch)-ucore
