@@ -4,6 +4,7 @@ use arch::driver::ide;
 use spin::Mutex;
 use process;
 
+#[cfg(not(feature = "link_user_program"))]
 pub fn load_sfs() {
 //    let slice = unsafe { MemBuf::new(_binary_user_ucore32_img_start, _binary_user_ucore32_img_end) };
     let sfs = SimpleFileSystem::open(Box::new(&ide::DISK0)).unwrap();
@@ -23,11 +24,21 @@ pub fn load_sfs() {
 }
 
 #[cfg(feature = "link_user_program")]
+pub fn load_sfs() {
+    let slice = unsafe {
+        slice::from_raw_parts(_binary_hello_start as *const u8,
+                              _binary_hello_size as usize)
+    };
+
+    process::add_user_process("hello", slice);
+    process::print();
+}
+
+
+#[cfg(feature = "link_user_program")]
 extern {
-    fn _binary_user_ucore32_img_start();
-    fn _binary_user_ucore32_img_end();
-    fn _binary_user_xv6_64_img_start();
-    fn _binary_user_xv6_64_img_end();
+    fn _binary_hello_start();
+    fn _binary_hello_size();
 }
 
 struct MemBuf(&'static [u8]);

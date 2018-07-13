@@ -22,8 +22,9 @@ grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
-user_image_files := $(wildcard ../user/*.img)
-user_object_files := $(patsubst ../user/%.img, build/user/%.o, $(user_image_files))
+user_bin_path := ../user/target/$(arch)-ucore/debug
+user_obj_path := build/arch/$(arch)/user
+user_object_files := $(patsubst $(user_bin_path)/%.d, $(user_obj_path)/%.o, $(wildcard $(user_bin_path)/*.d))
 SFSIMG := ../user/ucore32.img
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
 ifeq ($(arch), riscv32)
@@ -103,6 +104,9 @@ build: iso
 asm:
 	@$(objdump) -dS $(kernel) | less
 
+elf-h:
+	@$(objdump) -h $(kernel)
+
 build/os-x86_64.iso: $(kernel) $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
@@ -139,10 +143,11 @@ build/arch/riscv32/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@$(as) -march=rv32i $< -o $@
 
-# make .o from .img file
-build/user/%.o: ../user/%.img
-	@mkdir -p $(shell dirname $@)
-	@$(ld) -r -b binary $< -o $@
+# make .o from binary files
+$(user_obj_path)/%.o: $(user_bin_path)/%
+	@mkdir -p $(user_obj_path)
+	@cd $(user_bin_path) && \
+	 $(ld) -b binary $(notdir $<) -o $(abspath $@)
 
 # patch Rust core for RISCV32I atomic
 patch-core:

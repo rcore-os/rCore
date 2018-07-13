@@ -82,6 +82,25 @@ pub extern fn rust_main() -> ! {
     arch::init();
     process::init();
     info!("RISCV init end");
+
+    #[cfg(feature = "link_user_program")]
+        {
+            use core::slice;
+            let slice = unsafe {
+                slice::from_raw_parts(_binary_hello_start as *const u8,
+                                      _binary_hello_size as usize)
+            };
+
+            process::add_user_process("hello", slice);
+            process::print();
+
+
+            extern {
+                fn _binary_hello_start();
+                fn _binary_hello_size();
+            }
+        }
+
     unsafe { arch::interrupt::enable(); }
     loop {}
 }
