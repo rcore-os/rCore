@@ -10,8 +10,8 @@
 # 	make clean					Clean
 
 arch ?= riscv32
-kernel := build/kernel-$(arch).bin
-iso := build/os-$(arch).iso
+kernel := build/$(arch)/kernel.bin
+iso := build/$(arch)/os.iso
 target ?= $(arch)-blog_os
 mode ?= debug
 rust_lib := target/$(target)/$(mode)/librust_ucore.a
@@ -21,9 +21,9 @@ linker_script := $(boot_src)/linker.ld
 grub_cfg := $(boot_src)/grub.cfg
 assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
-	build/arch/$(arch)/boot/%.o, $(assembly_source_files))
+	build/$(arch)/boot/%.o, $(assembly_source_files))
 user_bin_path := ../user/target/$(arch)-ucore/debug
-user_obj_path := build/arch/$(arch)/user
+user_obj_path := build/$(arch)/user
 user_object_files := $(patsubst $(user_bin_path)/%.d, $(user_obj_path)/%.o, $(wildcard $(user_bin_path)/*.d))
 SFSIMG := ../user/ucore32.img
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
@@ -107,14 +107,14 @@ asm:
 elf-h:
 	@$(objdump) -h $(kernel)
 
-build/os-x86_64.iso: $(kernel) $(grub_cfg)
+build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
 	@cp $(grub_cfg) build/isofiles/boot/grub
 	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
 	@rm -r build/isofiles
 
-build/os-riscv32.iso: $(kernel)
+build/riscv32/os.iso: $(kernel)
 	@cd ../riscv-pk && \
 	 mkdir -p build && \
 	 cd build && \
@@ -123,7 +123,7 @@ build/os-riscv32.iso: $(kernel)
 	 	--prefix=$(RISCV) \
 	 	--disable-fp-emulation \
 	 	--host=riscv32-unknown-elf \
-	 	--with-payload=../../kernel/build/kernel-riscv32.bin && \
+	 	--with-payload=$(abspath $(kernel)) && \
 	 make && \
 	 cp bbl ../../kernel/$@
 
@@ -135,11 +135,11 @@ kernel:
 	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
 
 # compile assembly files
-build/arch/x86_64/boot/%.o: $(boot_src)/%.asm
+build/x86_64/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 
-build/arch/riscv32/boot/%.o: $(boot_src)/%.asm
+build/riscv32/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@$(as) -march=rv32i $< -o $@
 
