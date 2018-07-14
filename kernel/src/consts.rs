@@ -6,7 +6,7 @@ pub use self::riscv::*;
 pub use self::x86_64::*;
 
 pub const MAX_CPU_NUM: usize = 8;
-pub const MAX_PROCESS_NUM: usize = 32;
+pub const MAX_PROCESS_NUM: usize = 48;
 
 #[cfg(target_arch = "riscv")]
 mod riscv {
@@ -18,7 +18,7 @@ mod riscv {
     pub const KERNEL_OFFSET: usize = 0;
     pub const KERNEL_PML4: usize = 0x8000_0000 >> 22;
     pub const KERNEL_HEAP_OFFSET: usize = 0x8020_0000;
-    pub const KERNEL_HEAP_SIZE: usize = 0x0010_0000;
+    pub const KERNEL_HEAP_SIZE: usize = 0x0020_0000;
     pub const MEMORY_OFFSET: usize = 0x8000_0000;
     pub const MEMORY_END: usize = 0x8080_0000;
     pub const USER_STACK_OFFSET: usize = 0x70000000;

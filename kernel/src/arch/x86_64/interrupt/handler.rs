@@ -160,14 +160,14 @@ fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
     let ret = syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9], tf);
-    unsafe { *(&tf.rax as *const _ as *mut i32) = ret; }
+    tf.rax = ret as usize;
 }
 
 fn syscall32(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
     let ret = syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
-    unsafe { *(&tf.rax as *const _ as *mut i32) = ret; }
+    tf.rax = ret as usize;
 }
 
 fn error(tf: &TrapFrame) {

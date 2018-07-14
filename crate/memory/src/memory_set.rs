@@ -205,6 +205,12 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
     }
 }
 
+impl<T: InactivePageTable> Drop for MemorySet<T> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 impl<T: InactivePageTable> Debug for MemorySet<T> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         f.debug_list()

@@ -153,7 +153,7 @@ impl Context {
             context: ContextData::new(cr3),
             tf: {
                 let mut tf = tf.clone();
-                tf.x[1] = 0; // ra
+                tf.x[10] = 0; // a0
                 tf
             },
         }.push_at(kstack_top)
