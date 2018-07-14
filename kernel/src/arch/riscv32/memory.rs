@@ -1,6 +1,6 @@
 use core::slice;
 use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Stack};
-use super::riscv::addr::*;
+use super::riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 
 pub fn init() {
@@ -8,6 +8,7 @@ pub fn init() {
     struct PageData([u8; PAGE_SIZE]);
     static PAGE_TABLE_ROOT: PageData = PageData([0; PAGE_SIZE]);
 
+    unsafe { sstatus::set_sum(); }  // Allow user memory access
     let frame = Frame::of_addr(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as u32));
     super::paging::setup_page_table(frame);
     init_frame_allocator();

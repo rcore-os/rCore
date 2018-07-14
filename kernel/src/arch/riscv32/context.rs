@@ -24,8 +24,15 @@ impl TrapFrame {
         tf.sstatus.set_spp(sstatus::SPP::Supervisor);
         tf
     }
-    fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
-        unimplemented!()
+    fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
+        use core::mem::zeroed;
+        let mut tf: Self = unsafe { zeroed() };
+        tf.x[2] = sp;
+        tf.sepc = entry_addr;
+        tf.sstatus = sstatus::read();
+        tf.sstatus.set_spie(false);     // Enable interrupt
+        tf.sstatus.set_spp(sstatus::SPP::User);
+        tf
     }
     pub fn is_user(&self) -> bool {
         unimplemented!()
