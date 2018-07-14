@@ -6,10 +6,13 @@ mod context;
 
 pub fn init() {
     unsafe {
+        // Set sscratch register to 0, indicating to exception vector that we are
+        // presently executing in the kernel
+        sscratch::write(0);
         // Set the exception vector address
         stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
     }
-    info!("stvec: init end");
+    info!("interrupt: init end");
 }
 
 #[inline(always)]

@@ -1,6 +1,13 @@
 .macro SAVE_ALL
-    # store sp in sscratch
-    csrw sscratch, sp
+    # If coming from userspace, preserve the user stack pointer and load
+    # the kernel stack pointer. If we came from the kernel, sscratch
+    # will contain 0, and we should continue on the current stack.
+    csrrw sp, sscratch, sp
+    bnez sp, _save_context
+_restore_kernel_sp:
+    csrr sp, sscratch
+    # sscratch = previous-sp, sp = kernel-sp
+_save_context:
     # provide room for trap frame
     addi sp, sp, -36 * 4
     # save x registers except x2 (sp)
@@ -36,7 +43,8 @@
     sw x31, 31*4(sp)
 
     # get sp, sstatus, sepc, sbadvaddr, scause
-    csrr s0, sscratch
+    # set sscratch = 0
+    csrrw s0, sscratch, x0
     csrr s1, sstatus
     csrr s2, sepc
     csrr s3, sbadaddr
@@ -50,9 +58,15 @@
 .endm
 
 .macro RESTORE_ALL
-    # sstatus and sepc may be changed in ISR
-    lw s1, 32*4(sp)
-    lw s2, 33*4(sp)
+    lw s1, 32*4(sp)             # s1 = sstatus
+    lw s2, 33*4(sp)             # s2 = sepc
+    andi s0, s1, 1 << 8
+    bnez s0, _restore_context   # back to U-mode? (sstatus.SPP = 1)
+_save_kernel_sp:
+    addi s0, sp, 36*4
+    csrw sscratch, s0           # sscratch = kernel-sp
+_restore_context:
+    # restore sstatus, sepc
     csrw sstatus, s1
     csrw sepc, s2
 
