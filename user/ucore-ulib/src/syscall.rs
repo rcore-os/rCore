@@ -29,13 +29,13 @@ impl fmt::Write for StdOut {
 }
 
 #[inline(always)]
-fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> isize {
-    let ret: isize;
+fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
+    let ret: i32;
     unsafe {
         #[cfg(target_arch = "riscv")]
             asm!("ecall"
             : "={x10}" (ret)
-            : "{x17}" (id), "{x10}" (arg0), "{x11}" (arg1), "{x12}" (arg2), "{x13}" (arg3), "{x14}" (arg4), "{x15}" (arg5)
+            : "{x10}" (id), "{x11}" (arg0), "{x12}" (arg1), "{x13}" (arg2), "{x14}" (arg3), "{x15}" (arg4), "{x16}" (arg5)
             : "memory"
             : "volatile");
         #[cfg(target_arch = "x86_64")]
@@ -53,8 +53,63 @@ pub fn sys_exit(code: usize) -> ! {
     unreachable!()
 }
 
-pub fn sys_write(fd: usize, base: *const u8, len: usize) -> isize {
+pub fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
     sys_call(SYS_WRITE, fd, base as usize, len, 0, 0, 0)
+}
+
+pub fn sys_open(path: &str, flags: usize) -> i32 {
+    // UNSAFE: append '\0' to the string
+    use core::mem::replace;
+    let end = unsafe { &mut *(path.as_ptr().offset(path.len() as isize) as *mut u8) };
+    let backup = replace(end, 0);
+    let ret = sys_call(SYS_OPEN, path.as_ptr() as usize, flags, 0, 0, 0, 0);
+    *end = backup;
+    ret
+}
+
+pub fn sys_close(fd: usize) -> i32 {
+    sys_call(SYS_CLOSE, fd, 0 , 0, 0, 0, 0)
+}
+
+/// Fork the current process. Return the child's PID.
+pub fn sys_fork() -> i32 {
+    sys_call(SYS_FORK, 0, 0, 0, 0, 0, 0)
+}
+
+/// Wait the process exit.
+/// Return the PID. Store exit code to `code` if it's not null.
+pub fn sys_wait(pid: usize, code: *mut i32) -> i32 {
+    sys_call(SYS_WAIT, pid, code as usize, 0, 0, 0, 0)
+}
+
+pub fn sys_yield() -> i32 {
+    sys_call(SYS_YIELD, 0, 0, 0, 0, 0, 0)
+}
+
+/// Kill the process
+pub fn sys_kill(pid: usize) -> i32 {
+    sys_call(SYS_KILL, pid, 0, 0, 0, 0, 0)
+}
+
+/// Get the current process id
+pub fn sys_getpid() -> i32 {
+    sys_call(SYS_GETPID, 0, 0, 0, 0, 0, 0)
+}
+
+pub fn sys_sleep(time: usize) -> i32 {
+    sys_call(SYS_SLEEP, time, 0, 0, 0, 0, 0)
+}
+
+pub fn sys_get_time() -> i32 {
+    sys_call(SYS_GETTIME, 0, 0, 0, 0, 0, 0)
+}
+
+pub fn sys_lab6_set_priority(priority: usize) -> i32 {
+    sys_call(SYS_LAB6_SET_PRIORITY, priority, 0, 0, 0, 0, 0)
+}
+
+pub fn sys_putc(c: char) -> i32 {
+    sys_call(SYS_PUTC, c as usize, 0, 0, 0, 0, 0)
 }
 
 const SYS_EXIT: usize = 1;

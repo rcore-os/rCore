@@ -22,8 +22,7 @@ mod riscv {
     pub const MEMORY_OFFSET: usize = 0x8000_0000;
     pub const MEMORY_END: usize = 0x8080_0000;
     pub const USER_STACK_OFFSET: usize = 0x70000000;
-    pub const USER_STACK_SIZE: usize = 1024 * 1024;
-    // 1 MB
+    pub const USER_STACK_SIZE: usize = 0x10000;
     pub const USER32_STACK_OFFSET: usize = USER_STACK_OFFSET;
 }
 

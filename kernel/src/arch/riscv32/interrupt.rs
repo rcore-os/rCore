@@ -50,8 +50,9 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    let ret = ::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
-    tf.x[10] = ret as usize;
+    let ret = ::syscall::syscall(tf.x[10], [tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15], tf.x[16]], tf);
+    unsafe { *(&tf.x[10] as *const _ as *mut i32) = ret; }
+    tf.sepc += 4;
 }
 
 extern {

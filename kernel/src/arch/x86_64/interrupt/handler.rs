@@ -157,17 +157,17 @@ fn to_kernel(tf: &mut TrapFrame) {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    info!("\nInterupt: Syscall {:#x?}", tf.rax);
+    trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
     let ret = syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9], tf);
-    tf.rax = ret as usize;
+    unsafe { *(&tf.rax as *const _ as *mut i32) = ret; }
 }
 
 fn syscall32(tf: &mut TrapFrame) {
-    //    info!("\nInterupt: Syscall {:#x?}", tf.rax);
+    trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     use syscall::syscall;
     let ret = syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
-    tf.rax = ret as usize;
+    unsafe { *(&tf.rax as *const _ as *mut i32) = ret; }
 }
 
 fn error(tf: &TrapFrame) {

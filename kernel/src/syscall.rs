@@ -26,7 +26,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         SYS_LAB6_SET_PRIORITY => sys_lab6_set_priority(args[0]),
         SYS_PUTC => sys_putc(args[0] as u8 as char),
         _ => {
-            error!("unknown syscall {:#x?}", id);
+            error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
             -1
         }
     }
