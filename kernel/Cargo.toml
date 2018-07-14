@@ -36,7 +36,7 @@ volatile = "0.1.0"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 ucore-memory = { path = "../crate/memory" }
-
+simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.x86_64-blog_os.dependencies]
 multiboot2 = "0.6"
@@ -44,7 +44,6 @@ x86_64 = "0.2.6"
 linked_list_allocator = "0.6"
 redox_syscall = "0.1"
 uart_16550 = "0.1"
-simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.riscv32-blog_os.dependencies]
 linked_list_allocator = "0.5" # due to rust version

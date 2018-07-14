@@ -1,19 +1,28 @@
 use simple_filesystem::*;
 use alloc::boxed::Box;
+#[cfg(target_arch = "x86_64")]
 use arch::driver::ide;
 use spin::Mutex;
 use process;
 
-#[cfg(not(feature = "link_user_program"))]
 pub fn load_sfs() {
-//    let slice = unsafe { MemBuf::new(_binary_user_ucore32_img_start, _binary_user_ucore32_img_end) };
-    let sfs = SimpleFileSystem::open(Box::new(&ide::DISK0)).unwrap();
+    #[cfg(target_arch = "riscv")]
+    let device = {
+        extern {
+            fn _binary_user_riscv_img_start();
+            fn _binary_user_riscv_img_end();
+        }
+        Box::new(unsafe { MemBuf::new(_binary_user_riscv_img_start, _binary_user_riscv_img_end) })
+    };
+    #[cfg(target_arch = "x86_64")]
+    let device = Box::new(&ide::DISK0);
+    let sfs = SimpleFileSystem::open(device).unwrap();
     let root = sfs.root_inode();
     let files = root.borrow().list().unwrap();
     trace!("Loading programs: {:?}", files);
 
 //    for name in files.iter().filter(|&f| f != "." && f != "..") {
-    for name in files.iter().filter(|&f| f == "sleep") {
+    for name in files.iter().filter(|&f| f == "hello") {
         static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
         let file = root.borrow().lookup(name.as_str()).unwrap();
         let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
@@ -21,24 +30,6 @@ pub fn load_sfs() {
     }
 
     process::print();
-}
-
-#[cfg(feature = "link_user_program")]
-pub fn load_sfs() {
-    let slice = unsafe {
-        slice::from_raw_parts(_binary_hello_start as *const u8,
-                              _binary_hello_size as usize)
-    };
-
-    process::add_user_process("hello", slice);
-    process::print();
-}
-
-
-#[cfg(feature = "link_user_program")]
-extern {
-    fn _binary_hello_start();
-    fn _binary_hello_size();
 }
 
 struct MemBuf(&'static [u8]);
@@ -64,6 +55,7 @@ impl Device for MemBuf {
 
 use core::slice;
 
+#[cfg(target_arch = "x86_64")]
 impl BlockedDevice for &'static ide::DISK0 {
     fn block_size_log2(&self) -> u8 {
         debug_assert_eq!(ide::BLOCK_SIZE, 512);

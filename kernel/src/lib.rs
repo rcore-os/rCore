@@ -37,7 +37,6 @@ extern crate once;
 extern crate rlibc;
 #[cfg(target_arch = "riscv")]
 extern crate compiler_builtins;
-#[cfg(target_arch = "x86_64")]
 extern crate simple_filesystem;
 extern crate spin;
 extern crate ucore_memory;
@@ -63,7 +62,6 @@ mod util;
 mod consts;
 mod process;
 mod syscall;
-#[cfg(target_arch = "x86_64")]
 mod fs;
 mod thread;
 mod sync;
@@ -83,27 +81,9 @@ mod arch;
 pub extern fn rust_main() -> ! {
     logging::init();
     arch::init();
-    process::init();
     info!("RISCV init end");
-
-    #[cfg(feature = "link_user_program")]
-        {
-            use core::slice;
-            let slice = unsafe {
-                slice::from_raw_parts(_binary_hello_start as *const u8,
-                                      _binary_hello_size as usize)
-            };
-
-            process::add_user_process("hello", slice);
-            process::print();
-
-
-            extern {
-                fn _binary_hello_start();
-                fn _binary_hello_size();
-            }
-        }
-
+    process::init();
+    fs::load_sfs();
     unsafe { arch::interrupt::enable(); }
     loop {}
 }

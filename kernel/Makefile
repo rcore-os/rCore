@@ -23,10 +23,12 @@ assembly_source_files := $(wildcard $(boot_src)/*.asm)
 assembly_object_files := $(patsubst $(boot_src)/%.asm, \
 	build/$(arch)/boot/%.o, $(assembly_source_files))
 user_bin_path := ../user/target/$(arch)-ucore/debug
-user_obj_path := build/$(arch)/user
-user_object_files := $(patsubst $(user_bin_path)/%.d, $(user_obj_path)/%.o, $(wildcard $(user_bin_path)/*.d))
+user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
+user_obj := build/$(arch)/user.o
 SFSIMG := ../user/ucore32.img
+ifeq ($(arch), x86_64)
 qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
+endif
 ifeq ($(arch), riscv32)
 qemu_opts := -machine virt -kernel $(iso) -nographic
 endif
@@ -34,9 +36,16 @@ features := use_apic
 
 LOG ?= debug
 
+# Link user binaries at ../user
 ifdef link_user
 features := $(features) link_user_program
-assembly_object_files := $(assembly_object_files) $(user_object_files)
+assembly_object_files := $(assembly_object_files) $(user_obj)
+endif
+
+# Link user-riscv.img for RV32
+ifeq ($(arch), riscv32)
+riscv_user_img_obj := build/riscv32/user-riscv.o
+assembly_object_files := $(assembly_object_files) $(riscv_user_img_obj)
 endif
 
 ifdef travis
@@ -143,11 +152,13 @@ build/riscv32/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@$(as) -march=rv32i $< -o $@
 
-# make .o from binary files
-$(user_obj_path)/%.o: $(user_bin_path)/%
-	@mkdir -p $(user_obj_path)
+# make user.o from binary files
+$(user_obj): $(user_bins)
 	@cd $(user_bin_path) && \
-	 $(ld) -b binary $(notdir $<) -o $(abspath $@)
+		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
+
+$(riscv_user_img_obj): ../user/user-riscv.img
+	@cd ../user && $(ld) -o $(abspath $@) -b binary $(notdir $<)
 
 # patch Rust core for RISCV32I atomic
 patch-core:
