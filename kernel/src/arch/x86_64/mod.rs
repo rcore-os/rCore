@@ -11,9 +11,15 @@ pub mod idt;
 pub mod smp;
 pub mod memory;
 
-pub fn init(multiboot_information_address: usize) {
+pub fn init() {
     idt::init();
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    // Load boot info address from stack_top.
+    // See `boot.asm`
+    extern {
+        fn stack_top();
+    }
+    let boot_info_addr = unsafe { *(stack_top as *const u32).offset(-1) } as usize;
+    let boot_info = unsafe { multiboot2::load(boot_info_addr) };
     let rsdt_addr = boot_info.rsdp_v1_tag().unwrap().rsdt_address();
     memory::init(boot_info);
     // Now heap is available

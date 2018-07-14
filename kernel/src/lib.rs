@@ -76,32 +76,16 @@ mod arch;
 #[path = "arch/riscv32/mod.rs"]
 mod arch;
 
-#[no_mangle]
-#[cfg(target_arch = "riscv")]
-pub extern fn rust_main() -> ! {
-    logging::init();
-    arch::init();
-    info!("RISCV init end");
-    process::init();
-    fs::load_sfs();
-    unsafe { arch::interrupt::enable(); }
-    loop {}
-}
-
 /// The entry point of Rust kernel
 #[no_mangle]
-#[cfg(target_arch = "x86_64")]
-pub extern "C" fn rust_main(multiboot_information_address: usize) -> ! {
+pub extern "C" fn rust_main() -> ! {
     // ATTENTION: we have a very small stack and no guard page
     println!("Hello World{}", "!");
 
     logging::init();
-    arch::init(multiboot_information_address);
-
+    arch::init();
     process::init();
-
     fs::load_sfs();
-
     unsafe { arch::interrupt::enable(); }
 
 //    thread::test::local_key();
