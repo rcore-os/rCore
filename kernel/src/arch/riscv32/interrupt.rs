@@ -37,6 +37,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     trace!("Interrupt: {:?}", tf.scause.cause());
     match tf.scause.cause() {
         Trap::Interrupt(SupervisorTimer) => timer(),
+        Trap::Exception(UserEnvCall) => syscall(tf),
         _ => panic!("Unhandled interrupt: {:?}\n{:#010x?}", tf.scause.cause(), tf),
     }
     ::trap::before_return();
@@ -46,6 +47,11 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 fn timer() {
     ::trap::timer();
     super::timer::set_next();
+}
+
+fn syscall(tf: &mut TrapFrame) {
+    let ret = ::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
+    tf.x[10] = ret as usize;
 }
 
 extern {

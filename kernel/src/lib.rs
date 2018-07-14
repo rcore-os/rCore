@@ -16,6 +16,7 @@
 #![feature(panic_info_message)]
 #![feature(universal_impl_trait)]
 #![feature(global_asm)]
+#![feature(compiler_builtins_lib)]
 #![no_std]
 
 
@@ -32,7 +33,10 @@ extern crate linked_list_allocator;
 extern crate log;
 #[macro_use]
 extern crate once;
+#[cfg(target_arch = "x86_64")]
 extern crate rlibc;
+#[cfg(target_arch = "riscv")]
+extern crate compiler_builtins;
 #[cfg(target_arch = "x86_64")]
 extern crate simple_filesystem;
 extern crate spin;
@@ -58,7 +62,6 @@ mod lang;
 mod util;
 mod consts;
 mod process;
-#[cfg(target_arch = "x86_64")]
 mod syscall;
 #[cfg(target_arch = "x86_64")]
 mod fs;

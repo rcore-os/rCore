@@ -10,50 +10,21 @@ use util;
 /// 系统调用入口点
 ///
 /// 当发生系统调用中断时，中断服务例程将控制权转移到这里。
-/// 它从中断帧中提取参数，根据系统调用号分发执行具体操作。
-/// 它同时支持 xv6的64位程序 和 uCore的32位程序。
-pub fn syscall(tf: &TrapFrame, is32: bool) -> i32 {
-    let id = match is32 {
-        false => Syscall::Xv6(tf.rax),
-        true => Syscall::Ucore(tf.rax),
-    };
-    let args = match is32 {
-        // For ucore x86
-        true => [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0],
-        // For xv6 x86_64
-        false => [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9],
-    };
-
+pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
     match id {
-        Syscall::Xv6(SYS_WRITE) | Syscall::Ucore(UCORE_SYS_WRITE) =>
-            sys_write(args[0], args[1] as *const u8, args[2]),
-        Syscall::Xv6(SYS_OPEN) | Syscall::Ucore(UCORE_SYS_OPEN) =>
-            sys_open(args[0] as *const u8, args[1]),
-        Syscall::Xv6(SYS_CLOSE) | Syscall::Ucore(UCORE_SYS_CLOSE) =>
-            sys_close(args[0]),
-        Syscall::Xv6(SYS_WAIT) | Syscall::Ucore(UCORE_SYS_WAIT) =>
-            sys_wait(args[0], args[1] as *mut i32),
-        Syscall::Xv6(SYS_FORK) | Syscall::Ucore(UCORE_SYS_FORK) =>
-            sys_fork(tf),
-        Syscall::Xv6(SYS_KILL) | Syscall::Ucore(UCORE_SYS_KILL) =>
-            sys_kill(args[0]),
-        Syscall::Xv6(SYS_EXIT) | Syscall::Ucore(UCORE_SYS_EXIT) =>
-            sys_exit(args[0]),
-        Syscall::Ucore(UCORE_SYS_YIELD) =>
-            sys_yield(),
-        Syscall::Ucore(UCORE_SYS_GETPID) =>
-            sys_getpid(),
-        Syscall::Ucore(UCORE_SYS_SLEEP) =>
-            sys_sleep(args[0]),
-        Syscall::Ucore(UCORE_SYS_GETTIME) =>
-            sys_get_time(),
-        Syscall::Ucore(UCORE_SYS_LAB6_SET_PRIORITY) =>
-            sys_lab6_set_priority(args[0]),
-        Syscall::Ucore(UCORE_SYS_PUTC) =>
-            {
-                print!("{}", args[0] as u8 as char);
-                0
-            }
+        SYS_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
+        SYS_OPEN => sys_open(args[0] as *const u8, args[1]),
+        SYS_CLOSE => sys_close(args[0]),
+        SYS_WAIT => sys_wait(args[0], args[1] as *mut i32),
+        SYS_FORK => sys_fork(tf),
+        SYS_KILL => sys_kill(args[0]),
+        SYS_EXIT => sys_exit(args[0]),
+        SYS_YIELD => sys_yield(),
+        SYS_GETPID => sys_getpid(),
+        SYS_SLEEP => sys_sleep(args[0]),
+        SYS_GETTIME => sys_get_time(),
+        SYS_LAB6_SET_PRIORITY => sys_lab6_set_priority(args[0]),
+        SYS_PUTC => sys_putc(args[0] as u8 as char),
         _ => {
             error!("unknown syscall {:#x?}", id);
             -1
@@ -104,7 +75,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
                 unsafe { *code = error_code as i32 };
             }
             0
-        },
+        }
         WaitResult::NotExist => -1,
     }
 }
@@ -150,59 +121,34 @@ fn sys_lab6_set_priority(priority: usize) -> i32 {
     0
 }
 
-
-#[derive(Debug)]
-enum Syscall {
-    Xv6(usize),
-    Ucore(usize),
+fn sys_putc(c: char) -> i32 {
+    print!("{}", c);
+    0
 }
 
-const SYS_FORK: usize = 1;
-const SYS_EXIT: usize = 2;
+const SYS_EXIT: usize = 1;
+const SYS_FORK: usize = 2;
 const SYS_WAIT: usize = 3;
-const SYS_PIPE: usize = 4;
-const SYS_READ: usize = 5;
-const SYS_KILL: usize = 6;
-const SYS_EXEC: usize = 7;
-const SYS_FSTAT: usize = 8;
-const SYS_CHDIR: usize = 9;
-const SYS_DUP: usize = 10;
-const SYS_GETPID: usize = 11;
-const SYS_SBRK: usize = 12;
-const SYS_SLEEP: usize = 13;
-const SYS_UPTIME: usize = 14;
-const SYS_OPEN: usize = 15;
-const SYS_WRITE: usize = 16;
-const SYS_MKNOD: usize = 17;
-const SYS_UNLINK: usize = 18;
-const SYS_LINK: usize = 19;
-const SYS_MKDIR: usize = 20;
-const SYS_CLOSE: usize = 21;
-const SYS_CHMOD: usize = 22;
-
-const UCORE_SYS_EXIT: usize = 1;
-const UCORE_SYS_FORK: usize = 2;
-const UCORE_SYS_WAIT: usize = 3;
-const UCORE_SYS_EXEC: usize = 4;
-const UCORE_SYS_CLONE: usize = 5;
-const UCORE_SYS_YIELD: usize = 10;
-const UCORE_SYS_SLEEP: usize = 11;
-const UCORE_SYS_KILL: usize = 12;
-const UCORE_SYS_GETTIME: usize = 17;
-const UCORE_SYS_GETPID: usize = 18;
-const UCORE_SYS_MMAP: usize = 20;
-const UCORE_SYS_MUNMAP: usize = 21;
-const UCORE_SYS_SHMEM: usize = 22;
-const UCORE_SYS_PUTC: usize = 30;
-const UCORE_SYS_PGDIR: usize = 31;
-const UCORE_SYS_OPEN: usize = 100;
-const UCORE_SYS_CLOSE: usize = 101;
-const UCORE_SYS_READ: usize = 102;
-const UCORE_SYS_WRITE: usize = 103;
-const UCORE_SYS_SEEK: usize = 104;
-const UCORE_SYS_FSTAT: usize = 110;
-const UCORE_SYS_FSYNC: usize = 111;
-const UCORE_SYS_GETCWD: usize = 121;
-const UCORE_SYS_GETDIRENTRY: usize = 128;
-const UCORE_SYS_DUP: usize = 130;
-const UCORE_SYS_LAB6_SET_PRIORITY: usize = 255;
+const SYS_EXEC: usize = 4;
+const SYS_CLONE: usize = 5;
+const SYS_YIELD: usize = 10;
+const SYS_SLEEP: usize = 11;
+const SYS_KILL: usize = 12;
+const SYS_GETTIME: usize = 17;
+const SYS_GETPID: usize = 18;
+const SYS_MMAP: usize = 20;
+const SYS_MUNMAP: usize = 21;
+const SYS_SHMEM: usize = 22;
+const SYS_PUTC: usize = 30;
+const SYS_PGDIR: usize = 31;
+const SYS_OPEN: usize = 100;
+const SYS_CLOSE: usize = 101;
+const SYS_READ: usize = 102;
+const SYS_WRITE: usize = 103;
+const SYS_SEEK: usize = 104;
+const SYS_FSTAT: usize = 110;
+const SYS_FSYNC: usize = 111;
+const SYS_GETCWD: usize = 121;
+const SYS_GETDIRENTRY: usize = 128;
+const SYS_DUP: usize = 130;
+const SYS_LAB6_SET_PRIORITY: usize = 255;
