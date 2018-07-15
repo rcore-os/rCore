@@ -57,10 +57,7 @@ use core::slice;
 
 #[cfg(target_arch = "x86_64")]
 impl BlockedDevice for &'static ide::DISK0 {
-    fn block_size_log2(&self) -> u8 {
-        debug_assert_eq!(ide::BLOCK_SIZE, 512);
-        9
-    }
+    const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
