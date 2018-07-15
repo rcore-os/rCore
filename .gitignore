@@ -1,4 +1,3 @@
 build
 target
-Cargo.lock
-/src/arch/x86_64/boot/vector.asm
+kernel/src/arch/x86_64/boot/vector.asm
