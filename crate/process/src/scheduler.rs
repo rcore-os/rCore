@@ -1,7 +1,6 @@
-use alloc::BinaryHeap;
+use alloc::{BinaryHeap, Vec};
 
 type Pid = usize;
-const MAX_PROCESS_NUM: usize = 32;
 
 ///
 pub trait Scheduler {
@@ -20,7 +19,7 @@ mod rr {
 
     pub struct RRScheduler {
         max_time_slice: usize,
-        infos: [RRProcInfo; MAX_PROCESS_NUM],
+        infos: Vec<RRProcInfo>,
     }
 
     #[derive(Debug, Default, Copy, Clone)]
@@ -34,6 +33,7 @@ mod rr {
     impl Scheduler for RRScheduler {
         fn insert(&mut self, pid: Pid) {
             let pid = pid + 1;
+            expand(&mut self.infos, pid);
             {
                 let info = &mut self.infos[pid];
                 assert!(!info.present);
@@ -65,6 +65,7 @@ mod rr {
 
         fn tick(&mut self, current: Pid) -> bool {
             let current = current + 1;
+            expand(&mut self.infos, current);
             assert!(!self.infos[current].present);
 
             let rest = &mut self.infos[current].rest_slice;
@@ -84,7 +85,7 @@ mod rr {
         pub fn new(max_time_slice: usize) -> Self {
             RRScheduler {
                 max_time_slice,
-                infos: [RRProcInfo::default(); MAX_PROCESS_NUM],
+                infos: Vec::default(),
             }
         }
         fn _list_add_before(&mut self, i: Pid, at: Pid) {
@@ -110,7 +111,7 @@ mod stride {
 
     pub struct StrideScheduler {
         max_time_slice: usize,
-        infos: [StrideProcInfo; MAX_PROCESS_NUM],
+        infos: Vec<StrideProcInfo>,
         queue: BinaryHeap<(Stride, Pid)>, // It's max heap, so pass < 0
     }
 
@@ -140,6 +141,7 @@ mod stride {
 
     impl Scheduler for StrideScheduler {
         fn insert(&mut self, pid: Pid) {
+            expand(&mut self.infos, pid);
             let info = &mut self.infos[pid];
             assert!(!info.present);
             info.present = true;
@@ -172,6 +174,7 @@ mod stride {
         }
 
         fn tick(&mut self, current: Pid) -> bool {
+            expand(&mut self.infos, current);
             assert!(!self.infos[current].present);
 
             let rest = &mut self.infos[current].rest_slice;
@@ -193,9 +196,14 @@ mod stride {
         pub fn new(max_time_slice: usize) -> Self {
             StrideScheduler {
                 max_time_slice,
-                infos: [StrideProcInfo::default(); MAX_PROCESS_NUM],
-                queue: BinaryHeap::new(),
+                infos: Vec::default(),
+                queue: BinaryHeap::default(),
             }
         }
     }
+}
+
+fn expand<T: Default + Clone>(vec: &mut Vec<T>, id: usize) {
+    let len = vec.len();
+    vec.resize(len.max(id + 1), T::default());
 }
