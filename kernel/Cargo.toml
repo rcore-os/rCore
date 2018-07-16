@@ -36,6 +36,7 @@ volatile = "0.1.0"
 lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 ucore-memory = { path = "../crate/memory" }
+ucore-process = { path = "../crate/process" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.x86_64-blog_os.dependencies]

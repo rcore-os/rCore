@@ -40,6 +40,7 @@ extern crate compiler_builtins;
 extern crate simple_filesystem;
 extern crate spin;
 extern crate ucore_memory;
+extern crate ucore_process;
 extern crate volatile;
 #[macro_use]
 #[cfg(target_arch = "x86_64")]

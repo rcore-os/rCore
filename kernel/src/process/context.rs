@@ -8,10 +8,16 @@ pub struct Context {
     memory_set: MemorySet,
 }
 
-impl Context {
-    pub unsafe fn switch(&mut self, target: &mut Self) {
+impl ::ucore_process::processor::Context for Context {
+    unsafe fn switch(&mut self, target: &mut Self) {
+        super::PROCESSOR.try().unwrap().force_unlock();
         self.arch.switch(&mut target.arch);
+        use core::mem::forget;
+        forget(super::processor());
     }
+}
+
+impl Context {
 
     pub unsafe fn new_init() -> Self {
         Context {

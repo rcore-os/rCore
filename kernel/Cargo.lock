@@ -138,6 +138,7 @@ dependencies = [
  "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ucore-memory 0.1.0",
+ "ucore-process 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -174,6 +175,13 @@ dependencies = [
 [[package]]
 name = "ucore-memory"
 version = "0.1.0"
+
+[[package]]
+name = "ucore-process"
+version = "0.1.0"
+dependencies = [
+ "log 0.4.3 (git+https://github.com/riscv-and-rust-and-decaf/log.git)",
+]
 
 [[package]]
 name = "usize_conversions"

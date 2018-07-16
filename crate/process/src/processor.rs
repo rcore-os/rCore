@@ -1,15 +1,15 @@
-use alloc::BTreeMap;
-use core::fmt::{Debug, Error, Formatter};
-use super::context::*;
-use super::scheduler::*;
-use util::{EventHub, GetMut2};
+use alloc::{boxed::Box, BTreeMap};
+use scheduler::*;
+use event_hub::EventHub;
+use util::GetMut2;
+use core::fmt::Debug;
 
 #[derive(Debug)]
-pub struct Process {
+pub struct Process<T> {
     pid: Pid,
     parent: Pid,
     status: Status,
-    context: Context,
+    context: T,
 }
 
 pub type Pid = usize;
@@ -24,17 +24,21 @@ pub enum Status {
     Exited(ErrorCode),
 }
 
-pub struct Processor {
-    procs: BTreeMap<Pid, Process>,
+pub trait Context: Debug {
+    unsafe fn switch(&mut self, target: &mut Self);
+}
+
+pub struct Processor_<T: Context, S: Scheduler> {
+    procs: BTreeMap<Pid, Process<T>>,
     current_pid: Pid,
     event_hub: EventHub<Event>,
     /// Choose what on next schedule ?
     next: Option<Pid>,
     // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
-    scheduler: RRScheduler,
+    scheduler: S,
 }
 
-impl Process {
+impl<T> Process<T> {
     fn exit_code(&self) -> Option<ErrorCode> {
         match self.status {
             Status::Exited(code) => Some(code),
@@ -44,30 +48,29 @@ impl Process {
 }
 
 // TODO: 除schedule()外的其它函数，应该只设置进程状态，不应调用schedule
-impl Processor {
-    pub fn new(init_context: Context) -> Self {
+impl<T: Context, S: Scheduler> Processor_<T, S> {
+    pub fn new(init_context: T, scheduler: S) -> Self {
         let init_proc = Process {
             pid: 0,
             parent: 0,
             status: Status::Running,
             context: init_context,
         };
-        Processor {
+        Processor_ {
             procs: {
-                let mut map = BTreeMap::<Pid, Process>::new();
+                let mut map = BTreeMap::<Pid, Process<T>>::new();
                 map.insert(0, init_proc);
                 map
             },
             current_pid: 0,
             event_hub: EventHub::new(),
             next: None,
-            // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
-            scheduler: RRScheduler::new(5),
+            scheduler,
         }
     }
 
-    pub fn lab6_set_priority(&mut self, priority: u8) {
-//        self.scheduler.set_priority(self.current_pid, priority);
+    pub fn set_priority(&mut self, priority: u8) {
+        self.scheduler.set_priority(self.current_pid, priority);
     }
 
     pub fn set_reschedule(&mut self) {
@@ -127,7 +130,7 @@ impl Processor {
         self.event_hub.get_time()
     }
 
-    pub fn add(&mut self, context: Context) -> Pid {
+    pub fn add(&mut self, context: T) -> Pid {
         let pid = self.alloc_pid();
         let process = Process {
             pid,
@@ -173,22 +176,16 @@ impl Processor {
         self.scheduler.remove(pid);
 
         info!("switch from {} to {} {:x?}", pid0, pid, to.context);
-        unsafe {
-            // FIXME: safely pass MutexGuard
-            use core::mem::forget;
-            super::PROCESSOR.try().unwrap().force_unlock();
-            from.context.switch(&mut to.context);
-            forget(super::processor());
-        }
+        unsafe { from.context.switch(&mut to.context); }
     }
 
-    fn get(&self, pid: Pid) -> &Process {
+    fn get(&self, pid: Pid) -> &Process<T> {
         self.procs.get(&pid).unwrap()
     }
-    fn get_mut(&mut self, pid: Pid) -> &mut Process {
+    fn get_mut(&mut self, pid: Pid) -> &mut Process<T> {
         self.procs.get_mut(&pid).unwrap()
     }
-    pub fn current_context(&self) -> &Context {
+    pub fn current_context(&self) -> &T {
         &self.get(self.current_pid).context
     }
     pub fn current_pid(&self) -> Pid {
@@ -270,9 +267,9 @@ enum Event {
     Wakeup(Pid),
 }
 
-impl GetMut2<Pid> for BTreeMap<Pid, Process> {
-    type Output = Process;
-    fn get_mut(&mut self, id: Pid) -> &mut Process {
+impl<T: Context> GetMut2<Pid> for BTreeMap<Pid, Process<T>> {
+    type Output = Process<T>;
+    fn get_mut(&mut self, id: Pid) -> &mut Process<T> {
         self.get_mut(&id).unwrap()
     }
 }

@@ -1,6 +1,7 @@
-use super::*;
-use consts::MAX_PROCESS_NUM;
 use alloc::BinaryHeap;
+
+type Pid = usize;
+const MAX_PROCESS_NUM: usize = 32;
 
 ///
 pub trait Scheduler {
@@ -8,6 +9,7 @@ pub trait Scheduler {
     fn remove(&mut self, pid: Pid);
     fn select(&mut self) -> Option<Pid>;
     fn tick(&mut self, current: Pid) -> bool;   // need reschedule?
+    fn set_priority(&mut self, pid: Pid, priority: u8);
 }
 
 pub use self::rr::RRScheduler;
@@ -72,6 +74,9 @@ mod rr {
                 warn!("current process rest_slice = 0, need reschedule")
             }
             *rest == 0
+        }
+
+        fn set_priority(&mut self, pid: usize, priority: u8) {
         }
     }
 
@@ -177,6 +182,11 @@ mod stride {
             }
             *rest == 0
         }
+
+        fn set_priority(&mut self, pid: Pid, priority: u8) {
+            self.infos[pid].priority = priority;
+            debug!("{} priority = {}", pid, priority);
+        }
     }
 
     impl StrideScheduler {
@@ -186,10 +196,6 @@ mod stride {
                 infos: [StrideProcInfo::default(); MAX_PROCESS_NUM],
                 queue: BinaryHeap::new(),
             }
-        }
-        pub fn set_priority(&mut self, pid: Pid, priority: u8) {
-            self.infos[pid].priority = priority;
-            debug!("{} priority = {}", pid, priority);
         }
     }
 }

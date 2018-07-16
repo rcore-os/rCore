@@ -117,7 +117,7 @@ fn sys_get_time() -> i32 {
 
 fn sys_lab6_set_priority(priority: usize) -> i32 {
     let mut processor = processor();
-    processor.lab6_set_priority(priority as u8);
+    processor.set_priority(priority as u8);
     0
 }
 
