@@ -9,8 +9,9 @@ pub fn init() {
         Some("error") => LevelFilter::Error,
         Some("warn") => LevelFilter::Warn,
         Some("info") => LevelFilter::Info,
+        Some("debug") => LevelFilter::Debug,
         Some("trace") => LevelFilter::Trace,
-        Some("debug") | _ => LevelFilter::Debug,
+        _ => LevelFilter::Warn,
     });
 }
 
