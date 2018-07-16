@@ -1,57 +1,30 @@
-use alloc::String;
-use arch::interrupt::*;
+use arch::interrupt::{TrapFrame, Context as ArchContext};
 use memory::{MemoryArea, MemoryAttr, MemorySet};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
+use core::fmt::{Debug, Error, Formatter};
 
-#[derive(Debug)]
-pub struct Process {
-    pub(in process) pid: Pid,
-    pub(in process) parent: Pid,
-    pub(in process) name: String,
-    pub(in process) memory_set: MemorySet,
-    pub(in process) status: Status,
-    pub(in process) context: Context,
+pub struct Context {
+    arch: ArchContext,
+    memory_set: MemorySet,
 }
 
-pub type Pid = usize;
-pub type ErrorCode = usize;
+impl Context {
+    pub unsafe fn switch(&mut self, target: &mut Self) {
+        self.arch.switch(&mut target.arch);
+    }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Status {
-    Ready,
-    Running,
-    Waiting(Pid),
-    Sleeping,
-    Exited(ErrorCode),
-}
-
-impl Process {
-    /// Make a new kernel thread
-    pub fn new(name: &str, entry: extern fn(usize) -> !, arg: usize) -> Self {
-        let ms = MemorySet::new();
-        let context = unsafe { Context::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) };
-
-        Process {
-            pid: 0,
-            parent: 0,
-            name: String::from(name),
-            memory_set: ms,
-            status: Status::Ready,
-            context,
+    pub unsafe fn new_init() -> Self {
+        Context {
+            arch: ArchContext::null(),
+            memory_set: MemorySet::new(),
         }
     }
 
-    /// Make the first kernel thread `initproc`
-    /// Should be called only once
-    pub fn new_init() -> Self {
-        assert_has_not_been_called!();
-        Process {
-            pid: 0,
-            parent: 0,
-            name: String::from("init"),
-            memory_set: MemorySet::new(),
-            status: Status::Running,
-            context: unsafe { Context::null() }, // will be set at first schedule
+    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
+        let ms = MemorySet::new();
+        Context {
+            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
+            memory_set: ms,
         }
     }
 
@@ -100,20 +73,12 @@ impl Process {
             });
         }
 
-
-        // Allocate kernel stack and push trap frame
-        let context = unsafe {
-            Context::new_user_thread(
-                entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
-        };
-
-        Process {
-            pid: 0,
-            parent: 0,
-            name: String::new(),
+        Context {
+            arch: unsafe {
+                ArchContext::new_user_thread(
+                    entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
+            },
             memory_set,
-            status: Status::Ready,
-            context,
         }
     }
 
@@ -123,7 +88,7 @@ impl Process {
         let memory_set = self.memory_set.clone();
 
         // Copy data to temp space
-        use alloc::Vec;
+        use alloc::vec::Vec;
         let datas: Vec<Vec<u8>> = memory_set.iter().map(|area| {
             Vec::from(unsafe { area.as_slice() })
         }).collect();
@@ -137,24 +102,16 @@ impl Process {
             });
         }
 
-        // Push context at kstack top
-        let context = unsafe { Context::new_fork(tf, memory_set.kstack_top(), memory_set.token()) };
-
-        Process {
-            pid: 0,
-            parent: self.pid,
-            name: self.name.clone() + "_fork",
+        Context {
+            arch: unsafe { ArchContext::new_fork(tf, memory_set.kstack_top(), memory_set.token()) },
             memory_set,
-            status: Status::Ready,
-            context,
         }
     }
+}
 
-    pub fn exit_code(&self) -> Option<ErrorCode> {
-        match self.status {
-            Status::Exited(code) => Some(code),
-            _ => None,
-        }
+impl Debug for Context {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{:?}", self.arch)
     }
 }
 

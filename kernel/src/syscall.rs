@@ -58,9 +58,9 @@ fn sys_close(fd: usize) -> i32 {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
-    let mut processor = PROCESSOR.try().unwrap().lock();
-    let new = processor.current().fork(tf);
-    let pid = processor.add(new);
+    let mut processor = processor();
+    let context = processor.current_context().fork(tf);
+    let pid = processor.add(context);
     info!("fork: {} -> {}", processor.current_pid(), pid);
     pid as i32
 }
@@ -68,7 +68,7 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 fn sys_wait(pid: usize, code: *mut i32) -> i32 {
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     match processor.current_wait_for(pid) {
         WaitResult::Ok(pid, error_code) => {
             if !code.is_null() {
@@ -87,7 +87,7 @@ fn sys_yield() -> i32 {
 
 /// Kill the process
 fn sys_kill(pid: usize) -> i32 {
-    PROCESSOR.try().unwrap().lock().kill(pid);
+    processor().kill(pid);
     0
 }
 
@@ -98,7 +98,7 @@ fn sys_getpid() -> i32 {
 
 /// Exit the current process
 fn sys_exit(error_code: usize) -> i32 {
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     let pid = processor.current_pid();
     processor.exit(pid, error_code);
     0
@@ -111,12 +111,12 @@ fn sys_sleep(time: usize) -> i32 {
 }
 
 fn sys_get_time() -> i32 {
-    let processor = PROCESSOR.try().unwrap().lock();
+    let processor = processor();
     processor.get_time() as i32
 }
 
 fn sys_lab6_set_priority(priority: usize) -> i32 {
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     processor.lab6_set_priority(priority as u8);
     0
 }

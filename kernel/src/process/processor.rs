@@ -1,8 +1,28 @@
 use alloc::BTreeMap;
 use core::fmt::{Debug, Error, Formatter};
-use super::process::*;
+use super::context::*;
 use super::scheduler::*;
 use util::{EventHub, GetMut2};
+
+#[derive(Debug)]
+pub struct Process {
+    pid: Pid,
+    parent: Pid,
+    status: Status,
+    context: Context,
+}
+
+pub type Pid = usize;
+pub type ErrorCode = usize;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Status {
+    Ready,
+    Running,
+    Waiting(Pid),
+    Sleeping,
+    Exited(ErrorCode),
+}
 
 pub struct Processor {
     procs: BTreeMap<Pid, Process>,
@@ -14,11 +34,30 @@ pub struct Processor {
     scheduler: RRScheduler,
 }
 
+impl Process {
+    fn exit_code(&self) -> Option<ErrorCode> {
+        match self.status {
+            Status::Exited(code) => Some(code),
+            _ => None,
+        }
+    }
+}
+
 // TODO: 除schedule()外的其它函数，应该只设置进程状态，不应调用schedule
 impl Processor {
-    pub fn new() -> Self {
+    pub fn new(init_context: Context) -> Self {
+        let init_proc = Process {
+            pid: 0,
+            parent: 0,
+            status: Status::Running,
+            context: init_context,
+        };
         Processor {
-            procs: BTreeMap::<Pid, Process>::new(),
+            procs: {
+                let mut map = BTreeMap::<Pid, Process>::new();
+                map.insert(0, init_proc);
+                map
+            },
             current_pid: 0,
             event_hub: EventHub::new(),
             next: None,
@@ -28,7 +67,6 @@ impl Processor {
     }
 
     pub fn lab6_set_priority(&mut self, priority: u8) {
-        unimplemented!();
 //        self.scheduler.set_priority(self.current_pid, priority);
     }
 
@@ -89,12 +127,15 @@ impl Processor {
         self.event_hub.get_time()
     }
 
-    pub fn add(&mut self, mut process: Process) -> Pid {
+    pub fn add(&mut self, context: Context) -> Pid {
         let pid = self.alloc_pid();
-        process.pid = pid;
-        if process.status == Status::Ready {
-            self.scheduler.insert(pid);
-        }
+        let process = Process {
+            pid,
+            parent: self.current_pid,
+            status: Status::Ready,
+            context,
+        };
+        self.scheduler.insert(pid);
         self.procs.insert(pid, process);
         pid
     }
@@ -102,7 +143,7 @@ impl Processor {
     /// Called every interrupt end
     /// Do schedule ONLY IF current status != Running
     pub fn schedule(&mut self) {
-        if self.current().status == Status::Running {
+        if self.get(self.current_pid).status == Status::Running {
             return;
         }
         let pid = self.next.take().unwrap_or_else(|| self.scheduler.select().unwrap());
@@ -117,7 +158,7 @@ impl Processor {
         let pid0 = self.current_pid;
 
         if pid == self.current_pid {
-            if self.current().status != Status::Running {
+            if self.get(self.current_pid).status != Status::Running {
                 self.set_status(pid, Status::Running);
             }
             return;
@@ -137,7 +178,7 @@ impl Processor {
             use core::mem::forget;
             super::PROCESSOR.try().unwrap().force_unlock();
             from.context.switch(&mut to.context);
-            forget(super::PROCESSOR.try().unwrap().lock());
+            forget(super::processor());
         }
     }
 
@@ -147,8 +188,8 @@ impl Processor {
     fn get_mut(&mut self, pid: Pid) -> &mut Process {
         self.procs.get_mut(&pid).unwrap()
     }
-    pub fn current(&self) -> &Process {
-        self.get(self.current_pid)
+    pub fn current_context(&self) -> &Context {
+        &self.get(self.current_pid).context
     }
     pub fn current_pid(&self) -> Pid {
         self.current_pid
@@ -212,14 +253,6 @@ impl Processor {
             p.status == Status::Waiting(pid) ||
                 (p.status == Status::Waiting(0) && self.get(pid).parent == p.pid)
         }).map(|ref p| p.pid)
-    }
-}
-
-impl Debug for Processor {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        f.debug_map()
-            .entries(self.procs.iter().map(|(pid, proc0)| { (pid, &proc0.name) }))
-            .finish()
     }
 }
 

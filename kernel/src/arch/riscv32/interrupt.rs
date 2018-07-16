@@ -41,7 +41,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     match tf.scause.cause() {
         Trap::Interrupt(SupervisorTimer) => timer(),
         Trap::Exception(UserEnvCall) => syscall(tf),
-        _ => panic!("Unhandled interrupt: {:?}\n{:#010x?}", tf.scause.cause(), tf),
+        _ => ::trap::error(tf),
     }
     ::trap::before_return();
     trace!("Interrupt end");

@@ -170,16 +170,7 @@ fn syscall32(tf: &mut TrapFrame) {
 }
 
 fn error(tf: &TrapFrame) {
-    use process::PROCESSOR;
-    if let Some(processor) = PROCESSOR.try() {
-        let mut processor = processor.lock();
-        let pid = processor.current_pid();
-        error!("Process {} error:\n{:#x?}", pid, tf);
-        processor.exit(pid, 0x100); // TODO: Exit code for error
-    } else {
-        error!("Exception {:#x} when processor not inited\n{:#x?}", tf.trap_num, tf);
-        loop {}
-    }
+    ::trap::error(tf);
 }
 
 #[no_mangle]

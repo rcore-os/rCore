@@ -14,7 +14,7 @@ use process::*;
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
     Thread {
-        pid: PROCESSOR.try().unwrap().lock().current_pid(),
+        pid: processor().current_pid(),
     }
 }
 
@@ -22,7 +22,7 @@ pub fn current() -> Thread {
 pub fn sleep(dur: Duration) {
     let time = dur_to_ticks(dur);
     info!("sleep: {:?} ticks", time);
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     let pid = processor.current_pid();
     processor.sleep(pid, time);
     processor.schedule();
@@ -39,9 +39,8 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         T: Send + 'static,
 {
     info!("spawn:");
-    use process;
     let f = Box::into_raw(Box::new(f));
-    let pid = process::add_kernel_process(kernel_thread_entry::<F, T>, f as usize);
+    let pid = processor().add(Context::new_kernel(kernel_thread_entry::<F, T>, f as usize));
     return JoinHandle {
         thread: Thread { pid },
         mark: PhantomData,
@@ -55,7 +54,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         let f = unsafe { Box::from_raw(f as *mut F) };
         let ret = Box::new(f());
         unsafe { LocalKey::<usize>::get_map() }.clear();
-        let mut processor = PROCESSOR.try().unwrap().lock();
+        let mut processor = processor();
         let pid = processor.current_pid();
         processor.exit(pid, Box::into_raw(ret) as usize);
         processor.schedule();
@@ -66,7 +65,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 /// Cooperatively gives up a timeslice to the OS scheduler.
 pub fn yield_now() {
     info!("yield:");
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     processor.set_reschedule();
     processor.schedule();
 }
@@ -74,7 +73,7 @@ pub fn yield_now() {
 /// Blocks unless or until the current thread's token is made available.
 pub fn park() {
     info!("park:");
-    let mut processor = PROCESSOR.try().unwrap().lock();
+    let mut processor = processor();
     let pid = processor.current_pid();
     processor.sleep_(pid);
     processor.schedule();
@@ -88,7 +87,7 @@ pub struct Thread {
 impl Thread {
     /// Atomically makes the handle's token available if it is not already.
     pub fn unpark(&self) {
-        let mut processor = PROCESSOR.try().unwrap().lock();
+        let mut processor = processor();
         processor.wakeup_(self.pid);
     }
     /// Gets the thread's unique identifier.
@@ -110,13 +109,10 @@ impl<T> JoinHandle<T> {
     }
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
-        let mut processor = PROCESSOR.try().unwrap().lock();
+        let mut processor = processor();
         match processor.current_wait_for(self.thread.pid) {
-            WaitResult::Ok(_, exit_code) => {
-                unsafe {
-                    let value = Box::from_raw(exit_code as *mut T);
-                    Ok(ptr::read(exit_code as *const T))
-                }
+            WaitResult::Ok(_, exit_code) => unsafe {
+                Ok(*Box::from_raw(exit_code as *mut T))
             }
             WaitResult::NotExist => Err(()),
         }

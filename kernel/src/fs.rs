@@ -3,7 +3,6 @@ use alloc::boxed::Box;
 #[cfg(target_arch = "x86_64")]
 use arch::driver::ide;
 use spin::Mutex;
-use process;
 
 pub fn shell() {
     #[cfg(target_arch = "riscv")]
@@ -31,7 +30,8 @@ pub fn shell() {
         }
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
-            process::add_user_process(name, &buf[..len]);
+            use process::*;
+            processor().add(Context::new_user(&buf[..len]));
         } else {
             println!("Program not exist");
         }
