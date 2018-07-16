@@ -10,6 +10,7 @@ pub mod gdt;
 pub mod idt;
 pub mod smp;
 pub mod memory;
+pub mod io;
 
 pub fn init() {
     idt::init();

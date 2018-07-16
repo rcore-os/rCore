@@ -1,6 +1,5 @@
 use core::fmt;
-use log;
-use log::{Level, LevelFilter, Log, Metadata, Record};
+use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
@@ -34,42 +33,14 @@ macro_rules! with_color {
     }};
 }
 
-#[cfg(target_arch = "x86_64")]
 fn print_in_color(args: fmt::Arguments, color: Color) {
-    use core::fmt::Write;
-    use arch::driver::serial::COM1;
-//    use arch::driver::vga::*;
-//    {
-//        let mut writer = vga_writer::VGA_WRITER.lock();
-//        writer.set_color(color);
-//        writer.write_fmt(args).unwrap();
-//    }
-    // TODO: 解决死锁问题
-    // 若进程在持有锁时被中断，中断处理程序请求输出，就会死锁
-    unsafe{ COM1.force_unlock(); }
-    COM1.lock().write_fmt(with_color!(args, color)).unwrap();
+    use arch::io;
+    io::putfmt(with_color!(args, color));
 }
 
-#[cfg(target_arch = "riscv")]
-fn print_in_color(args: fmt::Arguments, color: Color) {
-    use arch::serial::SerialPort;
-    use core::fmt::Write;
-    SerialPort.write_fmt(with_color!(args, color)).unwrap();
-}
-
-#[cfg(target_arch = "x86_64")]
 pub fn print(args: fmt::Arguments) {
-    use core::fmt::Write;
-    use arch::driver::serial::COM1;
-    unsafe { COM1.force_unlock(); }
-    COM1.lock().write_fmt(args).unwrap();
-}
-
-#[cfg(target_arch = "riscv")]
-pub fn print(args: fmt::Arguments) {
-    use arch::serial::SerialPort;
-    use core::fmt::Write;
-    SerialPort.write_fmt(args).unwrap();
+    use arch::io;
+    io::putfmt(args);
 }
 
 struct SimpleLogger;

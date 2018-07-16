@@ -20,20 +20,17 @@ pub fn init() {
 }
 
 pub trait SerialRead {
-    fn receive(&mut self);
+    fn receive(&mut self) -> u8;
 }
 
 impl SerialRead for SerialPort {
-    fn receive(&mut self) {
+    fn receive(&mut self) -> u8 {
         unsafe {
             let ports = self as *mut _ as *mut [Pio<u8>; 6];
             let line_sts = &(*ports)[5];
             let data = &(*ports)[0];
-            while line_sts.read() & 1 == 1 {
-                let data = data.read();
-                writeln!(self, "serial receive {}", data).unwrap();
-                // TODO handle received data
-            }
+            while line_sts.read() & 1 != 1 {}
+            data.read()
         }
     }
 }

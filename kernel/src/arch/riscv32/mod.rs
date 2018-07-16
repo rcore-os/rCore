@@ -1,7 +1,7 @@
 extern crate bbl;
 extern crate riscv;
 
-pub mod serial;
+pub mod io;
 pub mod interrupt;
 pub mod timer;
 pub mod paging;
