@@ -5,7 +5,7 @@ use arch::driver::ide;
 use spin::Mutex;
 use process;
 
-pub fn load_sfs() {
+pub fn shell() {
     #[cfg(target_arch = "riscv")]
     let device = {
         extern {
@@ -19,17 +19,23 @@ pub fn load_sfs() {
     let sfs = SimpleFileSystem::open(device).unwrap();
     let root = sfs.root_inode();
     let files = root.borrow().list().unwrap();
-    trace!("Loading programs: {:?}", files);
+    println!("Available programs: {:?}", files);
 
-//    for name in files.iter().filter(|&f| f != "." && f != "..") {
-    for name in files.iter().filter(|&f| f == "hello") {
-        static mut BUF: [u8; 64 << 12] = [0; 64 << 12];
-        let file = root.borrow().lookup(name.as_str()).unwrap();
-        let len = file.borrow().read_at(0, unsafe { &mut BUF }).unwrap();
-        process::add_user_process(name, unsafe { &BUF[..len] });
+    let mut buf = Box::new([0; 64 << 12]);
+    loop {
+        use console::get_line;
+        let name = get_line();
+        if name == "" {
+            continue;
+        }
+        if let Ok(file) = root.borrow().lookup(name.as_str()) {
+            println!("Running: {}", name);
+            let len = file.borrow().read_at(0, &mut *buf).unwrap();
+            process::add_user_process(name, &buf[..len]);
+        } else {
+            println!("Program not exist");
+        }
     }
-
-    process::print();
 }
 
 struct MemBuf(&'static [u8]);

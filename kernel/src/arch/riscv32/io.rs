@@ -6,14 +6,24 @@ struct SerialPort;
 impl Write for SerialPort {
     fn write_str(&mut self, s: &str) -> Result {
         for c in s.bytes() {
-            sbi::console_putchar(c as usize);
+            if c == 8 {
+                sbi::console_putchar(8);
+                sbi::console_putchar(' ' as usize);
+                sbi::console_putchar(8);
+            } else {
+                sbi::console_putchar(c as usize);
+            }
         }
         Ok(())
     }
 }
 
 pub fn getchar() -> char {
-    sbi::console_getchar() as u8 as char
+    match sbi::console_getchar() as u8 {
+        255 => 0,   // null
+        127 => 8,   // back
+        c => c,
+    } as char
 }
 
 pub fn putfmt(fmt: Arguments) {

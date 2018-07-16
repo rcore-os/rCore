@@ -66,6 +66,7 @@ mod fs;
 mod thread;
 mod sync;
 mod trap;
+mod console;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -85,8 +86,9 @@ pub extern "C" fn rust_main() -> ! {
     logging::init();
     arch::init();
     process::init();
-    fs::load_sfs();
     unsafe { arch::interrupt::enable(); }
+
+    fs::shell();
 
 //    thread::test::local_key();
 //    thread::test::unpack();
