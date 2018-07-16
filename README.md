@@ -18,14 +18,14 @@ Available on DockerHub: `wangrunji0408/riscv-rust`
 
 ```bash
 git clone https://github.com/wangrunji0408/RustOS.git -b riscv --recursive
-cd RustOS/kernel
+cd RustOS
 # Pull docker image and enter docker interactive shell
 make docker_riscv
 # Inside docker ...
+cd kernel
 # Patch the atomic mod of core lib
 make patch-core
-make build
-make justrun
+make run
 ```
 
 ## Summary
