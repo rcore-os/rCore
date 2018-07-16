@@ -21,7 +21,6 @@ impl Write for SerialPort {
 pub fn getchar() -> char {
     match sbi::console_getchar() as u8 {
         255 => 0,   // null
-        127 => 8,   // back
         c => c,
     } as char
 }

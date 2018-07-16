@@ -23,13 +23,13 @@ pub fn shell() {
 
     let mut buf = Box::new([0; 64 << 12]);
     loop {
+        print!(">> ");
         use console::get_line;
         let name = get_line();
         if name == "" {
             continue;
         }
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
-            println!("Running: {}", name);
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
             process::add_user_process(name, &buf[..len]);
         } else {
