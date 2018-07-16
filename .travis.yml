@@ -2,13 +2,39 @@ sudo: required
 
 language: rust
 
-services:
-  - docker
+rust: nightly-2018-06-25
+
+cache:
+  cargo: true
+
+services: docker
+
+addons:
+  apt:
+    packages:
+      - nasm
+      - qemu
+
+env:
+  matrix:
+    - ARCH="riscv32"
+    - ARCH="x86_64"
 
 before_install:
-  - docker pull wangrunji0408/riscv-rust
-  - docker run -d -v $(pwd):$(pwd) -w $(pwd) wangrunji0408/riscv-rust \
-    /bin/sh -c "make build arch=riscv32"
+  - if [ $ARCH = riscv32 ]; then
+      docker pull wangrunji0408/riscv-rust;
+    fi
+
+before_script:
+  - rustup component add rust-src
+  - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)
+  - (test -x $HOME/.cargo/bin/xargo || cargo install xargo)
+  - cargo install-update -a
 
 script:
-- bundle exec rake test
+  - if [ $ARCH = riscv32 ]; then
+      docker run -v $(pwd):$(pwd) -w $(pwd) wangrunji0408/riscv-rust
+        bash -c "cd kernel && make patch-core && make build arch=riscv32";
+    elif [ $ARCH = x86_64 ]; then
+      cd kernel && make build arch=x86_64;
+    fi
