@@ -65,6 +65,9 @@ impl Context {
                     let virt_addr = ph.virtual_addr() as usize;
                     let offset = ph.offset() as usize;
                     let file_size = ph.file_size() as usize;
+                    if file_size == 0 {
+                        return;
+                    }
                     use core::slice;
                     let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
                     target.copy_from_slice(&data[offset..offset + file_size]);
@@ -117,7 +120,7 @@ impl Context {
 
 impl Debug for Context {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{:?}", self.arch)
+        write!(f, "{:x?}", self.arch)
     }
 }
 
