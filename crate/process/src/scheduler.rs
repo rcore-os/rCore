@@ -43,7 +43,7 @@ mod rr {
                 }
             }
             self._list_add_before(pid, 0);
-            debug!("insert {}", pid - 1);
+            trace!("rr insert {}", pid - 1);
         }
 
         fn remove(&mut self, pid: Pid) {
@@ -51,7 +51,7 @@ mod rr {
             assert!(self.infos[pid].present);
             self.infos[pid].present = false;
             self._list_remove(pid);
-            debug!("remove {}", pid - 1);
+            trace!("rr remove {}", pid - 1);
         }
 
         fn select(&mut self) -> Option<Pid> {
@@ -59,7 +59,7 @@ mod rr {
                 0 => None,
                 i => Some(i - 1),
             };
-            debug!("select {:?}", ret);
+            trace!("rr select {:?}", ret);
             ret
         }
 
@@ -149,16 +149,21 @@ mod stride {
                 info.rest_slice = self.max_time_slice;
             }
             self.queue.push((-info.stride, pid));
-            debug!("insert {}", pid);
+            trace!("stride insert {}", pid);
         }
 
         fn remove(&mut self, pid: Pid) {
             let info = &mut self.infos[pid];
             assert!(info.present);
             info.present = false;
-            // FIXME: Support removing any element
-            assert_eq!(self.queue.pop().unwrap().1, pid, "Can only remove the top");
-            debug!("remove {}", pid);
+            // BinaryHeap only support pop the top.
+            // So in order to remove an arbitrary element,
+            // we have to take all elements into a Vec,
+            // then push the rest back.
+            let rest: Vec<_> = self.queue.drain().filter(|&p| p.1 != pid).collect();
+            use core::iter::FromIterator;
+            self.queue = BinaryHeap::from_iter(rest.into_iter());
+            trace!("stride remove {}", pid);
         }
 
         fn select(&mut self) -> Option<Pid> {
@@ -167,9 +172,9 @@ mod stride {
                 let old_stride = self.infos[pid].stride;
                 self.infos[pid].pass();
                 let stride = self.infos[pid].stride;
-                debug!("{} stride {:#x} -> {:#x}", pid, old_stride, stride);
+                trace!("stride {} {:#x} -> {:#x}", pid, old_stride, stride);
             }
-            debug!("select {:?}", ret);
+            trace!("stride select {:?}", ret);
             ret
         }
 
@@ -188,7 +193,7 @@ mod stride {
 
         fn set_priority(&mut self, pid: Pid, priority: u8) {
             self.infos[pid].priority = priority;
-            debug!("{} priority = {}", pid, priority);
+            trace!("stride {} priority = {}", pid, priority);
         }
     }
 
