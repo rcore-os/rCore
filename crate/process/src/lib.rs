@@ -15,5 +15,6 @@ extern crate std;
 
 pub mod processor;
 pub mod scheduler;
+pub mod thread;
 mod util;
 mod event_hub;

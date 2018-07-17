@@ -15,22 +15,21 @@ impl ::ucore_process::processor::Context for Context {
         use core::mem::forget;
         forget(super::processor());
     }
-}
 
-impl Context {
-
-    pub unsafe fn new_init() -> Self {
-        Context {
-            arch: ArchContext::null(),
-            memory_set: MemorySet::new(),
-        }
-    }
-
-    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
+    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
         let ms = MemorySet::new();
         Context {
             arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
             memory_set: ms,
+        }
+    }
+}
+
+impl Context {
+    pub unsafe fn new_init() -> Self {
+        Context {
+            arch: ArchContext::null(),
+            memory_set: MemorySet::new(),
         }
     }
 

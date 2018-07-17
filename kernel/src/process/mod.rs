@@ -1,8 +1,9 @@
 use spin::Once;
 use sync::{SpinNoIrqLock, Mutex, MutexGuard, SpinNoIrq};
 pub use self::context::Context;
-pub use ucore_process::processor::*;
+pub use ucore_process::processor::{*, Context as _whatever};
 pub use ucore_process::scheduler::*;
+pub use ucore_process::thread::*;
 
 mod context;
 
@@ -29,4 +30,23 @@ pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
 
 pub fn processor() -> MutexGuard<'static, Processor, SpinNoIrq> {
     PROCESSOR.try().unwrap().lock()
+}
+
+#[allow(non_camel_case_types)]
+pub type thread = ThreadMod<ThreadSupportImpl>;
+
+pub mod thread_ {
+    pub type Thread = super::Thread<super::ThreadSupportImpl>;
+}
+
+pub struct ThreadSupportImpl;
+
+impl ThreadSupport for ThreadSupportImpl {
+    type Context = Context;
+    type Scheduler = StrideScheduler;
+    type ProcessorGuard = MutexGuard<'static, Processor, SpinNoIrq>;
+
+    fn processor() -> Self::ProcessorGuard {
+        processor()
+    }
 }

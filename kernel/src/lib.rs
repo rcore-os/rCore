@@ -64,7 +64,8 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
-mod thread;
+
+use process::{thread, thread_};
 mod sync;
 mod trap;
 mod console;

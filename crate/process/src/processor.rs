@@ -26,6 +26,7 @@ pub enum Status {
 
 pub trait Context: Debug {
     unsafe fn switch(&mut self, target: &mut Self);
+    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self;
 }
 
 pub struct Processor_<T: Context, S: Scheduler> {

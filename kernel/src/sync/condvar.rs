@@ -1,10 +1,11 @@
 use alloc::VecDeque;
 use super::*;
 use thread;
+use thread_;
 
 #[derive(Default)]
 pub struct Condvar {
-    wait_queue: SpinNoIrqLock<VecDeque<thread::Thread>>,
+    wait_queue: SpinNoIrqLock<VecDeque<thread_::Thread>>,
 }
 
 impl Condvar {
