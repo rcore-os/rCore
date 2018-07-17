@@ -202,7 +202,7 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         if let Some(waiter) = self.find_waiter(pid) {
             info!("  then wakeup {}", waiter);
             self.set_status(waiter, Status::Ready);
-            self.switch_to(waiter); // yield
+            self.next = Some(waiter);
         }
     }
 

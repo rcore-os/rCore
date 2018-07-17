@@ -58,8 +58,6 @@ impl PageTable for ActivePageTable {
     }
 
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
-        assert!(self.0.translate_page(Page::of_addr(addr)).is_some(),
-                "page table entry not exist");
         let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }

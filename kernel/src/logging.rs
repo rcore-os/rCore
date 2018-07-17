@@ -53,7 +53,6 @@ impl Log for SimpleLogger {
     }
     fn log(&self, record: &Record) {
         static DISABLED_TARGET: &[&str] = &[
-            "rust_ucore::process::scheduler::rr",
         ];
         if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
 //            let target = record.target();

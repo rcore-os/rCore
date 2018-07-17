@@ -50,7 +50,7 @@ impl PageTable for ActivePageTable {
 
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
         let page = Page::of_addr(VirtAddr::new(addr));
-        assert!(self.0.translate_page(page).is_some(), "page table entry not exist");
+        let _ = self.0.translate_page(page);
         let entry_addr = ((addr >> 10) & 0x003ffffc) | (RECURSIVE_PAGE_PML4 << 22);
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }

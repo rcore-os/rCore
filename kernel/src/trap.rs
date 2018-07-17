@@ -12,12 +12,14 @@ pub fn before_return() {
     }
 }
 
-pub fn error(tf: &TrapFrame) {
+pub fn error(tf: &TrapFrame) -> ! {
     if let Some(processor) = PROCESSOR.try() {
         let mut processor = processor.lock();
         let pid = processor.current_pid();
         error!("Process {} error:\n{:#x?}", pid, tf);
         processor.exit(pid, 0x100); // TODO: Exit code for error
+        processor.schedule();
+        unreachable!();
     } else {
         panic!("Exception when processor not inited\n{:#x?}", tf);
     }

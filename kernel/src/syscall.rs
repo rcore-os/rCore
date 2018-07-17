@@ -27,7 +27,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         SYS_PUTC => sys_putc(args[0] as u8 as char),
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
-            -1
+            ::trap::error(tf);
         }
     }
 }
