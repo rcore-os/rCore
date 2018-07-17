@@ -29,9 +29,10 @@ pub fn shell() {
             continue;
         }
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
-            let len = file.borrow().read_at(0, &mut *buf).unwrap();
             use process::*;
-            processor().add(Context::new_user(&buf[..len]));
+            let len = file.borrow().read_at(0, &mut *buf).unwrap();
+            let pid = processor().add(Context::new_user(&buf[..len]));
+            processor().current_wait_for(pid);
         } else {
             println!("Program not exist");
         }
