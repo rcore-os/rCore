@@ -20,16 +20,13 @@ env:
     - ARCH="riscv32"
     - ARCH="x86_64"
 
-before_install:
-  - if [ $ARCH = riscv32 ]; then
-      docker pull wangrunji0408/riscv-rust;
-    fi
-
 before_script:
-  - rustup component add rust-src
-  - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)
-  - (test -x $HOME/.cargo/bin/xargo || cargo install xargo)
-  - cargo install-update -a
+  - if [ $ARCH = x86_64 ]; then
+    rustup component add rust-src &&
+    (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update) &&
+    (test -x $HOME/.cargo/bin/xargo || cargo install xargo) &&
+    cargo install-update -a;
+    fi
 
 script:
   - if [ $ARCH = riscv32 ]; then
