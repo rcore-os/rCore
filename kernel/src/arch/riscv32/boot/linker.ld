@@ -4,9 +4,9 @@
    See the GNU ld 'info' manual ("info ld") to learn the syntax. */
 
 OUTPUT_ARCH(riscv)
-ENTRY(kern_entry)
+ENTRY(_start)
 
-BASE_ADDRESS = 0x80020000;  /* equal to payload address in bbl */
+BASE_ADDRESS = 0x80000000;
 
 SECTIONS
 {

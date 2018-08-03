@@ -41,6 +41,7 @@ fn remap_the_kernel() {
     };
     static mut SPACE: [u8; 0x1000] = [0; 0x1000];
     let mut ms = unsafe { MemorySet::new_from_raw_space(&mut SPACE, kstack) };
+    ms.push(MemoryArea::new_identity(0x10000000, 0x10000008, MemoryAttr::default(), "serial"));
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));

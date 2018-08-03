@@ -1,4 +1,3 @@
-extern crate bbl;
 extern crate riscv;
 
 pub mod io;

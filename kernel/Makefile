@@ -124,17 +124,7 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 build/riscv32/os.iso: $(kernel)
-	@cd ../riscv-pk && \
-	 mkdir -p build && \
-	 cd build && \
-	 ../configure \
-	 	--enable-logo \
-	 	--prefix=$(RISCV) \
-	 	--disable-fp-emulation \
-	 	--host=riscv32-unknown-elf \
-	 	--with-payload=$(abspath $(kernel)) && \
-	 make && \
-	 cp bbl ../../kernel/$@
+	@cp $(kernel) $@
 
 $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \

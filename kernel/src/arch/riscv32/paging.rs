@@ -17,6 +17,7 @@ pub fn setup_page_table(frame: Frame) {
     p2.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
 
     // Set kernel identity map
+    p2[0x40].set(Frame::of_addr(PhysAddr::new(0x10000000)), EF::VALID | EF::READABLE | EF::WRITABLE);
     p2[KERNEL_PML4].set(Frame::of_addr(PhysAddr::new((KERNEL_PML4 as u32) << 22)), EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2[KERNEL_PML4 + 1].set(Frame::of_addr(PhysAddr::new((KERNEL_PML4 as u32 + 1) << 22)), EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
 
@@ -218,10 +219,12 @@ impl InactivePageTable for InactivePageTable0 {
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
+        let e0 = table[0x40];
         let e1 = table[KERNEL_PML4];
         assert!(!e1.is_unused());
 
         self.edit(|_| {
+            table[0x40] = e0;
             table[KERNEL_PML4].set(e1.frame(), EF::VALID | EF::GLOBAL);
         });
     }

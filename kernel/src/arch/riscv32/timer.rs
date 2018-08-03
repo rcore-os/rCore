@@ -1,5 +1,4 @@
 use super::riscv::register::*;
-use super::bbl::sbi;
 
 #[cfg(target_pointer_width = "64")]
 pub fn get_cycle() -> u64 {
@@ -29,5 +28,12 @@ pub fn init() {
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 100000;
-    sbi::set_timer(get_cycle() + timebase);
+    set_timer(get_cycle() + timebase);
+}
+
+fn set_timer(t: u64) {
+    unsafe {
+        asm!("csrw 0x321, $0; csrw 0x322, $1"
+        : : "r"(t as u32), "r"((t >> 32) as u32) : : "volatile");
+    }
 }
