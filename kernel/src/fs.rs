@@ -4,6 +4,16 @@ use alloc::boxed::Box;
 use arch::driver::ide;
 use spin::Mutex;
 
+// Hard link user program
+#[cfg(target_arch = "riscv32")]
+global_asm!(r#"
+    .section .rodata
+    .align 12
+_binary_user_riscv_img_start:
+    .incbin "../user/user-riscv.img"
+_binary_user_riscv_img_end:
+"#);
+
 pub fn shell() {
     #[cfg(target_arch = "riscv32")]
     let device = {

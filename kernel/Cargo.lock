@@ -96,32 +96,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-ucore"
-version = "0.1.0"
-dependencies = [
- "bbl 0.1.0",
- "bit-allocator 0.1.0",
- "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "cc 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "riscv 0.2.0",
- "simple-filesystem 0.0.1 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
- "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ucore-memory 0.1.0",
- "ucore-process 0.1.0",
- "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "simple-filesystem"
 version = "0.0.1"
 source = "git+https://github.com/wangrunji0408/SimpleFileSystem-Rust#ca10d11264c85932e95e6c7c29e8b10c91ae0720"
@@ -147,6 +121,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ucore"
+version = "0.1.0"
+dependencies = [
+ "bbl 0.1.0",
+ "bit-allocator 0.1.0",
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "riscv 0.2.0",
+ "simple-filesystem 0.0.1 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
+ "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ucore-memory 0.1.0",
+ "ucore-process 0.1.0",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

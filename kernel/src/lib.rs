@@ -49,7 +49,7 @@ pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
-mod logging;
+pub mod logging;
 mod memory;
 mod lang;
 mod util;
@@ -70,7 +70,7 @@ mod arch;
 
 #[cfg(target_arch = "riscv32")]
 #[path = "arch/riscv32/mod.rs"]
-mod arch;
+pub mod arch;
 
 /// The entry point of Rust kernel
 #[no_mangle]

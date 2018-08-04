@@ -14,7 +14,7 @@ kernel := build/$(arch)/kernel.bin
 iso := build/$(arch)/os.iso
 target ?= $(arch)-blog_os
 mode ?= debug
-rust_lib := target/$(target)/$(mode)/librust_ucore.a
+rust_lib := target/$(target)/$(mode)/ucore
 
 boot_src := src/arch/$(arch)/boot
 linker_script := $(boot_src)/linker.ld
@@ -123,7 +123,7 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
 	@rm -r build/isofiles
 
-build/riscv32/os.iso: $(kernel)
+build/riscv32/os.iso: kernel
 	@cd ../riscv-pk && \
 	 mkdir -p build && \
 	 cd build && \
@@ -132,7 +132,7 @@ build/riscv32/os.iso: $(kernel)
 	 	--enable-logo \
 	 	--disable-fp-emulation \
 	 	--host=riscv64-unknown-elf \
-	 	--with-payload=$(abspath $(kernel)) && \
+	 	--with-payload=$(abspath $(rust_lib)) && \
 	 make && \
 	 cp bbl ../../kernel/$@
 

@@ -1,7 +1,7 @@
     .section .entry
     .globl kern_entry
 kern_entry:
-    la sp, bootstacktop
+    lui sp, %hi(bootstacktop)
     tail rust_main
 
     .section .bss

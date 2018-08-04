@@ -2,10 +2,10 @@
     # If coming from userspace, preserve the user stack pointer and load
     # the kernel stack pointer. If we came from the kernel, sscratch
     # will contain 0, and we should continue on the current stack.
-    csrrw sp, sscratch, sp
+    csrrw sp, 0x140, sp     # sscratch
     bnez sp, _save_context
 _restore_kernel_sp:
-    csrr sp, sscratch
+    csrr sp, 0x140          # sscratch
     # sscratch = previous-sp, sp = kernel-sp
 _save_context:
     # provide room for trap frame
@@ -42,13 +42,13 @@ _save_context:
     sw x30, 30*4(sp)
     sw x31, 31*4(sp)
 
-    # get sp, sstatus, sepc, sbadvaddr, scause
+    # get sp, sstatus, sepc, stval, scause
     # set sscratch = 0
-    csrrw s0, sscratch, x0
-    csrr s1, sstatus
-    csrr s2, sepc
-    csrr s3, sbadaddr
-    csrr s4, scause
+    csrrw s0, 0x140, x0     # sscratch
+    csrr s1, 0x100          # sstatus
+    csrr s2, 0x141          # sepc
+    csrr s3, 0x143          # stval
+    csrr s4, 0x142          # scause
     # store sp, sstatus, sepc, sbadvaddr, scause
     sw s0, 2*4(sp)
     sw s1, 32*4(sp)
@@ -64,11 +64,11 @@ _save_context:
     bnez s0, _restore_context   # back to U-mode? (sstatus.SPP = 1)
 _save_kernel_sp:
     addi s0, sp, 36*4
-    csrw sscratch, s0           # sscratch = kernel-sp
+    csrw 0x140, s0              # sscratch = kernel-sp
 _restore_context:
     # restore sstatus, sepc
-    csrw sstatus, s1
-    csrw sepc, s2
+    csrw 0x100, s1
+    csrw 0x141, s2
 
     # restore x registers except x2 (sp)
     lw x1, 1*4(sp)
@@ -109,7 +109,7 @@ _restore_context:
     .globl __alltraps
 __alltraps:
     SAVE_ALL
-    move a0, sp
+    mv a0, sp
     jal rust_trap
     .globl __trapret
 __trapret:
