@@ -91,7 +91,7 @@ static void memory_init()
 static void hart_init()
 {
   mstatus_init();
-  fp_init();
+//  fp_init();
   delegate_traps();
 }
 

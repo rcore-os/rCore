@@ -80,7 +80,7 @@ ifeq ($(uname), Darwin)
 prefix := x86_64-elf-
 endif
 ifeq ($(arch), riscv32)
-prefix := riscv32-unknown-elf-
+prefix := riscv64-unknown-elf-
 endif
 
 ld := $(prefix)ld
@@ -128,10 +128,10 @@ build/riscv32/os.iso: $(kernel)
 	 mkdir -p build && \
 	 cd build && \
 	 ../configure \
+	 	--enable-32bit \
 	 	--enable-logo \
-	 	--prefix=$(RISCV) \
 	 	--disable-fp-emulation \
-	 	--host=riscv32-unknown-elf \
+	 	--host=riscv64-unknown-elf \
 	 	--with-payload=$(abspath $(kernel)) && \
 	 make && \
 	 cp bbl ../../kernel/$@
