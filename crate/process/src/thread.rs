@@ -27,7 +27,7 @@
 //! ```
 
 use alloc::boxed::Box;
-use alloc::BTreeMap;
+use alloc::collections::BTreeMap;
 use core::any::Any;
 use core::marker::PhantomData;
 use core::ptr;

@@ -1,8 +1,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
-#![feature(linkage)]
-#![feature(universal_impl_trait, conservative_impl_trait)]
 
 extern crate alloc;
 #[macro_use]

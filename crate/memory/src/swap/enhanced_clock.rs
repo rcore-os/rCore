@@ -1,4 +1,4 @@
-use alloc::vec_deque::VecDeque;
+use alloc::collections::VecDeque;
 use super::*;
 use paging::Entry;
 

@@ -1,4 +1,4 @@
-use alloc::{BinaryHeap, Vec};
+use alloc::{collections::BinaryHeap, vec::Vec};
 
 type Pid = usize;
 

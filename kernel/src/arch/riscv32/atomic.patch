@@ -55,7 +55,7 @@
  
  #[inline]
 -unsafe fn atomic_compare_exchange<T>(dst: *mut T,
-+#[cfg(target_arch = "riscv")]
++#[cfg(target_arch = "riscv32")]
 +unsafe fn atomic_compare_exchange<T: PartialEq>(dst: *mut T,
                                       old: T,
                                       new: T,

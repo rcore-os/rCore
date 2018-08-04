@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, BTreeMap};
+use alloc::{boxed::Box, collections::BTreeMap};
 use scheduler::*;
 use event_hub::EventHub;
 use util::GetMut2;

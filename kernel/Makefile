@@ -63,7 +63,7 @@ ifdef int
 qemu_opts := $(qemu_opts) -d int
 endif
 
-build_args := --target $(target) --features "$(features)"
+build_args := --target $(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args := $(build_args) --release
@@ -141,7 +141,7 @@ $(kernel): kernel $(assembly_object_files) $(linker_script)
 		$(assembly_object_files) $(rust_lib)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) CC=$(cc) xargo build $(build_args)
+	@CC=$(cc) cargo xbuild $(build_args)
 
 # compile assembly files
 build/x86_64/boot/%.o: $(boot_src)/%.asm

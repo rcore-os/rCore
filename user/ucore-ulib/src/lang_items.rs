@@ -25,7 +25,7 @@ fn panic(info: &::core::panic::PanicInfo) -> ! {
     sys_exit(1)
 }
 
-#[cfg(target_arch = "riscv")]
+#[cfg(target_arch = "riscv32")]
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub fn panic_fmt(fmt: ::core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {

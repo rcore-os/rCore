@@ -20,7 +20,7 @@
 
 use super::paging::*;
 use super::*;
-use alloc::BTreeMap;
+use alloc::collections::BTreeMap;
 use core::ops::{Deref, DerefMut};
 
 /// Wrapper for page table, supporting shared map & copy-on-write

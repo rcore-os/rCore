@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{Write, Result};
 
 fn main() {
-	if std::env::var("TARGET").unwrap().starts_with("x86_64") {
+	if std::env::var("TARGET").unwrap().find("x86_64").is_some() {
 		cc::Build::new()
 			.file("src/arch/x86_64/driver/apic/lapic.c")
 			.file("src/arch/x86_64/driver/keyboard/keyboard.c")

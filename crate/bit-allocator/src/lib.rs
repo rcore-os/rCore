@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(asm)]
-#![feature(universal_impl_trait)]
 
 extern crate bit_field;
 

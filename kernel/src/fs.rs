@@ -5,7 +5,7 @@ use arch::driver::ide;
 use spin::Mutex;
 
 pub fn shell() {
-    #[cfg(target_arch = "riscv")]
+    #[cfg(target_arch = "riscv32")]
     let device = {
         extern {
             fn _binary_user_riscv_img_start();
