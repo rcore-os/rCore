@@ -2,4 +2,4 @@
 arch := riscv32
 
 all:
-	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(arch)-ucore
+	cargo xbuild --target $(arch)-ucore.json
