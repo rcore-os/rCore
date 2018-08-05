@@ -27,7 +27,7 @@ user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(u
 user_obj := build/$(arch)/user.o
 SFSIMG := ../user/ucore32.img
 ifeq ($(arch), x86_64)
-qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback
+qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback -device isa-debug-exit
 endif
 ifeq ($(arch), riscv32)
 qemu_opts := -machine virt -kernel $(iso) -nographic
@@ -42,31 +42,18 @@ features := $(features) link_user_program
 assembly_object_files := $(assembly_object_files) $(user_obj)
 endif
 
-# Link user-riscv.img for RV32
-ifeq ($(arch), riscv32)
-riscv_user_img_obj := build/riscv32/user-riscv.o
-assembly_object_files := $(assembly_object_files) $(riscv_user_img_obj)
-endif
-
-ifdef travis
-test := 1
-features := $(features) qemu_auto_exit
-endif
-
-ifdef test
-features := $(features) test
-# enable shutdown inside the qemu
-qemu_opts := $(qemu_opts) -device isa-debug-exit
-endif
-
-ifdef int
-qemu_opts := $(qemu_opts) -d int
+ifdef d
+qemu_opts := $(qemu_opts) -d $(d)
 endif
 
 build_args := --target $(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args := $(build_args) --release
+endif
+
+ifeq ($(arch), x86_64)
+build_args := $(build_args) --lib
 endif
 
 
@@ -124,6 +111,7 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 build/riscv32/os.iso: kernel
+	@mkdir -p build/riscv32
 	@cd ../riscv-pk && \
 	 mkdir -p build && \
 	 cd build && \
@@ -138,7 +126,7 @@ build/riscv32/os.iso: kernel
 
 $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
-		$(assembly_object_files) $(rust_lib)
+		$(assembly_object_files) target/x86_64-blog_os/$(mode)/libucore.a
 
 kernel:
 	@CC=$(cc) cargo xbuild $(build_args)
@@ -148,18 +136,7 @@ build/x86_64/boot/%.o: $(boot_src)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 
-build/riscv32/boot/%.o: $(boot_src)/%.asm
-	@mkdir -p $(shell dirname $@)
-	@$(as) -march=rv32i $< -o $@
-
 # make user.o from binary files
 $(user_obj): $(user_bins)
 	@cd $(user_bin_path) && \
 		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
-
-$(riscv_user_img_obj): ../user/user-riscv.img
-	@cd ../user && $(ld) -o $(abspath $@) -b binary $(notdir $<)
-
-# patch Rust core for RISCV32I atomic
-patch-core:
-	@patch -p0 /rust/rust-riscv-rust-1.26.0-1-dev/src/libcore/sync/atomic.rs src/arch/riscv32/atomic.patch

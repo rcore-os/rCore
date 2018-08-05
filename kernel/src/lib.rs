@@ -40,12 +40,6 @@ extern crate volatile;
 extern crate x86_64;
 extern crate xmas_elf;
 
-// Export to asm
-pub use arch::interrupt::rust_trap;
-#[cfg(target_arch = "x86_64")]
-pub use arch::interrupt::set_return_rsp;
-#[cfg(target_arch = "x86_64")]
-pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
@@ -66,7 +60,7 @@ mod console;
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86_64/mod.rs"]
-mod arch;
+pub mod arch;
 
 #[cfg(target_arch = "riscv32")]
 #[path = "arch/riscv32/mod.rs"]

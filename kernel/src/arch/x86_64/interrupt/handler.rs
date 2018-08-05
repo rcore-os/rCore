@@ -67,6 +67,9 @@
 use super::consts::*;
 use super::TrapFrame;
 
+global_asm!(include_str!("trap.asm"));
+global_asm!(include_str!("vector.asm"));
+
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     trace!("Interrupt: {:#x}", tf.trap_num);

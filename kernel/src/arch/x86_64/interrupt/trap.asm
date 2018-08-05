@@ -1,5 +1,7 @@
-section .text
-global __alltraps
+.section .text
+.global __alltraps
+.intel_syntax noprefix
+
 __alltraps:
     push rax
     push rcx
@@ -19,14 +21,12 @@ __alltraps:
     push r15
 
     mov rdi, rsp
-    extern rust_trap
     call rust_trap
 
-global trap_ret
+.global trap_ret
 trap_ret:
 
     mov rdi, rsp
-    extern set_return_rsp
     call set_return_rsp
 
     pop r15
@@ -46,7 +46,7 @@ trap_ret:
     pop rcx
     pop rax
 
-    ; pop trap_num, error_code
+    # pop trap_num, error_code
     add rsp, 16
 
     iretq

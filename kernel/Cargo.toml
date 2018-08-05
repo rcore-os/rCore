@@ -3,6 +3,9 @@ name = "ucore"
 version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
 
+[lib]
+crate-type = ["staticlib", "rlib"]
+
 [features]
 use_apic = []
 link_user_program = []
