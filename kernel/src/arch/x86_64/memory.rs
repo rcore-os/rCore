@@ -25,7 +25,7 @@ fn init_frame_allocator(boot_info: &BootInformation) {
 
     let mut ba = FRAME_ALLOCATOR.lock();
     for area in memory_areas {
-        ba.insert(to_range(area.start_address(), area.end_address()));
+        ba.insert(to_range(area.start_address() as usize, area.end_address() as usize));
     }
     for section in elf_sections {
         ba.remove(to_range(section.start_address() as usize, section.end_address() as usize));

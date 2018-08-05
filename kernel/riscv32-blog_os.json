@@ -5,12 +5,18 @@
   "target-pointer-width": "32",
   "target-c-int-width": "32",
   "os": "none",
-  "arch": "riscv",
+  "arch": "riscv32",
   "cpu": "generic-rv32",
-  "features": "+m",
+  "features": "",
   "max-atomic-width": "32",
-  "linker": "ld.lld",
+  "linker": "riscv64-unknown-elf-ld",
   "linker-flavor": "ld",
+  "pre-link-args": {
+    "ld": [
+      "-Tsrc/arch/riscv32/boot/linker.ld",
+      "-melf32lriscv"
+    ]
+  },
   "executables": true,
   "panic-strategy": "abort",
   "relocation-model": "static",

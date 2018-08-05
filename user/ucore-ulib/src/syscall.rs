@@ -32,7 +32,7 @@ impl fmt::Write for StdOut {
 fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
     let ret: i32;
     unsafe {
-        #[cfg(target_arch = "riscv")]
+        #[cfg(target_arch = "riscv32")]
             asm!("ecall"
             : "={x10}" (ret)
             : "{x10}" (id), "{x11}" (arg0), "{x12}" (arg1), "{x13}" (arg2), "{x14}" (arg3), "{x15}" (arg4), "{x16}" (arg5)

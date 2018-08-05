@@ -5,7 +5,6 @@
 #![feature(const_unique_new, const_atomic_usize_new)]
 #![feature(unique)]
 #![feature(allocator_api)]
-#![feature(global_allocator)]
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]
 #![feature(unboxed_closures)]
@@ -14,7 +13,6 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_implementation)]
 #![feature(panic_info_message)]
-#![feature(universal_impl_trait)]
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
 #![no_std]
@@ -33,30 +31,19 @@ extern crate linked_list_allocator;
 extern crate log;
 #[macro_use]
 extern crate once;
-#[cfg(target_arch = "x86_64")]
-extern crate rlibc;
-#[cfg(target_arch = "riscv")]
-extern crate compiler_builtins;
 extern crate simple_filesystem;
 extern crate spin;
 extern crate ucore_memory;
 extern crate ucore_process;
 extern crate volatile;
-#[macro_use]
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate xmas_elf;
 
-// Export to asm
-pub use arch::interrupt::rust_trap;
-#[cfg(target_arch = "x86_64")]
-pub use arch::interrupt::set_return_rsp;
-#[cfg(target_arch = "x86_64")]
-pub use arch::other_main;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
-mod logging;
+pub mod logging;
 mod memory;
 mod lang;
 mod util;
@@ -73,11 +60,11 @@ mod console;
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86_64/mod.rs"]
-mod arch;
+pub mod arch;
 
-#[cfg(target_arch = "riscv")]
+#[cfg(target_arch = "riscv32")]
 #[path = "arch/riscv32/mod.rs"]
-mod arch;
+pub mod arch;
 
 /// The entry point of Rust kernel
 #[no_mangle]

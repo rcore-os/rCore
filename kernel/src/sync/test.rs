@@ -2,7 +2,7 @@
 //!
 //! The code is borrowed from [RustDoc - Dining Philosophers](https://doc.rust-lang.org/1.6.0/book/dining-philosophers.html)
 
-use alloc::{arc::Arc, Vec};
+use alloc::{sync::Arc, vec::Vec};
 use core::time::Duration;
 use sync::Condvar;
 use sync::ThreadLock as Mutex;

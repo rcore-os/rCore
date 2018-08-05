@@ -5,6 +5,7 @@ pub mod interrupt;
 pub mod timer;
 pub mod paging;
 pub mod memory;
+pub mod compiler_rt;
 
 pub fn init() {
     println!("Hello RISCV! {}", 123);
@@ -12,3 +13,6 @@ pub fn init() {
     memory::init();
     timer::init();
 }
+
+global_asm!(include_str!("boot/entry.asm"));
+global_asm!(include_str!("boot/trap.asm"));

@@ -1,4 +1,4 @@
-use alloc::{arc::Arc, arc::Weak, VecDeque};
+use alloc::{sync::Arc, sync::Weak, collections::VecDeque};
 use super::Condvar;
 use super::SpinLock as Mutex;
 

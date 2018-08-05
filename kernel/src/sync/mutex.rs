@@ -215,7 +215,7 @@ impl MutexSupport for Spin {
         unsafe {
             #[cfg(target_arch = "x86_64")]
                 asm!("pause" :::: "volatile");
-            #[cfg(target_arch = "riscv")]
+            #[cfg(target_arch = "riscv32")]
                 asm!("nop" :::: "volatile");
         }
     }
@@ -245,7 +245,7 @@ impl MutexSupport for SpinNoIrq {
         unsafe {
             #[cfg(target_arch = "x86_64")]
                 asm!("pause" :::: "volatile");
-            #[cfg(target_arch = "riscv")]
+            #[cfg(target_arch = "riscv32")]
                 asm!("nop" :::: "volatile");
         }
     }

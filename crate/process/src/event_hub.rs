@@ -1,4 +1,4 @@
-use alloc::BinaryHeap;
+use alloc::collections::BinaryHeap;
 use core::cmp::{Ordering, PartialOrd};
 
 type Time = usize;

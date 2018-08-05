@@ -1,4 +1,4 @@
-use alloc::VecDeque;
+use alloc::collections::VecDeque;
 use super::*;
 use thread;
 use thread_;

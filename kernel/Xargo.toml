@@ -1,6 +1,0 @@
-[dependencies]
-alloc = {}
-
-[target.riscv32-blog_os.dependencies.compiler_builtins]
-features = ["mem"]
-stage = 1

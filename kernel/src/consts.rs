@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-#[cfg(target_arch = "riscv")]
+#[cfg(target_arch = "riscv32")]
 pub use self::riscv::*;
 #[cfg(target_arch = "x86_64")]
 pub use self::x86_64::*;
@@ -8,7 +8,7 @@ pub use self::x86_64::*;
 pub const MAX_CPU_NUM: usize = 8;
 pub const MAX_PROCESS_NUM: usize = 48;
 
-#[cfg(target_arch = "riscv")]
+#[cfg(target_arch = "riscv32")]
 mod riscv {
     // Physical address available on THINPAD:
     // [0x80000000, 0x80800000]
