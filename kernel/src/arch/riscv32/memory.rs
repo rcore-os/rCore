@@ -22,8 +22,8 @@ fn init_frame_allocator() {
     use consts::{MEMORY_OFFSET, MEMORY_END};
 
     let mut ba = FRAME_ALLOCATOR.lock();
-
-    ba.insert(to_range(end as usize, MEMORY_END));
+    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+    ba.insert(to_range(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MEMORY_END));
     info!("FrameAllocator init end");
 
     fn to_range(start: usize, end: usize) -> Range<usize> {
@@ -45,7 +45,7 @@ fn remap_the_kernel() {
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
-    ms.push(MemoryArea::new(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
+    ms.push(MemoryArea::new_identity(KERNEL_HEAP_OFFSET, KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MemoryAttr::default(), "kernel_heap"));
     unsafe { ms.activate(); }
     use core::mem::forget;
     forget(ms);
