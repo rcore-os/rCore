@@ -51,23 +51,22 @@ pub unsafe extern fn __atomic_store_4(dst: *mut u32, val: u32) {
     write(dst, val)
 }
 
-unsafe fn __atomic_compare_exchange<T: PartialEq>(dst: *mut T, old: T, new: T) -> (T, bool) {
+unsafe fn __atomic_compare_exchange<T: PartialEq>(dst: *mut T, expected: *mut T, desired: T) -> bool {
     use super::interrupt;
     let flags = interrupt::disable_and_store();
-    let ret = read(dst);
-    if ret == old {
-        write(dst, new);
-    }
+    let val = read(dst);
+    let success = val == read(expected);
+    write(dst, if success {desired} else {val});
     interrupt::restore(flags);
-    (ret, true)
+    success
 }
 
 #[no_mangle]
-pub unsafe extern fn __atomic_compare_exchange_1(dst: *mut u8, old: u8, src: u8) -> (u8, bool) {
-    __atomic_compare_exchange(dst, old, src)
+pub unsafe extern fn __atomic_compare_exchange_1(dst: *mut u8, expected: *mut u8, desired: u8) -> bool {
+    __atomic_compare_exchange(dst, expected, desired)
 }
 
 #[no_mangle]
-pub unsafe extern fn __atomic_compare_exchange_4(dst: *mut u32, old: u32, src: u32) -> (u32, bool) {
-    __atomic_compare_exchange(dst, old, src)
+pub unsafe extern fn __atomic_compare_exchange_4(dst: *mut u32, expected: *mut u32, desired: u32) -> bool {
+    __atomic_compare_exchange(dst, expected, desired)
 }

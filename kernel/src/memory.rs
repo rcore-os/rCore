@@ -26,14 +26,9 @@ pub fn dealloc_frame(target: usize) {
 
 // alloc from heap
 pub fn alloc_stack() -> Stack {
-    use alloc::boxed::Box;
+    use alloc::alloc::{alloc, Layout};
     const STACK_SIZE: usize = 0x8000;
-    // FIXME: This alignment will cause rsp align with 0x8000 in x86_64 release mode.
-    //        Because kernel stack is not large enough, it will trigger double fault.
-    #[repr(align(0x8000))]
-    struct StackData([u8; STACK_SIZE]);
-    let data = Box::new(StackData([0; STACK_SIZE]));
-    let bottom = Box::into_raw(data) as usize;
+    let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, 0x8000).unwrap()) } as usize;
     let top = bottom + STACK_SIZE;
     Stack { top, bottom }
 }
