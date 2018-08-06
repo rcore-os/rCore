@@ -30,7 +30,12 @@ pub fn shell() {
     let files = root.borrow().list().unwrap();
     println!("Available programs: {:?}", files);
 
-    let mut buf = Box::new([0; 64 << 12]);
+    // Avoid stack overflow in release mode
+    // Equal to: `buf = Box::new([0; 64 << 12])`
+    use alloc::alloc::{alloc, dealloc, Layout};
+    const BUF_SIZE: usize = 0x40000;
+    let layout = Layout::from_size_align(BUF_SIZE, 0x1000).unwrap();
+    let buf = unsafe{ slice::from_raw_parts_mut(alloc(layout), BUF_SIZE) };
     loop {
         print!(">> ");
         use console::get_line;
@@ -47,6 +52,7 @@ pub fn shell() {
             println!("Program not exist");
         }
     }
+    unsafe { dealloc(buf.as_mut_ptr(), layout) };
 }
 
 struct MemBuf(&'static [u8]);
