@@ -1,54 +1,46 @@
 # RustOS
 
-## Port to RISCV (WIP)
+[![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/wangrunji0408/RustOS)
 
-2018年THU计算机系统综合实验
+Rust port for uCore OS, supporting x86_64 and riscv32i.
 
-[Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
+## Summary
 
-[Documents](./docs/RISCV.md)
+This is a project of THU Operating System (2018 Spring) && Comprehensive Experiment of Computer System (2018 Summer).
+
+Project wiki (internal access only): [OS](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11), [CECS](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
+
+Reports (in Chinese): [MidReport](./docs/MidReport.md), [FinalReport](./docs/FinalReport.md), [RISCV port note](./docs/RISCV.md)
+
+
+
+The initial goal is to write a mini OS in Rust with multi-core support. More specifically, it would start from the post of the [Writing an OS in Rust](http://os.phil-opp.com) series, then reimplement [xv6-x86_64](https://github.com/jserv/xv6-x86_64) in Rust style.
+
+In fact, it's more complicated than we expected to write an OS starting from scratch. So by the end of OS course, we only finished rewriting [ucore_os_lab](https://github.com/chyyuu/ucore_os_lab), without multi-core support. Then as a part of [CECS project](https://github.com/riscv-and-rust-and-decaf), we ported it from x86_64 to RISCV32I, and made it work on our FPGA CPU.
+
+## Building
 
 ### Environment
 
-[Dockerfile](./riscv-env/Dockerfile) (Can not build directly. Just for reference)
-
-Available on DockerHub: `wangrunji0408/riscv-rust`
+* Rust toolchain at nightly-2018-08-03
+*  `cargo-xbuild`
+* `QEMU` >= 2.12.0
+* riscv32
+  * RISCV64 GNU toolchain
+* x86_64
+  * `nasm`
+  * `grub-mkrescue`
+  * `xorriso`
 
 ### How to run
 
 ```bash
 git clone https://github.com/wangrunji0408/RustOS.git --recursive
-cd RustOS
-# Pull docker image and enter docker interactive shell
-make docker_riscv
-# Inside docker ...
-cd kernel
-# Patch the atomic mod of core lib
-make patch-core
-make run
+cd RustOS/kernel
+make run arch=riscv32|x86_64
+# For FPGA: 
+# make run arch=riscv32 board=1
 ```
-
-## Summary
-
-[![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/wangrunji0408/RustOS)
-
-A project of THU OS2018 spring.
-
-[Project Wiki](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
-
-[MidReport](./docs/MidReport.md)
-
-[FinalReport](./docs/FinalReport.md)
-
-The goal is to write a mini OS in Rust with multicore supporting.
-
-It will start from the post of the [Writing an OS in Rust](http://os.phil-opp.com) series. Then reimplement [xv6-x86_64](https://github.com/jserv/xv6-x86_64) in Rust style.
-
-## Building
-
-You need to have `nasm`, `grub-mkrescue`, `xorriso`, `qemu`, a nightly Rust compiler, and `xargo` installed. Then you can run it using `make run`.
-
-A docker image is available and recommanded. Read [this](docker/README.md) for details.
 
 ## License
 
