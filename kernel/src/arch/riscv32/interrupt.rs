@@ -39,12 +39,12 @@ pub unsafe fn restore(flags: usize) {
 
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use super::riscv::register::scause::{Trap, Interrupt, Exception};
+    use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt: {:?}", tf.scause.cause());
     match tf.scause.cause() {
-        Trap::Interrupt(SupervisorTimer) => timer(),
-        Trap::Exception(IllegalInstruction) => illegal_inst(tf),
-        Trap::Exception(UserEnvCall) => syscall(tf),
+        Trap::Interrupt(I::SupervisorTimer) => timer(),
+        Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
+        Trap::Exception(E::UserEnvCall) => syscall(tf),
         _ => ::trap::error(tf),
     }
     ::trap::before_return();

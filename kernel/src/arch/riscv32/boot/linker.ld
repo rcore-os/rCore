@@ -6,17 +6,22 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-BASE_ADDRESS = 0x80000000;
+BASE_ADDRESS = 0x80020000;
 
 SECTIONS
 {
+    . = 0x80000000;
+    .boot : {
+        KEEP(*(.text.boot))
+    }
+
     /* Load the kernel at this address: "." means the current address */
     . = BASE_ADDRESS;
     start = .;
 
     .text : {
         stext = .;
-        *(.entry)
+        *(.text.entry)
         *(.text .stub .text.* .gnu.linkonce.t.*)
         . = ALIGN(4K);
         etext = .;

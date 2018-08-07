@@ -9,6 +9,7 @@ crate-type = ["staticlib", "rlib"]
 [features]
 use_apic = []
 link_user_program = []
+no_bbl = []
 
 [profile.dev]
 # MUST >= 1 : Enable RVO to avoid stack overflow

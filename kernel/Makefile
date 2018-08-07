@@ -1,19 +1,26 @@
-# Examples:
-# 	make run					Run in debug
-# 	make justrun				Run in debug without build
-#	make run int=1				Run with interrupt info by QEMU
-# 	make run mode=release		Run in release
-#	make run LOG=error			Run with log level: error
-#									LOG = off | error | warn | info | debug | trace
+# Commands:
+#   make build					Build
+# 	make run					Build and run in QEMU
+# 	make justrun				Run the last build
 # 	make doc					Generate docs
 # 	make asm					Open the deassemble file of the last build
+# 	make elf-h					Open 'objdump -h' of the last build
 # 	make clean					Clean
+#
+# Options:
+#   arch = x86_64 | riscv32
+#   d    = int | in_asm | ...	QEMU debug info
+#   mode = debug | release
+#   LOG  = off | error | warn | info | debug | trace
+#   board 						Only available on riscv32, build without bbl, run on board
 
 arch ?= riscv32
+mode ?= debug
+LOG  ?= debug
+
 kernel := build/$(arch)/kernel.bin
 iso := build/$(arch)/os.iso
-target ?= $(arch)-blog_os
-mode ?= debug
+target := $(arch)-blog_os
 rust_lib := target/$(target)/$(mode)/ucore
 
 boot_src := src/arch/$(arch)/boot
@@ -34,7 +41,9 @@ qemu_opts := -machine virt -kernel $(iso) -nographic
 endif
 features := use_apic
 
-LOG ?= debug
+ifdef board
+features := $(features) no_bbl
+endif
 
 # Link user binaries at ../user
 ifdef link_user
@@ -111,8 +120,23 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 build/riscv32/os.iso: kernel
-	@cp $(rust_lib) $@
 	@cp $(rust_lib) $(kernel)
+ifdef board
+	@cp $(rust_lib) $@
+else
+	@mkdir -p build/riscv32
+	@cd ../riscv-pk && \
+	 mkdir -p build && \
+	 cd build && \
+	 ../configure \
+	 	--enable-32bit \
+	 	--enable-logo \
+	 	--disable-fp-emulation \
+	 	--host=riscv64-unknown-elf \
+	 	--with-payload=$(abspath $(rust_lib)) && \
+	 make && \
+	 cp bbl ../../kernel/$@
+endif
 
 $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \

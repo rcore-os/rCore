@@ -1,4 +1,5 @@
 use super::riscv::register::*;
+use super::bbl::sbi;
 
 #[cfg(target_pointer_width = "64")]
 pub fn get_cycle() -> u64 {
@@ -32,8 +33,11 @@ pub fn set_next() {
 }
 
 fn set_timer(t: u64) {
+    #[cfg(feature = "no_bbl")]
     unsafe {
         asm!("csrw 0x321, $0; csrw 0x322, $1"
         : : "r"(t as u32), "r"((t >> 32) as u32) : : "volatile");
     }
+    #[cfg(not(feature = "no_bbl"))]
+    sbi::set_timer(t);
 }
