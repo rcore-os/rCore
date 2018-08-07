@@ -27,7 +27,7 @@ pub fn init() {
 
 pub fn set_next() {
     // 100Hz @ QEMU
-    let timebase = 100000;
+    let timebase = 250000;
     set_timer(get_cycle() + timebase);
 }
 

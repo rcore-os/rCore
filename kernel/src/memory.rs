@@ -1,5 +1,5 @@
 pub use arch::paging::*;
-use bit_allocator::{BitAlloc, BitAlloc64K};
+use bit_allocator::{BitAlloc, BitAlloc4K};
 use consts::MEMORY_OFFSET;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
@@ -10,7 +10,7 @@ pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySe
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: Mutex<BitAlloc64K> = Mutex::new(BitAlloc64K::default());
+    pub static ref FRAME_ALLOCATOR: Mutex<BitAlloc4K> = Mutex::new(BitAlloc4K::default());
 }
 
 pub fn alloc_frame() -> Option<usize> {

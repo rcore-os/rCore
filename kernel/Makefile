@@ -112,6 +112,7 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 
 build/riscv32/os.iso: kernel
 	@cp $(rust_lib) $@
+	@cp $(rust_lib) $(kernel)
 
 $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \

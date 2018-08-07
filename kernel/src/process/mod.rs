@@ -24,6 +24,7 @@ pub fn init() {
             processor
         })
     );
+    info!("process init end");
 }
 
 pub static PROCESSOR: Once<SpinNoIrqLock<Processor>> = Once::new();
