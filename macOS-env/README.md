@@ -1,5 +1,10 @@
 # MacOS environment
 
+``` bash
+brew tap altkatz/homebrew-gcc_cross_compilers
+brew install x64-elf-gcc
+```
+
 * x86_64_elf_*:
     <https://github.com/altkatz/homebrew-gcc_cross_compilers>
 

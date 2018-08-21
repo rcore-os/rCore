@@ -2,8 +2,6 @@
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(alloc)]
-#![feature(const_unique_new, const_atomic_usize_new)]
-#![feature(unique)]
 #![feature(allocator_api)]
 #![feature(abi_x86_interrupt)]
 #![feature(iterator_step_by)]

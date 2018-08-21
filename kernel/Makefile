@@ -120,11 +120,11 @@ build/x86_64/os.iso: $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 build/riscv32/os.iso: kernel
+	@mkdir -p build/riscv32
 	@cp $(rust_lib) $(kernel)
 ifdef board
 	@cp $(rust_lib) $@
 else
-	@mkdir -p build/riscv32
 	@cd ../riscv-pk && \
 	 mkdir -p build && \
 	 cd build && \
