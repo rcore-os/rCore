@@ -6,6 +6,18 @@ extern crate bit_field;
 use bit_field::BitField;
 use core::ops::Range;
 
+/// Allocator of a bitmap, able to allocate / free bits.
+///
+/// CAP: the bitmap has a total of CAP bits, numbered from 0 to CAP-1 inclusively.
+///
+/// alloc: allocate a free bit.
+/// dealloc: free an allocated bit.
+///
+/// insert: mark bits in the range as allocated
+/// remove: reverse of insert
+///
+/// any: whether there are free bits remaining
+/// test: whether a specific bit is free
 pub trait BitAlloc: Default {
     const CAP: usize;
     fn alloc(&mut self) -> Option<usize>;
@@ -23,6 +35,7 @@ pub type BitAlloc1M = BitAllocCascade16<BitAlloc64K>;
 pub type BitAlloc16M = BitAllocCascade16<BitAlloc1M>;
 pub type BitAlloc256M = BitAllocCascade16<BitAlloc16M>;
 
+/// Implement the bit allocator by segment tree algorithm.
 #[derive(Default)]
 pub struct BitAllocCascade16<T: BitAlloc> {
     bitset: u16,
@@ -77,6 +90,8 @@ impl<T: BitAlloc> BitAllocCascade16<T> {
 #[derive(Default)]
 pub struct BitAlloc16(u16);
 
+/// BitAlloc16 acts as the leaf (except the leaf bits of course) nodes
+/// in the segment trees.
 impl BitAlloc for BitAlloc16 {
     const CAP: usize = 16;
 
