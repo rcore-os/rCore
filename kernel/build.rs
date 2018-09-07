@@ -5,11 +5,11 @@ use std::io::{Write, Result};
 
 fn main() {
 	if std::env::var("TARGET").unwrap().find("x86_64").is_some() {
-		cc::Build::new()
-			.file("src/arch/x86_64/driver/apic/lapic.c")
-			.file("src/arch/x86_64/driver/keyboard/keyboard.c")
-			.flag("-mcmodel=large")
-			.compile("cobj");
+//		cc::Build::new()
+//			.file("src/arch/x86_64/driver/apic/lapic.c")
+//			.file("src/arch/x86_64/driver/keyboard/keyboard.c")
+//			.flag("-mcmodel=large")
+//			.compile("cobj");
 		gen_vector_asm().unwrap();
 	}
 }

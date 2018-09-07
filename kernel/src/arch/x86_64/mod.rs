@@ -14,12 +14,7 @@ pub mod io;
 
 pub fn init() {
     idt::init();
-    // Load boot info address from stack_top.
-    // See `boot.asm`
-    extern {
-        fn stack_top();
-    }
-    let boot_info_addr = unsafe { *(stack_top as *const u32).offset(-1) } as usize;
+    let boot_info_addr = unsafe { *(0 as *const u32).offset(-1) } as usize;
     let boot_info = unsafe { multiboot2::load(boot_info_addr) };
     let rsdt_addr = boot_info.rsdp_v1_tag().unwrap().rsdt_address();
     memory::init(boot_info);

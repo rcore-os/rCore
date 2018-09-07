@@ -4,3 +4,10 @@
 
 #[macro_use]
 extern crate ucore;
+
+#[cfg(not(test))]
+#[cfg(target_arch = "x86_64")]
+#[no_mangle] // don't mangle the name of this function
+pub extern "C" fn _start() -> ! {
+    ucore::rust_main();
+}

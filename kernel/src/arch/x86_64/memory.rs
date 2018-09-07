@@ -13,7 +13,7 @@ pub fn init(boot_info: BootInformation) {
     assert_has_not_been_called!("memory::init must be called only once");
     info!("{:?}", boot_info);
     init_frame_allocator(&boot_info);
-    remap_the_kernel(&boot_info);
+//    remap_the_kernel(&boot_info);
     init_heap();
 }
 
