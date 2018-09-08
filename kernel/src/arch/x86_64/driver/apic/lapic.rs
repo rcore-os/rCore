@@ -6,7 +6,7 @@ extern {
 	fn lapicstartap(apicid: u8, addr: u32);
 }
 
-pub fn set_addr(lapic_addr: *const ()) {
+pub fn set_addr(lapic_addr: usize) {
 	unsafe {
 //		lapic = lapic_addr;
 	}

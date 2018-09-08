@@ -33,7 +33,6 @@ simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-R
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = "0.3"
-multiboot2 = "0.7"
 x86_64 = "0.2.11"
 redox_syscall = "0.1"
 uart_16550 = "0.1"

@@ -9,10 +9,9 @@ use bit_field::BitField;
 use arch::interrupt::consts::T_IRQ0;
 use spin::Mutex;
 
-pub fn init(ioapic_id: u8)
+pub fn init()
 {
 	let mut ioapic = IOAPIC.lock();
-	assert_eq!(ioapic.id(), ioapic_id, "ioapic.init: id isn't equal to ioapicid; not a MP");
 
 	// Mark all interrupts edge-triggered, active high, disabled,
 	// and not routed to any CPUs.
