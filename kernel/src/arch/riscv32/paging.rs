@@ -17,9 +17,11 @@ pub fn setup_page_table(frame: Frame) {
     p2.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
 
     // Set kernel identity map
-    p2[0x40].set(Frame::of_addr(PhysAddr::new(0x10000000)), EF::VALID | EF::READABLE | EF::WRITABLE);
-    p2[KERNEL_PML4].set(Frame::of_addr(PhysAddr::new((KERNEL_PML4 as u32) << 22)), EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
-    p2[KERNEL_PML4 + 1].set(Frame::of_addr(PhysAddr::new((KERNEL_PML4 as u32 + 1) << 22)), EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+    // 0x10000000 ~ 1K area
+    p2.map_identity(0x40, EF::VALID | EF::READABLE | EF::WRITABLE);
+    // 0x80000000 ~ 8K area
+    p2.map_identity(KERNEL_PML4, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+    p2.map_identity(KERNEL_PML4 + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
 
     use super::riscv::register::satp;
     unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
