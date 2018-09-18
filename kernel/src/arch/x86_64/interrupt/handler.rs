@@ -85,7 +85,8 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 IRQ_KBD => keyboard(),
                 IRQ_COM1 => com1(),
                 IRQ_COM2 => com2(),
-                _ => panic!("Invalid IRQ number."),
+                IRQ_IDE => ide(),
+                _ => panic!("Invalid IRQ number: {}", irq),
             }
             #[cfg(feature = "use_apic")]
             use arch::driver::apic::ack;
@@ -141,6 +142,10 @@ fn com2() {
     use arch::driver::serial::*;
     trace!("\nInterupt: COM2");
     COM2.lock().receive();
+}
+
+fn ide() {
+    trace!("\nInterupt: IDE");
 }
 
 fn to_user(tf: &mut TrapFrame) {

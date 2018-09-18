@@ -43,13 +43,16 @@ bbl = { path = "../crate/bbl" }
 
 [package.metadata.bootimage]
 default-target = "x86_64-blog_os.json"
-output = "bootimage.bin"    # The output file name
+output = "target/x86_64-blog_os/bootimage.bin"
 minimum-image-size = 0      # The minimum output file size (in MiB)
 # The command invoked on `bootimage run`
 # (the "{}" will be replaced with the path to the bootable disk image)
 run-command = ["qemu-system-x86_64",
     "-drive", "format=raw,file={}",
-    "-serial", "mon:stdio"
+    "-drive", "format=raw,file=../user/ucore32.img,media=disk,cache=writeback",
+    "-serial", "mon:stdio",
+    "-device", "isa-debug-exit",
+    "-smp", "4"
 ]
 
 [build-dependencies]

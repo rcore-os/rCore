@@ -24,8 +24,8 @@ pub fn shell() {
         Box::new(unsafe { MemBuf::new(_binary_user_riscv_img_start, _binary_user_riscv_img_end) })
     };
     #[cfg(target_arch = "x86_64")]
-    let device = Box::new(&ide::DISK0);
-    let sfs = SimpleFileSystem::open(device).unwrap();
+    let device = Box::new(&ide::DISK1);
+    let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
     let root = sfs.root_inode();
     let files = root.borrow().list().unwrap();
     println!("Available programs: {:?}", files);
@@ -79,7 +79,7 @@ impl Device for MemBuf {
 use core::slice;
 
 #[cfg(target_arch = "x86_64")]
-impl BlockedDevice for &'static ide::DISK0 {
+impl BlockedDevice for &'static ide::DISK1 {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);

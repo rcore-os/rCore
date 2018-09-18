@@ -6,6 +6,7 @@ use spin::Mutex;
 
 lazy_static! {
     pub static ref DISK0: LockedIde = LockedIde(Mutex::new(DmaController::new(0)));
+    pub static ref DISK1: LockedIde = LockedIde(Mutex::new(DmaController::new(1)));
 }
 pub const BLOCK_SIZE: usize = 512;
 
