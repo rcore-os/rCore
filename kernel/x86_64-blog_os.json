@@ -9,6 +9,11 @@
   "os": "none",
   "executables": true,
   "linker": "rust-lld",
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/x86_64/linker.ld"
+    ]
+  },
   "disable-redzone": true,
   "features": "-mmx,-sse,+soft-float",
   "panic-strategy": "abort"
