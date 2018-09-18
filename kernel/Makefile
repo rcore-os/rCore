@@ -18,26 +18,25 @@ arch ?= riscv32
 mode ?= debug
 LOG  ?= debug
 
-kernel := build/$(arch)/kernel.bin
-iso := build/$(arch)/os.iso
 target := $(arch)-blog_os
-rust_lib := target/$(target)/$(mode)/ucore
+kernel := target/$(target)/$(mode)/ucore
+bin := target/$(target)/$(mode)/kernel.bin
+bootimage := target/$(target)/bootimage.bin
 
-boot_src := src/arch/$(arch)/boot
-linker_script := $(boot_src)/linker.ld
-grub_cfg := $(boot_src)/grub.cfg
-assembly_source_files := $(wildcard $(boot_src)/*.asm)
-assembly_object_files := $(patsubst $(boot_src)/%.asm, \
-	build/$(arch)/boot/%.o, $(assembly_source_files))
 user_bin_path := ../user/target/$(arch)-ucore/debug
 user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
 user_obj := build/$(arch)/user.o
 SFSIMG := ../user/ucore32.img
 ifeq ($(arch), x86_64)
-qemu_opts := -cdrom $(iso) -smp 4 -serial mon:stdio -drive file=$(SFSIMG),media=disk,cache=writeback -device isa-debug-exit
+qemu_opts := \
+	-drive format=raw,file=$(bootimage) \
+	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
+	-smp 4 \
+	-serial mon:stdio \
+	-device isa-debug-exit
 endif
 ifeq ($(arch), riscv32)
-qemu_opts := -machine virt -kernel $(iso) -nographic
+qemu_opts := -machine virt -kernel $(bin) -nographic
 endif
 features := use_apic
 
@@ -61,11 +60,6 @@ ifeq ($(mode), release)
 build_args := $(build_args) --release
 endif
 
-ifeq ($(arch), x86_64)
-build_args := $(build_args) --lib
-endif
-
-
 ifeq ($(OS),Windows_NT)
 uname := Win32
 else
@@ -84,27 +78,29 @@ objdump := $(prefix)objdump
 cc := $(prefix)gcc
 as := $(prefix)as
 
-.PHONY: all clean run iso build asm doc justrun kernel
+.PHONY: all clean run build asm doc justrun
 
 all: $(kernel)
 
 clean:
-	@rm -r build target
+	@cargo clean
 
 doc:
 	@cargo rustdoc -- --document-private-items
 
-run: $(iso) justrun
+run: build justrun
 
 justrun:
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
-debug: $(iso)
+debug: $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
 
-iso: $(iso)
-
-build: iso
+ifeq ($(arch), x86_64)
+build: $(kernel)
+else
+build: $(bin)
+endif
 
 asm:
 	@$(objdump) -dS $(kernel) | less
@@ -112,18 +108,9 @@ asm:
 elf-h:
 	@$(objdump) -h $(kernel)
 
-build/x86_64/os.iso: $(kernel) $(grub_cfg)
-	@mkdir -p build/isofiles/boot/grub
-	@cp $(kernel) build/isofiles/boot/kernel.bin
-	@cp $(grub_cfg) build/isofiles/boot/grub
-	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
-	@rm -r build/isofiles
-
-build/riscv32/os.iso: kernel
-	@mkdir -p build/riscv32
-	@cp $(rust_lib) $(kernel)
+$(bin): $(kernel)
 ifdef board
-	@cp $(rust_lib) $@
+	@cp $(kernel) $@
 else
 	@cd ../riscv-pk && \
 	 mkdir -p build && \
@@ -133,22 +120,17 @@ else
 	 	--enable-logo \
 	 	--disable-fp-emulation \
 	 	--host=riscv64-unknown-elf \
-	 	--with-payload=$(abspath $(rust_lib)) && \
+	 	--with-payload=$(abspath $(kernel)) && \
 	 make && \
 	 cp bbl ../../kernel/$@
 endif
 
-$(kernel): kernel $(assembly_object_files) $(linker_script)
-	@$(ld) -n --gc-sections -T $(linker_script) -o $(kernel) \
-		$(assembly_object_files) target/x86_64-blog_os/$(mode)/libucore.a
-
-kernel:
-	@CC=$(cc) cargo xbuild $(build_args)
-
-# compile assembly files
-build/x86_64/boot/%.o: $(boot_src)/%.asm
-	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@
+$(kernel):
+ifeq ($(arch), x86_64)
+	@bootimage build $(build_args)
+else
+	@cargo xbuild $(build_args)
+endif
 
 # make user.o from binary files
 $(user_obj): $(user_bins)
