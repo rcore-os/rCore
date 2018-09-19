@@ -3,9 +3,6 @@ name = "ucore"
 version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
 
-[lib]
-crate-type = ["staticlib", "rlib"]
-
 [features]
 use_apic = []
 link_user_program = []
@@ -21,7 +18,7 @@ debug = true
 
 [dependencies]
 log = "0.4"
-spin = "0.4.8"
+spin = "0.4.9"
 once = "0.3.3"
 xmas-elf = "0.6"
 bitflags = "1.0"
@@ -35,7 +32,7 @@ ucore-process = { path = "../crate/process" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-multiboot2 = "0.7"
+bootloader = "0.3"
 x86_64 = "0.2.11"
 redox_syscall = "0.1"
 uart_16550 = "0.1"
@@ -43,6 +40,20 @@ uart_16550 = "0.1"
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv = { path = "../crate/riscv" }
 bbl = { path = "../crate/bbl" }
+
+[package.metadata.bootimage]
+default-target = "x86_64-blog_os.json"
+output = "target/x86_64-blog_os/bootimage.bin"
+minimum-image-size = 0      # The minimum output file size (in MiB)
+# The command invoked on `bootimage run`
+# (the "{}" will be replaced with the path to the bootable disk image)
+run-command = ["qemu-system-x86_64",
+    "-drive", "format=raw,file={}",
+    "-drive", "format=raw,file=../user/ucore32.img,media=disk,cache=writeback",
+    "-serial", "mon:stdio",
+    "-device", "isa-debug-exit",
+    "-smp", "4"
+]
 
 [build-dependencies]
 cc = "1.0"

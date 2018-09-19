@@ -231,11 +231,13 @@ impl InactivePageTable for InactivePageTable0 {
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
         let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut x86PageTable) };
+        // Kernel at 0xffff_ff00_0000_0000
+        // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
         let e510 = table[510].clone();
-        let e509 = table[509].clone();
+        let estack = table[175].clone();
         self.edit(|_| {
             table[510].set_addr(e510.addr(), e510.flags() | EF::GLOBAL);
-            table[509].set_addr(e509.addr(), e509.flags() | EF::GLOBAL);
+            table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
         });
     }
 }

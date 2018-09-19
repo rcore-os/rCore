@@ -2,16 +2,10 @@
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(alloc)]
-#![feature(const_unique_new, const_atomic_usize_new)]
-#![feature(unique)]
-#![feature(allocator_api)]
-#![feature(abi_x86_interrupt)]
-#![feature(iterator_step_by)]
-#![feature(unboxed_closures)]
 #![feature(naked_functions)]
 #![feature(asm)]
 #![feature(optin_builtin_traits)]
-#![feature(panic_implementation)]
+#![feature(panic_handler)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
@@ -66,14 +60,7 @@ pub mod arch;
 #[path = "arch/riscv32/mod.rs"]
 pub mod arch;
 
-/// The entry point of Rust kernel
-#[no_mangle]
-pub extern "C" fn rust_main() -> ! {
-    // ATTENTION: we have a very small stack and no guard page
-    println!("Hello World{}", "!");
-
-    logging::init();
-    arch::init();
+pub fn kmain() -> ! {
     process::init();
     unsafe { arch::interrupt::enable(); }
 

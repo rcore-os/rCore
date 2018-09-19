@@ -8,11 +8,14 @@ pub mod paging;
 pub mod memory;
 pub mod compiler_rt;
 
-pub fn init() {
+#[no_mangle]
+pub extern fn rust_main() -> ! {
     println!("Hello RISCV! {}", 123);
+    ::logging::init();
     interrupt::init();
     memory::init();
     timer::init();
+    ::kmain();
 }
 
 #[cfg(feature = "no_bbl")]

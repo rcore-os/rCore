@@ -7,7 +7,7 @@ pub fn init() {
 }
 
 pub fn get() -> i32 {
-	unsafe{ kbdgetc() }
+	0
 }
 
 extern {

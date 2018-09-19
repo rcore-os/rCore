@@ -22,7 +22,7 @@ In fact, it's more complicated than we expected to write an OS starting from scr
 
 ### Environment
 
-* Rust toolchain at nightly-2018-08-03
+* Rust toolchain at nightly-2018-09-03
 *  `cargo-xbuild`
 * `QEMU` >= 2.12.0
 * riscv32
@@ -37,6 +37,7 @@ In fact, it's more complicated than we expected to write an OS starting from scr
 ```bash
 git clone https://github.com/wangrunji0408/RustOS.git --recursive
 cd RustOS/kernel
+rustup override set nightly-2018-09-03
 make run arch=riscv32|x86_64
 # For FPGA: 
 # make run arch=riscv32 board=1

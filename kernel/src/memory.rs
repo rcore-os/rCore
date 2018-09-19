@@ -1,5 +1,5 @@
 pub use arch::paging::*;
-use bit_allocator::{BitAlloc, BitAlloc4K};
+use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K};
 use consts::MEMORY_OFFSET;
 use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
@@ -9,8 +9,16 @@ pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySe
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
+// x86_64 support up to 256M memory
+#[cfg(target_arch = "x86_64")]
+pub type FrameAlloc = BitAlloc64K;
+
+// RISCV only have 8M memory
+#[cfg(target_arch = "riscv32")]
+pub type FrameAlloc = BitAlloc4K;
+
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: Mutex<BitAlloc4K> = Mutex::new(BitAlloc4K::default());
+    pub static ref FRAME_ALLOCATOR: Mutex<FrameAlloc> = Mutex::new(FrameAlloc::default());
 }
 
 pub fn alloc_frame() -> Option<usize> {
@@ -52,8 +60,9 @@ pub fn page_fault_handler(addr: usize) -> bool {
 }
 
 pub fn init_heap() {
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    unsafe { HEAP_ALLOCATOR.lock().init(KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE); }
+    use consts::KERNEL_HEAP_SIZE;
+    static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+    unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
     info!("heap init end");
 }
 
