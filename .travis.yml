@@ -2,7 +2,7 @@ sudo: required
 
 language: rust
 
-rust: nightly-2018-08-03
+rust: nightly-2018-09-18
 
 cache:
   cargo: true
@@ -10,7 +10,6 @@ cache:
 addons:
   apt:
     packages:
-      - nasm
       - qemu
 
 env:
@@ -28,9 +27,8 @@ install:
 
 before_script:
   - rustup component add rust-src
-  - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)
-  - cargo install-update -a
+  - (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage)
 
 script:
   - cd kernel && make build arch=$ARCH

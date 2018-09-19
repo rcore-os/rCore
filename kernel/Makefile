@@ -38,7 +38,6 @@ endif
 ifeq ($(arch), riscv32)
 qemu_opts := -machine virt -kernel $(bin) -nographic
 endif
-features := use_apic
 
 ifdef board
 features := $(features) no_bbl
@@ -78,7 +77,7 @@ objdump := $(prefix)objdump
 cc := $(prefix)gcc
 as := $(prefix)as
 
-.PHONY: all clean run build asm doc justrun
+.PHONY: all clean run build asm doc justrun kernel
 
 all: $(kernel)
 
@@ -97,7 +96,7 @@ debug: $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
 
 ifeq ($(arch), x86_64)
-build: $(kernel)
+build: kernel
 else
 build: $(bin)
 endif
@@ -108,7 +107,7 @@ asm:
 elf-h:
 	@$(objdump) -h $(kernel)
 
-$(bin): $(kernel)
+$(bin): kernel
 ifdef board
 	@cp $(kernel) $@
 else
@@ -125,7 +124,7 @@ else
 	 cp bbl ../../kernel/$@
 endif
 
-$(kernel):
+kernel:
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 else

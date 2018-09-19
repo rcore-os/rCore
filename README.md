@@ -22,22 +22,22 @@ In fact, it's more complicated than we expected to write an OS starting from scr
 
 ### Environment
 
-* Rust toolchain at nightly-2018-09-03
-*  `cargo-xbuild`
-* `QEMU` >= 2.12.0
-* riscv32
-  * RISCV64 GNU toolchain
-* x86_64
-  * `nasm`
-  * `grub-mkrescue`
-  * `xorriso`
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2018-09-18
+* Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild), [bootimage](https://github.com/rust-osdev/bootimage)
+* QEMU >= 2.12.0
+* [RISCV64 GNU toolchain](https://www.sifive.com/products/tools/) (for riscv32)
 
 ### How to run
 
 ```bash
+rustup component add rust-src
+cargo install cargo-xbuild bootimage
+```
+
+```bash
 git clone https://github.com/wangrunji0408/RustOS.git --recursive
 cd RustOS/kernel
-rustup override set nightly-2018-09-03
+rustup override set nightly-2018-09-18
 make run arch=riscv32|x86_64
 # For FPGA: 
 # make run arch=riscv32 board=1
