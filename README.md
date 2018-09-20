@@ -4,6 +4,8 @@
 
 Rust port for uCore OS, supporting x86_64 and riscv32i.
 
+[Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
+
 ## Summary
 
 This is a project of THU Operating System (2018 Spring) && Comprehensive Experiment of Computer System (2018 Summer).
