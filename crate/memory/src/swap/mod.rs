@@ -135,7 +135,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> DerefMut for SwapExt<T, M, S> {
 mod test {
     use super::*;
     use super::mock_swapper::MockSwapper;
-    use alloc::{arc::Arc, boxed::Box};
+    use alloc::{sync::Arc, boxed::Box};
     use core::cell::RefCell;
     use paging::MockPageTable;
 

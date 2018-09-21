@@ -133,7 +133,7 @@ impl MockPageTable {
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloc::arc::Arc;
+    use alloc::sync::Arc;
     use core::cell::RefCell;
 
     #[test]
