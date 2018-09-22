@@ -33,8 +33,6 @@ pub struct Processor_<T: Context, S: Scheduler> {
     procs: BTreeMap<Pid, Process<T>>,
     current_pid: Pid,
     event_hub: EventHub<Event>,
-    /// Choose what on next schedule ?
-    next: Option<Pid>,
     // WARNING: if MAX_PROCESS_NUM is too large, will cause stack overflow
     scheduler: S,
 }
@@ -65,7 +63,6 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
             },
             current_pid: 0,
             event_hub: EventHub::new(),
-            next: None,
             scheduler,
         }
     }
@@ -74,7 +71,7 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         self.scheduler.set_priority(self.current_pid, priority);
     }
 
-    pub fn set_reschedule(&mut self) {
+    pub fn yield_now(&mut self) {
         let pid = self.current_pid;
         self.set_status(pid, Status::Ready);
     }
@@ -108,7 +105,7 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
     pub fn tick(&mut self) {
         let current_pid = self.current_pid;
         if self.scheduler.tick(current_pid) {
-            self.set_reschedule();
+            self.yield_now();
         }
         self.event_hub.tick();
         while let Some(event) = self.event_hub.pop() {
@@ -116,12 +113,12 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
             match event {
                 Event::Schedule => {
                     self.event_hub.push(10, Event::Schedule);
-                    self.set_reschedule();
+                    self.yield_now();
                 },
                 Event::Wakeup(pid) => {
                     self.set_status(pid, Status::Ready);
-                    self.set_reschedule();
-                    self.next = Some(pid);
+                    self.yield_now();
+                    self.scheduler.move_to_head(pid);
                 },
             }
         }
@@ -150,13 +147,13 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         if self.get(self.current_pid).status == Status::Running {
             return;
         }
-        let pid = self.next.take().unwrap_or_else(|| self.scheduler.select().unwrap());
+        let pid = self.scheduler.select().unwrap();
         self.switch_to(pid);
     }
 
-    /// Switch process to `pid`, switch page table if necessary.
-    /// Store `rsp` and point it to target kernel stack.
+    /// Switch to process `pid`.
     /// The current status must be set before, and not be `Running`.
+    /// The target status must be `Ready`.
     fn switch_to(&mut self, pid: Pid) {
         // for debug print
         let pid0 = self.current_pid;
@@ -203,7 +200,7 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         if let Some(waiter) = self.find_waiter(pid) {
             info!("  then wakeup {}", waiter);
             self.set_status(waiter, Status::Ready);
-            self.next = Some(waiter);
+            self.scheduler.move_to_head(waiter);
         }
     }
 

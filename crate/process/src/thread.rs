@@ -107,7 +107,7 @@ impl<S: ThreadSupport> ThreadMod<S> {
     pub fn yield_now() {
         info!("yield:");
         let mut processor = S::processor();
-        processor.set_reschedule();
+        processor.yield_now();
         processor.schedule();
     }
 

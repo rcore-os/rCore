@@ -9,6 +9,7 @@ pub trait Scheduler {
     fn select(&mut self) -> Option<Pid>;
     fn tick(&mut self, current: Pid) -> bool;   // need reschedule?
     fn set_priority(&mut self, pid: Pid, priority: u8);
+    fn move_to_head(&mut self, pid: Pid);
 }
 
 pub use self::rr::RRScheduler;
@@ -79,6 +80,14 @@ mod rr {
 
         fn set_priority(&mut self, pid: usize, priority: u8) {
         }
+
+        fn move_to_head(&mut self, pid: usize) {
+            let pid = pid + 1;
+            assert!(self.infos[pid].present);
+            self._list_remove(pid);
+            self._list_add_after(pid, 0);
+            trace!("rr move_to_head {}", pid - 1);
+        }
     }
 
     impl RRScheduler {
@@ -94,6 +103,10 @@ mod rr {
             self.infos[i].prev = prev;
             self.infos[prev].next = i;
             self.infos[at].prev = i;
+        }
+        fn _list_add_after(&mut self, i: Pid, at: Pid) {
+            let next = self.infos[at].next;
+            self._list_add_before(i, next);
         }
         fn _list_remove(&mut self, i: Pid) {
             let next = self.infos[i].next;
@@ -156,13 +169,17 @@ mod stride {
             let info = &mut self.infos[pid];
             assert!(info.present);
             info.present = false;
-            // BinaryHeap only support pop the top.
-            // So in order to remove an arbitrary element,
-            // we have to take all elements into a Vec,
-            // then push the rest back.
-            let rest: Vec<_> = self.queue.drain().filter(|&p| p.1 != pid).collect();
-            use core::iter::FromIterator;
-            self.queue = BinaryHeap::from_iter(rest.into_iter());
+            if self.queue.peek().is_some() && self.queue.peek().unwrap().1 == pid {
+                self.queue.pop();
+            } else {
+                // BinaryHeap only support pop the top.
+                // So in order to remove an arbitrary element,
+                // we have to take all elements into a Vec,
+                // then push the rest back.
+                let rest: Vec<_> = self.queue.drain().filter(|&p| p.1 != pid).collect();
+                use core::iter::FromIterator;
+                self.queue = BinaryHeap::from_iter(rest.into_iter());
+            }
             trace!("stride remove {}", pid);
         }
 
@@ -194,6 +211,15 @@ mod stride {
         fn set_priority(&mut self, pid: Pid, priority: u8) {
             self.infos[pid].priority = priority;
             trace!("stride {} priority = {}", pid, priority);
+        }
+
+        fn move_to_head(&mut self, pid: Pid) {
+            if self.queue.peek().is_some() {
+                let stride = -self.queue.peek().unwrap().0;
+                self.remove(pid);
+                self.infos[pid].stride = stride;
+                self.insert(pid);
+            }
         }
     }
 
