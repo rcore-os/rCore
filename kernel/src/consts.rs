@@ -8,6 +8,7 @@ pub use self::x86_64::*;
 pub const MAX_CPU_NUM: usize = 8;
 pub const MAX_PROCESS_NUM: usize = 48;
 
+// Memory address for riscv32
 #[cfg(target_arch = "riscv32")]
 mod riscv {
     // Physical address available on THINPAD:
@@ -26,6 +27,7 @@ mod riscv {
     pub const USER32_STACK_OFFSET: usize = USER_STACK_OFFSET;
 }
 
+// Memory address for x86_64
 #[cfg(target_arch = "x86_64")]
 mod x86_64 {
     // Copy from Redox consts.rs:

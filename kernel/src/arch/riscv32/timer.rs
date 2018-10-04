@@ -26,12 +26,14 @@ pub fn init() {
     info!("timer: init end");
 }
 
+// set the next timer interrupt
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;
     set_timer(get_cycle() + timebase);
 }
 
+// set time for timer interrupt
 fn set_timer(t: u64) {
     #[cfg(feature = "no_bbl")]
     unsafe {
