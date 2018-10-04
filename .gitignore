@@ -1,3 +1,8 @@
 build
 target
 /kernel/src/arch/x86_64/interrupt/vector.asm
+/crate/bit-allocator/Cargo.lock
+/crate/memory/Cargo.lock
+/crate/bbl/Cargo.lock
+/crate/sync/Cargo.lock
+/crate/process/Cargo.lock
