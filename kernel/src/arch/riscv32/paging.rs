@@ -10,6 +10,12 @@ use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 
+/*
+* @param:
+*   Frame: page table root frame
+* @brief:
+*   setup page table in the frame 
+*/
 // need 1 page
 pub fn setup_page_table(frame: Frame) {
     let p2 = unsafe { &mut *(frame.start_address().as_u32() as *mut RvPageTable) };
