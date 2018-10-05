@@ -2,18 +2,51 @@ use alloc::{collections::BinaryHeap, vec::Vec};
 
 type Pid = usize;
 
-///
+
+//  implements of process scheduler
 pub trait Scheduler {
+
+    /*
+    **  @brief  add a new process
+    **  @param  pid: Pid            the pid of the process to add
+    **  @retval none
+    */
     fn insert(&mut self, pid: Pid);
+
+    /*
+    **  @brief  remove a processs from the list
+    **  @param  pid: Pid            the pid of the process to remove
+    **  @retval none
+    */
     fn remove(&mut self, pid: Pid);
+
+    /*
+    **  @brief  choose a process to run next
+    **  @param  none
+    **  @retval Option<Pid>         the pid of the process to run or none
+    */
     fn select(&mut self) -> Option<Pid>;
+
+    /*
+    **  @brief  when a clock interrupt occurs, update the list and check whether need to reschedule
+    **  @param  current: Pid        the pid of the process which is running now
+    **  @retval bool                if need to reschedule
+    */
     fn tick(&mut self, current: Pid) -> bool;   // need reschedule?
+
+    /*
+    **  @brief  set the priority of the process
+    **  @param  pid: Pid            the pid of the process to be set
+    **          priority: u8        the priority to be set
+    **  @retval none
+    */
     fn set_priority(&mut self, pid: Pid, priority: u8);
 }
 
 pub use self::rr::RRScheduler;
 pub use self::stride::StrideScheduler;
 
+//  use round-robin scheduling
 mod rr {
     use super::*;
 
@@ -106,6 +139,7 @@ mod rr {
     }
 }
 
+// use stride scheduling
 mod stride {
     use super::*;
 

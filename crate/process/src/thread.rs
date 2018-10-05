@@ -50,7 +50,11 @@ pub struct ThreadMod<S: ThreadSupport> {
 }
 
 impl<S: ThreadSupport> ThreadMod<S> {
-    /// Gets a handle to the thread that invokes it.
+    /*
+    **  @brief  Gets a handle to the thread that invokes it.
+    **  @param  none
+    **  @retval the thread to get
+    */
     pub fn current() -> Thread<S> {
         Thread {
             pid: S::processor().current_pid(),
@@ -58,7 +62,11 @@ impl<S: ThreadSupport> ThreadMod<S> {
         }
     }
 
-    /// Puts the current thread to sleep for the specified amount of time.
+    /*
+    **  @brief  Puts the current thread to sleep for the specified amount of time.
+    **  @param  dur: Duration           the time to sleep
+    **  @retval none
+    */
     pub fn sleep(dur: Duration) {
         let time = dur_to_ticks(dur);
         info!("sleep: {:?} ticks", time);
@@ -72,7 +80,11 @@ impl<S: ThreadSupport> ThreadMod<S> {
         }
     }
 
-    /// Spawns a new thread, returning a JoinHandle for it.
+    /*
+    **  @brief  Spawns a new thread, returning a JoinHandle for it.
+    **  @param  f: F                    the thread to start
+    **  @retval JoinHandle              the JoinHandle of the new thread
+    */
     pub fn spawn<F, T>(f: F) -> JoinHandle<S, T>
         where
             F: Send + 'static + FnOnce() -> T,
@@ -103,7 +115,11 @@ impl<S: ThreadSupport> ThreadMod<S> {
         }
     }
 
-    /// Cooperatively gives up a timeslice to the OS scheduler.
+    /*
+    **  @brief  Cooperatively gives up a timeslice to the OS scheduler.
+    **  @param  none
+    **  @retval none
+    */
     pub fn yield_now() {
         info!("yield:");
         let mut processor = S::processor();
@@ -111,7 +127,11 @@ impl<S: ThreadSupport> ThreadMod<S> {
         processor.schedule();
     }
 
-    /// Blocks unless or until the current thread's token is made available.
+    /*
+    **  @brief  Blocks unless or until the current thread's token is made available.
+    **  @param  none
+    **  @retval none
+    */
     pub fn park() {
         info!("park:");
         let mut processor = S::processor();
@@ -128,12 +148,20 @@ pub struct Thread<S: ThreadSupport> {
 }
 
 impl<S: ThreadSupport> Thread<S> {
-    /// Atomically makes the handle's token available if it is not already.
+    /*
+    **  @brief  Atomically makes the handle's token available if it is not already.
+    **  @param  none
+    **  @retval none
+    */
     pub fn unpark(&self) {
         let mut processor = S::processor();
         processor.wakeup_(self.pid);
     }
-    /// Gets the thread's unique identifier.
+    /*
+    **  @brief  Gets the thread's unique identifier.
+    **  @param  none
+    **  @retval usize           the the thread's unique identifier
+    */
     pub fn id(&self) -> usize {
         self.pid
     }
@@ -146,11 +174,19 @@ pub struct JoinHandle<S: ThreadSupport, T> {
 }
 
 impl<S: ThreadSupport, T> JoinHandle<S, T> {
-    /// Extracts a handle to the underlying thread.
+    /*
+    **  @brief  Extracts a handle to the underlying thread.
+    **  @param  none
+    **  @retval the thread of the handle
+    */
     pub fn thread(&self) -> &Thread<S> {
         &self.thread
     }
-    /// Waits for the associated thread to finish.
+    /*
+    **  @brief  Waits for the associated thread to finish.
+    **  @param  none
+    **  @retval Result<T, ()>       the result of the associated thread
+    */
     pub fn join(self) -> Result<T, ()> {
         let mut processor = S::processor();
         match processor.current_wait_for(self.thread.pid) {
