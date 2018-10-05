@@ -1,3 +1,5 @@
+//! solve the five philosophers problem with monitor
+
 use std::thread;
 use std::sync::{Mutex, Condvar, Arc};
 use std::time::Duration;
@@ -51,6 +53,7 @@ struct Table {
     fork_condvar: Vec<Condvar>,
 }
 
+// the main function to test
 pub fn main() {
     let table = Arc::new(Table {
         fork_status: Mutex::new(vec![false; 5]),
