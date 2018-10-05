@@ -11,6 +11,7 @@ pub struct TrapFrame {
 }
 
 /// 用于在内核栈中构造新线程的中断帧
+/// The trapframe for building new process in kernel
 impl TrapFrame {
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;

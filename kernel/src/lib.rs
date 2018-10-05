@@ -61,16 +61,20 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
+    // Init the first kernel process(idle proc)
     process::init();
+    // enable the interrupt
     unsafe { arch::interrupt::enable(); }
 
-    fs::shell();
+    // the test is not supported in riscv32(maybe)
+    //thread::test::local_key();
+    //thread::test::unpack();
+    //sync::test::philosopher_using_mutex();
+    //sync::test::philosopher_using_monitor();
+    //sync::mpsc::test::test_all();
 
-//    thread::test::local_key();
-//    thread::test::unpack();
-//    sync::test::philosopher_using_mutex();
-//    sync::test::philosopher_using_monitor();
-//    sync::mpsc::test::test_all();
+    // come into shell
+    fs::shell();
 
     loop {}
 }

@@ -226,7 +226,7 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         to.status = Status::Running;
         self.scheduler.remove(pid);
 
-        info!("switch from {} to {} {:x?}", pid0, pid, to.context);
+        //info!("switch from {} to {} {:x?}", pid0, pid, to.context);
         unsafe { from.context.switch(&mut to.context); }
     }
 

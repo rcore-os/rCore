@@ -9,6 +9,10 @@ mod context;
 
 type Processor = Processor_<Context, StrideScheduler>;
 
+/*
+* @brief:
+*   initialize a new kernel process (idleproc)
+*/
 pub fn init() {
     PROCESSOR.call_once(||
         SpinNoIrqLock::new({
