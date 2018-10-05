@@ -1,6 +1,10 @@
 use process::*;
 use arch::interrupt::TrapFrame;
 
+/*
+* @brief:
+*   process timer interrupt
+*/
 pub fn timer() {
     let mut processor = processor();
     processor.tick();
@@ -12,6 +16,12 @@ pub fn before_return() {
     }
 }
 
+/*
+* @param: 
+*   TrapFrame: the error's trapframe
+* @brief: 
+*   process the error trap, if processor inited then exit else panic!
+*/
 pub fn error(tf: &TrapFrame) -> ! {
     if let Some(processor) = PROCESSOR.try() {
         let mut processor = processor.lock();
