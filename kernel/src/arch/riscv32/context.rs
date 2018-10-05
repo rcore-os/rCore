@@ -103,6 +103,7 @@ struct ContextData {
 
 impl ContextData {
     fn new(satp: usize) -> Self {
+        // satp(asid) just like cr3, save the physical address for Page directory?  
         ContextData { ra: __trapret as usize, satp, ..ContextData::default() }
     }
 }
@@ -177,24 +178,59 @@ impl Context {
         Context(0)
     }
 
-    
+    /*
+    * @param:
+    *   entry: program entry for the thread
+    *   arg: a0
+    *   kstack_top: kernel stack top
+    *   cr3: cr3 register, save the physical address of Page directory
+    * @brief:
+    *   generate the content of kernel stack for the new kernel thread and save it's address at kernel stack top - 1
+    * @retval:
+    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
+    */
     pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top)
     }
+
+    /*
+    * @param:
+    *   entry_addr: program entry for the thread
+    *   ustack_top: user stack top
+    *   kstack_top: kernel stack top
+    *   is32: whether the cpu is 32 bit or not
+    *   cr3: cr3 register, save the physical address of Page directory
+    * @brief:
+    *   generate the content of kernel stack for the new user thread and save it's address at kernel stack top - 1
+    * @retval:
+    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
+    */
     pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
         }.push_at(kstack_top)
     }
+
+    /*
+    * @param:
+    *   TrapFrame: the trapframe of the forked process(thread)
+    *   kstack_top: kernel stack top
+    *   cr3: cr3 register, save the physical address of Page directory
+    * @brief: 
+    *   fork and generate a new process(thread) Context according to the TrapFrame and save it's address at kernel stack top - 1
+    * @retval: 
+    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
+    */
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: {
                 let mut tf = tf.clone();
+                // fork function's ret value, the new process is 0
                 tf.x[10] = 0; // a0
                 tf
             },
