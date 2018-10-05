@@ -1,3 +1,5 @@
+//! solve the five philosophers problem with mutex
+
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::time::Duration;
@@ -35,6 +37,7 @@ struct Table {
     forks: Vec<Mutex<()>>,
 }
 
+// the main function to test
 pub fn main() {
     let table = Arc::new(Table {
         forks: vec![
