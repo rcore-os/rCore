@@ -3,44 +3,69 @@ use super::super::riscv::register::*;
 #[derive(Debug, Clone)]
 #[repr(C)]
 pub struct TrapFrame {
-    pub x: [usize; 32],
-    pub sstatus: sstatus::Sstatus,
-    pub sepc: usize,
-    pub sbadaddr: usize,
-    pub scause: scause::Scause,
+    pub x: [usize; 32], // general registers
+    pub sstatus: sstatus::Sstatus, // Supervisor Status Register
+    pub sepc: usize, // Supervisor exception program counter (here is used to save the process program entry addr?)
+    pub sbadaddr: usize, // Supervisor bad address
+    pub scause: scause::Scause, // scause register: record the cause of exception/interrupt/trap
 }
 
-/// 用于在内核栈中构造新线程的中断帧
-/// The trapframe for building new process in kernel
+/// Generate the trapframe for building new thread in kernel
 impl TrapFrame {
+    /*
+    * @param:
+    *   entry: program entry for the thread
+    *   arg: a0
+    *   sp: stack top
+    * @brief:
+    *   generate a trapfram for building a new kernel thread
+    * @retval:
+    *   the trapframe for new kernel thread
+    */
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[10] = arg; // a0
-        tf.x[2] = sp;
+        tf.x[2] = sp; 
         tf.sepc = entry as usize;
         tf.sstatus = sstatus::read();
+        // Supervisor Previous Interrupt Enable
         tf.sstatus.set_spie(true);
+        // Supervisor Interrupt Disable
         tf.sstatus.set_sie(false);
+        // Supervisor Previous Privilege Mode is Supervisor
         tf.sstatus.set_spp(sstatus::SPP::Supervisor);
         tf
     }
+
+    /*
+    * @param:
+    *   entry_addr: program entry for the thread
+    *   sp: stack top
+    * @brief:
+    *   generate a trapfram for building a new user thread
+    * @retval:
+    *   the trapframe for new user thread
+    */
     fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[2] = sp;
         tf.sepc = entry_addr;
         tf.sstatus = sstatus::read();
+        // Supervisor Previous Interrupt Disable ?
         tf.sstatus.set_spie(false);     // Enable interrupt
+        // Supervisor Previous Privilege Mode is User
         tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }
+
     pub fn is_user(&self) -> bool {
         unimplemented!()
     }
 }
 
-/// 新线程的内核栈初始内容
+/// kernel stack contents for a new thread 
 #[derive(Debug)]
 #[repr(C)]
 pub struct InitStack {
@@ -49,8 +74,16 @@ pub struct InitStack {
 }
 
 impl InitStack {
+    /*
+    * @param:
+    *   stack_top: the pointer to kernel stack stop
+    * @brief:
+    *   save the InitStack on the kernel stack stop
+    * @retval:
+    *   a Context with ptr in it
+    */
     unsafe fn push_at(self, stack_top: usize) -> Context {
-        let ptr = (stack_top as *mut Self).offset(-1);
+        let ptr = (stack_top as *mut Self).offset(-1); //real kernel stack top
         *ptr = self;
         Context(ptr as usize)
     }
@@ -74,6 +107,7 @@ impl ContextData {
     }
 }
 
+/// A struct only contain one usize element
 #[derive(Debug)]
 pub struct Context(usize);
 
@@ -133,10 +167,17 @@ impl Context {
         : : : : "volatile" )
     }
 
+    /*
+    * @brief:
+    *   generate a null Context
+    * @retval:
+    *   a null Context
+    */
     pub unsafe fn null() -> Self {
         Context(0)
     }
 
+    
     pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
