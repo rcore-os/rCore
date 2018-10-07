@@ -1,11 +1,19 @@
 use super::riscv::register::*;
 use super::bbl::sbi;
 
+/*
+* @brief: 
+*   get timer cycle for 64 bit cpu
+*/ 
 #[cfg(target_pointer_width = "64")]
 pub fn get_cycle() -> u64 {
     time::read() as u64
 }
 
+/*
+* @brief: 
+*   get timer cycle for 32 bit cpu
+*/ 
 #[cfg(target_pointer_width = "32")]
 pub fn get_cycle() -> u64 {
     loop {
@@ -18,6 +26,10 @@ pub fn get_cycle() -> u64 {
     }
 }
 
+/*
+* @brief: 
+*   enable supervisor timer interrupt and set next timer interrupt
+*/
 pub fn init() {
     // Enable supervisor timer interrupt
     unsafe { sie::set_stimer(); }
@@ -26,14 +38,20 @@ pub fn init() {
     info!("timer: init end");
 }
 
-// set the next timer interrupt
+/*
+* @brief: 
+*   set the next timer interrupt
+*/
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;
     set_timer(get_cycle() + timebase);
 }
 
-// set time for timer interrupt
+/*
+* @brief: 
+*   set time for timer interrupt
+*/
 fn set_timer(t: u64) {
     #[cfg(feature = "no_bbl")]
     unsafe {

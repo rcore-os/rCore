@@ -42,10 +42,22 @@ pub struct PageEntry(PageTableEntry);
 impl PageTable for ActivePageTable {
     type Entry = PageEntry;
 
+    /*
+    * @param: 
+    *   addr: the virtual addr to be matched
+    *   target: the physical addr to be matched with addr
+    * @brief: 
+    *   map the virtual address 'addr' to the physical address 'target' in pagetable.
+    * @retval: 
+    *   the matched PageEntry
+    */
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
+        // the flag for the new page entry
         let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
+        // here page is for the virtual address while frame is for the physical, both of them is 4096 bytes align
         let page = Page::of_addr(VirtAddr::new(addr));
         let frame = Frame::of_addr(PhysAddr::new(target as u32));
+        // map the page to the frame using FrameAllocatorForRiscv
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap().flush();
         self.get_entry(addr)

@@ -3,6 +3,10 @@ use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, M
 use super::riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 
+/*
+* @brief:
+*   Init the mermory management module, allow memory access and set up page table and init heap and frame allocator
+*/
 pub fn init() {
     #[repr(align(4096))]  // align the PageData struct to 4096 bytes
     struct PageData([u8; PAGE_SIZE]);
@@ -17,6 +21,10 @@ pub fn init() {
     init_heap();
 }
 
+/*
+* @brief: 
+*   Init frame allocator, here use a BitAlloc implemented by segment tree.
+*/
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
@@ -44,6 +52,10 @@ fn init_frame_allocator() {
     }
 }
 
+/*
+* @brief: 
+*   remmap the kernel memory address
+*/
 fn remap_the_kernel() {
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     // set up kernel stack
