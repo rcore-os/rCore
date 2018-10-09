@@ -10,12 +10,28 @@ pub struct Page {
 }
 
 impl Page {
+    /*
+    **  @brief  get the virtual address of beginning of the page
+    **  @retval VirtAddr             the virtual address of beginning of the page
+    */
     pub fn start_address(&self) -> VirtAddr {
         self.number * PAGE_SIZE
     }
+    /*
+    **  @brief  get the page of a given virtual address
+    **  @param  addr: VirtAddr       the given virtual address
+    **  @retval Page                 the page of the given virtual address
+    */
     pub fn of_addr(addr: VirtAddr) -> Self {
         Page { number: addr / PAGE_SIZE }
     }
+
+    /*
+    **  @brief  get a pageRange between two virtual address
+    **  @param  begin: VirtAddr      the virtual address of the beginning
+    **  @param  end: VirtAddr        the virtual address of the end
+    **  @retval PageRange            the page of the given virtual address
+    */
     pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange {
         PageRange {
             start: Page::of_addr(begin),

@@ -1,15 +1,22 @@
+//! Mock Page Table
+//!
+//! An mock implementation for the PageTable.
+//! Used to test page table operation.
+
 use alloc::boxed::Box;
 use super::*;
 
 const PAGE_COUNT: usize = 16;
 const PAGE_SIZE: usize = 4096;
 
+// a mock page table for test purpose
 pub struct MockPageTable {
     entries: [MockEntry; PAGE_COUNT],
     data: [u8; PAGE_SIZE * PAGE_COUNT],
     page_fault_handler: Option<PageFaultHandler>,
 }
 
+// the entry of the mock page table
 #[derive(Default, Copy, Clone)]
 pub struct MockEntry {
     target: PhysAddr,
@@ -90,6 +97,10 @@ impl PageTable for MockPageTable {
 }
 
 impl MockPageTable {
+    /*
+    **  @brief  create a new MockPageTable
+    **  @retval MockPageTable        the mock page table created
+    */
     pub fn new() -> Self {
         use core::mem::uninitialized;
         MockPageTable {
@@ -98,9 +109,22 @@ impl MockPageTable {
             page_fault_handler: None,
         }
     }
+    /*
+    **  @brief  set the page fault handler
+    **          used for mock the page fault feature
+    **  @param  page_fault_handler: PageFaultHandler
+    **                               the page fault handler
+    **  @retval none
+    */
     pub fn set_handler(&mut self, page_fault_handler: PageFaultHandler) {
         self.page_fault_handler = Some(page_fault_handler);
     }
+    /*
+    **  @brief  trigger page fault
+    **          used for mock the page fault feature
+    **  @param  addr: VirtAddr       the virtual address used to trigger the page fault
+    **  @retval none
+    */
     fn trigger_page_fault(&mut self, addr: VirtAddr) {
         // In order to call the handler with &mut self as an argument
         // We have to first take the handler out of self, finally put it back
@@ -108,6 +132,12 @@ impl MockPageTable {
         handler(self, addr);
         self.page_fault_handler = Some(handler);
     }
+    /*
+    **  @brief  translate virtual address to physics address
+    **          used for mock address translation feature
+    **  @param  addr: VirtAddr       the virtual address to translation
+    **  @retval PhysAddr             the translation result
+    */
     fn translate(&self, addr: VirtAddr) -> PhysAddr {
         let entry = &self.entries[addr / PAGE_SIZE];
         assert!(entry.present);
@@ -115,12 +145,24 @@ impl MockPageTable {
         assert!(pa < self.data.len(), "Physical memory access out of range");
         pa
     }
+    /*
+    **  @brief  attempt to read the virtual address
+    **          trigger page fault when failed
+    **  @param  addr: VirtAddr       the virual address of data to read
+    **  @retval none
+    */
     fn _read(&mut self, addr: VirtAddr) {
         while !self.entries[addr / PAGE_SIZE].present {
             self.trigger_page_fault(addr);
         }
         self.entries[addr / PAGE_SIZE].accessed = true;
     }
+    /*
+    **  @brief  attempt to write the virtual address
+    **          trigger page fault when failed
+    **  @param  addr: VirtAddr       the virual address of data to write
+    **  @retval none
+    */
     fn _write(&mut self, addr: VirtAddr) {
         while !(self.entries[addr / PAGE_SIZE].present && self.entries[addr / PAGE_SIZE].writable) {
             self.trigger_page_fault(addr);

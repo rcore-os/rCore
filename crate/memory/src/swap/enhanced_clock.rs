@@ -1,3 +1,5 @@
+//! Implememnt the swap manager with the enhanced clock page replacement algorithm
+
 use alloc::collections::VecDeque;
 use super::*;
 use paging::Entry;
