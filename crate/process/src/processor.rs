@@ -50,6 +50,13 @@ impl<T> Process<T> {
 
 // TODO: 除schedule()外的其它函数，应该只设置进程状态，不应调用schedule
 impl<T: Context, S: Scheduler> Processor_<T, S> {
+
+    /*
+    **  @brief  create a new Processor
+    **  @param  init_context: T         initiate context
+    **          scheduler: S            the scheduler to use
+    **  @retval the Processor created
+    */
     pub fn new(init_context: T, scheduler: S) -> Self {
         let init_proc = Process {
             pid: 0,
@@ -70,15 +77,30 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         }
     }
 
+    /*
+    **  @brief  set the priority of current process
+    **  @param  priority: u8            the priority to set
+    **  @retval none
+    */
     pub fn set_priority(&mut self, priority: u8) {
         self.scheduler.set_priority(self.current_pid, priority);
     }
 
+    /*
+    **  @brief  mark the current process to reschedule
+    **  @param  none
+    **  @retval none
+    */
     pub fn set_reschedule(&mut self) {
         let pid = self.current_pid;
         self.set_status(pid, Status::Ready);
     }
 
+    /*
+    **  @brief  allocate the pid of the process
+    **  @param  none
+    **  @retval the pid allocated
+    */
     fn alloc_pid(&self) -> Pid {
         let mut next: Pid = 0;
         for &i in self.procs.keys() {
@@ -91,6 +113,12 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         return next;
     }
 
+    /*
+    **  @brief  set the status of the process
+    **  @param  pid: Pid            the pid of process which needs to be set
+    **          status: Status      the status to be set
+    **  @retval none
+    */
     fn set_status(&mut self, pid: Pid, status: Status) {
         let status0 = self.get(pid).status.clone();
         match (&status0, &status) {
@@ -103,8 +131,12 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         self.get_mut(pid).status = status;
     }
 
-    /// Called by timer.
-    /// Handle events.
+    /*
+    **  @brief  Called by timer.
+    **          Handle events.
+    **  @param  none
+    **  @retval none
+    */
     pub fn tick(&mut self) {
         let current_pid = self.current_pid;
         if self.scheduler.tick(current_pid) {
@@ -127,10 +159,20 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         }
     }
 
+    /*
+    **  @brief  get now time
+    **  @param  none
+    **  @retval the time got
+    */
     pub fn get_time(&self) -> usize {
         self.event_hub.get_time()
     }
 
+    /*
+    **  @brief  add a new process
+    **  @param  context: T      the context fo the process
+    **  @retval the pid of new process
+    */
     pub fn add(&mut self, context: T) -> Pid {
         let pid = self.alloc_pid();
         let process = Process {
@@ -144,8 +186,12 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         pid
     }
 
-    /// Called every interrupt end
-    /// Do schedule ONLY IF current status != Running
+    /*
+    **  @brief  Called every interrupt end
+    **          Do schedule ONLY IF current status != Running
+    **  @param  none
+    **  @retval none
+    */
     pub fn schedule(&mut self) {
         if self.get(self.current_pid).status == Status::Running {
             return;
@@ -154,9 +200,13 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         self.switch_to(pid);
     }
 
-    /// Switch process to `pid`, switch page table if necessary.
-    /// Store `rsp` and point it to target kernel stack.
-    /// The current status must be set before, and not be `Running`.
+    /*
+    **  @brief  Switch process to `pid`, switch page table if necessary.
+                Store `rsp` and point it to target kernel stack.
+                The current status must be set before, and not be `Running`.
+    **  @param  the pid of the process to switch
+    **  @retval none
+    */
     fn switch_to(&mut self, pid: Pid) {
         // for debug print
         let pid0 = self.current_pid;
@@ -176,27 +226,61 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         to.status = Status::Running;
         self.scheduler.remove(pid);
 
-        info!("switch from {} to {} {:x?}", pid0, pid, to.context);
+        //info!("switch from {} to {} {:x?}", pid0, pid, to.context);
         unsafe { from.context.switch(&mut to.context); }
     }
 
+    /*
+    **  @brief  get process by pid
+    **  @param  pid: Pid        the pid of the process
+    **  @retval the process struct
+    */
     fn get(&self, pid: Pid) -> &Process<T> {
         self.procs.get(&pid).unwrap()
     }
+
+    /*
+    **  @brief  get mut process struct by pid
+    **  @param  pid: Pid        the pid of the process
+    **  @retval the mut process struct
+    */
     fn get_mut(&mut self, pid: Pid) -> &mut Process<T> {
         self.procs.get_mut(&pid).unwrap()
     }
+
+    /*
+    **  @brief  get context of current process
+    **  @param  none
+    **  @retval current context
+    */
     pub fn current_context(&self) -> &T {
         &self.get(self.current_pid).context
     }
+
+    /*
+    **  @brief  get pid of current process
+    **  @param  none
+    **  @retval current pid
+    */
     pub fn current_pid(&self) -> Pid {
         self.current_pid
     }
 
+    /*
+    **  @brief  kill a process by pid
+    **  @param  pid: Pid            the pid of the process to kill
+    **  @retval none
+    */
     pub fn kill(&mut self, pid: Pid) {
         self.exit(pid, 0x1000); // TODO: error code for killed
     }
 
+    /*
+    **  @brief  exit a process by pid
+    **  @param  pid: Pid                    the pid to exit
+    **          error_code: ErrorCode       the error code when exiting
+    **  @retval none
+    */
     pub fn exit(&mut self, pid: Pid, error_code: ErrorCode) {
         info!("{} exit, code: {}", pid, error_code);
         self.set_status(pid, Status::Exited(error_code));
@@ -207,18 +291,40 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         }
     }
 
+    /*
+    **  @brief  let a process to sleep for a while
+    **  @param  pid: Pid            the pid of the process to sleep
+    **          time: usize         the time to sleep
+    **  @retval none
+    */
     pub fn sleep(&mut self, pid: Pid, time: usize) {
         self.set_status(pid, Status::Sleeping);
         self.event_hub.push(time, Event::Wakeup(pid));
     }
+
+    /*
+    **  @brief  let a process to sleep until wake up
+    **  @param  pid: Pid            the pid of the process to sleep
+    **  @retval none
+    */
     pub fn sleep_(&mut self, pid: Pid) {
         self.set_status(pid, Status::Sleeping);
     }
+
+    /*
+    **  @brief  wake up al sleeping process
+    **  @param  pid: Pid            the pid of the process to wake up
+    **  @retval none
+    */
     pub fn wakeup_(&mut self, pid: Pid) {
         self.set_status(pid, Status::Ready);
     }
 
-    /// Let current process wait for another
+    /*
+    **  @brief  Let current process wait for another
+    **  @param  pid: Pid            the pid of the process to wait for
+    **  @retval the result of wait
+    */
     pub fn current_wait_for(&mut self, pid: Pid) -> WaitResult {
         info!("current {} wait for {:?}", self.current_pid, pid);
         if self.procs.values().filter(|&p| p.parent == self.current_pid).next().is_none() {
@@ -236,7 +342,11 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         WaitResult::Ok(pid, exit_code)
     }
 
-    /// Try to find a exited wait target
+    /*
+    **  @brief  Try to find a exited wait target
+    **  @param  pid: Pid            the pid of the process to wait for
+    **  @retval the pid found or none
+    */
     fn try_wait(&mut self, pid: Pid) -> Option<Pid> {
         match pid {
             0 => self.procs.values()
@@ -246,6 +356,11 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         }
     }
 
+    /*
+    **  @brief  find one process which is waiting for the input process
+    **  @param  pid: Pid            the pid of the target process
+    **  @retval the pid of the waiting process or none
+    */
     fn find_waiter(&self, pid: Pid) -> Option<Pid> {
         self.procs.values().find(|&p| {
             p.status == Status::Waiting(pid) ||

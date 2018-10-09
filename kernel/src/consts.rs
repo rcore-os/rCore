@@ -8,14 +8,18 @@ pub use self::x86_64::*;
 pub const MAX_CPU_NUM: usize = 8;
 pub const MAX_PROCESS_NUM: usize = 48;
 
+// Memory address for riscv32
 #[cfg(target_arch = "riscv32")]
 mod riscv {
     // Physical address available on THINPAD:
     // [0x80000000, 0x80800000]
     const P2_SIZE: usize = 1 << 22;
     const P2_MASK: usize = 0x3ff << 22;
+    // RECURSIVE_PAGE_PML4 indicate the index of the self-maping entry in root pagetable
     pub const RECURSIVE_PAGE_PML4: usize = 0x3fe;
+    // KERNEL_OFFSET indicate (virtual kernel address - physical kernel address) ???
     pub const KERNEL_OFFSET: usize = 0;
+    // KERNEL_PML4 indicate the index of the kernel entry in root pagetable
     pub const KERNEL_PML4: usize = 0x8000_0000 >> 22;
     pub const KERNEL_HEAP_OFFSET: usize = 0x8020_0000;
     pub const KERNEL_HEAP_SIZE: usize = 0x0020_0000;
@@ -26,6 +30,7 @@ mod riscv {
     pub const USER32_STACK_OFFSET: usize = USER_STACK_OFFSET;
 }
 
+// Memory address for x86_64
 #[cfg(target_arch = "x86_64")]
 mod x86_64 {
     // Copy from Redox consts.rs:
