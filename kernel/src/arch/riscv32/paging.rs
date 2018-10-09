@@ -63,33 +63,71 @@ impl PageTable for ActivePageTable {
         self.get_entry(addr)
     }
 
+    /*
+    * @param: 
+    *   addr: virtual address of which the mapped physical frame should be unmapped
+    * @bridf: 
+    ^   unmap the virtual addresses' mapped physical frame
+    */
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
         let (frame, flush) = self.0.unmap(page).unwrap();
         flush.flush();
     }
 
+    /*
+    * @param: 
+    *   addr:input virtual address
+    * @brief: 
+    *   get the pageEntry of 'addr'
+    * @retval: 
+    *   a mutable PageEntry reference of 'addr'
+    */
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
         let page = Page::of_addr(VirtAddr::new(addr));
+        // ???
         let _ = self.0.translate_page(page);
         let entry_addr = ((addr >> 10) & 0x003ffffc) | (RECURSIVE_PAGE_PML4 << 22);
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }
 
+    /*
+    * @param: 
+    *   addr:the input (virutal) address
+    * @brief: 
+    *   get the addr's memory page slice 
+    * @retval: 
+    *   a mutable reference slice of 'addr' 's page  
+    */
     fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
         use core::slice;
         unsafe { slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE) }
     }
 
+    /*
+    * @param: 
+    *   addr: virtual address
+    * @brief: 
+    *   get the address's content
+    * @retval: 
+    *   the content(u8) of 'addr'
+    */
     fn read(&mut self, addr: usize) -> u8 {
         unsafe { *(addr as *const u8) }
     }
 
+    /*
+    * @param: 
+    *   addr: virtual address
+    * @brief: 
+    *   write the address's content
+    */
     fn write(&mut self, addr: usize, data: u8) {
         unsafe { *(addr as *mut u8) = data; }
     }
 }
 
+// define the ROOT_PAGE_TABLE, and the virtual address of it?
 const ROOT_PAGE_TABLE: *mut RvPageTable =
     (((RECURSIVE_PAGE_PML4 << 10) | (RECURSIVE_PAGE_PML4 + 1)) << 12) as *mut RvPageTable;
 

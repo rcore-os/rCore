@@ -67,6 +67,7 @@ pub unsafe fn restore(flags: usize) {
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt: {:?}", tf.scause.cause());
+    // page should be processed here but not now
     match tf.scause.cause() {
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
