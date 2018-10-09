@@ -46,4 +46,5 @@ ucoreOS lab基于x86结构，主要由C语言完成编写。x86架构由于其�
 
 ## 4 参考文献
 ucore OS lab实验指导书：https://objectkuan.gitbooks.io/ucore-docs/content/index.html
+
 王润基同学的Rust OS开发文档：https://rucore.gitbook.io/rust-os-docs/
