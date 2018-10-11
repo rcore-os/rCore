@@ -52,7 +52,14 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 
-// Return true to continue, false to halt
+/* 
+* @param:
+*   addr: the virtual address of the page fault
+* @brief: 
+*   handle page fault
+* @retval: 
+*   Return true to continue, false to halt  
+*/
 pub fn page_fault_handler(addr: usize) -> bool {
     // Handle copy on write
     unsafe { ACTIVE_TABLE.force_unlock(); }

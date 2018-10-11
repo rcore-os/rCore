@@ -72,6 +72,9 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
+        Trap::Exception(E::LoadPageFault) => page_fault(tf),
+        Trap::Exception(E::StoreFault) => page_fault(tf),
+        Trap::Exception(E::InstructionPageFault) => page_fault(tf),
         _ => ::trap::error(tf),
     }
     ::trap::before_return();
@@ -107,6 +110,24 @@ fn syscall(tf: &mut TrapFrame) {
 */
 fn illegal_inst(tf: &mut TrapFrame) {
     if !emulate_mul_div(tf) {
+        ::trap::error(tf);
+    }
+}
+
+/*
+* @param: 
+*   TrapFrame: the Trapframe for the page fault exception
+* @brief: 
+*   process page fault exception
+*/
+fn page_fault(tf: &mut TrapFrame) {
+    let addr: usize;
+    // move stval(i.e. sbadaddr) to addr
+    addr = stval::read();
+    error!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+
+    use memory::page_fault_handler;
+    if !page_fault_handler(addr) {
         ::trap::error(tf);
     }
 }
