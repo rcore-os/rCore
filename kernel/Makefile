@@ -12,11 +12,13 @@
 #   d    = int | in_asm | ...	QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
+#   smp                         SMP core number
 #   board 						Only available on riscv32, build without bbl, run on board
 
 arch ?= riscv32
 mode ?= debug
 LOG  ?= debug
+smp  ?= 1
 
 target := $(arch)-blog_os
 kernel := target/$(target)/$(mode)/ucore
@@ -31,12 +33,12 @@ ifeq ($(arch), x86_64)
 qemu_opts := \
 	-drive format=raw,file=$(bootimage) \
 	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
-	-smp 4 \
+	-smp $(smp) \
 	-serial mon:stdio \
 	-device isa-debug-exit
 endif
 ifeq ($(arch), riscv32)
-qemu_opts := -machine virt -kernel $(bin) -nographic
+qemu_opts := -machine virt -kernel $(bin) -nographic -smp cpus=$(smp)
 endif
 
 ifdef board
@@ -69,7 +71,7 @@ ifeq ($(uname), Darwin)
 prefix := x86_64-elf-
 endif
 ifeq ($(arch), riscv32)
-prefix := riscv64-unknown-elf-
+prefix := riscv32-unknown-elf-
 endif
 
 ld := $(prefix)ld
@@ -118,7 +120,7 @@ else
 	 	--enable-32bit \
 	 	--enable-logo \
 	 	--disable-fp-emulation \
-	 	--host=riscv64-unknown-elf \
+	 	--host=riscv32-unknown-elf \
 	 	--with-payload=$(abspath $(kernel)) && \
 	 make && \
 	 cp bbl ../../kernel/$@

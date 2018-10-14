@@ -7,10 +7,11 @@ pub mod timer;
 pub mod paging;
 pub mod memory;
 pub mod compiler_rt;
+pub mod smp;
 
 #[no_mangle]
-pub extern fn rust_main() -> ! {
-    println!("Hello RISCV! {}", 123);
+pub extern fn rust_main(hartid: usize) -> ! {
+    println!("Hello RISCV! {}", hartid);
     ::logging::init();
     interrupt::init();
     memory::init();
