@@ -12,6 +12,7 @@ pub mod idt;
 //pub mod smp;
 pub mod memory;
 pub mod io;
+pub mod consts;
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function

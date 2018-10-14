@@ -48,7 +48,7 @@ void boot_other_hart(uintptr_t unused __attribute__((unused)))
     }
   }
 
-  enter_supervisor_mode(entry, hartid, dtb_output());
+  enter_supervisor_mode(entry, hartid, dtb_output(), ~disabled_hart_mask & hart_mask);
 }
 
 void boot_loader(uintptr_t dtb)
