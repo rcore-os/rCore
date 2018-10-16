@@ -73,7 +73,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
         Trap::Exception(E::LoadPageFault) => page_fault(tf),
-        Trap::Exception(E::StoreFault) => page_fault(tf),
+        Trap::Exception(E::StorePageFault) => page_fault(tf),
         Trap::Exception(E::InstructionPageFault) => page_fault(tf),
         _ => ::trap::error(tf),
     }

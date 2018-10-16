@@ -13,10 +13,11 @@ use core::ops::{Deref, DerefMut};
 //pub use self::fifo::FifoSwapManager;
 pub use self::enhanced_clock::EnhancedClockSwapManager;
 
-mod fifo;
+pub mod fifo;
 mod enhanced_clock;
-#[cfg(test)]
-mod mock_swapper;
+pub mod mock_swapper;
+//#[cfg(test)]
+//mod mock_swapper;
 
 /// Manage all swappable pages, decide which to swap out
 pub trait SwapManager {
@@ -76,7 +77,7 @@ pub trait Swapper {
 }
 
 /// Wrapper for page table, supporting swap functions
-struct SwapExt<T: PageTable, M: SwapManager, S: Swapper> {
+pub struct SwapExt<T: PageTable, M: SwapManager, S: Swapper> {
     page_table: T,
     swap_manager: M,
     swapper: S,

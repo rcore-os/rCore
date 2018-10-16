@@ -4,7 +4,8 @@
 //! Used to test page table operation
 
 use super::Swapper;
-use alloc::btree_map::BTreeMap;
+//use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use core::mem::uninitialized;
 
 const PAGE_SIZE: usize = 4096;

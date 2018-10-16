@@ -6,6 +6,7 @@ use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
+use ucore_memory::swap::*;
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -52,6 +53,16 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 
+// Page table for swpa in and out
+lazy_static!{
+    static ref ACTIVE_TABLE_SWAP: Mutex<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> = 
+        Mutex::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
+}
+
+pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>>{
+    ACTIVE_TABLE_SWAP.lock()
+}
+
 /* 
 * @param:
 *   addr: the virtual address of the page fault
@@ -63,7 +74,15 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
 pub fn page_fault_handler(addr: usize) -> bool {
     // Handle copy on write
     unsafe { ACTIVE_TABLE.force_unlock(); }
-    active_table().page_fault_handler(addr, || alloc_frame().unwrap())
+    if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
+        return true;
+    }
+    // handle the swap in/out
+    unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
+    if active_table_swap().page_fault_handler(addr, || alloc_frame()){
+        return true;
+    }
+    false
 }
 
 pub fn init_heap() {
