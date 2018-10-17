@@ -53,6 +53,15 @@ pub use self::condvar::*;
 pub use self::mutex::*;
 pub use self::semaphore::*;
 
+#[allow(dead_code)]
+#[cfg(target_arch = "x86_64")]
+#[path = "arch/x86_64/atomic_lock.rs"]
+pub mod atomic_lock;
+
+#[cfg(target_arch = "riscv32")]
+#[path = "arch/riscv32/atomic_lock.rs"]
+pub mod atomic_lock;
+
 mod mutex;
 mod condvar;
 mod semaphore;

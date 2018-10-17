@@ -77,6 +77,7 @@ endif
 ld := $(prefix)ld
 objdump := $(prefix)objdump
 cc := $(prefix)gcc
+CC := $(cc)
 as := $(prefix)as
 
 .PHONY: all clean run build asm doc justrun kernel

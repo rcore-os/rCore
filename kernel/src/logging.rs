@@ -1,8 +1,10 @@
 use core::fmt;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
-use spin::Mutex;
+use sync::SpinLock as Mutex;
 
-static log_mutex: Mutex<()> = Mutex::new(());
+lazy_static! {
+    static ref log_mutex: Mutex<()> = Mutex::new(());
+}
 
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
