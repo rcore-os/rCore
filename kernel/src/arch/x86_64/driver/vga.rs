@@ -1,7 +1,7 @@
 use consts::KERNEL_OFFSET;
 use core::ptr::Unique;
 use core::fmt;
-use spin::Mutex;
+use sync::SpinLock as Mutex;
 use volatile::Volatile;
 use x86_64::instructions::port::Port;
 use logging::Color;
