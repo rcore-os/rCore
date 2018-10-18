@@ -1,14 +1,15 @@
 use bit_allocator::BitAlloc;
 use consts::KERNEL_OFFSET;
 // Depends on kernel
-use memory::{FRAME_ALLOCATOR, init_heap};
+use memory::{FRAME_ALLOCATOR, init_heap, active_table};
 use super::{BootInfo, MemoryRegionType};
 use ucore_memory::PAGE_SIZE;
-use ucore_memory::paging::PageTable;
+use ucore_memory::paging::*;
 
 pub fn init(boot_info: &BootInfo) {
     assert_has_not_been_called!("memory::init must be called only once");
     init_frame_allocator(boot_info);
+    init_device_vm_map();
     init_heap();
     info!("memory: init end");
 }
@@ -21,4 +22,12 @@ fn init_frame_allocator(boot_info: &BootInfo) {
             ba.insert(region.range.start_frame_number as usize..region.range.end_frame_number as usize);
         }
     }
+}
+
+fn init_device_vm_map() {
+    let mut page_table = active_table();
+    // IOAPIC
+    page_table.map(KERNEL_OFFSET + 0xfec00000, 0xfec00000).update();
+    // LocalAPIC
+    page_table.map(KERNEL_OFFSET + 0xfee00000, 0xfee00000).update();
 }

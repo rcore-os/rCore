@@ -72,7 +72,7 @@ global_asm!(include_str!("vector.asm"));
 
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    trace!("Interrupt: {:#x}", tf.trap_num);
+    trace!("Interrupt: {:#x} @ CPU{}", tf.trap_num, super::super::cpu::id());
     // Dispatch
     match tf.trap_num as u8 {
         T_BRKPT => breakpoint(),
@@ -88,11 +88,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 IRQ_IDE => ide(),
                 _ => panic!("Invalid IRQ number: {}", irq),
             }
-            #[cfg(feature = "use_apic")]
-            use arch::driver::apic::ack;
-            #[cfg(not(feature = "use_apic"))]
-            use arch::driver::pic::ack;
-            ack(irq);
+            super::ack(irq);
         }
         T_SWITCH_TOK => to_kernel(tf),
         T_SWITCH_TOU => to_user(tf),

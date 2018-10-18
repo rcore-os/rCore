@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
 
 [features]
-use_apic = []
 link_user_program = []
 no_bbl = []
 
@@ -32,8 +31,12 @@ ucore-process = { path = "../crate/process" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = "0.3"
-x86_64 = "0.2.11"
+bootloader = { git = "https://github.com/wangrunji0408/bootloader" }
+apic = { git = "https://github.com/wangrunji0408/APIC-Rust" }
+#bootloader = { path = "../crate/bootloader" }
+#apic = { path = "../crate/apic" }
+x86_64 = "0.2"
+raw-cpuid = "6.0"
 redox_syscall = "0.1"
 uart_16550 = "0.1"
 

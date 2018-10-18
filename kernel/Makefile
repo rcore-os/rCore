@@ -36,7 +36,7 @@ qemu_opts := \
 	-device isa-debug-exit
 endif
 ifeq ($(arch), riscv32)
-qemu_opts := -machine virt -kernel $(bin) -nographic
+qemu_opts := -machine virt -kernel $(bin) -nographic -smp 4
 endif
 
 ifdef board
