@@ -12,6 +12,13 @@ fn main() {
 //			.compile("cobj");
 		gen_vector_asm().unwrap();
 	}
+	if std::env::var("TARGET").unwrap().find("riscv32").is_some() {
+		cc::Build::new()
+			.file("src/arch/riscv32/compiler_rt.c")
+			.flag("-march=rv32ia")
+			.flag("-mabi=ilp32")
+			.compile("atomic_rt");
+	}
 }
 
 fn gen_vector_asm() -> Result<()> {

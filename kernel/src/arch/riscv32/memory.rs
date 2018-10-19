@@ -3,6 +3,8 @@ use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, M
 use super::riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 
+// static mut KERNEL_MS: Option<MemorySet> = None;
+
 pub fn init() {
     #[repr(align(4096))]
     struct PageData([u8; PAGE_SIZE]);

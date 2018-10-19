@@ -1,5 +1,10 @@
 use core::fmt;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
+use sync::SpinLock as Mutex;
+
+lazy_static! {
+    static ref log_mutex: Mutex<()> = Mutex::new(());
+}
 
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
@@ -38,11 +43,13 @@ macro_rules! with_color {
 
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use arch::io;
+    let mutex = log_mutex.lock();
     io::putfmt(with_color!(args, color));
 }
 
 pub fn print(args: fmt::Arguments) {
     use arch::io;
+    let mutex = log_mutex.lock();
     io::putfmt(args);
 }
 

@@ -172,7 +172,7 @@ void init_other_hart(uintptr_t hartid, uintptr_t dtb)
   boot_other_hart(dtb);
 }
 
-void enter_supervisor_mode(void (*fn)(uintptr_t), uintptr_t arg0, uintptr_t arg1)
+void enter_supervisor_mode(void (*fn)(uintptr_t), uintptr_t arg0, uintptr_t arg1, uintptr_t arg2)
 {
   // Set up a PMP to permit access to all of memory.
   // Ignore the illegal-instruction trap if PMPs aren't supported.
@@ -194,6 +194,7 @@ void enter_supervisor_mode(void (*fn)(uintptr_t), uintptr_t arg0, uintptr_t arg1
 
   register uintptr_t a0 asm ("a0") = arg0;
   register uintptr_t a1 asm ("a1") = arg1;
-  asm volatile ("mret" : : "r" (a0), "r" (a1));
+  register uintptr_t a2 asm ("a2") = arg2;
+  asm volatile ("mret" : : "r" (a0), "r" (a1), "r" (a2));
   __builtin_unreachable();
 }
