@@ -4084,8 +4084,8 @@ fi
 case "${BUILD_32BIT}" in
   yes|default)
 	echo "Building 32-bit pk"
-	CFLAGS="$default_CFLAGS -march=rv32ia -mabi=ilp32"
-	LDFLAGS="-march=rv32ia -mabi=ilp32"
+	CFLAGS="$default_CFLAGS -march=rv32iac -mabi=ilp32"
+	LDFLAGS="-march=rv32iac -mabi=ilp32"
 	install_subdir="riscv32-unknown-elf"
 	;;
   *)

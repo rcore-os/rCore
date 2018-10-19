@@ -9,7 +9,7 @@
   "cpu": "generic-rv32",
   "features": "",
   "max-atomic-width": "32",
-  "linker": "riscv32-unknown-elf-ld",
+  "linker": "riscv64-unknown-elf-ld",
   "linker-flavor": "ld",
   "pre-link-args": {
     "ld": [

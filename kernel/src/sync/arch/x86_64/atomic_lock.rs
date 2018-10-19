@@ -1,14 +1,15 @@
+use core::sync::atomic::{AtomicBool, Ordering};
 
 pub struct AtomicLock
 {
-    lock: usize
+    lock: AtomicBool
 }
 
 impl AtomicLock 
 {
     pub fn new() -> AtomicLock {
         AtomicLock {
-            lock: ATOMIC_BOOL_INIT
+            lock: AtomicBool::new(false)
         }
     }
 
@@ -26,5 +27,5 @@ impl AtomicLock
 }
 
 pub const ATOMIC_LOCK_INIT: AtomicLock = AtomicLock {
-    lock: ATOMIC_BOOL_INIT
+    lock: AtomicBool::new(false)
 };

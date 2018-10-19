@@ -1,9 +1,13 @@
 //! RISCV atomic is not currently supported by Rust.
 //! This is a ugly workaround.
 
-
-use arch::compiler_rt::{__atomic_compare_exchange_4, __atomic_store_4, __atomic_load_4};
 use core::cell::UnsafeCell;
+
+extern {
+    fn __atomic_load_4(src: *const u32) -> u32;
+    fn __atomic_store_4(dst: *mut u32, val: u32);
+    fn __atomic_compare_exchange_4(dst: *mut u32, expected: *mut u32, desired: u32) -> bool;
+}
 
 pub struct AtomicLock
 {
