@@ -5,17 +5,17 @@ use memory::*;
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 
 pub unsafe fn set_cpu_id(cpu_id: usize) {
-    unsafe {
-        asm!("mv tp, $0" : : "r"(cpu_id));
-    }
+    asm!("mv tp, $0" : : "r"(cpu_id));
 }
 
-pub unsafe fn get_cpu_id() -> usize {
-    let mut cpu_id = 0;
-    unsafe {
-        asm!("mv $0, tp" : : "r" (cpu_id));
-    }
+pub fn id() -> usize {
+    let cpu_id;
+    unsafe { asm!("mv $0, tp" : "=r"(cpu_id)); }
     cpu_id
+}
+
+pub fn send_ipi(cpu_id: usize) {
+    super::bbl::sbi::send_ipi(1 << cpu_id);
 }
 
 pub unsafe fn has_started(cpu_id: usize) -> bool {

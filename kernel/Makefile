@@ -33,12 +33,16 @@ ifeq ($(arch), x86_64)
 qemu_opts := \
 	-drive format=raw,file=$(bootimage) \
 	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
-	-smp $(smp) \
+	-smp cores=$(smp) \
 	-serial mon:stdio \
 	-device isa-debug-exit
 endif
 ifeq ($(arch), riscv32)
-qemu_opts := -machine virt -kernel $(bin) -nographic -smp cpus=$(smp)
+qemu_opts := \
+	-machine virt \
+	-kernel $(bin) \
+	-nographic \
+	-smp cores=$(smp)
 endif
 
 ifdef board

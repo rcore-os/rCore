@@ -16,9 +16,9 @@ pub fn id() -> usize {
     CpuId::new().get_feature_info().unwrap().initial_local_apic_id() as usize
 }
 
-pub fn send_ipi(cpu_id: u8) {
+pub fn send_ipi(cpu_id: usize) {
     let mut lapic = unsafe { XApic::new(0xffffff00_fee00000) };
-    unsafe { lapic.send_ipi(cpu_id, 0x30); } // TODO: Find a IPI trap num
+    unsafe { lapic.send_ipi(cpu_id as u8, 0x30); } // TODO: Find a IPI trap num
 }
 
 pub fn init() {

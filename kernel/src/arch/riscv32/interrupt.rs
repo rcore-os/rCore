@@ -14,6 +14,8 @@ pub fn init() {
         sscratch::write(0);
         // Set the exception vector address
         stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
+        // Enable IPI
+        sie::set_ssoft();
     }
     info!("interrupt: init end");
 }
@@ -42,6 +44,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt: {:?}", tf.scause.cause());
     match tf.scause.cause() {
+        Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
@@ -49,6 +52,11 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     }
     ::trap::before_return();
     trace!("Interrupt end");
+}
+
+fn ipi() {
+    debug!("IPI");
+    super::bbl::sbi::clear_ipi();
 }
 
 fn timer() {

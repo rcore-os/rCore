@@ -8,34 +8,33 @@ pub mod paging;
 pub mod memory;
 pub mod compiler_rt;
 pub mod consts;
-pub mod smp;
-
-use self::smp::*;
-
-fn others_main(hartid: usize) -> ! {
-    println!("hart {} is booting", hartid);
-    loop { }
-}
+pub mod cpu;
 
 #[no_mangle]
 pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
-    unsafe { set_cpu_id(hartid); } 
+    unsafe { cpu::set_cpu_id(hartid); }
+    println!("Hello RISCV! in hart {}, {}, {}", hartid, dtb, hart_mask);
 
     if hartid != 0 {
-        while unsafe { !has_started(hartid) }  { }
-        others_main(hartid);
-        // others_main should not return
+        while unsafe { !cpu::has_started(hartid) }  { }
+        others_main();
+        unreachable!();
     }
-
-    println!("Hello RISCV! in hart {}, {}, {}", hartid, dtb, hart_mask);
 
     ::logging::init();
     interrupt::init();
     memory::init();
     timer::init();
 
-    unsafe { start_others(hart_mask); }
+    unsafe { cpu::start_others(hart_mask); }
     ::kmain();
+}
+
+fn others_main() -> ! {
+    interrupt::init();
+    timer::init();
+    cpu::send_ipi(0);
+    loop { }
 }
 
 #[cfg(feature = "no_bbl")]
