@@ -20,7 +20,7 @@ pub trait InactivePageTable {
     */
     fn new() -> Self;
     /*
-    **  @brief  create a inactive page table without kernel memory mapped
+    **  @brief  create an inactive page table without kernel memory mapped
     **  @retval InactivePageTable    the created inactive page table
     */
     fn new_bare() -> Self;
@@ -180,7 +180,7 @@ impl MemoryArea {
         }
     }
     /*
-    **  @brief  map the memory area from the physice address in a page table
+    **  @brief  unmap the memory area from the physice address in a page table
     **  @param  pt: &mut T::Active   the page table to use
     **  @retval none
     */
@@ -193,6 +193,14 @@ impl MemoryArea {
             }
             pt.unmap(addr);
         }
+    }
+
+    pub fn get_start_addr(&self) -> VirtAddr {
+        self.start_addr
+    }
+
+    pub fn get_end_addr(&self) -> VirtAddr{
+        self.end_addr
     }
 }
 

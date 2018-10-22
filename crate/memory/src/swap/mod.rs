@@ -98,6 +98,15 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
             swapper,
         }
     }
+
+    /*
+    **  @brief set a virtual address (a page) swappable
+    **  @param addr: VirtAddr        the target page's virtual address
+    */
+    pub fn set_swappable(&mut self, addr: VirtAddr){
+        self.swap_manager.push(addr);
+    }
+
     /*
     **  @brief  map the virtual address to a target physics address as swappable
     **  @param  addr: VirtAddr       the virual address to map
@@ -180,12 +189,13 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **                               of beginning of the page
     **  @retval bool                 whether swap in happens.
     */
-    pub fn page_fault_handler(&mut self, addr: VirtAddr, alloc_frame: impl FnOnce() -> Option<PhysAddr>) -> bool {
+    pub fn page_fault_handler(&mut self, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr) -> bool {
         if !self.page_table.get_entry(addr).swapped() {
             return false;
         }
         // Allocate a frame, if failed, swap out a page
-        let frame = alloc_frame().unwrap_or_else(|| self.swap_out_any().ok().unwrap());
+        //let frame = alloc_frame().unwrap_or_else(|| self.swap_out_any().ok().unwrap());
+        let frame = alloc_frame();
         self.swap_in(addr, frame).ok().unwrap();
         true
     }
@@ -220,7 +230,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> DerefMut for SwapExt<T, M, S> {
 mod test {
     use super::*;
     use super::mock_swapper::MockSwapper;
-    use alloc::{arc::Arc, boxed::Box};
+    use alloc::{sync::Arc, boxed::Box};
     use core::cell::RefCell;
     use paging::MockPageTable;
 

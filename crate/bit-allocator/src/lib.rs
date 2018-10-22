@@ -13,7 +13,7 @@ use core::ops::Range;
 /// alloc: allocate a free bit.
 /// dealloc: free an allocated bit.
 ///
-/// insert: mark bits in the range as allocated
+/// insert: mark bits in the range as allocated (available)
 /// remove: reverse of insert
 ///
 /// any: whether there are free bits remaining
@@ -38,7 +38,7 @@ pub type BitAlloc256M = BitAllocCascade16<BitAlloc16M>;
 /// Implement the bit allocator by segment tree algorithm.
 #[derive(Default)]
 pub struct BitAllocCascade16<T: BitAlloc> {
-    bitset: u16,
+    bitset: u16, // for each bit, 1 indicates available, 0 indicates inavailable
     sub: [T; 16],
 }
 

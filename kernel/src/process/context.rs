@@ -1,7 +1,8 @@
 use arch::interrupt::{TrapFrame, Context as ArchContext};
-use memory::{MemoryArea, MemoryAttr, MemorySet};
+use memory::{MemoryArea, MemoryAttr, MemorySet, active_table_swap};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
+use ucore_memory::{Page};
 
 pub struct Context {
     arch: ArchContext,
@@ -9,13 +10,29 @@ pub struct Context {
 }
 
 impl ::ucore_process::processor::Context for Context {
+    /*
+    * @param: 
+    *   target: the target process context
+    * @brief: 
+    *   switch to the target process context
+    */
     unsafe fn switch(&mut self, target: &mut Self) {
         super::PROCESSOR.try().unwrap().force_unlock();
         self.arch.switch(&mut target.arch);
         use core::mem::forget;
+        // don't run the distructor of processor()
         forget(super::processor());
     }
 
+    /*
+    * @param: 
+    *   entry: the program entry for the process
+    *   arg: a0 (a parameter)
+    * @brief: 
+    *   new a kernel thread Context
+    * @retval: 
+    *   the new kernel thread Context
+    */
     fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
         let ms = MemorySet::new();
         Context {
@@ -34,6 +51,14 @@ impl Context {
     }
 
     /// Make a new user thread from ELF data
+    /*
+    * @param: 
+    *   data: the ELF data stream 
+    * @brief: 
+    *   make a new thread from ELF data
+    * @retval: 
+    *   the new user thread Context
+    */
     pub fn new_user(data: &[u8]) -> Self {
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
@@ -81,6 +106,15 @@ impl Context {
             });
         }
 
+        //set the user Memory pages in the memory set swappable
+        for area in memory_set.iter(){
+            for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
+                    let addr = page.start_address();
+                    active_table_swap().set_swappable(addr);
+                }
+        }
+        info!("finish setting memory swappable.");
+
         Context {
             arch: unsafe {
                 ArchContext::new_user_thread(
@@ -123,6 +157,14 @@ impl Debug for Context {
     }
 }
 
+/*
+* @param: 
+*   elf: the source ELF file
+* @brief: 
+*   generate a memory set according to the elf file
+* @retval: 
+*   the new memory set
+*/
 fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
     let mut set = MemorySet::new();
     for ph in elf.program_iter() {
@@ -131,9 +173,10 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
         }
         let (virt_addr, mem_size, flags) = match ph {
             ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
+            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),//???
         };
         set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
+
     }
     set
 }

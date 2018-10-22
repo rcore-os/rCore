@@ -58,6 +58,7 @@ impl PageTable for ActivePageTable {
         let page = Page::of_addr(VirtAddr::new(addr));
         let frame = Frame::of_addr(PhysAddr::new(target as u32));
         // map the page to the frame using FrameAllocatorForRiscv
+        // we may need frame allocator to alloc frame for new page table(first/second)
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap().flush();
         self.get_entry(addr)
@@ -135,6 +136,14 @@ impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap())
     }
+
+    /*
+    * @param:
+    *   frame: the target physical frame which will be temporarily mapped
+    *   f: the function you would like to apply for once
+    * @brief: 
+    *   do something on the target physical frame?
+    */
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
         // Create a temporary page
         let page = Page::of_addr(VirtAddr::new(0xcafebabe));
@@ -148,7 +157,7 @@ impl ActivePageTable {
         self.unmap(0xcafebabe);
     }
 }
-
+/// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
         let addr = VirtAddr::new((self as *const _ as usize) << 10);
@@ -176,8 +185,9 @@ impl Entry for PageEntry {
         flags.set(EF::RESERVED2, !writable);
     }
     fn clear_shared(&mut self) { self.as_flags().remove(EF::RESERVED1 | EF::RESERVED2); }
-    fn swapped(&self) -> bool { unimplemented!() }
-    fn set_swapped(&mut self, value: bool) { unimplemented!() }
+    // valid property must be 0 used when swapped
+    fn swapped(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
+    fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::RESERVED1, value); }
     fn user(&self) -> bool { self.0.flags().contains(EF::USER) }
     fn set_user(&mut self, value: bool) { self.as_flags().set(EF::USER, value); }
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
@@ -198,12 +208,24 @@ pub struct InactivePageTable0 {
 impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
+    /*
+    * @brief: 
+    *   get a new pagetable (for a new process or thread)
+    * @retbal: 
+    *   the new pagetable
+    */
     fn new() -> Self {
         let mut pt = Self::new_bare();
         pt.map_kernel();
         pt
     }
 
+    /*
+    * @brief: 
+    *   allocate a new frame and then self-mapping it and regard it as the inactivepagetale
+    * retval: 
+    *   the inactive page table
+    */
     fn new_bare() -> Self {
         let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
             .expect("failed to allocate frame");
@@ -214,6 +236,12 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { p2_frame: frame }
     }
 
+    /*
+    * @param: 
+    *   f: a function to do something for a muatable activepagetable
+    * @brief: 
+    *   temporarily map the pagetable as an active page and apply f on the it 
+    */
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
         active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
             let backup = p2_table[RECURSIVE_PAGE_PML4].clone();
@@ -275,6 +303,10 @@ impl InactivePageTable for InactivePageTable0 {
 }
 
 impl InactivePageTable0 {
+    /*
+    * @brief: 
+    *   map the kernel code memory address (p2 page table) in the new inactive page table according the current active page table 
+    */
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];

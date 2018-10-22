@@ -22,26 +22,6 @@ lazy_static! {
     pub static ref FRAME_ALLOCATOR: Mutex<FrameAlloc> = Mutex::new(FrameAlloc::default());
 }
 
-pub fn alloc_frame() -> Option<usize> {
-    let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
-    trace!("Allocate frame: {:x?}", ret);
-    ret
-}
-
-pub fn dealloc_frame(target: usize) {
-    trace!("Deallocate frame: {:x}", target);
-    FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
-}
-
-// alloc from heap
-pub fn alloc_stack() -> Stack {
-    use alloc::alloc::{alloc, Layout};
-    const STACK_SIZE: usize = 0x8000;
-    let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, 0x8000).unwrap()) } as usize;
-    let top = bottom + STACK_SIZE;
-    Stack { top, bottom }
-}
-
 lazy_static! {
     static ref ACTIVE_TABLE: Mutex<CowExt<ActivePageTable>> = Mutex::new(unsafe {
         CowExt::new(ActivePageTable::new())
@@ -63,6 +43,36 @@ pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo:
     ACTIVE_TABLE_SWAP.lock()
 }
 
+/*
+* @brief: 
+*   allocate a free physical frame, if no free frame, then swap out one page and reture mapped frame as the free one
+* @retval: 
+*   the physical address for the allocated frame
+*/
+pub fn alloc_frame() -> Option<usize> {
+    // get the real address of the alloc frame
+    let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+    trace!("Allocate frame: {:x?}", ret);
+    //do we need : unsafe { ACTIVE_TABLE_SWAP.force_unlock(); } ???
+    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any().ok().unwrap()))
+}
+
+pub fn dealloc_frame(target: usize) {
+    trace!("Deallocate frame: {:x}", target);
+    FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
+}
+
+// alloc from heap
+pub fn alloc_stack() -> Stack {
+    use alloc::alloc::{alloc, Layout};
+    const STACK_SIZE: usize = 0x8000;
+    let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, 0x8000).unwrap()) } as usize;
+    let top = bottom + STACK_SIZE;
+    Stack { top, bottom }
+}
+
+
+
 /* 
 * @param:
 *   addr: the virtual address of the page fault
@@ -72,14 +82,14 @@ pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo:
 *   Return true to continue, false to halt  
 */
 pub fn page_fault_handler(addr: usize) -> bool {
-    // Handle copy on write
+    // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
         return true;
     }
     // handle the swap in/out
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-    if active_table_swap().page_fault_handler(addr, || alloc_frame()){
+    if active_table_swap().page_fault_handler(addr, || alloc_frame().unwrap()){
         return true;
     }
     false
