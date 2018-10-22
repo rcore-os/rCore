@@ -70,3 +70,26 @@ pub unsafe extern fn __atomic_compare_exchange_1(dst: *mut u8, expected: *mut u8
 pub unsafe extern fn __atomic_compare_exchange_4(dst: *mut u32, expected: *mut u32, desired: u32) -> bool {
     __atomic_compare_exchange(dst, expected, desired)
 }
+
+
+#[no_mangle]
+pub unsafe extern fn __atomic_fetch_add_4(dst: *mut u32, delta: u32) -> u32 {
+    use super::interrupt;
+    let flags = interrupt::disable_and_store();
+    let val = read(dst);
+    let new_val = val + delta;
+    write(dst, new_val);
+    interrupt::restore(flags);
+    val
+}
+
+#[no_mangle]
+pub unsafe extern fn __atomic_fetch_sub_4(dst: *mut u32, delta: u32) -> u32 {
+    use super::interrupt;
+    let flags = interrupt::disable_and_store();
+    let val = read(dst);
+    let new_val = val - delta;
+    write(dst, new_val);
+    interrupt::restore(flags);
+    val
+}
