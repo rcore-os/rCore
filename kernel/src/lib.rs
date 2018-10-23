@@ -9,6 +9,7 @@
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
+#![feature(raw)]
 #![no_std]
 
 
@@ -61,18 +62,18 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    process::init();
-    unsafe { arch::interrupt::enable(); }
+    if arch::cpu::id() == 0 {
+        process::init();
+        thread::spawn(fs::shell);
+    }
 
-    fs::shell();
+    process::processor().run();
 
 //    thread::test::local_key();
 //    thread::test::unpack();
 //    sync::test::philosopher_using_mutex();
 //    sync::test::philosopher_using_monitor();
 //    sync::mpsc::test::test_all();
-
-    loop {}
 }
 
 /// Global heap allocator

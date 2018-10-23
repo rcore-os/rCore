@@ -1,26 +1,19 @@
 use process::*;
 use arch::interrupt::TrapFrame;
+use arch::cpu;
 
 pub fn timer() {
-    let mut processor = processor();
-    processor.tick();
+    processor().tick();
 }
 
 pub fn before_return() {
-    if let Some(processor) = PROCESSOR.try() {
-        processor.lock().schedule();
-    }
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
-    if let Some(processor) = PROCESSOR.try() {
-        let mut processor = processor.lock();
-        let pid = processor.current_pid();
-        error!("Process {} error:\n{:#x?}", pid, tf);
-        processor.exit(pid, 0x100); // TODO: Exit code for error
-        processor.schedule();
-        unreachable!();
-    } else {
-        panic!("Exception when processor not inited\n{:#x?}", tf);
-    }
+    let pid = processor().pid();
+    error!("On CPU{} Process {}:\n{:#x?}", cpu::id(), pid, tf);
+
+    processor().manager().set_status(pid, Status::Exited(0x100));
+    processor().yield_now();
+    unreachable!();
 }

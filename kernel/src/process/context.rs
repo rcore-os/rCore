@@ -2,39 +2,45 @@ use arch::interrupt::{TrapFrame, Context as ArchContext};
 use memory::{MemoryArea, MemoryAttr, MemorySet};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
+use ucore_process::processor::Context;
+use alloc::boxed::Box;
 
-pub struct Context {
+pub struct ContextImpl {
     arch: ArchContext,
     memory_set: MemorySet,
 }
 
-impl ::ucore_process::processor::Context for Context {
-    unsafe fn switch(&mut self, target: &mut Self) {
-        super::PROCESSOR.try().unwrap().force_unlock();
-        self.arch.switch(&mut target.arch);
-        use core::mem::forget;
-        forget(super::processor());
-    }
+impl Context for ContextImpl {
+    unsafe fn switch_to(&mut self, target: &mut Context) {
+        use core::raw::TraitObject;
+        use core::mem::transmute;
 
-    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
-        let ms = MemorySet::new();
-        Context {
-            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
-            memory_set: ms,
-        }
+        // Cast &mut Context -> &mut ContextImpl
+        let raw: TraitObject = transmute(target);
+        let target = &mut *(raw.data as *mut ContextImpl);
+
+        self.arch.switch(&mut target.arch);
     }
 }
 
-impl Context {
-    pub unsafe fn new_init() -> Self {
-        Context {
+impl ContextImpl {
+    pub unsafe fn new_init() -> Box<Context> {
+        Box::new(ContextImpl {
             arch: ArchContext::null(),
             memory_set: MemorySet::new(),
-        }
+        })
+    }
+
+    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+        let ms = MemorySet::new();
+        Box::new(ContextImpl {
+            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
+            memory_set: ms,
+        })
     }
 
     /// Make a new user thread from ELF data
-    pub fn new_user(data: &[u8]) -> Self {
+    pub fn new_user(data: &[u8]) -> Box<Context> {
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
@@ -81,17 +87,17 @@ impl Context {
             });
         }
 
-        Context {
+        Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
                     entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
             },
             memory_set,
-        }
+        })
     }
 
     /// Fork
-    pub fn fork(&self, tf: &TrapFrame) -> Self {
+    pub fn fork(&self, tf: &TrapFrame) -> Box<Context> {
         // Clone memory set, make a new page table
         let memory_set = self.memory_set.clone();
 
@@ -110,14 +116,14 @@ impl Context {
             });
         }
 
-        Context {
+        Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, memory_set.kstack_top(), memory_set.token()) },
             memory_set,
-        }
+        })
     }
 }
 
-impl Debug for Context {
+impl Debug for ContextImpl {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{:x?}", self.arch)
     }

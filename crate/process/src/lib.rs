@@ -5,6 +5,7 @@
 extern crate alloc;
 #[macro_use]
 extern crate log;
+extern crate spin;
 
 // To use `println!` in test
 #[cfg(test)]

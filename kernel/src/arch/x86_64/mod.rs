@@ -57,6 +57,5 @@ fn other_start() -> ! {
     idt::init();
     gdt::init();
     cpu::init();
-//    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
-    loop {}
+    ::kmain();
 }

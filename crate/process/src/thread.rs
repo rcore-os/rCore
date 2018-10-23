@@ -38,10 +38,8 @@ use scheduler::Scheduler;
 
 /// All dependencies for thread mod.
 pub trait ThreadSupport {
-    type Context: Context;
-    type Scheduler: Scheduler;
-    type ProcessorGuard: DerefMut<Target=Processor_<Self::Context, Self::Scheduler>>;
-    fn processor() -> Self::ProcessorGuard;
+    fn processor() -> &'static Processor;
+    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context>;
 }
 
 /// Root structure served as thread mod
@@ -53,7 +51,7 @@ impl<S: ThreadSupport> ThreadMod<S> {
     /// Gets a handle to the thread that invokes it.
     pub fn current() -> Thread<S> {
         Thread {
-            pid: S::processor().current_pid(),
+            pid: S::processor().pid(),
             mark: PhantomData,
         }
     }
@@ -62,10 +60,8 @@ impl<S: ThreadSupport> ThreadMod<S> {
     pub fn sleep(dur: Duration) {
         let time = dur_to_ticks(dur);
         info!("sleep: {:?} ticks", time);
-        let mut processor = S::processor();
-        let pid = processor.current_pid();
-        processor.sleep(pid, time);
-        processor.schedule();
+        // TODO: register wakeup
+        Self::park();
 
         fn dur_to_ticks(dur: Duration) -> usize {
             return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
@@ -111,16 +107,17 @@ impl<S: ThreadSupport> ThreadMod<S> {
             //   unsafe { LocalKey::<usize>::get_map() }.clear();
             // 让Processor退出当前线程
             // 把f返回值在堆上的指针，以线程返回码的形式传递出去
-            let mut processor = S::processor();
-            let pid = processor.current_pid();
-            processor.exit(pid, Box::into_raw(ret) as usize);
-            processor.schedule();
+            let pid = S::processor().pid();
+            let exit_code = Box::into_raw(ret) as usize;
+            S::processor().manager().set_status(pid, Status::Exited(exit_code));
+            S::processor().yield_now();
             // 再也不会被调度回来了
             unreachable!()
         }
 
         // 在Processor中创建新的线程
-        let pid = S::processor().add(Context::new_kernel(kernel_thread_entry::<S, F, T>, f as usize));
+        let context = S::new_kernel(kernel_thread_entry::<S, F, T>, f as usize);
+        let pid = S::processor().manager().add(context);
 
         // 接下来看看`JoinHandle::join()`的实现
         // 了解是如何获取f返回值的
@@ -133,18 +130,15 @@ impl<S: ThreadSupport> ThreadMod<S> {
     /// Cooperatively gives up a timeslice to the OS scheduler.
     pub fn yield_now() {
         info!("yield:");
-        let mut processor = S::processor();
-        processor.yield_now();
-        processor.schedule();
+        S::processor().yield_now();
     }
 
     /// Blocks unless or until the current thread's token is made available.
     pub fn park() {
         info!("park:");
-        let mut processor = S::processor();
-        let pid = processor.current_pid();
-        processor.sleep_(pid);
-        processor.schedule();
+        let pid = S::processor().pid();
+        S::processor().manager().set_status(pid, Status::Sleeping);
+        S::processor().yield_now();
     }
 }
 
@@ -157,8 +151,7 @@ pub struct Thread<S: ThreadSupport> {
 impl<S: ThreadSupport> Thread<S> {
     /// Atomically makes the handle's token available if it is not already.
     pub fn unpark(&self) {
-        let mut processor = S::processor();
-        processor.wakeup_(self.pid);
+        S::processor().manager().set_status(self.pid, Status::Ready);
     }
     /// Gets the thread's unique identifier.
     pub fn id(&self) -> usize {
@@ -179,14 +172,8 @@ impl<S: ThreadSupport, T> JoinHandle<S, T> {
     }
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
-        let mut processor = S::processor();
-        match processor.current_wait_for(self.thread.pid) {
-            WaitResult::Ok(_, exit_code) => unsafe {
-                // Find return value on the heap from the exit code.
-                Ok(*Box::from_raw(exit_code as *mut T))
-            }
-            WaitResult::NotExist => Err(()),
-        }
+        // TODO: wait for the thread
+        unimplemented!()
     }
 }
 
