@@ -2,7 +2,7 @@ use arch::interrupt::{TrapFrame, Context as ArchContext};
 use memory::{MemoryArea, MemoryAttr, MemorySet};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
-use ucore_process::processor::Context;
+use ucore_process::Context;
 use alloc::boxed::Box;
 
 pub struct ContextImpl {

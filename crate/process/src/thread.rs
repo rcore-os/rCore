@@ -28,12 +28,11 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use core::any::Any;
 use core::marker::PhantomData;
 use core::ptr;
 use core::time::Duration;
-use core::ops::DerefMut;
 use processor::*;
+use process_manager::*;
 use scheduler::Scheduler;
 
 /// All dependencies for thread mod.
