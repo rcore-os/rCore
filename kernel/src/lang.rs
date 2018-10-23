@@ -1,4 +1,4 @@
-// Rust language features implementions
+// Rust language features implementations
 
 use core::panic::PanicInfo;
 use core::alloc::Layout;
@@ -13,7 +13,8 @@ pub fn panic(info: &PanicInfo) -> ! {
     let location = info.location().unwrap();
     let message = info.message().unwrap();
     error!("\n\nPANIC in {} at line {}\n    {}", location.file(), location.line(), message);
-    loop { }
+    use arch::cpu::halt;
+    loop { halt() }
 }
 
 #[lang = "oom"]

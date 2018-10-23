@@ -29,3 +29,8 @@ pub unsafe fn start_others(hart_mask: usize) {
         }
     }
 }
+
+pub fn halt() {
+    use super::riscv::asm::wfi;
+    unsafe { wfi() }
+}

@@ -25,3 +25,8 @@ pub fn init() {
     let mut lapic = unsafe { XApic::new(0xffffff00_fee00000) };
     lapic.cpu_init();
 }
+
+pub fn halt() {
+    use x86_64::instructions::hlt;
+    hlt();
+}
