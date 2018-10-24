@@ -78,6 +78,10 @@ impl Processor {
         self.inner().proc.as_ref().unwrap().0
     }
 
+    pub fn context(&self) -> &Context {
+        &*self.inner().proc.as_ref().unwrap().1
+    }
+
     pub fn manager(&self) -> &ProcessManager {
         &*self.inner().manager
     }

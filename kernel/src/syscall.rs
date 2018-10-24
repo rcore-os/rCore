@@ -58,7 +58,11 @@ fn sys_close(fd: usize) -> i32 {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
-    unimplemented!();
+    use core::mem::transmute;
+    let (context, _): (&ContextImpl, *const ()) = unsafe { transmute(processor().context()) };
+    let pid = processor().manager().add(context.fork(tf));
+    info!("fork: {} -> {}", thread::current().id(), pid);
+    pid as i32
 }
 
 /// Wait the process exit.
@@ -85,7 +89,7 @@ fn sys_getpid() -> i32 {
 
 /// Exit the current process
 fn sys_exit(exit_code: usize) -> i32 {
-    let pid = processor().pid();
+    let pid = thread::current().id();
     processor().manager().set_status(pid, Status::Exited(exit_code));
     processor().yield_now();
     0
@@ -102,7 +106,8 @@ fn sys_get_time() -> i32 {
 }
 
 fn sys_lab6_set_priority(priority: usize) -> i32 {
-    unimplemented!();
+    let pid = thread::current().id();
+    processor().manager().set_priority(pid, priority as u8);
     0
 }
 

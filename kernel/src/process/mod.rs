@@ -19,7 +19,7 @@ pub fn init() {
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }
     }
-    for i in 0..MAX_CPU_NUM {
+    for i in 0..4 {
         manager.add(ContextImpl::new_kernel(idle, i));
     }
 

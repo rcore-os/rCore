@@ -71,6 +71,11 @@ impl ProcessManager {
         self.scheduler.lock().tick(pid)
     }
 
+    /// Set the priority of process `pid`
+    pub fn set_priority(&self, pid: Pid, priority: u8) {
+        self.scheduler.lock().set_priority(pid, priority);
+    }
+
     /// Called by Processor to get a process to run.
     /// The manager first mark it `Running`,
     /// then take out and return its Context.

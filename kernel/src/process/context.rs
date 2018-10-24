@@ -12,13 +12,8 @@ pub struct ContextImpl {
 
 impl Context for ContextImpl {
     unsafe fn switch_to(&mut self, target: &mut Context) {
-        use core::raw::TraitObject;
         use core::mem::transmute;
-
-        // Cast &mut Context -> &mut ContextImpl
-        let raw: TraitObject = transmute(target);
-        let target = &mut *(raw.data as *mut ContextImpl);
-
+        let (target, _): (&mut ContextImpl, *const ()) = transmute(target);
         self.arch.switch(&mut target.arch);
     }
 }
