@@ -1,30 +1,10 @@
 //! Thread std-like interface
 //!
-//! Based on Processor.
-//! Used in the kernel.
+//! Based on Processor. Used in kernel.
 //!
-//! # Example
-//!
-//! ```
-//! // Define a support implementation struct
-//! pub struct ThreadSupportImpl;
-//!
-//! // Impl `ThreadSupport` trait
-//! impl ThreadSupport for ThreadSupportImpl { ... }
-//!
-//! // Export the full struct as `thread`.
-//! #[allow(non_camel_case_types)]
-//! pub type thread = ThreadMod<ThreadSupportImpl>;
-//! ```
-//!
-//! ```
-//! // Use it just like `std::thread`
-//! use thread;
-//! let t = thread::current();
-//!
-//! // But the other struct is not available ...
-//! let t: thread::Thread;   // ERROR!
-//! ```
+//! You need to implement the following functions before use:
+//! - `processor`: Get a reference of the current `Processor`
+//! - `new_kernel_context`: Construct a `Context` of the new kernel thread
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -35,122 +15,121 @@ use processor::*;
 use process_manager::*;
 use scheduler::Scheduler;
 
-/// All dependencies for thread mod.
-pub trait ThreadSupport {
-    fn processor() -> &'static Processor;
-    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context>;
+#[linkage = "weak"]
+#[no_mangle]
+/// Get a reference of the current `Processor`
+fn processor() -> &'static Processor {
+    unimplemented!("thread: Please implement and export `processor`")
 }
 
-/// Root structure served as thread mod
-pub struct ThreadMod<S: ThreadSupport> {
-    mark: PhantomData<S>
+#[linkage = "weak"]
+#[no_mangle]
+/// Construct a `Context` of the new kernel thread
+fn new_kernel_context(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+    unimplemented!("thread: Please implement and export `new_kernel_context`")
 }
 
-impl<S: ThreadSupport> ThreadMod<S> {
-    /// Gets a handle to the thread that invokes it.
-    pub fn current() -> Thread<S> {
-        Thread {
-            pid: S::processor().pid(),
-            mark: PhantomData,
-        }
+
+/// Gets a handle to the thread that invokes it.
+pub fn current() -> Thread {
+    Thread {
+        pid: processor().pid(),
     }
+}
 
-    /// Puts the current thread to sleep for the specified amount of time.
-    pub fn sleep(dur: Duration) {
-        let time = dur_to_ticks(dur);
-        info!("sleep: {:?} ticks", time);
-        // TODO: register wakeup
-        Self::park();
+/// Puts the current thread to sleep for the specified amount of time.
+pub fn sleep(dur: Duration) {
+    let time = dur_to_ticks(dur);
+    info!("sleep: {:?} ticks", time);
+    // TODO: register wakeup
+    park();
 
-        fn dur_to_ticks(dur: Duration) -> usize {
-            return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
-        }
+    fn dur_to_ticks(dur: Duration) -> usize {
+        return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
     }
+}
 
-    /// Spawns a new thread, returning a JoinHandle for it.
-    ///
-    /// `F`: Type of the function `f`
-    /// `T`: Type of the return value of `f`
-    pub fn spawn<F, T>(f: F) -> JoinHandle<S, T>
+/// Spawns a new thread, returning a JoinHandle for it.
+///
+/// `F`: Type of the function `f`
+/// `T`: Type of the return value of `f`
+pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    where
+        F: Send + 'static + FnOnce() -> T,
+        T: Send + 'static,
+{
+    info!("spawn:");
+
+    // 注意到下面的问题：
+    // Processor只能从入口地址entry+参数arg创建新线程
+    // 而我们现在需要让它执行一个未知类型的（闭包）函数f
+
+    // 首先把函数本体（代码数据）置于堆空间中
+    let f = Box::into_raw(Box::new(f));
+
+    // 定义一个静态函数作为新线程的入口点
+    // 其参数是函数f在堆上的指针
+    // 这样我们就把函数f传到了一个静态函数内部
+    //
+    // 注意到它具有泛型参数，因此对每一次spawn调用，
+    // 由于F类型是独特的，因此都会生成一个新的kernel_thread_entry
+    extern fn kernel_thread_entry<F, T>(f: usize) -> !
         where
             F: Send + 'static + FnOnce() -> T,
             T: Send + 'static,
     {
-        info!("spawn:");
-
-        // 注意到下面的问题：
-        // Processor只能从入口地址entry+参数arg创建新线程
-        // 而我们现在需要让它执行一个未知类型的（闭包）函数f
-
-        // 首先把函数本体（代码数据）置于堆空间中
-        let f = Box::into_raw(Box::new(f));
-
-        // 定义一个静态函数作为新线程的入口点
-        // 其参数是函数f在堆上的指针
-        // 这样我们就把函数f传到了一个静态函数内部
-        //
-        // 注意到它具有泛型参数，因此对每一次spawn调用，
-        // 由于F类型是独特的，因此都会生成一个新的kernel_thread_entry
-        extern fn kernel_thread_entry<S, F, T>(f: usize) -> !
-            where
-                S: ThreadSupport,
-                F: Send + 'static + FnOnce() -> T,
-                T: Send + 'static,
-        {
-            // 在静态函数内部：
-            // 根据传进来的指针，恢复f
-            let f = unsafe { Box::from_raw(f as *mut F) };
-            // 调用f，并将其返回值也放在堆上
-            let ret = Box::new(f());
-            // 清理本地线程存储
-            //   unsafe { LocalKey::<usize>::get_map() }.clear();
-            // 让Processor退出当前线程
-            // 把f返回值在堆上的指针，以线程返回码的形式传递出去
-            let pid = S::processor().pid();
-            let exit_code = Box::into_raw(ret) as usize;
-            S::processor().manager().set_status(pid, Status::Exited(exit_code));
-            S::processor().yield_now();
-            // 再也不会被调度回来了
-            unreachable!()
-        }
-
-        // 在Processor中创建新的线程
-        let context = S::new_kernel(kernel_thread_entry::<S, F, T>, f as usize);
-        let pid = S::processor().manager().add(context);
-
-        // 接下来看看`JoinHandle::join()`的实现
-        // 了解是如何获取f返回值的
-        return JoinHandle {
-            thread: Thread { pid, mark: PhantomData },
-            mark: PhantomData,
-        };
+        // 在静态函数内部：
+        // 根据传进来的指针，恢复f
+        let f = unsafe { Box::from_raw(f as *mut F) };
+        // 调用f，并将其返回值也放在堆上
+        let ret = Box::new(f());
+        // 清理本地线程存储
+        //   unsafe { LocalKey::<usize>::get_map() }.clear();
+        // 让Processor退出当前线程
+        // 把f返回值在堆上的指针，以线程返回码的形式传递出去
+        let pid = processor().pid();
+        let exit_code = Box::into_raw(ret) as usize;
+        processor().manager().set_status(pid, Status::Exited(exit_code));
+        processor().yield_now();
+        // 再也不会被调度回来了
+        unreachable!()
     }
 
-    /// Cooperatively gives up a timeslice to the OS scheduler.
-    pub fn yield_now() {
-        info!("yield:");
-        S::processor().yield_now();
-    }
+    // 在Processor中创建新的线程
+    let context = new_kernel_context(kernel_thread_entry::<F, T>, f as usize);
+    let pid = processor().manager().add(context);
 
-    /// Blocks unless or until the current thread's token is made available.
-    pub fn park() {
-        info!("park:");
-        let pid = S::processor().pid();
-        S::processor().manager().set_status(pid, Status::Sleeping);
-        S::processor().yield_now();
-    }
+    // 接下来看看`JoinHandle::join()`的实现
+    // 了解是如何获取f返回值的
+    return JoinHandle {
+        thread: Thread { pid },
+        mark: PhantomData,
+    };
+}
+
+/// Cooperatively gives up a timeslice to the OS scheduler.
+pub fn yield_now() {
+    info!("yield:");
+    processor().yield_now();
+}
+
+/// Blocks unless or until the current thread's token is made available.
+pub fn park() {
+    info!("park:");
+    let pid = processor().pid();
+    processor().manager().set_status(pid, Status::Sleeping);
+    processor().yield_now();
 }
 
 /// A handle to a thread.
-pub struct Thread<S: ThreadSupport> {
+pub struct Thread {
     pid: usize,
-    mark: PhantomData<S>,
 }
 
-impl<S: ThreadSupport> Thread<S> {
+impl Thread {
     /// Atomically makes the handle's token available if it is not already.
     pub fn unpark(&self) {
-        S::processor().manager().set_status(self.pid, Status::Ready);
+        processor().manager().set_status(self.pid, Status::Ready);
     }
     /// Gets the thread's unique identifier.
     pub fn id(&self) -> usize {
@@ -159,14 +138,14 @@ impl<S: ThreadSupport> Thread<S> {
 }
 
 /// An owned permission to join on a thread (block on its termination).
-pub struct JoinHandle<S: ThreadSupport, T> {
-    thread: Thread<S>,
+pub struct JoinHandle<T> {
+    thread: Thread,
     mark: PhantomData<T>,
 }
 
-impl<S: ThreadSupport, T> JoinHandle<S, T> {
+impl<T> JoinHandle<T> {
     /// Extracts a handle to the underlying thread.
-    pub fn thread(&self) -> &Thread<S> {
+    pub fn thread(&self) -> &Thread {
         &self.thread
     }
     /// Waits for the associated thread to finish.

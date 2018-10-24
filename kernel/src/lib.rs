@@ -35,6 +35,8 @@ extern crate volatile;
 extern crate x86_64;
 extern crate xmas_elf;
 
+pub use process::{processor, new_kernel_context};
+use ucore_process::thread;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
@@ -46,8 +48,6 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
-
-use process::{thread, thread_};
 mod sync;
 mod trap;
 mod console;
