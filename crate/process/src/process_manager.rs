@@ -19,8 +19,8 @@ const MAX_PROC_NUM: usize = 32;
 pub enum Status {
     Ready,
     Running(usize),
-    Waiting(Pid),
     Sleeping,
+    /// aka ZOMBIE. Its context was dropped.
     Exited(ExitCode),
 }
 
@@ -98,8 +98,10 @@ impl ProcessManager {
         proc.status = proc.status_after_stop.clone();
         proc.status_after_stop = Status::Ready;
         proc.context = Some(context);
-        if proc.status == Status::Ready {
-            self.scheduler.lock().insert(pid);
+        match proc.status {
+            Status::Ready => self.scheduler.lock().insert(pid),
+            Status::Exited(_) => proc.context = None,
+            _ => {}
         }
     }
 
@@ -120,6 +122,10 @@ impl ProcessManager {
         match proc.status {
             Status::Running(_) => proc.status_after_stop = status,
             _ => proc.status = status,
+        }
+        match proc.status {
+            Status::Exited(_) => proc.context = None,
+            _ => {}
         }
     }
 }
