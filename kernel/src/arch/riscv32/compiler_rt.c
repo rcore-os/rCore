@@ -47,3 +47,15 @@ char __atomic_compare_exchange_4(int* dst, int* expected, int desired) {
     }
     return 0;
 }
+
+int __atomic_fetch_add_4(int* ptr, int val) {
+    int res;
+    __asm__ __volatile__("amoadd.w.rl %0, %1, (%2)" : "=r"(res) : "r"(val), "r"(ptr) : "memory");
+    return res;
+}
+
+int __atomic_fetch_sub_4(int* ptr, int val) {
+    int res;
+    __asm__ __volatile__("amoadd.w.rl %0, %1, (%2)" : "=r"(res) : "r"(-val), "r"(ptr) : "memory");
+    return res;
+}
