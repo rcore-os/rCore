@@ -41,7 +41,7 @@ pub fn current() -> Thread {
 pub fn sleep(dur: Duration) {
     let time = dur_to_ticks(dur);
     info!("sleep: {:?} ticks", time);
-    // TODO: register wakeup
+    processor().manager().sleep(current().id(), time);
     park();
 
     fn dur_to_ticks(dur: Duration) -> usize {
@@ -87,9 +87,8 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         //   unsafe { LocalKey::<usize>::get_map() }.clear();
         // 让Processor退出当前线程
         // 把f返回值在堆上的指针，以线程返回码的形式传递出去
-        let pid = processor().pid();
         let exit_code = Box::into_raw(ret) as usize;
-        processor().manager().set_status(pid, Status::Exited(exit_code));
+        processor().manager().exit(current().id(), exit_code);
         processor().yield_now();
         // 再也不会被调度回来了
         unreachable!()
@@ -116,8 +115,7 @@ pub fn yield_now() {
 /// Blocks unless or until the current thread's token is made available.
 pub fn park() {
     info!("park:");
-    let pid = processor().pid();
-    processor().manager().set_status(pid, Status::Sleeping);
+    processor().manager().sleep(current().id(), 0);
     processor().yield_now();
 }
 
@@ -129,7 +127,7 @@ pub struct Thread {
 impl Thread {
     /// Atomically makes the handle's token available if it is not already.
     pub fn unpark(&self) {
-        processor().manager().set_status(self.pid, Status::Ready);
+        processor().manager().wakeup(self.pid);
     }
     /// Gets the thread's unique identifier.
     pub fn id(&self) -> usize {
@@ -150,8 +148,19 @@ impl<T> JoinHandle<T> {
     }
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
-        // TODO: wait for the thread
-        unimplemented!()
+        loop {
+            match processor().manager().get_status(self.thread.pid) {
+                Some(Status::Exited(exit_code)) => {
+                    processor().manager().remove(self.thread.pid);
+                    // Find return value on the heap from the exit code.
+                    return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
+                }
+                None => return Err(()),
+                _ => {}
+            }
+            processor().manager().wait(current().id(), self.thread.pid);
+            processor().yield_now();
+        }
     }
 }
 
