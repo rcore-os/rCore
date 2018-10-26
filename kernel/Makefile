@@ -137,6 +137,9 @@ kernel:
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 else
+	@-patch -p0 -N -b \
+		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
+		src/arch/riscv32/atomic.patch
 	@CC=$(cc) cargo xbuild $(build_args)
 endif
 

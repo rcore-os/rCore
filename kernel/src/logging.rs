@@ -1,6 +1,6 @@
 use core::fmt;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
-use sync::SpinLock as Mutex;
+use spin::Mutex;
 
 lazy_static! {
     static ref log_mutex: Mutex<()> = Mutex::new(());

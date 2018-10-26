@@ -1,8 +1,7 @@
 pub use arch::paging::*;
 use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K};
 use consts::MEMORY_OFFSET;
-use sync::{MutexGuard, Spin};
-use sync::SpinLock as Mutex;
+use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
@@ -49,7 +48,7 @@ lazy_static! {
 }
 
 /// The only way to get active page table
-pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>, Spin> {
+pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 

@@ -2,7 +2,7 @@ use simple_filesystem::*;
 use alloc::boxed::Box;
 #[cfg(target_arch = "x86_64")]
 use arch::driver::ide;
-use sync::SpinLock as Mutex;
+use spin::Mutex;
 
 // Hard link user program
 #[cfg(target_arch = "riscv32")]

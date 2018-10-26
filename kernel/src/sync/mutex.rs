@@ -30,8 +30,8 @@ use arch::interrupt;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{ATOMIC_BOOL_INIT, AtomicBool, Ordering};
 use super::Condvar;
-use super::atomic_lock::AtomicLock;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
@@ -39,7 +39,7 @@ pub type ThreadLock<T> = Mutex<T, Condvar>;
 
 pub struct Mutex<T: ?Sized, S: MutexSupport>
 {
-    lock: AtomicLock,
+    lock: AtomicBool,
     support: S,
     data: UnsafeCell<T>,
 }
@@ -78,7 +78,7 @@ impl<T, S: MutexSupport> Mutex<T, S>
     /// ```
     pub fn new(user_data: T) -> Mutex<T, S> {
         Mutex {
-            lock: AtomicLock::new(),
+            lock: ATOMIC_BOOL_INIT,
             data: UnsafeCell::new(user_data),
             support: S::new(),
         }
@@ -96,9 +96,9 @@ impl<T, S: MutexSupport> Mutex<T, S>
 impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
 {
     fn obtain_lock(&self) {
-        while !self.lock.try_lock() {
+        while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
             // Wait until the lock looks unlocked before retrying
-            while self.lock.load() {
+            while self.lock.load(Ordering::Relaxed) {
                 self.support.cpu_relax();
             }
         }
@@ -137,14 +137,14 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     ///
     /// If the lock isn't held, this is a no-op.
     pub unsafe fn force_unlock(&self) {
-        self.lock.store();
+        self.lock.store(false, Ordering::Release);
     }
 
     /// Tries to lock the mutex. If it is already locked, it will return None. Otherwise it returns
     /// a guard within Some.
     pub fn try_lock(&self) -> Option<MutexGuard<T, S>> {
         let support_guard = S::before_lock();
-        if self.lock.try_lock() {
+        if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
             Some(MutexGuard {
                 mutex: self,
                 support_guard,
@@ -174,19 +174,19 @@ impl<T: ?Sized + Default, S: MutexSupport> Default for Mutex<T, S> {
 impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S>
 {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { unsafe { &*self.mutex.data.get() } }
+    fn deref(&self) -> &T { unsafe { &*self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S>
 {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { unsafe { &mut *self.mutex.data.get() } }
+    fn deref_mut(&mut self) -> &mut T { unsafe { &mut *self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>
 {
     /// The dropping of the MutexGuard will release the lock it was created from.
     fn drop(&mut self) {
-        self.mutex.lock.store();
+        self.mutex.lock.store(false, Ordering::Release);
         self.mutex.support.after_unlock();
     }
 }
