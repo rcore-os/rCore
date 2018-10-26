@@ -8,6 +8,8 @@ use_apic = []
 link_user_program = []
 no_bbl = []
 
+board_raspi3 = []
+
 [profile.dev]
 # MUST >= 1 : Enable RVO to avoid stack overflow
 # MUST <= 1 : Avoid double fault at -O2 T_T
