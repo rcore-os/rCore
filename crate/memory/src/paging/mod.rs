@@ -13,7 +13,7 @@ pub trait PageTable {
     type Entry: Entry;
     fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Self::Entry;
     fn unmap(&mut self, addr: VirtAddr);
-    fn get_entry(&mut self, addr: VirtAddr) -> &mut Self::Entry;
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Self::Entry>;
     // For testing with mock
     fn get_page_slice_mut<'a,'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8];
     fn read(&mut self, addr: VirtAddr) -> u8;

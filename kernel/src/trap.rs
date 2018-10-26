@@ -15,8 +15,9 @@ pub fn before_return() {
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
+    error!("{:#x?}", tf);
     let pid = processor().pid();
-    error!("On CPU{} Process {}:\n{:#x?}", cpu::id(), pid, tf);
+    error!("On CPU{} Process {}", cpu::id(), pid);
 
     processor().manager().exit(pid, 0x100);
     processor().yield_now();

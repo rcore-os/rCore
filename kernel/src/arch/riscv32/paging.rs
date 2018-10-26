@@ -1,4 +1,4 @@
-use consts::{KERNEL_PML4, RECURSIVE_PAGE_PML4};
+use consts::{KERNEL_P2_INDEX, RECURSIVE_INDEX};
 // Depends on kernel
 use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use super::riscv::addr::*;
@@ -14,14 +14,14 @@ use ucore_memory::paging::*;
 pub fn setup_page_table(frame: Frame) {
     let p2 = unsafe { &mut *(frame.start_address().as_u32() as *mut RvPageTable) };
     p2.zero();
-    p2.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
+    p2.set_recursive(RECURSIVE_INDEX, frame.clone());
 
     // Set kernel identity map
     // 0x10000000 ~ 1K area
     p2.map_identity(0x40, EF::VALID | EF::READABLE | EF::WRITABLE);
     // 0x80000000 ~ 8K area
-    p2.map_identity(KERNEL_PML4, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
-    p2.map_identity(KERNEL_PML4 + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+    p2.map_identity(KERNEL_P2_INDEX, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+    p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
 
     use super::riscv::register::satp;
     unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
@@ -42,7 +42,7 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target as u32));
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap().flush();
-        self.get_entry(addr)
+        self.get_entry(addr).unwrap()
     }
 
     fn unmap(&mut self, addr: usize) {
@@ -51,11 +51,14 @@ impl PageTable for ActivePageTable {
         flush.flush();
     }
 
-    fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
+    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
+        if unsafe { !(*ROOT_PAGE_TABLE)[addr >> 22].flags().contains(EF::VALID) } {
+            return None;
+        }
         let page = Page::of_addr(VirtAddr::new(addr));
         let _ = self.0.translate_page(page);
-        let entry_addr = ((addr >> 10) & 0x003ffffc) | (RECURSIVE_PAGE_PML4 << 22);
-        unsafe { &mut *(entry_addr as *mut PageEntry) }
+        let entry_addr = ((addr >> 10) & ((1 << 22) - 4)) | (RECURSIVE_INDEX << 22);
+        unsafe { Some(&mut *(entry_addr as *mut PageEntry)) }
     }
 
     fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
@@ -73,7 +76,7 @@ impl PageTable for ActivePageTable {
 }
 
 const ROOT_PAGE_TABLE: *mut RvPageTable =
-    (((RECURSIVE_PAGE_PML4 << 10) | (RECURSIVE_PAGE_PML4 + 1)) << 12) as *mut RvPageTable;
+    (((RECURSIVE_INDEX << 10) | (RECURSIVE_INDEX + 1)) << 12) as *mut RvPageTable;
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
@@ -153,24 +156,24 @@ impl InactivePageTable for InactivePageTable0 {
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
             table.zero();
-            table.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
+            table.set_recursive(RECURSIVE_INDEX, frame.clone());
         });
         InactivePageTable0 { p2_frame: frame }
     }
 
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
         active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
-            let backup = p2_table[RECURSIVE_PAGE_PML4].clone();
+            let backup = p2_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
-            p2_table[RECURSIVE_PAGE_PML4].set(self.p2_frame.clone(), EF::VALID);
+            p2_table[RECURSIVE_INDEX].set(self.p2_frame.clone(), EF::VALID);
             sfence_vma_all();
 
             // execute f in the new context
             f(active_table);
 
-            // restore recursive mapping to original p4 table
-            p2_table[RECURSIVE_PAGE_PML4] = backup;
+            // restore recursive mapping to original p2 table
+            p2_table[RECURSIVE_INDEX] = backup;
             sfence_vma_all();
         });
     }
@@ -222,12 +225,12 @@ impl InactivePageTable0 {
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
-        let e1 = table[KERNEL_PML4];
+        let e1 = table[KERNEL_P2_INDEX];
         assert!(!e1.is_unused());
 
         self.edit(|_| {
             table[0x40] = e0;
-            table[KERNEL_PML4].set(e1.frame(), EF::VALID | EF::GLOBAL);
+            table[KERNEL_P2_INDEX].set(e1.frame(), EF::VALID | EF::GLOBAL);
         });
     }
 }

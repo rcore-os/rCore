@@ -38,7 +38,7 @@ impl SwapManager for EnhancedClockSwapManager {
             //        The reason may be `get_page_slice_mut()` contains unsafe operation,
             //        which lead the compiler to do a wrong optimization.
 //            let slice = page_table.get_page_slice_mut(addr);
-            let entry = page_table.get_entry(addr);
+            let entry = page_table.get_entry(addr).unwrap();
 //            println!("{:#x} , {}, {}", addr, entry.accessed(), entry.dirty());
 
             match (entry.accessed(), entry.dirty()) {

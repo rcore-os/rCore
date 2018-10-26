@@ -48,33 +48,34 @@ impl<T: PageTable> CowExt<T> {
         }
     }
     pub fn unmap_shared(&mut self, addr: VirtAddr) {
-        {
-            let entry = self.page_table.get_entry(addr);
-            let frame = entry.target() / PAGE_SIZE;
-            if entry.readonly_shared() {
-                self.rc_map.read_decrease(&frame);
-            } else if entry.writable_shared() {
-                self.rc_map.write_decrease(&frame);
-            }
+        let entry = self.page_table.get_entry(addr)
+            .expect("entry not exist");
+        let frame = entry.target() / PAGE_SIZE;
+        if entry.readonly_shared() {
+            self.rc_map.read_decrease(&frame);
+        } else if entry.writable_shared() {
+            self.rc_map.write_decrease(&frame);
         }
         self.page_table.unmap(addr);
     }
     /// This function must be called whenever PageFault happens.
     /// Return whether copy-on-write happens.
     pub fn page_fault_handler(&mut self, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr) -> bool {
-        {
-            let entry = self.page_table.get_entry(addr);
-            if !entry.readonly_shared() && !entry.writable_shared() {
-                return false;
-            }
-            let frame = entry.target() / PAGE_SIZE;
-            if self.rc_map.read_count(&frame) == 0 && self.rc_map.write_count(&frame) == 1 {
-                entry.clear_shared();
-                entry.set_writable(true);
-                entry.update();
-                self.rc_map.write_decrease(&frame);
-                return true;
-            }
+        let entry = self.page_table.get_entry(addr);
+        if entry.is_none() {
+            return false;
+        }
+        let entry = entry.unwrap();
+        if !entry.readonly_shared() && !entry.writable_shared() {
+            return false;
+        }
+        let frame = entry.target() / PAGE_SIZE;
+        if self.rc_map.read_count(&frame) == 0 && self.rc_map.write_count(&frame) == 1 {
+            entry.clear_shared();
+            entry.set_writable(true);
+            entry.update();
+            self.rc_map.write_decrease(&frame);
+            return true;
         }
         use core::mem::uninitialized;
         let mut temp_data: [u8; PAGE_SIZE] = unsafe { uninitialized() };
@@ -186,7 +187,7 @@ pub mod test {
         pt.write(0x1000, 2);
         assert_eq!(pt.rc_map.read_count(&frame), 1);
         assert_eq!(pt.rc_map.write_count(&frame), 1);
-        assert_ne!(pt.get_entry(0x1000).target(), target);
+        assert_ne!(pt.get_entry(0x1000).unwrap().target(), target);
         assert_eq!(pt.read(0x1000), 2);
         assert_eq!(pt.read(0x2000), 1);
         assert_eq!(pt.read(0x3000), 1);
@@ -199,7 +200,7 @@ pub mod test {
         pt.write(0x2000, 3);
         assert_eq!(pt.rc_map.read_count(&frame), 0);
         assert_eq!(pt.rc_map.write_count(&frame), 0);
-        assert_eq!(pt.get_entry(0x2000).target(), target,
+        assert_eq!(pt.get_entry(0x2000).unwrap().target(), target,
                    "The last write reference should not allocate new frame.");
         assert_eq!(pt.read(0x1000), 2);
         assert_eq!(pt.read(0x2000), 3);

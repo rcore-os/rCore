@@ -85,7 +85,7 @@ impl MemoryArea {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             let addr = page.start_address();
             if self.phys_start_addr.is_none() {
-                let target = pt.get_entry(addr).target();
+                let target = pt.get_entry(addr).unwrap().target();
                 T::dealloc_frame(target);
             }
             pt.unmap(addr);
