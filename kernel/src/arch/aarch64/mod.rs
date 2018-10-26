@@ -11,8 +11,11 @@ pub mod board;
 
 /// TODO
 /// The entry point of kernel
-#[no_mangle]    // don't mangle the name of this function
-pub extern fn rust_main() -> ! {
+#[no_mangle] // don't mangle the name of this function
+pub extern "C" fn rust_main() -> ! {
+    // Init board.
+    board::init();
+
     println!("Hello ARM64!");
 
     // First init log mod, so that we can print log info.
@@ -24,8 +27,6 @@ pub extern fn rust_main() -> ! {
     // Now heap is available
     // timer::init();
 
-    // Init board.
-    board::init();
     ::kmain();
 }
 
