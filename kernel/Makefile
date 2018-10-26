@@ -87,6 +87,7 @@ objdump := $(prefix)-objdump
 objcopy := $(prefix)-objcopy
 cc := $(prefix)-gcc
 as := $(prefix)-as
+gdb := $(prefix)-gdb
 
 .PHONY: all clean run build asm doc justrun kernel
 
@@ -103,8 +104,10 @@ run: build justrun
 justrun:
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
-debug: $(bin)
+debug: $(kernel) $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
+	@sleep 1
+	@$(gdb) $(kernel) -x ../tools/gdbinit
 
 ifeq ($(arch), x86_64)
 build: kernel
@@ -136,7 +139,7 @@ else
 	cp bbl ../../kernel/$@
 endif
 else ifeq ($(arch), aarch64)
-	$(objcopy) $(kernel) -O binary $@
+	$(objcopy) $(kernel) --strip-all -O binary $@
 endif
 
 kernel:

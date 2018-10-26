@@ -29,6 +29,4 @@ pub extern fn rust_main() -> ! {
     ::kmain();
 }
 
-// global_asm!(include_str!("boot/boot.asm"));
-// global_asm!(include_str!("boot/entry.asm"));
-// global_asm!(include_str!("boot/trap.asm"));
+global_asm!(include_str!("boot/boot.S"));

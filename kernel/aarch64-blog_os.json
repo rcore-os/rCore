@@ -13,6 +13,11 @@
   "linker": "aarch64-none-elf-ld",
   "linker-flavor": "ld",
   "linker-is-gnu": true,
+  "pre-link-args": {
+    "ld": [
+      "-Tsrc/arch/aarch64/boot/linker.ld"
+    ]
+  },
   "llvm-target": "aarch64-unknown-none",
   "no-compiler-rt": true,
   "features": "+a53,+strict-align",
@@ -20,6 +25,7 @@
   "os": "none",
   "panic": "abort",
   "panic-strategy": "abort",
+  "relocation-model": "static",
   "position-independent-executables": true,
   "target-c-int-width": "32",
   "target-endian": "little",
