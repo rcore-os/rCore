@@ -2,5 +2,7 @@ build
 target
 /kernel/src/arch/x86_64/interrupt/vector.asm
 
+.DS_Store
+
 # for eclipse
 .project
