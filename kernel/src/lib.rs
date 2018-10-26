@@ -60,6 +60,10 @@ pub mod arch;
 #[path = "arch/riscv32/mod.rs"]
 pub mod arch;
 
+#[cfg(target_arch = "aarch64")]
+#[path = "arch/aarch64/mod.rs"]
+pub mod arch;
+
 pub fn kmain() -> ! {
     process::init();
     unsafe { arch::interrupt::enable(); }

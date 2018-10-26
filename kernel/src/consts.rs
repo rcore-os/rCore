@@ -4,6 +4,8 @@
 pub use self::riscv::*;
 #[cfg(target_arch = "x86_64")]
 pub use self::x86_64::*;
+#[cfg(target_arch = "aarch64")]
+pub use self::aarch64::*;
 
 pub const MAX_CPU_NUM: usize = 8;
 pub const MAX_PROCESS_NUM: usize = 48;
@@ -125,4 +127,19 @@ mod x86_64 {
     /// Offset for usage in other temporary pages
     pub const USER_TMP_MISC_OFFSET: usize = USER_TMP_TLS_OFFSET + PML4_SIZE;
     pub const USER_TMP_MISC_PML4: usize = (USER_TMP_MISC_OFFSET & PML4_MASK) / PML4_SIZE;
+}
+
+#[cfg(target_arch = "aarch64")]
+mod aarch64 {
+    //! TODO: replace unmiplemented consts with real value
+    const UNIMPLEMENTED: usize = 0;
+    pub const KERNEL_OFFSET: usize = UNIMPLEMENTED;
+    pub const KERNEL_PML4: usize = UNIMPLEMENTED;
+    pub const KERNEL_HEAP_OFFSET: usize = UNIMPLEMENTED;
+    pub const KERNEL_HEAP_SIZE: usize = 8 * 1024 * 1024;
+    pub const MEMORY_OFFSET: usize = UNIMPLEMENTED;
+    pub const MEMORY_END: usize = UNIMPLEMENTED;
+    pub const USER_STACK_OFFSET: usize = UNIMPLEMENTED;
+    pub const USER_STACK_SIZE: usize = UNIMPLEMENTED;
+    pub const USER32_STACK_OFFSET: usize = UNIMPLEMENTED;
 }
