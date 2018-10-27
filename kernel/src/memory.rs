@@ -5,7 +5,7 @@ use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_};
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -32,13 +32,25 @@ pub fn dealloc_frame(target: usize) {
     FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
 }
 
-// alloc from heap
-pub fn alloc_stack() -> Stack {
-    use alloc::alloc::{alloc, Layout};
-    const STACK_SIZE: usize = 0x8000;
-    let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, 0x8000).unwrap()) } as usize;
-    let top = bottom + STACK_SIZE;
-    Stack { top, bottom }
+pub struct KernelStack(usize);
+const STACK_SIZE: usize = 0x8000;
+
+impl KernelStack {
+    pub fn new() -> Self {
+        use alloc::alloc::{alloc, Layout};
+        let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
+        KernelStack(bottom)
+    }
+    pub fn top(&self) -> usize {
+        self.0 + STACK_SIZE
+    }
+}
+
+impl Drop for KernelStack {
+    fn drop(&mut self) {
+        use alloc::alloc::{dealloc, Layout};
+        unsafe{ dealloc(self.0 as _, Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()); }
+    }
 }
 
 lazy_static! {

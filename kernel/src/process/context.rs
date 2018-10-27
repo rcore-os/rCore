@@ -1,5 +1,5 @@
 use arch::interrupt::{TrapFrame, Context as ArchContext};
-use memory::{MemoryArea, MemoryAttr, MemorySet};
+use memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use ucore_process::Context;
@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 pub struct ContextImpl {
     arch: ArchContext,
     memory_set: MemorySet,
+    kstack: KernelStack,
 }
 
 impl Context for ContextImpl {
@@ -23,14 +24,17 @@ impl ContextImpl {
         Box::new(ContextImpl {
             arch: ArchContext::null(),
             memory_set: MemorySet::new(),
+            kstack: KernelStack::new(),
         })
     }
 
     pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
-        let ms = MemorySet::new();
+        let memory_set = MemorySet::new();
+        let kstack = KernelStack::new();
         Box::new(ContextImpl {
-            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
-            memory_set: ms,
+            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
+            memory_set,
+            kstack,
         })
     }
 
@@ -82,12 +86,15 @@ impl ContextImpl {
             });
         }
 
+        let kstack = KernelStack::new();
+
         Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
-                    entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
+                    entry_addr, user_stack_top - 8, kstack.top(), is32, memory_set.token())
             },
             memory_set,
+            kstack,
         })
     }
 
@@ -111,9 +118,12 @@ impl ContextImpl {
             });
         }
 
+        let kstack = KernelStack::new();
+
         Box::new(ContextImpl {
-            arch: unsafe { ArchContext::new_fork(tf, memory_set.kstack_top(), memory_set.token()) },
+            arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
+            kstack,
         })
     }
 }

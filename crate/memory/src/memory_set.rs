@@ -15,7 +15,6 @@ pub trait InactivePageTable {
 
     fn alloc_frame() -> Option<PhysAddr>;
     fn dealloc_frame(target: PhysAddr);
-    fn alloc_stack() -> Stack;
 }
 
 /// 一片连续内存空间，有相同的访问权限
@@ -132,7 +131,6 @@ impl MemoryAttr {
 pub struct MemorySet<T: InactivePageTable> {
     areas: Vec<MemoryArea>,
     page_table: T,
-    kstack: Stack,
 }
 
 impl<T: InactivePageTable> MemorySet<T> {
@@ -140,17 +138,12 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
             page_table: T::new(),
-            kstack: T::alloc_stack(),
         }
     }
-    /// Used for remap_kernel() where heap alloc is unavailable
-    pub unsafe fn new_from_raw_space(slice: &mut [u8], kstack: Stack) -> Self {
-        use core::mem::size_of;
-        let cap = slice.len() / size_of::<MemoryArea>();
+    pub fn new_bare() -> Self {
         MemorySet {
-            areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
+            areas: Vec::<MemoryArea>::new(),
             page_table: T::new_bare(),
-            kstack,
         }
     }
     pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
@@ -175,9 +168,6 @@ impl<T: InactivePageTable> MemorySet<T> {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
-    pub fn kstack_top(&self) -> usize {
-        self.kstack.top
-    }
     pub fn clear(&mut self) {
         let Self { ref mut page_table, ref mut areas, .. } = self;
         page_table.edit(|pt| {
@@ -200,7 +190,6 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
         MemorySet {
             areas: self.areas.clone(),
             page_table,
-            kstack: T::alloc_stack(),
         }
     }
 }
@@ -217,10 +206,4 @@ impl<T: InactivePageTable> Debug for MemorySet<T> {
             .entries(self.areas.iter())
             .finish()
     }
-}
-
-#[derive(Debug)]
-pub struct Stack {
-    pub top: usize,
-    pub bottom: usize,
 }

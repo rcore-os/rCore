@@ -1,6 +1,6 @@
 use consts::{KERNEL_P2_INDEX, RECURSIVE_INDEX};
 // Depends on kernel
-use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
+use memory::{active_table, alloc_frame, dealloc_frame};
 use super::riscv::addr::*;
 use super::riscv::asm::{sfence_vma, sfence_vma_all};
 use super::riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
@@ -214,10 +214,6 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn dealloc_frame(target: usize) {
         dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
     }
 }
 

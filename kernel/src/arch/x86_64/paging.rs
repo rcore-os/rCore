@@ -1,6 +1,6 @@
 use bit_allocator::{BitAlloc, BitAlloc64K};
 // Depends on kernel
-use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
+use memory::{active_table, alloc_frame, dealloc_frame};
 use spin::{Mutex, MutexGuard};
 use ucore_memory::cow::CowExt;
 use ucore_memory::memory_set::*;
@@ -230,10 +230,6 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn dealloc_frame(target: usize) {
         dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
     }
 }
 
