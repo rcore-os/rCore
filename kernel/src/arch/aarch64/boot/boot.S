@@ -55,7 +55,6 @@ switch_to_el1:
     movk    x0, #0x8000, lsl #16
     msr     hcr_el2, x0
 
-
     # don't trap accessing SVE registers (ref: D10.2.30)
     msr     cptr_el2, xzr
 
