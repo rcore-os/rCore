@@ -14,7 +14,21 @@ _binary_user_riscv_img_start:
 _binary_user_riscv_img_end:
 "#);
 
+const LOGO: &str = r#"
+    ____                __   ____  _____
+   / __ \ __  __ _____ / /_ / __ \/ ___/
+  / /_/ // / / // ___// __// / / /\__ \
+ / _, _// /_/ /(__  )/ /_ / /_/ /___/ /
+/_/ |_| \__,_//____/ \__/ \____//____/
+"#;
+
+pub fn show_logo() {
+    println!("{}", LOGO);
+}
+
 pub fn shell() {
+    show_logo();
+
     #[cfg(target_arch = "riscv32")]
     let device = {
         extern {

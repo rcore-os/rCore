@@ -19,6 +19,8 @@ pub extern "C" fn rust_main() -> ! {
     // First init log mod, so that we can print log info.
     ::logging::init();
 
+    super::fs::show_logo();
+
     loop {
         print!(">> ");
         loop {
