@@ -17,7 +17,8 @@ pub extern "C" fn rust_main() -> ! {
     board::init();
 
     // First init log mod, so that we can print log info.
-    ::logging::init();
+    // FIXME
+    // ::logging::init();
 
     super::fs::show_logo();
 

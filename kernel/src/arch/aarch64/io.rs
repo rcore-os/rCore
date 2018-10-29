@@ -4,9 +4,15 @@ use core::fmt::{Arguments, Write};
 use super::board::serial::{SerialRead, SERIAL_PORT};
 
 pub fn getchar() -> char {
-    SERIAL_PORT.lock().receive() as char
+    // FIXME
+    unsafe {
+        SERIAL_PORT.receive() as char
+    }
 }
 
 pub fn putfmt(fmt: Arguments) {
-    SERIAL_PORT.lock().write_fmt(fmt).unwrap()
+    // FIXME
+    unsafe {
+        SERIAL_PORT.write_fmt(fmt).unwrap()
+    }
 }

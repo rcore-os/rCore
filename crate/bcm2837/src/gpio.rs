@@ -116,8 +116,12 @@ impl Gpio<Uninitialized> {
     /// Enables the alternative function `function` for `self`. Consumes self
     /// and returns a `Gpio` structure in the `Alt` state.
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
-        self.registers.FSEL[(self.pin / 10) as usize]
-            .write((function as u32) << (3 * (self.pin % 10)));
+        let select = (self.pin / 10) as usize;
+        let offset = 3 * (self.pin % 10) as usize;
+        let mut value = self.registers.FSEL[select].read();
+        value &= !(0b111 << offset);
+        value |= (function as u32) << offset;
+        self.registers.FSEL[select].write(value);
         self.transition()
     }
 
