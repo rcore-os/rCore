@@ -9,10 +9,10 @@
   "cpu": "generic-rv32",
   "features": "",
   "max-atomic-width": "32",
-  "linker": "riscv64-unknown-elf-ld",
-  "linker-flavor": "ld",
+  "linker": "rust-lld",
+  "linker-flavor": "ld.lld",
   "pre-link-args": {
-    "ld": [
+    "ld.lld": [
       "-Tsrc/arch/riscv32/boot/linker.ld",
       "-melf32lriscv"
     ]
