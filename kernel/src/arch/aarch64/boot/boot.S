@@ -55,6 +55,15 @@ switch_to_el1:
     movk    x0, #0x8000, lsl #16
     msr     hcr_el2, x0
 
+
+    # don't trap accessing SVE registers (ref: D10.2.30)
+    msr     cptr_el2, xzr
+
+    # enable floating point and SVE (SIMD) (bits 20, 21) (ref: D10.2.29)
+    mrs     x0, cpacr_el1
+    orr     x0, x0, #(0x3 << 20)
+    msr     cpacr_el1, x0
+
     # Set SCTLR to known state (RES1: 11, 20, 22, 23, 28, 29) (ref: D10.2.100)
     mov     x0, #0x0800
     movk    x0, #0x30d0, lsl #16

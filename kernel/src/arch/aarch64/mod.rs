@@ -13,21 +13,33 @@ pub mod board;
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main() -> ! {
-    // Init board.
+    // Init board to enable serial port.
     board::init();
 
-    println!("Hello ARM64!");
-
     // First init log mod, so that we can print log info.
-    // ::logging::init();
-    // Init trap handling.
-    // interrupt::init();
-    // Init physical memory management and heap.
-    // memory::init();
-    // Now heap is available
-    // timer::init();
+    ::logging::init();
 
-    ::kmain();
+    loop {
+        print!(">> ");
+        loop {
+            let c = io::getchar();
+            match c {
+                '\u{7f}' => {
+                    print!("\u{7f}");
+                }
+                ' '...'\u{7e}' => {
+                    print!("{}", c);
+                }
+                '\n' | '\r' => {
+                    print!("\n");
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // ::kmain();
 }
 
 global_asm!(include_str!("boot/boot.S"));
