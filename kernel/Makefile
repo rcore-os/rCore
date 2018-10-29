@@ -153,3 +153,24 @@ endif
 $(user_obj): $(user_bins)
 	@cd $(user_bin_path) && \
 		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
+
+
+
+### install ###
+ifeq ($(board), raspi3)
+sd_card ?=
+
+ifeq ($(shell uname), Darwin)
+sd_card := /Volumes/boot
+else ifeq ($(shell uname), Linux)
+sd_card := /media/$(shell whoami)/boot
+endif
+
+ifdef sd_card
+.PHONY:
+install: $(bin)
+	cp $(bin) $(sd_card)/kernel8.img
+	sudo umount $(sd_card)
+endif
+
+endif
