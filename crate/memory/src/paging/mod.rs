@@ -3,6 +3,7 @@
 //! Implemented for every architecture, used by OS.
 
 use super::*;
+use super::memory_set::InactivePageTable;
 #[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
 

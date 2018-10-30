@@ -69,8 +69,8 @@ pub fn kmain() -> ! {
     // the test is not supported in riscv32(maybe)
     //thread::test::local_key();
     //thread::test::unpack();
-    sync::test::philosopher_using_mutex();
-    sync::test::philosopher_using_monitor();
+    //sync::test::philosopher_using_mutex();
+    //sync::test::philosopher_using_monitor();
     //sync::mpsc::test::test_all();
 
     // come into shell

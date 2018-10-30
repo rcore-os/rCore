@@ -7,6 +7,8 @@ use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 use ucore_memory::swap::*;
+use alloc::collections::VecDeque;
+use process::processor;
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -22,6 +24,7 @@ lazy_static! {
     pub static ref FRAME_ALLOCATOR: Mutex<FrameAlloc> = Mutex::new(FrameAlloc::default());
 }
 
+
 lazy_static! {
     static ref ACTIVE_TABLE: Mutex<CowExt<ActivePageTable>> = Mutex::new(unsafe {
         CowExt::new(ActivePageTable::new())
@@ -33,7 +36,7 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
     ACTIVE_TABLE.lock()
 }
 
-// Page table for swpa in and out
+// Page table for swap in and out
 lazy_static!{
     static ref ACTIVE_TABLE_SWAP: Mutex<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> = 
         Mutex::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
@@ -54,7 +57,7 @@ pub fn alloc_frame() -> Option<usize> {
     let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
     trace!("Allocate frame: {:x?}", ret);
     //do we need : unsafe { ACTIVE_TABLE_SWAP.force_unlock(); } ???
-    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any().ok().unwrap()))
+    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().unwrap()))
 }
 
 pub fn dealloc_frame(target: usize) {
@@ -88,8 +91,11 @@ pub fn page_fault_handler(addr: usize) -> bool {
         return true;
     }
     // handle the swap in/out
+    info!("start handling swap in/out page fault");
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-    if active_table_swap().page_fault_handler(addr, || alloc_frame().unwrap()){
+    let mut temp_proc = processor();
+    let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
+    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, || alloc_frame().unwrap()){
         return true;
     }
     false

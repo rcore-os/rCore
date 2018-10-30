@@ -238,9 +238,9 @@ impl InactivePageTable for InactivePageTable0 {
 
     /*
     * @param: 
-    *   f: a function to do something for a muatable activepagetable
+    *   f: a function to do something with the temporary modified activate page table
     * @brief: 
-    *   temporarily map the pagetable as an active page and apply f on the it 
+    *   temporarily map the inactive pagetable as an active p2page and apply f on the temporary modified active page table 
     */
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
         active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
@@ -259,6 +259,10 @@ impl InactivePageTable for InactivePageTable0 {
         });
     }
 
+    /*
+    * @brief:
+    *   active self as the current active page table
+    */
     unsafe fn activate(&self) {
         let old_frame = satp::read().frame();
         let new_frame = self.p2_frame.clone();
@@ -269,6 +273,12 @@ impl InactivePageTable for InactivePageTable0 {
         }
     }
 
+    /*
+    * @param:
+    *   f: the function to run when temporarily activate self as current page table
+    * @brief:
+    *   Temporarily activate self and run the process
+    */
     unsafe fn with(&self, f: impl FnOnce()) {
         let old_frame = satp::read().frame();
         let new_frame = self.p2_frame.clone();
@@ -285,6 +295,37 @@ impl InactivePageTable for InactivePageTable0 {
         }
     }
 
+    /*
+    * @param:
+    *   f: the function to run when temporarily activate self as current page table
+    * @brief:
+    *   Temporarily activate self and run the process, and return the return value of f
+    * @retval:
+    *   the return value of f
+    */
+    unsafe fn with_retval<T>(&self, f: impl FnOnce() -> T) -> T{
+        let old_frame = satp::read().frame();
+        let new_frame = self.p2_frame.clone();
+        debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
+        if old_frame != new_frame {
+            satp::set(satp::Mode::Sv32, 0, new_frame);
+            sfence_vma_all();
+        }
+        let target = f();
+        debug!("switch table {:x?} -> {:x?}", new_frame, old_frame);
+        if old_frame != new_frame {
+            satp::set(satp::Mode::Sv32, 0, old_frame);
+            sfence_vma_all();
+        }
+        target
+    }
+
+    /*
+    * @brief:
+    *   get the token of self, the token is self's pagetable frame's starting physical address
+    * @retval:
+    *   self token
+    */
     fn token(&self) -> usize {
         self.p2_frame.number() | (1 << 31) // as satp
     }

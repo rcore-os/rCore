@@ -66,6 +66,8 @@ pub trait InactivePageTable {
     **  @retval Stack                the stack allocated
     */
     fn alloc_stack() -> Stack;
+
+    unsafe fn with_retval<T>(&self, f: impl FnOnce() -> T) -> T;
 }
 
 /// a continuous memory space when the same attribute
@@ -367,6 +369,14 @@ impl<T: InactivePageTable> MemorySet<T> {
         });
         areas.clear();
     }
+
+    /*
+    **  @brief  get the mutable reference for the inactive page table
+    **  @retval: &mut T                 the mutable reference of the inactive page table 
+    */
+    pub fn get_page_table_mut(&mut self) -> &mut T{
+        &mut self.page_table
+    }
 }
 
 impl<T: InactivePageTable> Clone for MemorySet<T> {
@@ -387,6 +397,7 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
 
 impl<T: InactivePageTable> Drop for MemorySet<T> {
     fn drop(&mut self) {
+        info!("come into drop func for memoryset");
         self.clear();
     }
 }

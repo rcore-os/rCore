@@ -2,6 +2,8 @@
 #![feature(alloc)]
 
 extern crate alloc;
+#[macro_use]
+extern crate log;
 
 // To use `println!` in test
 #[cfg(test)]

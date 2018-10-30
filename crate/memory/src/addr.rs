@@ -1,4 +1,6 @@
 use core::ops::{Add, AddAssign};
+use super::paging::*;
+use super::memory_set::*;
 
 pub type VirtAddr = usize;
 pub type PhysAddr = usize;
@@ -73,4 +75,45 @@ impl Iterator for PageRange {
             None
         }
     }
+}
+
+/// frame for the swapmanager
+#[derive(Debug, Copy, Clone, PartialOrd, Ord)]
+#[repr(C)]
+pub struct Frame  {
+    page_table: usize, // the raw pointer for the frame's memory set's inactive page table
+    virtaddr: VirtAddr, // the virtual addr for the frame
+    token: usize, // the token for frame
+}
+
+impl Frame{
+    pub fn get_page_table(&self) -> usize {
+        self.page_table
+    }
+
+    pub fn get_virtaddr(&self) -> VirtAddr {
+        self.virtaddr
+    }
+
+    pub fn get_token(&self) -> usize{
+        self.token
+    }
+
+    pub fn new(pt: usize, addr: VirtAddr, pttoken: usize) -> Self{
+        Frame {
+            page_table: pt,
+            virtaddr: addr,
+            token: pttoken,
+        }
+    }
+} 
+
+impl PartialEq for Frame{
+    fn eq(&self, other: &Frame) -> bool {
+        self.token == other.token && self.virtaddr == other.virtaddr
+    }
+}
+
+impl Eq for Frame{
+    
 }

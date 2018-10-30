@@ -1,8 +1,9 @@
 use arch::interrupt::{TrapFrame, Context as ArchContext};
-use memory::{MemoryArea, MemoryAttr, MemorySet, active_table_swap};
+use memory::{MemoryArea, MemoryAttr, MemorySet, active_table_swap, alloc_frame};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use ucore_memory::{Page};
+use ::memory::{InactivePageTable0};
 
 pub struct Context {
     arch: ArchContext,
@@ -106,14 +107,9 @@ impl Context {
             });
         }
 
+        
         //set the user Memory pages in the memory set swappable
-        for area in memory_set.iter(){
-            for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
-                    let addr = page.start_address();
-                    active_table_swap().set_swappable(addr);
-                }
-        }
-        info!("finish setting memory swappable.");
+        memory_set_map_swappable(&mut memory_set);
 
         Context {
             arch: unsafe {
@@ -127,7 +123,7 @@ impl Context {
     /// Fork
     pub fn fork(&self, tf: &TrapFrame) -> Self {
         // Clone memory set, make a new page table
-        let memory_set = self.memory_set.clone();
+        let mut memory_set = self.memory_set.clone();
 
         // Copy data to temp space
         use alloc::vec::Vec;
@@ -143,11 +139,38 @@ impl Context {
                 }
             });
         }
+        // map the memory set swappable
+        memory_set_map_swappable(&mut memory_set);
 
         Context {
             arch: unsafe { ArchContext::new_fork(tf, memory_set.kstack_top(), memory_set.token()) },
             memory_set,
         }
+    }
+
+    pub fn get_memory_set_mut(&mut self) -> &mut MemorySet {
+        &mut self.memory_set
+    }
+
+}
+
+impl Drop for Context{
+    fn drop(&mut self){
+        //set the user Memory pages in the memory set unswappable
+        let Self {ref mut arch, ref mut memory_set} = self;
+        let pt = {
+            memory_set.get_page_table_mut() as *mut InactivePageTable0
+        };
+        for area in memory_set.iter(){
+            for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
+                let addr = page.start_address();
+                unsafe {
+                    active_table_swap().remove_from_swappable(pt, addr, || alloc_frame().unwrap());
+                }
+            }
+        }
+        info!("Finishing setting pages unswappable");
+        
     }
 }
 
@@ -186,4 +209,23 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
     // TODO: handle readonly
     if elf_flags.is_execute() { flags = flags.execute(); }
     flags
+}
+
+/*
+* @param: 
+*   memory_set: the target MemorySet to set swappable
+* @brief:
+*   map the memory area in the memory_set swappalbe, specially for the user process
+*/
+fn memory_set_map_swappable(memory_set: &mut MemorySet){
+    let pt = unsafe {
+        memory_set.get_page_table_mut() as *mut InactivePageTable0
+    };
+    for area in memory_set.iter(){
+        for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
+            let addr = page.start_address();
+            active_table_swap().set_swappable(pt, addr);
+        }
+    }
+    info!("Finishing setting pages swappable");
 }
