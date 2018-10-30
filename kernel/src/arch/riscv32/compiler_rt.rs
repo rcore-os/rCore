@@ -56,7 +56,13 @@ unsafe fn __atomic_compare_exchange<T: PartialEq>(dst: *mut T, expected: *mut T,
     let flags = interrupt::disable_and_store();
     let val = read(dst);
     let success = val == read(expected);
-    write(dst, if success {desired} else {val});
+    if success {
+        write(dst, desired);
+        write(expected, val);
+    } else {
+        write(expected, val);
+    }
+    
     interrupt::restore(flags);
     success
 }
