@@ -15,6 +15,7 @@ enum LsrStatus {
     TxAvailable = 1 << 5,
 }
 
+/// MU registers starting from `AUX_ENABLES` (ref: peripherals 2.1, page 8)
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {

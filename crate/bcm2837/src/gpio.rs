@@ -6,7 +6,7 @@ use volatile::{ReadOnly, Volatile, WriteOnly};
 /// The base address of the `GPIO` registers.
 const GPIO_BASE: usize = IO_BASE + 0x200000;
 
-/// An alternative GPIO function.
+/// An alternative GPIO function. (ref: peripherals 6.1, page 92)
 #[repr(u8)]
 pub enum Function {
     Input = 0b000,
@@ -19,6 +19,7 @@ pub enum Function {
     Alt5 = 0b010,
 }
 
+/// GPIO registers starting from `GPIO_BASE` (ref: peripherals 6.1, page 90)
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
@@ -81,6 +82,7 @@ impl<T> Gpio<T> {
     }
 
     /// Set the Gpio pull-up/pull-down state for values in `pin_value`
+    /// (ref: peripherals 6.1, page 101)
     pub fn set_gpio_pd(&mut self, pud_value: u8) {
         unsafe {
             let index = if self.pin >= 32 { 1 } else { 0 };
@@ -118,10 +120,10 @@ impl Gpio<Uninitialized> {
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
         let select = (self.pin / 10) as usize;
         let offset = 3 * (self.pin % 10) as usize;
-        let mut value = self.registers.FSEL[select].read();
-        value &= !(0b111 << offset);
-        value |= (function as u32) << offset;
-        self.registers.FSEL[select].write(value);
+        self.registers.FSEL[select].update(|value| {
+            *value &= !(0b111 << offset);
+            *value |= (function as u32) << offset;
+        });
         self.transition()
     }
 
