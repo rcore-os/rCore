@@ -24,7 +24,7 @@ simple-filesystem = { git = "https://github.com/benpigchu/SimpleFileSystem-Rust"
 	- [ ] `mount`
 	- [ ] 符号链接相关内容
 - [-] 调整接口的定义
-	- [x] 用 `get_entry` 取代 `list`
+	- [x] 用只获得一个目录项的 `get_entry` 取代获得所有目录项的 `list`
 	- [x] 用单层查找的 `find` 取代多层查找的 `lookup`
 	- [ ] 返回错误类型而非直接 `panic!`
 	- [ ] 将 `vfs` `device` 等与具体文件系统无关的内容从 `SimpleFileSystem-Rust` 仓库移动到主仓库的新包中（`crate/vfs`）
