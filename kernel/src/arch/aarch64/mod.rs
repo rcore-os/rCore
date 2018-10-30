@@ -19,6 +19,7 @@ pub extern "C" fn rust_main() -> ! {
     // First init log mod, so that we can print log info.
     // FIXME
     // ::logging::init();
+    interrupt::init();
 
     super::fs::show_logo();
 
@@ -30,6 +31,14 @@ pub extern "C" fn rust_main() -> ! {
                 '\u{7f}' => {
                     print!("\u{7f}");
                 }
+                'b' => unsafe {
+                    println!("brk 233");
+                    asm!("brk 233");
+                },
+                'c' => unsafe {
+                    println!("svc 666");
+                    asm!("svc 666");
+                },
                 ' '...'\u{7e}' => {
                     print!("{}", c);
                 }

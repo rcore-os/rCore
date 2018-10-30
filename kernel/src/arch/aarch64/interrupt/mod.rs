@@ -1,14 +1,20 @@
-//! Interrupt handler implementation on raspi3.
+//! Interrupt and exception for aarch64.
+
+mod handler;
+mod context;
+mod syndrome;
 
 pub use self::context::*;
+pub use self::handler::*;
 
-#[path = "context.rs"]
-mod context;
-
-/// Initialize the trap to enable the interrupt.
+/// Set the exception vector address
 pub fn init() {
-    // TODO
-    // info!("interrupt: init end");
+    unsafe {
+        asm!(
+            "adr x0, __vectors;
+             msr vbar_el1, x0"
+        );
+    }
 }
 
 /// Enable the interrupt.
