@@ -2,10 +2,10 @@
 ## 1 内存管理
 ### 1.0 尚未实现
 * 物理页帧的延迟分配:正在尝试尚未完成
-* 页面置换Enhanced Clock算法实现（修改和完善以适应新的接口）: 可以考虑作为lab中的challenge
+* 页面置换Enhanced Clock算法实现: 主要需要修改和完善以适应新的接口, 可以考虑作为lab中的challenge
 * 页面换出到磁盘而非堆内存中: ide无法挂载,目前是换入到堆内存中.
-* Copy On Write: 之前框架中有Copy on write的部分实现,并未启用,正确性存疑.
-* 获取页表项方法中存在的bug修复: 该bug目前不会影响OS运行, 但是这显然是十分危险的(比如在多核时,或者被中断时). 可能的修复方式是fork一份riscv库并对其进行修改,提供对页表项的操作借口.
+* Copy On Write: 之前框架中有Copy on write的部分实现,并未启用,正确性存疑. 可以考虑作为lab中的challenge
+* 获取页表项方法中存在的bug修复: 该bug目前不会影响OS运行, 但是这显然是十分危险的(比如在多核时,或者被中断时). 可能的修复方式是fork一份riscv库并对其进行修改,提供对页表项的操作接口.
 
 ### 1.1 page fault 处理
 Rust OS riscv32中之前并未实现page fault的异常处理, 目前已经加入page fault处理,目前的page fault能够处理的错误包括:
