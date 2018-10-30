@@ -7,7 +7,6 @@ use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 use ucore_memory::swap::*;
-use alloc::collections::VecDeque;
 use process::processor;
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;

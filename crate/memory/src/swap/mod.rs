@@ -259,6 +259,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **  @retval bool                 whether swap in happens.
     */
     pub fn page_fault_handler<T2: InactivePageTable>(&mut self, pt: *mut T2, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr) -> bool {
+        // now we didn't attach the cow so the present will be false when swapped(), to enable the cow some changes will be needed
         if !self.page_table.get_entry(addr).swapped() {
             return false;
         }
