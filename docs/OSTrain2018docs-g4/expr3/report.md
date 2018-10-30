@@ -2,9 +2,9 @@
 ## 1 内存管理
 @刘辰屹
 ## 2 进程管理
-@陈秋昊
+等待王润基完善后迁移。
 ## 3 同步互斥
-@陈秋昊
+修正了原本底层原子函数的bug并补全了底层原子函数的实现，但是目前的底层使用关中断实现，不支持多核，不过不影响lab实验的制作。
 ## 4 文件系统
 
 由于文件系统的主体不在主仓库而是在 [wangrunji0408/SimpleFileSystem-Rust](https://github.com/wangrunji0408/SimpleFileSystem-Rust) 中，对文件系统的修改在 [benpigchu/SimpleFileSystem-Rust](https://github.com/benpigchu/SimpleFileSystem-Rust) 进行（`ucore-fs-enhance` 分支）。要在主仓库中预览目前进行的修改，可以在 `kernel/Cargo.toml` 中加入以下内容：
