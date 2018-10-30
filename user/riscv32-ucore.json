@@ -9,13 +9,8 @@
   "cpu": "generic-rv32",
   "features": "",
   "max-atomic-width": "32",
-  "linker": "riscv64-unknown-elf-ld",
-  "linker-flavor": "ld",
-  "pre-link-args": {
-    "ld": [
-      "-melf32lriscv"
-    ]
-  },
+  "linker": "rust-lld",
+  "linker-flavor": "ld.lld",
   "executables": true,
   "panic-strategy": "abort",
   "relocation-model": "static",
