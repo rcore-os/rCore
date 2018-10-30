@@ -1,6 +1,27 @@
 # Rust OS 教学lab实验的制作 基础功能完善
 ## 1 内存管理
-@刘辰屹
+### 1.0 尚未实现
+* 物理页帧的延迟分配:正在尝试尚未完成
+* 页面置换Enhanced Clock算法实现（修改和完善以适应新的接口）: 可以考虑作为lab中的challenge
+* 页面换出到磁盘而非堆内存中: ide无法挂载,目前是换入到堆内存中.
+* Copy On Write: 之前框架中有Copy on write的部分实现,并未启用,正确性存疑.
+* 获取页表项方法中存在的bug修复: 该bug目前不会影响OS运行, 但是这显然是十分危险的(比如在多核时,或者被中断时). 可能的修复方式是fork一份riscv库并对其进行修改,提供对页表项的操作借口.
+
+### 1.1 page fault 处理
+Rust OS riscv32中之前并未实现page fault的异常处理, 目前已经加入page fault处理,目前的page fault能够处理的错误包括:
+* 页面换出导致的page fault
+* copy on write导致的page fault(由于目前尚未将copy on write机制接入框架,因此正确性有待验证)
+
+### 1.2 页面置换
+框架中原本的页面置换算法框架仅支持单页表, 且并未在RustOS中启用而只是在ucore-memory库中进行了测试. 此外之前部分swap in/out的底层支持尚未实现(set_swapped等等).
+目前已经:
+**完成了swap in/out所需的底层支持**: 由于目前框架中尚未启用copy on write, 因此实际上swap并未考虑到copy on write在page entry上所占用的标志位.不过swap标志位仅在not present时候有意义,因此通过略微修改现有框架是可以实现同时开启copy on write和swap 机制的.
+**修改页面置换的框架实现，使之支持多个用户进程**: 这里主要的改动在于SwapManager除了需要记录可换出页的虚地址以为,还要记录虚地址所在的二级页表(InactivePageTable0). 在换入换出操作时可能需要短暂进行活跃页表的切换.
+**在RustOS中启用页面置换**: 仅用户进程地址空间的用户页(MemorySet中所包含的地址)允许被换出.目前实现是在用户进程创建时将这些页设为swappable,在进程结束Context资源释放前先将这些页全部换入内存,然后进行unmap操作释放物理内存.
+
+
+
+
 ## 2 进程管理
 等待王润基完善后迁移。
 ## 3 同步互斥
