@@ -15,7 +15,6 @@ struct Process {
 
 pub type Pid = usize;
 type ExitCode = usize;
-const MAX_PROC_NUM: usize = 32;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Status {
@@ -36,25 +35,33 @@ pub trait Context {
 }
 
 pub struct ProcessManager {
-    procs: [Mutex<Option<Process>>; MAX_PROC_NUM],
+    procs: Vec<Mutex<Option<Process>>>,
     scheduler: Mutex<Box<Scheduler>>,
-    wait_queue: [Mutex<Vec<Pid>>; MAX_PROC_NUM],
+    wait_queue: Vec<Mutex<Vec<Pid>>>,
     event_hub: Mutex<EventHub<Event>>,
 }
 
 impl ProcessManager {
-    pub fn new(scheduler: Box<Scheduler>) -> Self {
+    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize) -> Self {
         ProcessManager {
-            procs: Default::default(),
+            procs: {
+                let mut vec = Vec::new();
+                vec.resize_default(max_proc_num);
+                vec
+            },
             scheduler: Mutex::new(scheduler),
-            wait_queue: Default::default(),
+            wait_queue: {
+                let mut vec = Vec::new();
+                vec.resize_default(max_proc_num);
+                vec
+            },
             event_hub: Mutex::new(EventHub::new()),
         }
     }
 
     fn alloc_pid(&self) -> Pid {
-        for i in 0..MAX_PROC_NUM {
-            if self.procs[i].lock().is_none() {
+        for (i, proc) in self.procs.iter().enumerate() {
+            if proc.lock().is_none() {
                 return i;
             }
         }
@@ -64,7 +71,7 @@ impl ProcessManager {
     /// Add a new process
     pub fn add(&self, context: Box<Context>) -> Pid {
         let pid = self.alloc_pid();
-        *self.procs[pid].lock() = Some(Process {
+        *(&self.procs[pid]).lock() = Some(Process {
             id: pid,
             status: Status::Ready,
             status_after_stop: Status::Ready,

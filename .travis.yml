@@ -19,7 +19,7 @@ env:
 
 install:
   - if [ $ARCH = riscv32 ]; then
-    export FILE="riscv64-unknown-elf-gcc-2018.07.0-x86_64-linux-ubuntu14";
+    export FILE="riscv64-unknown-elf-gcc-20180928-x86_64-linux-ubuntu14";
     wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
     tar xf $FILE.tar.gz;
     export PATH=$PATH:$PWD/$FILE/bin;

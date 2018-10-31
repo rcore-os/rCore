@@ -1,19 +1,16 @@
-use spin::Once;
-use sync::{SpinNoIrqLock, Mutex, MutexGuard, SpinNoIrq};
+use spin::Mutex;
 pub use self::context::ContextImpl;
 pub use ucore_process::*;
-use alloc::boxed::Box;
-use consts::MAX_CPU_NUM;
+use consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use arch::cpu;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 mod context;
 
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
     let scheduler = Box::new(scheduler::RRScheduler::new(5));
-    let manager = Arc::new(ProcessManager::new(scheduler));
+    let manager = Arc::new(ProcessManager::new(scheduler, MAX_PROCESS_NUM));
 
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }

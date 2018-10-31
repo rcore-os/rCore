@@ -3,6 +3,7 @@
 #![feature(const_fn)]
 #![feature(linkage)]
 #![feature(nll)]
+#![feature(vec_resize_default)]
 
 extern crate alloc;
 #[macro_use]
