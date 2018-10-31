@@ -13,7 +13,8 @@ _save_context:
     # save x registers except x2 (sp)
     sw x1, 1*4(sp)
     sw x3, 3*4(sp)
-    sw x4, 4*4(sp)
+    # tp(x4) = hartid. DON'T change.
+    # sw x4, 4*4(sp)
     sw x5, 5*4(sp)
     sw x6, 6*4(sp)
     sw x7, 7*4(sp)
@@ -73,7 +74,7 @@ _restore_context:
     # restore x registers except x2 (sp)
     lw x1, 1*4(sp)
     lw x3, 3*4(sp)
-    lw x4, 4*4(sp)
+    # lw x4, 4*4(sp)
     lw x5, 5*4(sp)
     lw x6, 6*4(sp)
     lw x7, 7*4(sp)

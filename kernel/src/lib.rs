@@ -62,11 +62,6 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    if arch::cpu::id() == 0 {
-        process::init();
-        thread::spawn(fs::shell);
-    }
-
     process::processor().run();
 
 //    thread::test::local_key();

@@ -11,9 +11,6 @@ pub fn timer() {
     }
 }
 
-pub fn before_return() {
-}
-
 pub fn error(tf: &TrapFrame) -> ! {
     error!("{:#x?}", tf);
     let pid = processor().pid();

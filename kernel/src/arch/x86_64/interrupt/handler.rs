@@ -97,7 +97,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_DIVIDE | T_GPFLT | T_ILLOP => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
-    ::trap::before_return();
 }
 
 fn breakpoint() {
