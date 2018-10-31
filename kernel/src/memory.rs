@@ -1,13 +1,14 @@
 pub use arch::paging::*;
 use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K};
 use consts::MEMORY_OFFSET;
-use spin::{Mutex, MutexGuard};
+//use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 use ucore_memory::swap::*;
 use process::processor;
+use sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -20,28 +21,28 @@ pub type FrameAlloc = BitAlloc64K;
 pub type FrameAlloc = BitAlloc4K;
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: Mutex<FrameAlloc> = Mutex::new(FrameAlloc::default());
+    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
 
 
 lazy_static! {
-    static ref ACTIVE_TABLE: Mutex<CowExt<ActivePageTable>> = Mutex::new(unsafe {
+    static ref ACTIVE_TABLE: SpinNoIrqLock<CowExt<ActivePageTable>> = SpinNoIrqLock::new(unsafe {
         CowExt::new(ActivePageTable::new())
     });
 }
 
 /// The only way to get active page table
-pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>> {
+pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>, SpinNoIrq> {
     ACTIVE_TABLE.lock()
 }
 
 // Page table for swap in and out
 lazy_static!{
-    static ref ACTIVE_TABLE_SWAP: Mutex<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> = 
-        Mutex::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
+    static ref ACTIVE_TABLE_SWAP: SpinNoIrqLock<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> = 
+        SpinNoIrqLock::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
 }
 
-pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>>{
+pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>, SpinNoIrq>{
     ACTIVE_TABLE_SWAP.lock()
 }
 
