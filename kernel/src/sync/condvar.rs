@@ -33,4 +33,7 @@ impl Condvar {
             t.unpark();
         }
     }
+    pub fn _clear(&self) {
+        self.wait_queue.lock().clear();
+    }
 }

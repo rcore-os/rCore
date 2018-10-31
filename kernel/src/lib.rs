@@ -10,6 +10,7 @@
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
 #![feature(raw)]
+#![feature(vec_resize_default)]
 #![no_std]
 
 

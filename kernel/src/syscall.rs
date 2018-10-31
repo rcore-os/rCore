@@ -58,9 +58,9 @@ fn sys_close(fd: usize) -> i32 {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
-    use core::mem::transmute;
-    let (context, _): (&ContextImpl, *const ()) = unsafe { transmute(processor().context()) };
-    let pid = processor().manager().add(context.fork(tf));
+    let mut context = process().fork(tf);
+    let pid = processor().manager().add(context);
+    Process::new_fork(pid, thread::current().id());
     info!("fork: {} -> {}", thread::current().id(), pid);
     pid as i32
 }
@@ -68,21 +68,35 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 fn sys_wait(pid: usize, code: *mut i32) -> i32 {
-    assert_ne!(pid, 0, "wait for 0 is not supported yet");
     loop {
-        match processor().manager().get_status(pid) {
-            Some(Status::Exited(exit_code)) => {
-                if !code.is_null() {
-                    unsafe { code.write(exit_code as i32); }
-                }
-                processor().manager().remove(pid);
-                return 0;
-            }
-            None => return -1,
-            _ => {}
+        let wait_procs = match pid {
+            0 => Process::get_children(),
+            _ => vec![pid],
+        };
+        if wait_procs.is_empty() {
+            return -1;
         }
-        processor().manager().wait(thread::current().id(), pid);
-        processor().yield_now();
+        for pid in wait_procs {
+            match processor().manager().get_status(pid) {
+                Some(Status::Exited(exit_code)) => {
+                    if !code.is_null() {
+                        unsafe { code.write(exit_code as i32); }
+                    }
+                    processor().manager().remove(pid);
+                    Process::do_wait(pid);
+                    info!("wait: {} -> {}", thread::current().id(), pid);
+                    return 0;
+                }
+                None => return -1,
+                _ => {}
+            }
+        }
+        if pid == 0 {
+            Process::wait_child();
+        } else {
+            processor().manager().wait(thread::current().id(), pid);
+            processor().yield_now();
+        }
     }
 }
 
@@ -94,6 +108,10 @@ fn sys_yield() -> i32 {
 /// Kill the process
 fn sys_kill(pid: usize) -> i32 {
     processor().manager().exit(pid, 0x100);
+    Process::proc_exit(pid);
+    if pid == thread::current().id() {
+        processor().yield_now();
+    }
     0
 }
 
@@ -106,6 +124,7 @@ fn sys_getpid() -> i32 {
 fn sys_exit(exit_code: usize) -> i32 {
     let pid = thread::current().id();
     processor().manager().exit(pid, exit_code);
+    Process::proc_exit(pid);
     processor().yield_now();
     unreachable!();
 }
