@@ -20,13 +20,13 @@ pub fn init() {
 /// Enable the interrupt.
 #[inline(always)]
 pub unsafe fn enable() {
-    // TODO
+    asm!("msr daifclr, #2");
 }
 
 /// Disable the interrupt.
 #[inline(always)]
 pub unsafe fn disable() {
-    // TODO
+    asm!("msr daifset, #2");
 }
 
 /// Disable the interrupt and store the status.

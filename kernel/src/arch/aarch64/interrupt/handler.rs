@@ -1,5 +1,6 @@
 //! Trap handler
 
+use arch::board::irq::handle_irq;
 use super::context::TrapFrame;
 use super::syndrome::Syndrome;
 
@@ -48,9 +49,7 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                 _ => ::trap::error(tf),
             }
         }
-        Kind::Irq => {
-            // TODO
-        }
+        Kind::Irq => handle_irq(),
         _ => ::trap::error(tf),
     }
     ::trap::before_return();

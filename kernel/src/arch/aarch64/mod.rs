@@ -9,6 +9,8 @@ pub mod interrupt;
 #[path = "board/raspi3/mod.rs"]
 pub mod board;
 
+pub use self::board::timer;
+
 /// TODO
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
@@ -20,6 +22,9 @@ pub extern "C" fn rust_main() -> ! {
     // FIXME
     // ::logging::init();
     interrupt::init();
+    timer::init();
+
+    unsafe { interrupt::enable(); }
 
     super::fs::show_logo();
 
@@ -38,6 +43,9 @@ pub extern "C" fn rust_main() -> ! {
                 'c' => unsafe {
                     println!("svc 666");
                     asm!("svc 666");
+                },
+                't' => unsafe {
+                    println!("{}", timer::get_cycle());
                 },
                 ' '...'\u{7e}' => {
                     print!("{}", c);
