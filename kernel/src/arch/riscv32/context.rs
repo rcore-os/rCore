@@ -30,7 +30,8 @@ impl TrapFrame {
         tf.x[2] = sp;
         tf.sepc = entry_addr;
         tf.sstatus = sstatus::read();
-        tf.sstatus.set_spie(false);     // Enable interrupt
+        tf.sstatus.set_spie(true);
+        tf.sstatus.set_sie(false);
         tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }

@@ -62,7 +62,7 @@ _save_context:
     lw s1, 32*4(sp)             # s1 = sstatus
     lw s2, 33*4(sp)             # s2 = sepc
     andi s0, s1, 1 << 8
-    bnez s0, _restore_context   # back to U-mode? (sstatus.SPP = 1)
+    bnez s0, _restore_context   # back to S-mode? (sstatus.SPP = 1)
 _save_kernel_sp:
     addi s0, sp, 36*4
     csrw 0x140, s0              # sscratch = kernel-sp
