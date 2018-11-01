@@ -91,6 +91,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
                 _ => {}
             }
         }
+        info!("wait: {} -> {}, sleep", thread::current().id(), pid);
         if pid == 0 {
             Process::wait_child();
         } else {
@@ -107,8 +108,8 @@ fn sys_yield() -> i32 {
 
 /// Kill the process
 fn sys_kill(pid: usize) -> i32 {
+    info!("kill: {}", pid);
     processor().manager().exit(pid, 0x100);
-    Process::proc_exit(pid);
     if pid == thread::current().id() {
         processor().yield_now();
     }
@@ -123,8 +124,8 @@ fn sys_getpid() -> i32 {
 /// Exit the current process
 fn sys_exit(exit_code: usize) -> i32 {
     let pid = thread::current().id();
+    info!("exit: {}", pid);
     processor().manager().exit(pid, exit_code);
-    Process::proc_exit(pid);
     processor().yield_now();
     unreachable!();
 }

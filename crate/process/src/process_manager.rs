@@ -39,23 +39,17 @@ pub struct ProcessManager {
     scheduler: Mutex<Box<Scheduler>>,
     wait_queue: Vec<Mutex<Vec<Pid>>>,
     event_hub: Mutex<EventHub<Event>>,
+    exit_handler: fn(Pid),
 }
 
 impl ProcessManager {
-    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize) -> Self {
+    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize, exit_handler: fn(Pid)) -> Self {
         ProcessManager {
-            procs: {
-                let mut vec = Vec::new();
-                vec.resize_default(max_proc_num);
-                vec
-            },
+            procs: new_vec_default(max_proc_num),
             scheduler: Mutex::new(scheduler),
-            wait_queue: {
-                let mut vec = Vec::new();
-                vec.resize_default(max_proc_num);
-                vec
-            },
+            wait_queue: new_vec_default(max_proc_num),
             event_hub: Mutex::new(EventHub::new()),
+            exit_handler,
         }
     }
 
@@ -124,7 +118,7 @@ impl ProcessManager {
         proc.context = Some(context);
         match proc.status {
             Status::Ready => self.scheduler.lock().insert(pid),
-            Status::Exited(_) => proc.context = None,
+            Status::Exited(_) => self.exit_handler(pid, proc),
             _ => {}
         }
     }
@@ -152,7 +146,7 @@ impl ProcessManager {
             _ => proc.status = status,
         }
         match proc.status {
-            Status::Exited(_) => proc.context = None,
+            Status::Exited(_) => self.exit_handler(pid, proc),
             _ => {}
         }
     }
@@ -189,8 +183,20 @@ impl ProcessManager {
 
     pub fn exit(&self, pid: Pid, code: ExitCode) {
         self.set_status(pid, Status::Exited(code));
+    }
+
+    /// Called when a process exit
+    fn exit_handler(&self, pid: Pid, proc: &mut Process) {
         for waiter in self.wait_queue[pid].lock().drain(..) {
             self.wakeup(waiter);
         }
+        proc.context = None;
+        (self.exit_handler)(pid);
     }
+}
+
+fn new_vec_default<T: Default>(size: usize) -> Vec<T> {
+    let mut vec = Vec::new();
+    vec.resize_default(size);
+    vec
 }

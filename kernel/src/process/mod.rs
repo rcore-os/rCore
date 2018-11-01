@@ -12,7 +12,7 @@ mod context;
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
     let scheduler = Box::new(scheduler::RRScheduler::new(5));
-    let manager = Arc::new(ProcessManager::new(scheduler, MAX_PROCESS_NUM));
+    let manager = Arc::new(ProcessManager::new(scheduler, MAX_PROCESS_NUM, Process::proc_exit));
 
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }
