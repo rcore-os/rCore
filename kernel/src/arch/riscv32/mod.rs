@@ -35,6 +35,7 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
 
 fn others_main() -> ! {
     interrupt::init();
+    memory::init_other();
     timer::init();
     ::kmain();
 }

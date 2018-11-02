@@ -1,4 +1,4 @@
-use core::slice;
+use core::{slice, mem};
 use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet};
 use super::riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
@@ -14,6 +14,13 @@ pub fn init() {
     init_frame_allocator();
     init_heap();
     remap_the_kernel();
+}
+
+pub fn init_other() {
+    unsafe {
+        sstatus::set_sum();         // Allow user memory access
+        asm!("csrw 0x180, $0; sfence.vma" :: "r"(SATP) :: "volatile");
+    }
 }
 
 fn init_frame_allocator() {
@@ -42,10 +49,14 @@ fn remap_the_kernel() {
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
     unsafe { ms.activate(); }
-    use core::mem::forget;
-    forget(ms);
+    unsafe { SATP = ms.token(); }
+    mem::forget(ms);
     info!("kernel remap end");
 }
+
+// First core stores its SATP here.
+// Other cores load it later.
+static mut SATP: usize = 0;
 
 // Symbols provided by linker script
 extern {
