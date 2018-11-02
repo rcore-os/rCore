@@ -57,6 +57,8 @@ static void uart16550_done(const struct fdt_scan_node *node, void *extra)
   uart16550[1] = 0x00;    //                  (hi byte)
   uart16550[3] = 0x03;    // 8 bits, no parity, one stop bit
   uart16550[2] = 0xC7;    // Enable FIFO, clear them, with 14-byte threshold
+  uart16550[4] = 0x0B;
+  uart16550[1] = 0x01;    // Enable interrupt
 }
 
 void query_uart16550(uintptr_t fdt)

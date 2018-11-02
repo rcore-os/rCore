@@ -29,7 +29,6 @@ impl SerialRead for SerialPort {
             let ports = self as *mut _ as *mut [Pio<u8>; 6];
             let line_sts = &(*ports)[5];
             let data = &(*ports)[0];
-            while line_sts.read() & 1 != 1 {}
             data.read()
         }
     }

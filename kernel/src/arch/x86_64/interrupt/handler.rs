@@ -131,6 +131,7 @@ fn keyboard() {
 fn com1() {
     use arch::driver::serial::*;
     trace!("\nInterupt: COM1");
+    ::trap::serial(COM1.lock().receive() as char);
 }
 
 fn com2() {

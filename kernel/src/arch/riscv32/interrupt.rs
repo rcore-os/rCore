@@ -16,6 +16,8 @@ pub fn init() {
         stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
         // Enable IPI
         sie::set_ssoft();
+        // Enable serial interrupt
+        sie::set_sext();
     }
     info!("interrupt: init end");
 }
@@ -44,6 +46,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
+        Trap::Interrupt(I::SupervisorExternal) => serial(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
@@ -51,6 +54,10 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         _ => ::trap::error(tf),
     }
     trace!("Interrupt end");
+}
+
+fn serial() {
+    ::trap::serial(super::io::getchar());
 }
 
 fn ipi() {
