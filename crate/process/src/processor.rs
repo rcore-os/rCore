@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use spin::Mutex;
 use core::cell::UnsafeCell;
 use process_manager::*;
+use interrupt;
 
 /// Process executor
 ///
@@ -52,6 +53,7 @@ impl Processor {
     ///   via switch back to the scheduler.
     pub fn run(&self) -> ! {
         let inner = self.inner();
+        unsafe { interrupt::disable_and_store(); }
         loop {
             let proc = inner.manager.run(inner.id);
             trace!("CPU{} begin running process {}", inner.id, proc.0);
@@ -70,7 +72,9 @@ impl Processor {
     pub fn yield_now(&self) {
         let inner = self.inner();
         unsafe {
+            let flags = interrupt::disable_and_store();
             inner.proc.as_mut().unwrap().1.switch_to(&mut *inner.loop_context);
+            interrupt::restore(flags);
         }
     }
 
