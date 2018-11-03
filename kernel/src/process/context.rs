@@ -61,6 +61,7 @@ impl Context {
     *   the new user thread Context
     */
     pub fn new_user(data: &[u8]) -> Self {
+        info!("come into new user");
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
@@ -70,6 +71,7 @@ impl Context {
         assert_eq!(elf.header.pt2.type_().as_type(), header::Type::Executable, "ELF is not executable");
 
         // User stack
+        info!("start building suer stack");
         use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
         let (user_stack_buttom, user_stack_top) = match is32 {
             true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
@@ -77,13 +79,16 @@ impl Context {
         };
 
         // Make page table
+        info!("make page table!");
         let mut memory_set = memory_set_from(&elf);
+        info!("start to push user stack to the mmset");
         memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
 
         let entry_addr = elf.header.pt2.entry_point() as usize;
 
         // Temporary switch to it, in order to copy data
+        info!("starting copy data.");
         unsafe {
             memory_set.with(|| {
                 for ph in elf.program_iter() {
@@ -93,9 +98,13 @@ impl Context {
                     if file_size == 0 {
                         return;
                     }
+                    info!("file virtaddr: {:x?}, file size: {:x?}", virt_addr, file_size);
                     use core::slice;
+                    info!("starting copy!");
                     let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
+                    info!("target got!");
                     target.copy_from_slice(&data[offset..offset + file_size]);
+                    info!("finish copy!");
                 }
                 if is32 {
                     unsafe {
@@ -106,10 +115,10 @@ impl Context {
                 }
             });
         }
-
+        info!("ending copy data.");
         
         //set the user Memory pages in the memory set swappable
-        memory_set_map_swappable(&mut memory_set);
+        //memory_set_map_swappable(&mut memory_set);
 
         Context {
             arch: unsafe {
@@ -156,6 +165,7 @@ impl Context {
 
 impl Drop for Context{
     fn drop(&mut self){
+        /*
         //set the user Memory pages in the memory set unswappable
         let Self {ref mut arch, ref mut memory_set} = self;
         let pt = {
@@ -170,7 +180,7 @@ impl Drop for Context{
             }
         }
         info!("Finishing setting pages unswappable");
-        
+        */
     }
 }
 
@@ -189,6 +199,7 @@ impl Debug for Context {
 *   the new memory set
 */
 fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
+    info!("come in to memory_set_from");
     let mut set = MemorySet::new();
     for ph in elf.program_iter() {
         if ph.get_type() != Ok(Type::Load) {
@@ -198,6 +209,7 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
             ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
             ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),//???
         };
+        info!("push!");
         set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
 
     }

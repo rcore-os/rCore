@@ -12,8 +12,12 @@ pub fn timer() {
 
 pub fn before_return() {
     if let Some(processor) = PROCESSOR.try() {
-        processor.lock().schedule();
+        // try lock for delayed frame allocated to avoid deadlock
+        if processor.try_lock().is_some() {
+            processor.lock().schedule();
+        }
     }
+    //info!("finish before return!");
 }
 
 /*

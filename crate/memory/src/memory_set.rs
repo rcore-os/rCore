@@ -173,11 +173,22 @@ impl MemoryArea {
                 }
             }
             None => {
+                info!("map delayed!");
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let addr = page.start_address();
-                    let target = T::alloc_frame().expect("failed to allocate frame");
-                    self.flags.apply(pt.map(addr, target));
+                    //let target = T::alloc_frame().expect("failed to allocate frame");
+                    //self.flags.apply(pt.map(addr, target));
+                    // for frame delayed allocation
+                    {
+                        let entry = pt.map(addr,0);
+                        self.flags.apply(entry);
+                    }
+                    let entry = pt.get_entry(addr);
+                    entry.set_present(false);
+                    entry.update();
+
                 }
+                info!("finish map delayed!");
             }
         }
     }
@@ -190,8 +201,14 @@ impl MemoryArea {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             let addr = page.start_address();
             if self.phys_start_addr.is_none() {
-                let target = pt.get_entry(addr).target();
-                T::dealloc_frame(target);
+                if pt.get_entry(addr).present(){
+                    let target = pt.get_entry(addr).target();
+                    T::dealloc_frame(target);
+                }
+                else{
+                    // set valid for pt.unmap function
+                    pt.get_entry(addr).set_present(true);
+                }
             }
             pt.unmap(addr);
         }
@@ -204,6 +221,11 @@ impl MemoryArea {
     pub fn get_end_addr(&self) -> VirtAddr{
         self.end_addr
     }
+
+    pub fn get_flags(&self) -> &MemoryAttr{
+        &self.flags
+    }
+
 }
 
 /// The attributes of the memory
@@ -377,6 +399,7 @@ impl<T: InactivePageTable> MemorySet<T> {
     pub fn get_page_table_mut(&mut self) -> &mut T{
         &mut self.page_table
     }
+
 }
 
 impl<T: InactivePageTable> Clone for MemorySet<T> {

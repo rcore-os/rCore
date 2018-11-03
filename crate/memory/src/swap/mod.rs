@@ -147,6 +147,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
                 entry.update();
                 token
             };
+            info!("swap in vaddr {:x?} at remove from swappable.", addr);
             let data = page_table.get_page_slice_mut(addr);
             swapper.swap_in(token, data).unwrap();
         });
@@ -172,6 +173,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **                               the error if failed
     */
     pub fn swap_out_any<T2: InactivePageTable>(&mut self) -> Result<PhysAddr, SwapError> {
+        info!("COME in to swap_out_any");
         let victim: Option<Frame> = {
             let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
             swap_manager.pop(page_table, swapper)
