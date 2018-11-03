@@ -7,7 +7,7 @@ use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 use ucore_memory::swap::*;
-use process::processor;
+use process::{processor, process};
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -73,6 +73,26 @@ pub fn alloc_stack() -> Stack {
     Stack { top, bottom }
 }
 
+pub struct KernelStack(usize);
+const STACK_SIZE: usize = 0x8000;
+
+impl KernelStack {
+    pub fn new() -> Self {
+        use alloc::alloc::{alloc, Layout};
+        let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
+        KernelStack(bottom)
+    }
+    pub fn top(&self) -> usize {
+        self.0 + STACK_SIZE
+    }
+}
+
+impl Drop for KernelStack {
+    fn drop(&mut self) {
+        use alloc::alloc::{dealloc, Layout};
+        unsafe{ dealloc(self.0 as _, Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()); }
+    }
+}
 
 
 /* 
@@ -92,8 +112,7 @@ pub fn page_fault_handler(addr: usize) -> bool {
     // handle the swap in/out
     info!("start handling swap in/out page fault");
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-    let mut temp_proc = processor();
-    let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
+    let pt = process().get_memory_set_mut().get_page_table_mut();
     if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, || alloc_frame().unwrap()){
         return true;
     }

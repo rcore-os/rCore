@@ -48,8 +48,9 @@ pub fn shell() {
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
             use process::*;
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
-            let pid = processor().add(Context::new_user(&buf[..len]));
-            processor().current_wait_for(pid);
+            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len]));
+            processor().manager().wait(thread::current().id(), pid);
+            processor().yield_now();
         } else {
             println!("Program not exist");
         }

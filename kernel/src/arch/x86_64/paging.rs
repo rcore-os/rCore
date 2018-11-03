@@ -1,6 +1,6 @@
 use bit_allocator::{BitAlloc, BitAlloc64K};
 // Depends on kernel
-use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
+use memory::{active_table, alloc_frame, dealloc_frame};
 use spin::{Mutex, MutexGuard};
 use ucore_memory::cow::CowExt;
 use ucore_memory::memory_set::*;
@@ -49,7 +49,7 @@ impl PageTable for ActivePageTable {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
             .unwrap().flush();
-        self.get_entry(addr)
+        unsafe { &mut *(get_entry_ptr(addr, 1)) }
     }
 
     fn unmap(&mut self, addr: usize) {
@@ -57,9 +57,12 @@ impl PageTable for ActivePageTable {
         flush.flush();
     }
 
-    fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
-        let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
-        unsafe { &mut *(entry_addr as *mut PageEntry) }
+    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
+        for level in 0..3 {
+            let entry = get_entry_ptr(addr, 4 - level);
+            if unsafe { !(*entry).present() } { return None; }
+        }
+        unsafe { Some(&mut *(get_entry_ptr(addr, 1))) }
     }
 
     fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
@@ -138,6 +141,12 @@ impl Entry for PageEntry {
     }
     fn execute(&self) -> bool { !self.0.flags().contains(EF::NO_EXECUTE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::NO_EXECUTE, !value); }
+}
+
+fn get_entry_ptr(addr: usize, level: u8) -> *mut PageEntry {
+    debug_assert!(level <= 4);
+    let entry_addr = ((addr >> (level * 9)) & !0x7) | !((1 << (48 - level * 9)) - 1);
+    entry_addr as *mut PageEntry
 }
 
 impl PageEntry {
@@ -221,10 +230,6 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn dealloc_frame(target: usize) {
         dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
     }
 }
 

@@ -5,3 +5,4 @@ authors = ["WangRunji <wangrunji0408@163.com>"]
 
 [dependencies]
 log = "0.4"
+spin = "0.4"

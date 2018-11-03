@@ -18,6 +18,8 @@ pub fn init() {
         sscratch::write(0);
         // Set the exception vector address
         stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
+        // Enable IPI
+        sie::set_ssoft();
     }
     info!("interrupt: init end");
 }
@@ -77,10 +79,13 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         Trap::Exception(E::InstructionPageFault) => page_fault(tf),
         _ => ::trap::error(tf),
     }
-    ::trap::before_return();
     trace!("Interrupt end");
 }
 
+fn ipi() {
+    debug!("IPI");
+    super::bbl::sbi::clear_ipi();
+}
 /*
 * @brief: 
 *   process timer interrupt
