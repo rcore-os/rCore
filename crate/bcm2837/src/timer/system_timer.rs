@@ -1,5 +1,6 @@
-use super::IO_BASE;
+use ::IO_BASE;
 use volatile::{ReadOnly, Volatile};
+use interrupt::{Controller, Interrupt};
 
 /// The base address for the ARM system timer registers.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
@@ -15,8 +16,9 @@ struct Registers {
 }
 
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum SystemTimer {
+#[allow(dead_code)]
+#[derive(Copy, Clone, PartialEq, Debug)]
+enum SystemTimer {
     Timer0 = 0,
     Timer1 = 1,
     Timer2 = 2,
@@ -47,22 +49,21 @@ impl Timer {
     /// Sets up a match in timer 1 to occur `us` microseconds from now. If
     /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
     /// interrupt will be issued in `us` microseconds.
-    pub fn tick_in(&mut self, st: SystemTimer, us: u32) {
+    pub fn tick_in(&mut self, us: u32) {
         let current_low = self.registers.CLO.read();
         let compare = current_low.wrapping_add(us);
-        self.registers.COMPARE[st as usize].write(compare);
-        self.registers.CS.write(1 << (st as usize)); // unmask
+        self.registers.COMPARE[SystemTimer::Timer1 as usize].write(compare);
+        self.registers.CS.write(1 << (SystemTimer::Timer1 as usize)); // unmask
     }
-}
 
-/// Returns the current time in microseconds.
-pub fn current_time() -> u64 {
-    Timer::new().read()
-}
+    /// Initialization timer
+    pub fn init(&mut self) {
+        Controller::new().enable(Interrupt::Timer1);
+    }
 
-/// Sets up a match in timer 1 to occur `us` microseconds from now. If
-/// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
-/// interrupt will be issued in `us` microseconds.
-pub fn tick_in(st: SystemTimer, us: u32) {
-    Timer::new().tick_in(st, us)
+    /// Returns `true` if timer interruption is pending. Otherwise, returns `false`.
+    pub fn is_pending(&self) -> bool {
+        let controller = Controller::new();
+        controller.is_pending(Interrupt::Timer1)
+    }
 }
