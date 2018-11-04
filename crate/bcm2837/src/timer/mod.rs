@@ -24,3 +24,11 @@ pub fn current_time() -> u64 {
 pub fn tick_in(us: u32) {
     Timer::new().tick_in(us);
 }
+
+/// wait for `cycle` CPU cycles
+#[inline(always)]
+pub fn delay(cycle: u32) {
+    for _ in 0..cycle {
+        unsafe { asm!("nop") }
+    }
+}

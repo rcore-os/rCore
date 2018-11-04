@@ -1,4 +1,4 @@
-use super::IO_BASE;
+use IO_BASE;
 use gpio::{Function, Gpio};
 use volatile::{ReadOnly, Volatile};
 

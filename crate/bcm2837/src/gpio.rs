@@ -1,5 +1,5 @@
-use super::IO_BASE;
-use super::asm::delay;
+use IO_BASE;
+use timer::delay;
 use core::marker::PhantomData;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
@@ -84,16 +84,14 @@ impl<T> Gpio<T> {
     /// Set the Gpio pull-up/pull-down state for values in `pin_value`
     /// (ref: peripherals 6.1, page 101)
     pub fn set_gpio_pd(&mut self, pud_value: u8) {
-        unsafe {
-            let index = if self.pin >= 32 { 1 } else { 0 };
+        let index = if self.pin >= 32 { 1 } else { 0 };
 
-            self.registers.PUD.write(pud_value as u32);
-            delay(150);
-            self.registers.PUDCLK[index as usize].write((1 << self.pin) as u32);
-            delay(150);
-            self.registers.PUD.write(0);
-            self.registers.PUDCLK[index as usize].write(0);
-        }
+        self.registers.PUD.write(pud_value as u32);
+        delay(150);
+        self.registers.PUDCLK[index as usize].write((1 << self.pin) as u32);
+        delay(150);
+        self.registers.PUD.write(0);
+        self.registers.PUDCLK[index as usize].write(0);
     }
 }
 
