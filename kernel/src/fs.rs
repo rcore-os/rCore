@@ -52,12 +52,12 @@ pub fn shell() {
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
             use process::*;
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
-            let mut new_context = Context::new_user(&buf[..len]);
-            //memory_set_record().push_back((new_context.get_memory_set_mut() as *mut MemorySet) as usize);
-            let pid = processor().add(new_context);
-            // map swappable for the new user process's memroy areas (only for the page which has been allocated)
-            memory_set_map_swappable(processor().get_context_mut(pid).get_memory_set_mut());
-            processor().current_wait_for(pid);
+            let context = ContextImpl::new_user(&buf[..len]);
+            memory_set_map_swappable(context.get_memory_set_mut());
+            let pid = processor().manager().add(context);
+            //memory_set_map_swappable(processor().get_context_mut(pid).get_memory_set_mut());
+            processor().manager().wait(thread::current().id(), pid);
+            processor().yield_now();
         } else {
             println!("Program not exist");
         }

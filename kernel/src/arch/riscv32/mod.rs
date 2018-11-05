@@ -7,19 +7,35 @@ pub mod timer;
 pub mod paging;
 pub mod memory;
 pub mod compiler_rt;
+pub mod consts;
+pub mod cpu;
 
 #[no_mangle]
-pub extern fn rust_main() -> ! {
-    println!("Hello RISCV! {}", 123);
-    // First init log mod, so that we can print log info.
+pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
+    unsafe { cpu::set_cpu_id(hartid); }
+    println!("Hello RISCV! in hart {}, {}, {}", hartid, dtb, hart_mask);
+
+    if hartid != 0 {
+        while unsafe { !cpu::has_started(hartid) }  { }
+        others_main();
+        unreachable!();
+    }
+
     ::logging::init();
-    // Init interrupt handling.
     interrupt::init();
-    // Init physical memory management and heap
     memory::init();
-    // Init timer interrupt
     timer::init();
-    
+
+    ::process::init();
+    ::thread::spawn(::fs::shell);
+
+    unsafe { cpu::start_others(hart_mask); }
+    ::kmain();
+}
+
+fn others_main() -> ! {
+    interrupt::init();
+    timer::init();
     ::kmain();
 }
 

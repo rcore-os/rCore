@@ -1,55 +1,44 @@
 use arch::interrupt::{TrapFrame, Context as ArchContext};
-use memory::{MemoryArea, MemoryAttr, MemorySet, active_table_swap, alloc_frame};
+use memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
+use ucore_process::Context;
+use alloc::boxed::Box;
 use ucore_memory::{Page};
 use ::memory::{InactivePageTable0, memory_set_record};
 use ucore_memory::memory_set::*;
 
-pub struct Context {
+pub struct ContextImpl {
     arch: ArchContext,
     memory_set: MemorySet,
+    kstack: KernelStack,
 }
 
-impl ::ucore_process::processor::Context for Context {
-    /*
-    * @param: 
-    *   target: the target process context
-    * @brief: 
-    *   switch to the target process context
-    */
-    unsafe fn switch(&mut self, target: &mut Self) {
-        super::PROCESSOR.try().unwrap().force_unlock();
+impl Context for ContextImpl {
+    unsafe fn switch_to(&mut self, target: &mut Context) {
+        use core::mem::transmute;
+        let (target, _): (&mut ContextImpl, *const ()) = transmute(target);
         self.arch.switch(&mut target.arch);
-        use core::mem::forget;
-        // don't run the distructor of processor()
-        forget(super::processor());
-    }
-
-    /*
-    * @param: 
-    *   entry: the program entry for the process
-    *   arg: a0 (a parameter)
-    * @brief: 
-    *   new a kernel thread Context
-    * @retval: 
-    *   the new kernel thread Context
-    */
-    fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Self {
-        let ms = MemorySet::new();
-        Context {
-            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, ms.kstack_top(), ms.token()) },
-            memory_set: ms,
-        }
     }
 }
 
-impl Context {
-    pub unsafe fn new_init() -> Self {
-        Context {
+impl ContextImpl {
+    pub unsafe fn new_init() -> Box<Context> {
+        Box::new(ContextImpl {
             arch: ArchContext::null(),
             memory_set: MemorySet::new(),
-        }
+            kstack: KernelStack::new(),
+        })
+    }
+
+    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+        let memory_set = MemorySet::new();
+        let kstack = KernelStack::new();
+        Box::new(ContextImpl {
+            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
+            memory_set,
+            kstack,
+        })
     }
 
     /// Make a new user thread from ELF data
@@ -61,8 +50,7 @@ impl Context {
     * @retval: 
     *   the new user thread Context
     */
-    pub fn new_user(data: &[u8]) -> Self {
-        debug!("come into new user");
+    pub fn new_user(data: &[u8]) -> Box<Context> {
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
@@ -115,24 +103,30 @@ impl Context {
                 }
             });
         }
+
+        let kstack = KernelStack::new();
+
+        // map the memory set swappable
+        //memory_set_map_swappable(&mut memory_set);
         
         //set the user Memory pages in the memory set swappable
         //memory_set_map_swappable(&mut memory_set);
         let id = memory_set_record().iter()
             .position(|x| x.clone() == mmset_ptr).unwrap();
         memory_set_record().remove(id);
-        Context {
+
+        Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
-                    entry_addr, user_stack_top - 8, memory_set.kstack_top(), is32, memory_set.token())
+                    entry_addr, user_stack_top - 8, kstack.top(), is32, memory_set.token())
             },
             memory_set,
-        }
+            kstack,
+        })
     }
 
     /// Fork
-    pub fn fork(&self, tf: &TrapFrame) -> Self {
-        debug!("Come in to fork!");
+    pub fn fork(&self, tf: &TrapFrame) -> Box<Context> {
         // Clone memory set, make a new page table
         let mut memory_set = self.memory_set.clone();
         
@@ -156,14 +150,20 @@ impl Context {
             });
         }
 
+        let kstack = KernelStack::new();
+
+        // map the memory set swappable
+        //memory_set_map_swappable(&mut memory_set);
         // remove the raw pointer for the memory set since it will 
         let id = memory_set_record().iter()
             .position(|x| x.clone() == mmset_ptr).unwrap();
         memory_set_record().remove(id);
-        Context {
-            arch: unsafe { ArchContext::new_fork(tf, memory_set.kstack_top(), memory_set.token()) },
+        
+        Box::new(ContextImpl {
+            arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
-        }
+            kstack,
+        })
     }
 
     pub fn get_memory_set_mut(&mut self) -> &mut MemorySet {
@@ -172,7 +172,7 @@ impl Context {
 
 }
 
-impl Drop for Context{
+impl Drop for ContextImpl{
     fn drop(&mut self){
         // remove the new memory set to the recorder (deprecated in the latest version)
         /*
@@ -185,7 +185,7 @@ impl Drop for Context{
         */
         
         //set the user Memory pages in the memory set unswappable
-        let Self {ref mut arch, ref mut memory_set} = self;
+        let Self {ref mut arch, ref mut memory_set, ref mut kstack} = self;
         let pt = {
             memory_set.get_page_table_mut() as *mut InactivePageTable0
         };
@@ -202,7 +202,7 @@ impl Drop for Context{
     }
 }
 
-impl Debug for Context {
+impl Debug for ContextImpl {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{:x?}", self.arch)
     }
@@ -225,7 +225,7 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
         }
         let (virt_addr, mem_size, flags) = match ph {
             ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),//???
+            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
         };
         set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
 
@@ -256,5 +256,6 @@ pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
             unsafe { active_table_swap().set_swappable(pt, addr); }
         }
     }
-    debug!("Finishing setting pages swappable");
+    info!("Finishing setting pages swappable");
 }
+

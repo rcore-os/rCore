@@ -1,40 +1,23 @@
 use process::*;
 use arch::interrupt::TrapFrame;
+use arch::cpu;
 
-/*
-* @brief:
-*   process timer interrupt
-*/
+pub static mut TICK: usize = 0;
+
 pub fn timer() {
-    let mut processor = processor();
-    processor.tick();
-}
-
-pub fn before_return() {
-    if let Some(processor) = PROCESSOR.try() {
-        // try lock for delayed frame allocated to avoid deadlock
-        if processor.try_lock().is_some() {
-            processor.lock().schedule();
-        }
+    processor().tick();
+    if cpu::id() == 0 {
+        unsafe { TICK += 1; }
     }
     //info!("finish before return!");
 }
 
-/*
-* @param: 
-*   TrapFrame: the error's trapframe
-* @brief: 
-*   process the error trap, if processor inited then exit else panic!
-*/
 pub fn error(tf: &TrapFrame) -> ! {
-    if let Some(processor) = PROCESSOR.try() {
-        let mut processor = processor.lock();
-        let pid = processor.current_pid();
-        error!("Process {} error:\n{:#x?}", pid, tf);
-        processor.exit(pid, 0x100); // TODO: Exit code for error
-        processor.schedule();
-        unreachable!();
-    } else {
-        panic!("Exception when processor not inited\n{:#x?}", tf);
-    }
+    error!("{:#x?}", tf);
+    let pid = processor().pid();
+    error!("On CPU{} Process {}", cpu::id(), pid);
+
+    processor().manager().exit(pid, 0x100);
+    processor().yield_now();
+    unreachable!();
 }

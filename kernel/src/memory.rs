@@ -7,10 +7,14 @@ use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack, InactivePageTable};
 use ucore_memory::swap::*;
+<<<<<<< HEAD
 use process::{processor, PROCESSOR};
 use sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use alloc::collections::VecDeque;
 
+=======
+use process::{processor, process};
+>>>>>>> 87506b000dc9a8f08c0040fee9570f5913bdd5b8
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -84,6 +88,26 @@ pub fn alloc_stack() -> Stack {
     Stack { top, bottom }
 }
 
+pub struct KernelStack(usize);
+const STACK_SIZE: usize = 0x8000;
+
+impl KernelStack {
+    pub fn new() -> Self {
+        use alloc::alloc::{alloc, Layout};
+        let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
+        KernelStack(bottom)
+    }
+    pub fn top(&self) -> usize {
+        self.0 + STACK_SIZE
+    }
+}
+
+impl Drop for KernelStack {
+    fn drop(&mut self) {
+        use alloc::alloc::{dealloc, Layout};
+        unsafe{ dealloc(self.0 as _, Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()); }
+    }
+}
 
 
 /* 
@@ -97,6 +121,7 @@ pub fn alloc_stack() -> Stack {
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
+<<<<<<< HEAD
     unsafe {PROCESSOR.try().unwrap().force_unlock();}
 
     let mut temp_proc = processor();
@@ -133,6 +158,10 @@ pub fn page_fault_handler(addr: usize) -> bool {
     // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
+=======
+    let pt = process().get_memory_set_mut().get_page_table_mut();
+    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, || alloc_frame().unwrap()){
+>>>>>>> 87506b000dc9a8f08c0040fee9570f5913bdd5b8
         return true;
     }
     false

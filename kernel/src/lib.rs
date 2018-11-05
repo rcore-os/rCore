@@ -9,6 +9,8 @@
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
+#![feature(raw)]
+#![feature(vec_resize_default)]
 #![no_std]
 
 
@@ -34,6 +36,8 @@ extern crate volatile;
 extern crate x86_64;
 extern crate xmas_elf;
 
+pub use process::{processor, new_kernel_context};
+use ucore_process::thread;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!
@@ -45,8 +49,6 @@ mod consts;
 mod process;
 mod syscall;
 mod fs;
-
-use process::{thread, thread_};
 mod sync;
 mod trap;
 mod console;
@@ -61,22 +63,13 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    // Init the first kernel process(idle proc)
-    process::init();
-    // enable the interrupt
-    unsafe { arch::interrupt::enable(); }
+    process::processor().run();
 
-    // the test is not supported in riscv32(maybe)
-    //thread::test::local_key();
-    //thread::test::unpack();
-    //sync::test::philosopher_using_mutex();
-    //sync::test::philosopher_using_monitor();
-    //sync::mpsc::test::test_all();
-
-    // come into shell
-    fs::shell();
-
-    loop {}
+//    thread::test::local_key();
+//    thread::test::unpack();
+//    sync::test::philosopher_using_mutex();
+//    sync::test::philosopher_using_monitor();
+//    sync::mpsc::test::test_all();
 }
 
 /// Global heap allocator

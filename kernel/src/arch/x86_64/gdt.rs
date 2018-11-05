@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use arch::driver::apic::lapic_id;
 use consts::MAX_CPU_NUM;
 use core::fmt;
 use core::fmt::Debug;
@@ -50,7 +49,7 @@ pub fn init() {
         load_tss(TSS_SELECTOR);
     }
 
-    CPUS[lapic_id() as usize].call_once(||
+    CPUS[super::cpu::id() as usize].call_once(||
         Mutex::new(Cpu { gdt, tss: unsafe { &mut *tss } }));
 }
 
@@ -67,7 +66,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn current() -> MutexGuard<'static, Cpu> {
-        CPUS[lapic_id() as usize].try().unwrap().lock()
+        CPUS[super::cpu::id()].try().unwrap().lock()
     }
 
     /// 设置从Ring3跳到Ring0时，自动切换栈的地址
