@@ -4,6 +4,10 @@ use alloc::boxed::Box;
 use arch::driver::ide;
 use spin::Mutex;
 
+use ::memory::{InactivePageTable0, memory_set_record};
+use memory::MemorySet;
+use process::context::memory_set_map_swappable;
+
 // Hard link user program
 #[cfg(target_arch = "riscv32")]
 global_asm!(r#"
@@ -48,7 +52,11 @@ pub fn shell() {
         if let Ok(file) = root.borrow().lookup(name.as_str()) {
             use process::*;
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
-            let pid = processor().add(Context::new_user(&buf[..len]));
+            let mut new_context = Context::new_user(&buf[..len]);
+            //memory_set_record().push_back((new_context.get_memory_set_mut() as *mut MemorySet) as usize);
+            let pid = processor().add(new_context);
+            // map swappable for the new user process's memroy areas (only for the page which has been allocated)
+            memory_set_map_swappable(processor().get_context_mut(pid).get_memory_set_mut());
             processor().current_wait_for(pid);
         } else {
             println!("Program not exist");

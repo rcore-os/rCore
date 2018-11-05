@@ -5,7 +5,7 @@ pub use ucore_process::processor::{*, Context as _whatever};
 pub use ucore_process::scheduler::*;
 pub use ucore_process::thread::*;
 
-mod context;
+pub mod context;
 
 type Processor = Processor_<Context, StrideScheduler>;
 

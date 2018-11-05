@@ -5,11 +5,12 @@ use consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack, InactivePageTable};
 use ucore_memory::swap::*;
 use process::{processor, PROCESSOR};
 use sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
-use ucore_memory::paging::Entry;
+use alloc::collections::VecDeque;
+
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -24,7 +25,15 @@ pub type FrameAlloc = BitAlloc4K;
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
+// record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function 
+// after the process is set we can use use processor() to get the inactive page table
+lazy_static! {
+    pub static ref MEMORY_SET_RECORD: SpinNoIrqLock<VecDeque<usize>> = SpinNoIrqLock::new(VecDeque::default());
+}
 
+pub fn memory_set_record() -> MutexGuard<'static, VecDeque<usize>, SpinNoIrq> {
+    MEMORY_SET_RECORD.lock()
+}
 
 lazy_static! {
     static ref ACTIVE_TABLE: SpinNoIrqLock<CowExt<ActivePageTable>> = SpinNoIrqLock::new(unsafe {
@@ -86,49 +95,44 @@ pub fn alloc_stack() -> Stack {
 *   Return true to continue, false to halt  
 */
 pub fn page_fault_handler(addr: usize) -> bool {
-    // since some page fault for frame delayed allocating may occur in the building of the process, we can't use processor() to get the real memset for it
-    // unless we write a mmset manager for all the memory set, which is a little bit hard.
-    /*
-    info!("come in to page fault handler.");
-    {
-        info!("1");
-        unsafe{ PROCESSOR.try().unwrap().force_unlock();}
-        let mut temp_proc = processor();
-        info!("2");
-        let mmset = temp_proc.current_context_mut().get_memory_set_mut();
-        let target_area = mmset.find_area(addr);
-        // check whether the virtual address is valid
-        info!("checked the valid virtual address");
-        match target_area {
-            None => {
-                info!("invalid virtual address: {:x?}", addr);
-                return false;
-            },
-            Some(area)=>{
-                // Handle delayed frame allocate and copy on write (the second not being used now)
-                unsafe { ACTIVE_TABLE.force_unlock(); }
-                if active_table().page_fault_handler(addr, || alloc_frame().unwrap()) {
-                    return true;
-                }
-            },
-        }
-    }
-    */
+    info!("start handling swap in/out page fault");
+    unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
+    unsafe {PROCESSOR.try().unwrap().force_unlock();}
 
-    // Handle delayed frame allocate and copy on write (the second not being used now)
+    let mut temp_proc = processor();
+    debug!("active page table token in pg fault is {:x?}", ActivePageTable::token());
+    let id = memory_set_record().iter()
+            .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
+    let mut mmsets = memory_set_record();
+    match id {
+        Some(targetid) => {
+            debug!("get id from memroy set recorder.");
+            let mmset_ptr = mmsets.get(targetid);
+            let pt = unsafe { (*(mmset_ptr.unwrap().clone() as *mut MemorySet)).get_page_table_mut() };
+            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().unwrap()){
+                return true;
+            }
+        },
+        None => {
+            debug!("get pt from processor()");
+            let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
+            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().unwrap()){
+                return true;
+            }
+        },
+    };
+    
+    // handle the swap in/out
+    //info!("start handling swap in/out page fault");
+    //let mut temp_proc = processor();
+    //let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
+    //let pt = unsafe { (*(mmset_ptr.unwrap().clone() as *mut MemorySet)).get_page_table_mut() };
+    
+    
+
+    // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
-        info!("general page fault handle successfully!");
-        return true;
-    }
-
-
-    // handle the swap in/out
-    info!("start handling swap in/out page fault");
-    let mut temp_proc = processor();
-    let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
-    unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, || alloc_frame().unwrap()){
         return true;
     }
     false

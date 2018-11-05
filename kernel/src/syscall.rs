@@ -7,6 +7,8 @@ use process::*;
 use thread;
 use util;
 
+use process::context::memory_set_map_swappable;
+
 /// 系统调用入口点
 ///
 /// 当发生系统调用中断时，中断服务例程将控制权转移到这里。
@@ -61,6 +63,8 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut processor = processor();
     let context = processor.current_context().fork(tf);
     let pid = processor.add(context);
+    // map swappable for the forked process's memroy areas (only for the page which has been allocated)
+    memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
     info!("fork: {} -> {}", processor.current_pid(), pid);
     pid as i32
 }

@@ -262,6 +262,10 @@ impl<T: Context, S: Scheduler> Processor_<T, S> {
         &mut self.get_mut(id).context
     }
 
+    pub fn get_context_mut(&mut self, pid: Pid) -> &mut T{
+        &mut self.get_mut(pid).context
+    }
+
     /*
     **  @brief  get pid of current process
     **  @param  none

@@ -91,27 +91,6 @@ impl<T: PageTable> CowExt<T> {
     **  @retval bool                 whether copy-on-write happens.
     */
     pub fn page_fault_handler(&mut self, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr) -> bool {
-        // handle page delayed allocating
-        {
-            info!("try handling delayed frame allocator");
-            let need_alloc ={
-                let entry = self.page_table.get_entry(addr);
-                //info!("got entry!");
-                !entry.present() && !entry.swapped()
-            };
-            if need_alloc{
-                info!("need_alloc!");
-                let frame = alloc_frame();
-                let entry = self.page_table.get_entry(addr);
-                entry.set_target(frame);
-                //let new_entry = self.page_table.map(addr, frame);
-                entry.set_present(true);
-                entry.update();
-                //area.get_flags().apply(new_entry); this instruction may be used when hide attr is used
-                info!("allocated successfully");
-                return true;
-            }
-        }
         // below is not being used now(no shared pages)
         {
             let entry = self.page_table.get_entry(addr);

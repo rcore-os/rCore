@@ -156,6 +156,10 @@ impl ActivePageTable {
         // Unmap the page
         self.unmap(0xcafebabe);
     }
+
+    pub fn token() -> usize {
+        satp::read().frame().number() | (1 << 31)
+    }
 }
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
