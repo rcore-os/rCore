@@ -53,7 +53,7 @@ pub fn shell() {
             use process::*;
             let len = file.borrow().read_at(0, &mut *buf).unwrap();
             let context = ContextImpl::new_user(&buf[..len]);
-            memory_set_map_swappable(context.get_memory_set_mut());
+            //memory_set_map_swappable(context.get_memory_set_mut());
             let pid = processor().manager().add(context);
             //memory_set_map_swappable(processor().get_context_mut(pid).get_memory_set_mut());
             processor().manager().wait(thread::current().id(), pid);

@@ -8,6 +8,8 @@ use thread;
 use util;
 
 use process::context::memory_set_map_swappable;
+use alloc::boxed::Box;
+use process::context::*;
 
 /// 系统调用入口点
 ///
@@ -61,7 +63,7 @@ fn sys_close(fd: usize) -> i32 {
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut context = process().fork(tf);
-    memory_set_map_swappable(context.get_memory_set_mut());
+    //memory_set_map_swappable(context.get_memory_set_mut());
     let pid = processor().manager().add(context);
     Process::new_fork(pid, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());

@@ -7,14 +7,11 @@ use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack, InactivePageTable};
 use ucore_memory::swap::*;
-<<<<<<< HEAD
-use process::{processor, PROCESSOR};
+//use process::{processor, PROCESSOR};
+use process::{process};
 use sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use alloc::collections::VecDeque;
 
-=======
-use process::{processor, process};
->>>>>>> 87506b000dc9a8f08c0040fee9570f5913bdd5b8
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
 
@@ -121,10 +118,7 @@ impl Drop for KernelStack {
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-<<<<<<< HEAD
-    unsafe {PROCESSOR.try().unwrap().force_unlock();}
 
-    let mut temp_proc = processor();
     debug!("active page table token in pg fault is {:x?}", ActivePageTable::token());
     let id = memory_set_record().iter()
             .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
@@ -140,28 +134,18 @@ pub fn page_fault_handler(addr: usize) -> bool {
         },
         None => {
             debug!("get pt from processor()");
-            let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
+            let pt = process().get_memory_set_mut().get_page_table_mut();
             if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().unwrap()){
                 return true;
             }
         },
     };
     
-    // handle the swap in/out
-    //info!("start handling swap in/out page fault");
-    //let mut temp_proc = processor();
-    //let pt = temp_proc.current_context_mut().get_memory_set_mut().get_page_table_mut();
-    //let pt = unsafe { (*(mmset_ptr.unwrap().clone() as *mut MemorySet)).get_page_table_mut() };
-    
     
 
     // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
-=======
-    let pt = process().get_memory_set_mut().get_page_table_mut();
-    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, || alloc_frame().unwrap()){
->>>>>>> 87506b000dc9a8f08c0040fee9570f5913bdd5b8
         return true;
     }
     false

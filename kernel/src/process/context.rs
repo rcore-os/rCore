@@ -115,14 +115,16 @@ impl ContextImpl {
             .position(|x| x.clone() == mmset_ptr).unwrap();
         memory_set_record().remove(id);
 
-        Box::new(ContextImpl {
+        let mut ret = Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
                     entry_addr, user_stack_top - 8, kstack.top(), is32, memory_set.token())
             },
             memory_set,
             kstack,
-        })
+        });
+        memory_set_map_swappable(ret.get_memory_set_mut());
+        ret
     }
 
     /// Fork
@@ -159,11 +161,13 @@ impl ContextImpl {
             .position(|x| x.clone() == mmset_ptr).unwrap();
         memory_set_record().remove(id);
         
-        Box::new(ContextImpl {
+        let mut ret = Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
-        })
+        });
+        memory_set_map_swappable(ret.get_memory_set_mut());
+        ret
     }
 
     pub fn get_memory_set_mut(&mut self) -> &mut MemorySet {
