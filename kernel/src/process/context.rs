@@ -87,10 +87,11 @@ impl ContextImpl {
                 }
             });
         }
-        // map the memory set swappable
-        //memory_set_map_swappable(&mut memory_set);
 
         let kstack = KernelStack::new();
+
+        // map the memory set swappable
+        memory_set_map_swappable(&mut memory_set);
 
         Box::new(ContextImpl {
             arch: unsafe {
@@ -121,11 +122,12 @@ impl ContextImpl {
                 }
             });
         }
-        // map the memory set swappable
-        //memory_set_map_swappable(&mut memory_set);
 
         let kstack = KernelStack::new();
 
+        // map the memory set swappable
+        memory_set_map_swappable(&mut memory_set);
+        
         Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
@@ -138,7 +140,7 @@ impl ContextImpl {
     }
 
 }
-/*
+
 impl Drop for ContextImpl{
     fn drop(&mut self){
         //set the user Memory pages in the memory set unswappable
@@ -158,7 +160,7 @@ impl Drop for ContextImpl{
         
     }
 }
-*/
+
 impl Debug for ContextImpl {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{:x?}", self.arch)
@@ -195,7 +197,7 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
     if elf_flags.is_execute() { flags = flags.execute(); }
     flags
 }
-/*
+
 /*
 * @param: 
 *   memory_set: the target MemorySet to set swappable
@@ -214,4 +216,4 @@ fn memory_set_map_swappable(memory_set: &mut MemorySet){
     }
     info!("Finishing setting pages swappable");
 }
-*/
+
