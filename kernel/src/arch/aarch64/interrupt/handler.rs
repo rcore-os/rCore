@@ -49,7 +49,7 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                 _ => ::trap::error(tf),
             }
         }
-        Kind::Irq => handle_irq(),
+        Kind::Irq => handle_irq(tf),
         _ => ::trap::error(tf),
     }
     ::trap::before_return();

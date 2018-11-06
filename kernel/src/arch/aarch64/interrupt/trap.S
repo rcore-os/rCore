@@ -97,7 +97,7 @@ __alltraps:
     mov x2, sp
     bl rust_trap
 
-.global trap_ret
-trap_ret:
+.global __trapret
+__trapret:
     RESTORE_ALL
     eret

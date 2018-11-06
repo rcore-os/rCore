@@ -5,6 +5,8 @@ pub use ucore_process::processor::{*, Context as _whatever};
 pub use ucore_process::scheduler::*;
 pub use ucore_process::thread::*;
 
+use arch::timer;
+
 mod context;
 
 type Processor = Processor_<Context, StrideScheduler>;
@@ -17,10 +19,18 @@ pub fn init() {
                 // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
                 StrideScheduler::new(5),
             );
-            extern fn idle(arg: usize) -> ! {
-                loop {}
+            extern fn idle1(arg: usize) -> ! {
+                loop {
+                    println!("idle 1 {}", timer::get_cycle());
+                }
             }
-            processor.add(Context::new_kernel(idle, 0));
+            extern fn idle2(arg: usize) -> ! {
+                loop {
+                    println!("idle 2 {}", timer::get_cycle());
+                }
+            }
+            processor.add(Context::new_kernel(idle1, 0));
+            processor.add(Context::new_kernel(idle2, 0));
             processor
         })
     );

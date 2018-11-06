@@ -24,6 +24,8 @@ pub extern "C" fn rust_main() -> ! {
     interrupt::init();
     timer::init();
 
+    // ::process::init();
+
     unsafe { interrupt::enable(); }
 
     super::fs::show_logo();
