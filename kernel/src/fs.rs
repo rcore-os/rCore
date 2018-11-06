@@ -1,7 +1,7 @@
 use simple_filesystem::*;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 #[cfg(target_arch = "x86_64")]
-use arch::driver::ide;
+use arch::driver::ide::IDE;
 use spin::Mutex;
 
 // Hard link user program
@@ -9,25 +9,33 @@ use spin::Mutex;
 global_asm!(r#"
     .section .rodata
     .align 12
-_binary_user_riscv_img_start:
+    .global _user_img_start
+    .global _user_img_end
+_user_img_start:
     .incbin "../user/user-riscv.img"
-_binary_user_riscv_img_end:
+_user_img_end:
 "#);
 
-pub fn shell() {
-    #[cfg(target_arch = "riscv32")]
-    let device = {
-        extern {
-            fn _binary_user_riscv_img_start();
-            fn _binary_user_riscv_img_end();
-        }
-        Box::new(unsafe { MemBuf::new(_binary_user_riscv_img_start, _binary_user_riscv_img_end) })
+lazy_static! {
+    static ref ROOT_INODE: Arc<INode> = {
+        #[cfg(target_arch = "riscv32")]
+        let device = {
+            extern {
+                fn _user_img_start();
+                fn _user_img_end();
+            }
+            Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
+        };
+        #[cfg(target_arch = "x86_64")]
+        let device = Box::new(IDE::new(1));
+
+        let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
+        sfs.root_inode()
     };
-    #[cfg(target_arch = "x86_64")]
-    let device = Box::new(&ide::DISK1);
-    let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
-    let root = sfs.root_inode();
-    let files = root.borrow().list().unwrap();
+}
+
+pub fn shell() {
+    let files = ROOT_INODE.list().unwrap();
     println!("Available programs: {:?}", files);
 
     // Avoid stack overflow in release mode
@@ -43,9 +51,9 @@ pub fn shell() {
         if name == "" {
             continue;
         }
-        if let Ok(file) = root.borrow().lookup(name.as_str()) {
+        if let Ok(file) = ROOT_INODE.lookup(name.as_str()) {
             use process::*;
-            let len = file.borrow().read_at(0, &mut *buf).unwrap();
+            let len = file.read_at(0, &mut *buf).unwrap();
             let pid = processor().manager().add(ContextImpl::new_user(&buf[..len]));
             processor().manager().wait(thread::current().id(), pid);
             processor().yield_now();
@@ -80,16 +88,16 @@ impl Device for MemBuf {
 use core::slice;
 
 #[cfg(target_arch = "x86_64")]
-impl BlockedDevice for &'static ide::DISK1 {
+impl BlockedDevice for IDE {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
-        self.0.lock().read(block_id as u64, 1, buf).is_ok()
+        self.read(block_id as u64, 1, buf).is_ok()
     }
     fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
-        self.0.lock().write(block_id as u64, 1, buf).is_ok()
+        self.write(block_id as u64, 1, buf).is_ok()
     }
 }
