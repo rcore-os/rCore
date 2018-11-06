@@ -43,8 +43,12 @@ pub extern "C" fn rust_main() -> ! {
                     asm!("brk 233");
                 },
                 'c' => unsafe {
-                    println!("svc 666");
-                    asm!("svc 666");
+                    println!("sys_putc");
+                    asm!(
+                        "mov x8, #30
+                         mov x0, #65
+                         svc 0"
+                    );
                 },
                 't' => unsafe {
                     println!("{}", timer::get_cycle());

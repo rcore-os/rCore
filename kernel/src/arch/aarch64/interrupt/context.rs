@@ -3,15 +3,15 @@
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TrapFrame {
-    pub elr: u64,
-    pub spsr: u64,
-    pub sp: u64,
-    pub tpidr: u64,
+    pub elr: usize,
+    pub spsr: usize,
+    pub sp: usize,
+    pub tpidr: usize,
     // pub q0to31: [u128; 32], // disable SIMD/FP registers
-    pub x1to29: [u64; 29],
-    pub __reserved: u64,
-    pub x30: u64, // lr
-    pub x0: u64,
+    pub x1to29: [usize; 29],
+    pub __reserved: usize,
+    pub x30: usize, // lr
+    pub x0: usize,
 }
 
 /// 用于在内核栈中构造新线程的中断帧
@@ -19,17 +19,17 @@ impl TrapFrame {
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
-        tf.x0 = arg as u64;
-        tf.sp = sp as u64;
-        tf.elr = entry as u64;
+        tf.x0 = arg;
+        tf.sp = sp;
+        tf.elr = entry as usize;
         tf.spsr = 0b1101_00_0101; // To EL 1, enable IRQ
         tf
     }
     fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
-        tf.sp = sp as u64;
-        tf.elr = entry_addr as u64;
+        tf.sp = sp;
+        tf.elr = entry_addr;
         tf.spsr = 0b1101_00_0000; // To EL 0, enable IRQ
         tf
     }

@@ -45,7 +45,7 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
             // syndrome is only valid with sync
             match syndrome {
                 Syndrome::Brk(brk) => handle_break(brk, tf),
-                Syndrome::Svc(syscall) => handle_syscall(syscall, tf),
+                Syndrome::Svc(_) => handle_syscall(tf),
                 _ => ::trap::error(tf),
             }
         }
@@ -57,10 +57,23 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
 }
 
 fn handle_break(num: u16, tf: &mut TrapFrame) {
-    tf.elr += 4; // Skip the current brk instruction
+    // Skip the current brk instruction (ref: J1.1.2, page 6147)
+    tf.elr += 4;
 }
 
-fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    // svc instruction has been skipped in syscall
-    println!("syscall {}", num);
+fn handle_syscall(tf: &mut TrapFrame) {
+    // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
+    let ret = ::syscall::syscall(
+        tf.x1to29[7] as usize,
+        [
+            tf.x0,
+            tf.x1to29[0],
+            tf.x1to29[1],
+            tf.x1to29[2],
+            tf.x1to29[3],
+            tf.x1to29[4],
+        ],
+        tf,
+    );
+    tf.x0 = ret as usize;
 }

@@ -1,0 +1,30 @@
+{
+  "abi-blacklist": [
+    "stdcall",
+    "fastcall",
+    "vectorcall",
+    "thiscall",
+    "win64",
+    "sysv64"
+  ],
+  "arch": "aarch64",
+  "data-layout": "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+  "executables": true,
+  "linker": "rust-lld",
+  "linker-flavor": "ld.lld",
+  "linker-is-gnu": true,
+  "llvm-target": "aarch64-unknown-none",
+  "no-compiler-rt": true,
+  "features": "+a53,+strict-align,-neon",
+  "max-atomic-width": 128,
+  "os": "none",
+  "panic": "abort",
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "position-independent-executables": true,
+  "target-c-int-width": "32",
+  "target-endian": "little",
+  "target-pointer-width": "64",
+  "target-family": "unix",
+  "disable-redzone": true
+}
