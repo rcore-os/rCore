@@ -4,13 +4,15 @@ use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use ucore_process::Context;
 use simple_filesystem::file::File;
-use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
+use spin::Mutex;
 
 pub struct ContextImpl {
     arch: ArchContext,
     memory_set: MemorySet,
     kstack: KernelStack,
-    pub files: BTreeMap<usize, Box<File>>,
+    pub files: BTreeMap<usize, Arc<Mutex<File>>>,
+    pub cwd: String,
 }
 
 impl Context for ContextImpl {
@@ -28,6 +30,7 @@ impl ContextImpl {
             memory_set: MemorySet::new(),
             kstack: KernelStack::new(),
             files: BTreeMap::default(),
+            cwd: String::new(),
         })
     }
 
@@ -39,6 +42,7 @@ impl ContextImpl {
             memory_set,
             kstack,
             files: BTreeMap::default(),
+            cwd: String::new(),
         })
     }
 
@@ -94,6 +98,7 @@ impl ContextImpl {
             memory_set,
             kstack,
             files: BTreeMap::default(),
+            cwd: String::new(),
         })
     }
 
@@ -124,6 +129,7 @@ impl ContextImpl {
             memory_set,
             kstack,
             files: BTreeMap::default(),
+            cwd: String::new(),
         })
     }
 }

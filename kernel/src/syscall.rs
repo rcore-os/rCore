@@ -8,7 +8,8 @@ use thread;
 use util;
 use simple_filesystem::{INode, file::File, FileInfo, FileType};
 use core::{slice, str};
-use alloc::boxed::Box;
+use alloc::sync::Arc;
+use spin::Mutex;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
@@ -23,11 +24,11 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         110 => sys_fstat(args[0], args[1] as *mut Stat),
 //        111 => sys_fsync(),
 //        121 => sys_getcwd(),
-//        128 => sys_getdirentry(),
-//        128 => sys_dup(),
+//        128 => sys_getdirentry(args[0], args[1]),
+        130 => sys_dup(args[0], args[1]),
 
         // process
-        001 => sys_exit(args[0]),
+        001 => sys_exit(args[0] as i32),
         002 => sys_fork(tf),
         003 => sys_wait(args[0], args[1] as *mut i32),
 //        004 => sys_exec(),
@@ -53,42 +54,45 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
 }
 
 fn sys_read(fd: usize, base: *mut u8, len: usize) -> i32 {
+    // TODO: check ptr
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     match fd {
         0 => unimplemented!(),
         1 | 2 => return -1,
         _ => {
-            let mut file = process().files.get_mut(&fd);
+            let file = process().files.get_mut(&fd);
             if file.is_none() {
                 return -1;
             }
             let file = file.unwrap();
-            file.read(slice).unwrap();
+            file.lock().read(slice).unwrap();
         }
     }
     0
 }
 
 fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
+    // TODO: check ptr
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts(base, len) };
     match fd {
         0 => return -1,
         1 | 2 => print!("{}", str::from_utf8(slice).unwrap()),
         _ => {
-            let mut file = process().files.get_mut(&fd);
+            let file = process().files.get_mut(&fd);
             if file.is_none() {
                 return -1;
             }
             let file = file.unwrap();
-            file.write(slice).unwrap();
+            file.lock().write(slice).unwrap();
         }
     }
     0
 }
 
 fn sys_open(path: *const u8, flags: usize) -> i32 {
+    // TODO: check ptr
     let path = unsafe { util::from_cstr(path) };
     let flags = VfsFlags::from_ucore_flags(flags);
     info!("open: path: {:?}, flags: {:?}", path, flags);
@@ -106,7 +110,7 @@ fn sys_open(path: *const u8, flags: usize) -> i32 {
     let files = &mut process().files;
     let fd = (3..).find(|i| !files.contains_key(i)).unwrap();
     let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
-    files.insert(fd, Box::new(file));
+    files.insert(fd, Arc::new(Mutex::new(file)));
     fd as i32
 }
 
@@ -122,14 +126,29 @@ fn sys_close(fd: usize) -> i32 {
 }
 
 fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> i32 {
-    let mut file = process().files.get(&fd);
+    // TODO: check ptr
+    info!("fstat: {}", fd);
+    let file = process().files.get(&fd);
     if file.is_none() {
         return -1;
     }
     let file = file.unwrap();
-    let stat = Stat::from(file.info().unwrap());
-    // TODO: check ptr
+    let stat = Stat::from(file.lock().info().unwrap());
     unsafe { stat_ptr.write(stat); }
+    0
+}
+
+fn sys_dup(fd1: usize, fd2: usize) -> i32 {
+    info!("dup: {} {}", fd1, fd2);
+    let file = process().files.get(&fd1);
+    if file.is_none() {
+        return -1;
+    }
+    let file = file.unwrap();
+    if process().files.contains_key(&fd2) {
+        return -1;
+    }
+    process().files.insert(fd2, file.clone());
     0
 }
 
@@ -145,6 +164,7 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 fn sys_wait(pid: usize, code: *mut i32) -> i32 {
+    // TODO: check ptr
     loop {
         let wait_procs = match pid {
             0 => Process::get_children(),
@@ -157,7 +177,6 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
                     if !code.is_null() {
-                        // TODO: check ptr
                         unsafe { code.write(exit_code as i32); }
                     }
                     processor().manager().remove(pid);
@@ -200,10 +219,10 @@ fn sys_getpid() -> i32 {
 }
 
 /// Exit the current process
-fn sys_exit(exit_code: usize) -> i32 {
+fn sys_exit(exit_code: i32) -> i32 {
     let pid = thread::current().id();
-    info!("exit: {}", pid);
-    processor().manager().exit(pid, exit_code);
+    info!("exit: {}, code: {}", pid, exit_code);
+    processor().manager().exit(pid, exit_code as usize);
     processor().yield_now();
     unreachable!();
 }
