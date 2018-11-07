@@ -1,4 +1,8 @@
 [[package]]
+name = "atags"
+version = "0.1.0"
+
+[[package]]
 name = "bare-metal"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -239,6 +243,7 @@ dependencies = [
 name = "ucore"
 version = "0.1.0"
 dependencies = [
+ "atags 0.1.0",
  "bbl 0.1.0",
  "bcm2837 0.1.0",
  "bit-allocator 0.1.0",
@@ -246,6 +251,7 @@ dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bootloader 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cortex-a 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,0 +1,6 @@
+[package]
+name = "atags"
+version = "0.1.0"
+authors = ["koumingyang <1761674434@qq.com>"]
+
+[dependencies]

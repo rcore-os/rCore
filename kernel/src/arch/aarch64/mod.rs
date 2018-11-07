@@ -1,5 +1,7 @@
 //! Entrance and initialization for aarch64.
 
+extern crate atags;
+
 pub mod io;
 pub mod paging;
 pub mod memory;
@@ -18,6 +20,18 @@ pub extern "C" fn rust_main() -> ! {
     // Init board to enable serial port.
     board::init();
 
+    let (start, end) = memory::memory_map().expect("failed to find memory map");
+    println!("The value of start is: {}, end is {}", start, end);
+
+    memory::init();
+    println!("memory init over");
+
+    let mut v = vec![];
+    for i in 0..1000 {
+        v.push(i);
+        println!("{:?}", v);
+    }
+    
     // First init log mod, so that we can print log info.
     // FIXME
     // ::logging::init();
