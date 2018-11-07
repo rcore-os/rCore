@@ -3,11 +3,11 @@
 use ucore_memory::memory_set::*;
 use ucore_memory::paging::*;
 
-type VirtAddr=usize;
-type PhysAddr=usize;
+type VirtAddr = usize;
+type PhysAddr = usize;
 
 use alloc::alloc::{alloc, Layout};
-use memory::alloc_stack;
+use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 
 /// TODO
 pub struct ActivePageTable {
@@ -36,7 +36,7 @@ impl PageTable for ActivePageTable {
     }
 
     // For testing with mock
-    fn get_page_slice_mut<'a,'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8] {
+    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8] {
         unimplemented!()
     }
 
@@ -82,7 +82,6 @@ impl Entry for PageEntry {
         unimplemented!()
     }
 
-
     fn clear_accessed(&mut self) {
         unimplemented!()
     }
@@ -99,7 +98,6 @@ impl Entry for PageEntry {
         unimplemented!()
     }
 
-
     fn target(&self) -> PhysAddr {
         unimplemented!()
     }
@@ -107,7 +105,6 @@ impl Entry for PageEntry {
     fn set_target(&mut self, target: PhysAddr) {
         unimplemented!()
     }
-
 
     // For Copy-on-write extension
     fn writable_shared(&self) -> bool {
@@ -126,7 +123,6 @@ impl Entry for PageEntry {
         unimplemented!()
     }
 
-
     // For Swap extension
     fn swapped(&self) -> bool {
         unimplemented!()
@@ -135,7 +131,6 @@ impl Entry for PageEntry {
     fn set_swapped(&mut self, value: bool) {
         unimplemented!()
     }
-
 
     fn user(&self) -> bool {
         unimplemented!()
@@ -152,7 +147,6 @@ impl Entry for PageEntry {
     fn set_execute(&mut self, value: bool) {
         unimplemented!()
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -186,14 +180,16 @@ impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
     fn new() -> Self {
-        unsafe {let layout = Layout::new::<u64>();
-        let ptr = alloc(layout);
-        let frame = MockFrame::of_addr(*ptr as usize);
-        InactivePageTable0 { p4_frame: frame }}
+        unsafe {
+            let layout = Layout::new::<u64>();
+            let ptr = alloc(layout);
+            let frame = MockFrame::of_addr(*ptr as usize);
+            InactivePageTable0 { p4_frame: frame }
+        }
     }
 
     fn new_bare() -> Self {
-        Self::new()
+        unimplemented!()
     }
 
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
@@ -201,11 +197,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn activate(&self) {
-        
+        unimplemented!()
     }
 
     unsafe fn with(&self, f: impl FnOnce()) {
-        
+        unimplemented!()
     }
 
     fn token(&self) -> usize {
@@ -213,11 +209,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn alloc_frame() -> Option<PhysAddr> {
-        unimplemented!()
+        alloc_frame()
     }
 
     fn dealloc_frame(target: PhysAddr) {
-        
+        dealloc_frame(target)
     }
 
     fn alloc_stack() -> Stack {

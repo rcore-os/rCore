@@ -10,6 +10,7 @@ pub fn init() {
     unsafe {
         HEAP_ALLOCATOR.lock().init(start, end - start);
     }
+    info!("memory: init end");
 }
 
 extern "C" {

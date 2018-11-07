@@ -9,7 +9,6 @@
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(compiler_builtins_lib)]
-#![feature(try_from)]
 #![no_std]
 
 
@@ -34,7 +33,6 @@ extern crate volatile;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate xmas_elf;
-extern crate usize_conversions;
 
 use linked_list_allocator::LockedHeap;
 
