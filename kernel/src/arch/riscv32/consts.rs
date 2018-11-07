@@ -5,7 +5,6 @@ const P2_MASK: usize = 0x3ff << 22;
 pub const RECURSIVE_INDEX: usize = 0x3fe;
 pub const KERNEL_OFFSET: usize = 0;
 pub const KERNEL_P2_INDEX: usize = 0x8000_0000 >> 22;
-pub const KERNEL_HEAP_OFFSET: usize = 0x8020_0000;
 pub const KERNEL_HEAP_SIZE: usize = 0x0020_0000;
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
 pub const MEMORY_END: usize = 0x8080_0000;

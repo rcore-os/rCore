@@ -29,8 +29,7 @@ fn init_frame_allocator() {
     use consts::{MEMORY_OFFSET, MEMORY_END};
 
     let mut ba = FRAME_ALLOCATOR.lock();
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    ba.insert(to_range(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MEMORY_END));
+    ba.insert(to_range(end as usize + PAGE_SIZE, MEMORY_END));
     info!("FrameAllocator init end");
 
     fn to_range(start: usize, end: usize) -> Range<usize> {
@@ -41,8 +40,8 @@ fn init_frame_allocator() {
 }
 
 fn remap_the_kernel() {
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     let mut ms = MemorySet::new_bare();
+    #[cfg(feature = "no_bbl")]
     ms.push(MemoryArea::new_identity(0x10000000, 0x10000008, MemoryAttr::default(), "serial"));
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
