@@ -3,8 +3,11 @@
 use ucore_memory::memory_set::*;
 use ucore_memory::paging::*;
 
-type VirtAddr = usize;
-type PhysAddr = usize;
+type VirtAddr=usize;
+type PhysAddr=usize;
+
+use alloc::alloc::{alloc, Layout};
+use memory::alloc_stack;
 
 /// TODO
 pub struct ActivePageTable {
@@ -152,21 +155,45 @@ impl Entry for PageEntry {
 
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MockFrame(PhysAddr);
+
+impl MockFrame {
+    pub fn of_addr(addr: PhysAddr) -> Self {
+        MockFrame(addr)
+    }
+    pub fn start_address(&self) -> PhysAddr {
+        unimplemented!()
+    }
+    pub fn p2_index(&self) -> usize {
+        unimplemented!()
+    }
+    pub fn p1_index(&self) -> usize {
+        unimplemented!()
+    }
+    pub fn number(&self) -> usize {
+        unimplemented!()
+    }
+}
+
 /// TODO
 pub struct InactivePageTable0 {
-    // TODO
+    p4_frame: MockFrame,
 }
 
 /// TODO
 impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
-        fn new() -> Self {
-        unimplemented!()
+    fn new() -> Self {
+        unsafe {let layout = Layout::new::<u64>();
+        let ptr = alloc(layout);
+        let frame = MockFrame::of_addr(*ptr as usize);
+        InactivePageTable0 { p4_frame: frame }}
     }
 
     fn new_bare() -> Self {
-        unimplemented!()
+        Self::new()
     }
 
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
@@ -174,15 +201,15 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn activate(&self) {
-        unimplemented!()
+        
     }
 
     unsafe fn with(&self, f: impl FnOnce()) {
-        unimplemented!()
+        
     }
 
     fn token(&self) -> usize {
-        unimplemented!()
+        0
     }
 
     fn alloc_frame() -> Option<PhysAddr> {
@@ -190,10 +217,10 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn dealloc_frame(target: PhysAddr) {
-        unimplemented!()
+        
     }
 
     fn alloc_stack() -> Stack {
-        unimplemented!()
+        alloc_stack()
     }
 }

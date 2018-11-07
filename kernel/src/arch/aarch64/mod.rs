@@ -1,6 +1,9 @@
 //! Entrance and initialization for aarch64.
 
 extern crate atags;
+extern crate bitflags;
+extern crate usize_conversions;
+pub extern crate ux;
 
 pub mod io;
 pub mod paging;
@@ -26,19 +29,19 @@ pub extern "C" fn rust_main() -> ! {
     memory::init();
     println!("memory init over");
 
-    let mut v = vec![];
-    for i in 0..1000 {
-        v.push(i);
-        println!("{:?}", v);
-    }
+    //let mut v = vec![];
+    //for i in 0..1000 {
+    //    v.push(i);
+    //    println!("{:?}", v);
+    //}
     
     // First init log mod, so that we can print log info.
     // FIXME
-    // ::logging::init();
+    ::logging::init();
     interrupt::init();
     timer::init();
 
-    // ::process::init();
+    ::process::init();
 
     unsafe { interrupt::enable(); }
 
