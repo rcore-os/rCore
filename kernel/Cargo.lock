@@ -209,7 +209,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "simple-filesystem"
 version = "0.0.1"
-source = "git+https://github.com/wangrunji0408/SimpleFileSystem-Rust?branch=multi-thread#80d72a9853aa8d64c3dc5f8117fc78a50b6f6ca3"
+source = "git+https://github.com/wangrunji0408/SimpleFileSystem-Rust?branch=multi-thread#fe473bc987a9a5dfd7ffe91883f8781b910ed45e"
 dependencies = [
  "bit-vec 0.5.0 (git+https://github.com/AltSysrq/bit-vec.git)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",

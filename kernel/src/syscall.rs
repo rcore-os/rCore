@@ -6,7 +6,7 @@ use arch::interrupt::TrapFrame;
 use process::*;
 use thread;
 use util;
-use simple_filesystem::{INode, file::File};
+use simple_filesystem::{INode, file::File, FileInfo, FileType};
 use core::{slice, str};
 use alloc::boxed::Box;
 
@@ -20,7 +20,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         103 => sys_write(args[0], args[1] as *const u8, args[2]),
         030 => sys_putc(args[0] as u8 as char),
 //        104 => sys_seek(),
-//        110 => sys_fstat(),
+        110 => sys_fstat(args[0], args[1] as *mut Stat),
 //        111 => sys_fsync(),
 //        121 => sys_getcwd(),
 //        128 => sys_getdirentry(),
@@ -63,7 +63,7 @@ fn sys_read(fd: usize, base: *mut u8, len: usize) -> i32 {
             if file.is_none() {
                 return -1;
             }
-            let file = file.as_mut().unwrap();
+            let file = file.unwrap();
             file.read(slice).unwrap();
         }
     }
@@ -81,7 +81,7 @@ fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
             if file.is_none() {
                 return -1;
             }
-            let file = file.as_mut().unwrap();
+            let file = file.unwrap();
             file.write(slice).unwrap();
         }
     }
@@ -121,6 +121,18 @@ fn sys_close(fd: usize) -> i32 {
     }
 }
 
+fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> i32 {
+    let mut file = process().files.get(&fd);
+    if file.is_none() {
+        return -1;
+    }
+    let file = file.unwrap();
+    let stat = Stat::from(file.info().unwrap());
+    // TODO: check ptr
+    unsafe { stat_ptr.write(stat); }
+    0
+}
+
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> i32 {
     let mut context = process().fork(tf);
@@ -145,6 +157,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
                     if !code.is_null() {
+                        // TODO: check ptr
                         unsafe { code.write(exit_code as i32); }
                     }
                     processor().manager().remove(pid);
@@ -236,5 +249,48 @@ impl VfsFlags {
     fn from_ucore_flags(f: usize) -> Self {
         assert_ne!(f & 0b11, 0b11);
         Self::from_bits_truncate(f + 1)
+    }
+}
+
+#[repr(C)]
+struct Stat {
+    /// protection mode and file type
+    mode: StatMode,
+    /// number of hard links
+    nlinks: u32,
+    /// number of blocks file is using
+    blocks: u32,
+    /// file size (bytes)
+    size: u32,
+}
+
+bitflags! {
+    struct StatMode: u32 {
+        const NULL  = 0;
+        /// ordinary regular file
+        const FILE  = 0o10000;
+        /// directory
+        const DIR   = 0o20000;
+        /// symbolic link
+        const LINK  = 0o30000;
+        /// character device
+        const CHAR  = 0o40000;
+        /// block device
+        const BLOCK = 0o50000;
+    }
+}
+
+impl From<FileInfo> for Stat {
+    fn from(info: FileInfo) -> Self {
+        Stat {
+            mode: match info.type_ {
+                FileType::File => StatMode::FILE,
+                FileType::Dir => StatMode::DIR,
+                _ => StatMode::NULL,
+            },
+            nlinks: info.nlinks as u32,
+            blocks: info.blocks as u32,
+            size: info.size as u32,
+        }
     }
 }
