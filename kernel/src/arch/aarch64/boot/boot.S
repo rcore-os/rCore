@@ -18,6 +18,9 @@ setup:
     # store the desired EL1 stack pointer in x1
     adr     x1, _start
 
+    # use SP_ELx for Exception level ELx
+    msr     SPsel, #1
+
     # read the current exception level into x0 (ref: C5.2.1)
     mrs     x0, CurrentEL
     and     x0, x0, #0b1100

@@ -217,6 +217,8 @@ impl MutexSupport for Spin {
                 asm!("pause" :::: "volatile");
             #[cfg(target_arch = "riscv32")]
                 asm!("nop" :::: "volatile");
+            #[cfg(target_arch = "aarch64")]
+                asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {}
@@ -247,6 +249,8 @@ impl MutexSupport for SpinNoIrq {
                 asm!("pause" :::: "volatile");
             #[cfg(target_arch = "riscv32")]
                 asm!("nop" :::: "volatile");
+            #[cfg(target_arch = "aarch64")]
+                asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {

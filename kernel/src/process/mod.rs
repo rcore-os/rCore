@@ -1,39 +1,32 @@
 use spin::Once;
-use sync::{SpinNoIrqLock, Mutex, MutexGuard, SpinNoIrq};
+use sync::{Mutex, MutexGuard, SpinNoIrq, SpinNoIrqLock};
 pub use self::context::Context;
 pub use ucore_process::processor::{*, Context as _whatever};
 pub use ucore_process::scheduler::*;
 pub use ucore_process::thread::*;
-
-use arch::timer;
 
 mod context;
 
 type Processor = Processor_<Context, StrideScheduler>;
 
 pub fn init() {
-    PROCESSOR.call_once(||
+    PROCESSOR.call_once(|| {
         SpinNoIrqLock::new({
             let mut processor = Processor::new(
                 unsafe { Context::new_init() },
                 // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
                 StrideScheduler::new(5),
             );
-            extern fn idle1(arg: usize) -> ! {
+            extern "C" fn idle(arg: usize) -> ! {
                 loop {
-                    println!("idle 1 {}", timer::get_cycle());
+                    #[cfg(target_arch = "aarch64")]
+                    unsafe { asm!("wfi" :::: "volatile") }
                 }
             }
-            extern fn idle2(arg: usize) -> ! {
-                loop {
-                    println!("idle 2 {}", timer::get_cycle());
-                }
-            }
-            processor.add(Context::new_kernel(idle1, 0));
-            processor.add(Context::new_kernel(idle2, 0));
+            processor.add(Context::new_kernel(idle, 0));
             processor
         })
-    );
+    });
     info!("process init end");
 }
 

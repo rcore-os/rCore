@@ -12,6 +12,6 @@ pub fn get_cycle() -> u64 {
 }
 
 pub fn set_next() {
-    // 1000 ms
-    timer::tick_in(1000 * 1000);
+    // 10 ms
+    timer::tick_in(10 * 1000);
 }

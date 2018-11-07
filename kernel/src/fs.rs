@@ -26,6 +26,62 @@ pub fn show_logo() {
     println!("{}", LOGO);
 }
 
+#[inline(always)]
+fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
+    let ret: i32;
+    unsafe {
+        #[cfg(target_arch = "riscv32")]
+            asm!("ecall"
+            : "={x10}" (ret)
+            : "{x10}" (id), "{x11}" (arg0), "{x12}" (arg1), "{x13}" (arg2), "{x14}" (arg3), "{x15}" (arg4), "{x16}" (arg5)
+            : "memory"
+            : "volatile");
+        #[cfg(target_arch = "x86_64")]
+            asm!("int 0x40"
+            : "={rax}" (ret)
+            : "{rax}" (id), "{rdi}" (arg0), "{rsi}" (arg1), "{rdx}" (arg2), "{rcx}" (arg3), "{r8}" (arg4), "{r9}" (arg5)
+            : "memory"
+            : "intel" "volatile");
+        #[cfg(target_arch = "aarch64")]
+            asm!("svc 0"
+            : "={x0}" (ret)
+            : "{x8}" (id), "{x0}" (arg0), "{x1}" (arg1), "{x2}" (arg2), "{x3}" (arg3), "{x4}" (arg4), "{x5}" (arg5)
+            : "memory"
+            : "volatile");
+    }
+    ret
+}
+
+pub fn test_shell(prefix: &str) -> ! {
+    show_logo();
+    loop {
+        print!("{}", prefix);
+        loop {
+            let c = super::arch::io::getchar();
+            match c {
+                '\u{7f}' => {
+                    print!("\u{7f}");
+                }
+                'c' => unsafe {
+                    print!("sys_putc: ");
+                    sys_call(30, 'A' as usize, 0, 0, 0, 0, 0);
+                },
+                't' => unsafe {
+                    println!("sys_get_time: {}", sys_call(17, 0, 0, 0, 0, 0, 0));
+                },
+                ' '...'\u{7e}' => {
+                    print!("{}", c);
+                }
+                '\n' | '\r' => {
+                    print!("\n");
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 pub fn shell() {
     show_logo();
 

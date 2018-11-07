@@ -116,6 +116,8 @@ impl Context {
         tlbi vmalle1is              // invalidate the TLB entry for the entry that changes
         dsb ish                     // ensure TLB invalidation is complete
         isb                         // synchronize context on this processor
+
+        str xzr, [x1]
         ret"
         : : : : "volatile" );
     }

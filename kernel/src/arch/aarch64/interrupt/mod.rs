@@ -4,6 +4,7 @@ mod handler;
 mod context;
 mod syndrome;
 
+use super::cortex_a::regs::*;
 pub use self::context::*;
 pub use self::handler::*;
 
@@ -34,8 +35,9 @@ pub unsafe fn disable() {
 /// return: status(usize)
 #[inline(always)]
 pub unsafe fn disable_and_store() -> usize {
-    // TODO
-    0
+    let daif = DAIF.get() as usize;
+    disable();
+    daif
 }
 
 /// Use the original status to restore the process
@@ -44,5 +46,5 @@ pub unsafe fn disable_and_store() -> usize {
 /// * flags:  original status(usize)
 #[inline(always)]
 pub unsafe fn restore(flags: usize) {
-    // TODO
+    DAIF.set(flags as u32);
 }
