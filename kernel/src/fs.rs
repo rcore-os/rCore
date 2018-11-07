@@ -47,14 +47,15 @@ pub fn shell() {
     loop {
         print!(">> ");
         use console::get_line;
-        let name = get_line();
-        if name == "" {
+        let cmd = get_line();
+        if cmd == "" {
             continue;
         }
-        if let Ok(file) = ROOT_INODE.lookup(name.as_str()) {
+        let name = cmd.split(' ').next().unwrap();
+        if let Ok(file) = ROOT_INODE.lookup(name) {
             use process::*;
             let len = file.read_at(0, &mut *buf).unwrap();
-            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len]));
+            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len], cmd.as_str()));
             processor().manager().wait(thread::current().id(), pid);
             processor().yield_now();
         } else {

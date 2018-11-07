@@ -4,7 +4,7 @@ use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use ucore_process::Context;
 use simple_filesystem::file::File;
-use alloc::{boxed::Box, collections::BTreeMap};
+use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 
 pub struct ContextImpl {
     arch: ArchContext,
@@ -43,7 +43,7 @@ impl ContextImpl {
     }
 
     /// Make a new user thread from ELF data
-    pub fn new_user(data: &[u8]) -> Box<Context> {
+    pub fn new_user(data: &[u8], cmd: &str) -> Box<Context> {
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
@@ -54,14 +54,14 @@ impl ContextImpl {
 
         // User stack
         use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
-        let (user_stack_buttom, user_stack_top) = match is32 {
+        let (ustack_buttom, mut ustack_top) = match is32 {
             true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
             false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
         };
 
         // Make page table
         let mut memory_set = memory_set_from(&elf);
-        memory_set.push(MemoryArea::new(user_stack_buttom, user_stack_top, MemoryAttr::default().user(), "user_stack"));
+        memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
 
         let entry_addr = elf.header.pt2.entry_point() as usize;
@@ -80,13 +80,7 @@ impl ContextImpl {
                     let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
                     target.copy_from_slice(&data[offset..offset + file_size]);
                 }
-                if is32 {
-                    unsafe {
-                        // TODO: full argc & argv
-                        *(user_stack_top as *mut u32).offset(-1) = 0; // argv
-                        *(user_stack_top as *mut u32).offset(-2) = 0; // argc
-                    }
-                }
+                ustack_top = push_args_at_stack(cmd, ustack_top);
             });
         }
 
@@ -95,7 +89,7 @@ impl ContextImpl {
         Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
-                    entry_addr, user_stack_top - 8, kstack.top(), is32, memory_set.token())
+                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
             },
             memory_set,
             kstack,
@@ -118,7 +112,7 @@ impl ContextImpl {
         unsafe {
             memory_set.with(|| {
                 for (area, data) in memory_set.iter().zip(datas.iter()) {
-                    unsafe { area.as_slice_mut() }.copy_from_slice(data.as_slice())
+                    area.as_slice_mut().copy_from_slice(data.as_slice())
                 }
             });
         }
@@ -138,6 +132,30 @@ impl Debug for ContextImpl {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{:x?}", self.arch)
     }
+}
+
+/// Push a slice at the stack. Return the new sp.
+unsafe fn push_slice<T: Copy>(mut sp: usize, vs: &[T]) -> usize {
+    use core::{mem::{size_of, align_of}, slice};
+    sp -= vs.len() * size_of::<T>();
+    sp -= sp % align_of::<T>();
+    slice::from_raw_parts_mut(sp as *mut T, vs.len())
+        .copy_from_slice(vs);
+    sp
+}
+
+unsafe fn push_args_at_stack(cmd: &str, stack_top: usize) -> usize {
+    use core::{ptr, slice};
+    let mut sp = stack_top;
+    let mut argv = Vec::new();
+    for arg in cmd.split(' ') {
+        sp = push_slice(sp, &[0u8]);
+        sp = push_slice(sp, arg.as_bytes());
+        argv.push(sp);
+    }
+    sp = push_slice(sp, argv.as_slice());
+    sp = push_slice(sp, &[argv.len()]);
+    sp
 }
 
 fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
