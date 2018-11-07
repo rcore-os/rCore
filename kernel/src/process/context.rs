@@ -3,12 +3,14 @@ use memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use ucore_process::Context;
-use alloc::boxed::Box;
+use simple_filesystem::file::File;
+use alloc::{boxed::Box, collections::BTreeMap};
 
 pub struct ContextImpl {
     arch: ArchContext,
     memory_set: MemorySet,
     kstack: KernelStack,
+    pub files: BTreeMap<usize, Box<File>>,
 }
 
 impl Context for ContextImpl {
@@ -25,6 +27,7 @@ impl ContextImpl {
             arch: ArchContext::null(),
             memory_set: MemorySet::new(),
             kstack: KernelStack::new(),
+            files: BTreeMap::default(),
         })
     }
 
@@ -35,6 +38,7 @@ impl ContextImpl {
             arch: unsafe { ArchContext::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
+            files: BTreeMap::default(),
         })
     }
 
@@ -95,6 +99,7 @@ impl ContextImpl {
             },
             memory_set,
             kstack,
+            files: BTreeMap::default(),
         })
     }
 
@@ -124,6 +129,7 @@ impl ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
+            files: BTreeMap::default(),
         })
     }
 }

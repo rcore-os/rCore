@@ -1,7 +1,7 @@
 use simple_filesystem::*;
 use alloc::{boxed::Box, sync::Arc};
 #[cfg(target_arch = "x86_64")]
-use arch::driver::ide::IDE;
+use arch::driver::ide;
 use spin::Mutex;
 
 // Hard link user program
@@ -17,7 +17,7 @@ _user_img_end:
 "#);
 
 lazy_static! {
-    static ref ROOT_INODE: Arc<INode> = {
+    pub static ref ROOT_INODE: Arc<INode> = {
         #[cfg(target_arch = "riscv32")]
         let device = {
             extern {
@@ -27,7 +27,7 @@ lazy_static! {
             Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
         };
         #[cfg(target_arch = "x86_64")]
-        let device = Box::new(IDE::new(1));
+        let device = Box::new(ide::IDE::new(1));
 
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()
@@ -88,7 +88,7 @@ impl Device for MemBuf {
 use core::slice;
 
 #[cfg(target_arch = "x86_64")]
-impl BlockedDevice for IDE {
+impl BlockedDevice for ide::IDE {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
