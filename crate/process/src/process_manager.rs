@@ -103,16 +103,16 @@ impl ProcessManager {
             .expect("failed to select a runnable process");
         scheduler.remove(pid);
         let mut proc_lock = self.procs[pid].lock();
-        let mut proc = proc_lock.as_mut().unwrap();
+        let mut proc = proc_lock.as_mut().expect("process not exist");;
         proc.status = Status::Running(cpu_id);
-        (pid, proc.context.take().unwrap())
+        (pid, proc.context.take().expect("context not exist"))
     }
 
     /// Called by Processor to finish running a process
     /// and give its context back.
     pub fn stop(&self, pid: Pid, context: Box<Context>) {
         let mut proc_lock = self.procs[pid].lock();
-        let mut proc = proc_lock.as_mut().unwrap();
+        let mut proc = proc_lock.as_mut().expect("process not exist");
         proc.status = proc.status_after_stop.clone();
         proc.status_after_stop = Status::Ready;
         proc.context = Some(context);
@@ -128,7 +128,7 @@ impl ProcessManager {
     fn set_status(&self, pid: Pid, status: Status) {
         let mut scheduler = self.scheduler.lock();
         let mut proc_lock = self.procs[pid].lock();
-        let mut proc = proc_lock.as_mut().unwrap();
+        let mut proc = proc_lock.as_mut().expect("process not exist");
         trace!("process {} {:?} -> {:?}", pid, proc.status, status);
         match (&proc.status, &status) {
             (Status::Ready, Status::Ready) => return,
@@ -158,7 +158,7 @@ impl ProcessManager {
 
     pub fn remove(&self, pid: Pid) {
         let mut proc_lock = self.procs[pid].lock();
-        let proc = proc_lock.as_ref().unwrap();
+        let proc = proc_lock.as_ref().expect("process not exist");
         match proc.status {
             Status::Exited(_) => *proc_lock = None,
             _ => panic!("can not remove non-exited process"),
