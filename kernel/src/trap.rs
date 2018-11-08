@@ -5,10 +5,10 @@ use arch::cpu;
 pub static mut TICK: usize = 0;
 
 pub fn timer() {
-    processor().tick();
     if cpu::id() == 0 {
         unsafe { TICK += 1; }
     }
+    processor().tick();
     //info!("finish before return!");
 }
 
@@ -21,3 +21,7 @@ pub fn error(tf: &TrapFrame) -> ! {
     processor().yield_now();
     unreachable!();
 }
+
+pub fn serial(c: char) {
+    ::console::CONSOLE_INPUT.push(c);
+} 
