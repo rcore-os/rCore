@@ -288,7 +288,8 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
                 //info!("got entry!");
                 !entry.present() && !entry.swapped()
             };
-            if need_alloc{
+            info!("need_alloc got");
+            if need_alloc {
                 info!("need_alloc!");
                 let frame = alloc_frame();
                 {
@@ -307,6 +308,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
                 info!("allocated successfully");
                 return true;
             }
+            info!("not need alloc!");
         }
         // now we didn't attach the cow so the present will be false when swapped(), to enable the cow some changes will be needed
         if !self.page_table.get_entry(addr).swapped() {

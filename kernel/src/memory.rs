@@ -119,22 +119,26 @@ pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
-    debug!("active page table token in pg fault is {:x?}", ActivePageTable::token());
+    info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
     let id = memory_set_record().iter()
             .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
+    info!("id got");
     let mut mmsets = memory_set_record();
+    info!("mmset got");
     match id {
         Some(targetid) => {
-            debug!("get id from memroy set recorder.");
+            info!("get id from memroy set recorder.");
             let mmset_ptr = mmsets.get(targetid);
             let pt = unsafe { (*(mmset_ptr.unwrap().clone() as *mut MemorySet)).get_page_table_mut() };
+            info!("pt got!");
             if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().unwrap()){
                 return true;
             }
         },
         None => {
-            debug!("get pt from processor()");
+            info!("get pt from processor()");
             let pt = process().get_memory_set_mut().get_page_table_mut();
+            info!("pt got");
             if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().unwrap()){
                 return true;
             }
