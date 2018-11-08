@@ -1,7 +1,5 @@
 //! System call
 
-#![allow(unused)]
-
 use arch::interrupt::TrapFrame;
 use process::*;
 use thread;
@@ -24,7 +22,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         110 => sys_fstat(args[0], args[1] as *mut Stat),
 //        111 => sys_fsync(),
 //        121 => sys_getcwd(),
-//        128 => sys_getdirentry(args[0], args[1]),
+        128 => sys_getdirentry(args[0], args[1] as *mut DirEntry),
         130 => sys_dup(args[0], args[1]),
 
         // process
@@ -135,6 +133,26 @@ fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> i32 {
     let file = file.unwrap();
     let stat = Stat::from(file.lock().info().unwrap());
     unsafe { stat_ptr.write(stat); }
+    0
+}
+
+/// entry_id = dentry.offset / 256
+/// dentry.name = entry_name
+/// dentry.offset += 256
+fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> i32 {
+    // TODO: check ptr
+    info!("getdirentry: {}", fd);
+    let file = process().files.get(&fd);
+    if file.is_none() { return -1; }
+    let file = file.unwrap();
+    let dentry = unsafe { &mut *dentry_ptr };
+    if !dentry.check() { return -1; }
+    let info = file.lock().info().unwrap();
+    if info.type_ != FileType::Dir || info.size <= dentry.entry_id() { return -1; }
+    let name = file.lock().get_entry(dentry.entry_id());
+    if name.is_err() { return -1; }
+    let name = name.unwrap();
+    dentry.set_name(name.as_str());
     0
 }
 
@@ -268,6 +286,26 @@ impl VfsFlags {
     fn from_ucore_flags(f: usize) -> Self {
         assert_ne!(f & 0b11, 0b11);
         Self::from_bits_truncate(f + 1)
+    }
+}
+
+#[repr(C)]
+struct DirEntry {
+    offset: u32,
+    name: [u8; 256],
+}
+
+impl DirEntry {
+    fn check(&self) -> bool {
+        self.offset % 256 == 0
+    }
+    fn entry_id(&self) -> usize {
+        (self.offset / 256) as usize
+    }
+    fn set_name(&mut self, name: &str) {
+        self.name[..name.len()].copy_from_slice(name.as_bytes());
+        self.name[name.len()] = 0;
+        self.offset += 256;
     }
 }
 
