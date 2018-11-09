@@ -106,11 +106,6 @@ impl ContextImpl {
 
         let kstack = KernelStack::new();
 
-        // map the memory set swappable
-        //memory_set_map_swappable(&mut memory_set);
-        
-        //set the user Memory pages in the memory set swappable
-        //memory_set_map_swappable(&mut memory_set);
         let id = memory_set_record().iter()
             .position(|x| x.clone() == mmset_ptr).unwrap();
         memory_set_record().remove(id);
@@ -123,27 +118,32 @@ impl ContextImpl {
             memory_set,
             kstack,
         });
+        //set the user Memory pages in the memory set swappable
         memory_set_map_swappable(ret.get_memory_set_mut());
         ret
     }
 
     /// Fork
     pub fn fork(&self, tf: &TrapFrame) -> Box<Context> {
+        info!("COME into fork!");
         // Clone memory set, make a new page table
         let mut memory_set = self.memory_set.clone();
-        
+        info!("finish mmset clone in fork!");
         // add the new memory set to the recorder
         debug!("fork! new page table token: {:x?}", memory_set.token());
         let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
         memory_set_record().push_back(mmset_ptr);
         
+        info!("before copy data to temp space");
         // Copy data to temp space
         use alloc::vec::Vec;
         let datas: Vec<Vec<u8>> = memory_set.iter().map(|area| {
             Vec::from(unsafe { area.as_slice() })
         }).collect();
 
-        // Temporary switch to it, in order to copy data
+        info!("Finish copy data to temp space.");
+
+        // Temporarily switch to it, in order to copy data
         unsafe {
             memory_set.with(|| {
                 for (area, data) in memory_set.iter().zip(datas.iter()) {
@@ -152,10 +152,9 @@ impl ContextImpl {
             });
         }
 
+        info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        // map the memory set swappable
-        //memory_set_map_swappable(&mut memory_set);
         // remove the raw pointer for the memory set since it will 
         let id = memory_set_record().iter()
             .position(|x| x.clone() == mmset_ptr).unwrap();
@@ -166,7 +165,9 @@ impl ContextImpl {
             memory_set,
             kstack,
         });
+
         memory_set_map_swappable(ret.get_memory_set_mut());
+        info!("FORK() finsihed!");
         ret
     }
 
@@ -187,7 +188,7 @@ impl Drop for ContextImpl{
             memory_set_record().remove(id.unwrap());
         }
         */
-        
+
         //set the user Memory pages in the memory set unswappable
         let Self {ref mut arch, ref mut memory_set, ref mut kstack} = self;
         let pt = {
@@ -202,7 +203,6 @@ impl Drop for ContextImpl{
             }
         }
         debug!("Finishing setting pages unswappable");
-        
     }
 }
 

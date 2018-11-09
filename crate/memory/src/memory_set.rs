@@ -190,7 +190,7 @@ impl MemoryArea {
                 }
                 info!("finish map delayed!");
             }
-        }
+        };
     }
     /*
     **  @brief  unmap the memory area from the physice address in a page table
@@ -410,6 +410,7 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
                 area.map::<T>(pt);
             }
         });
+        info!("finish map in clone!");
         MemorySet {
             areas: self.areas.clone(),
             page_table,

@@ -31,9 +31,10 @@ fn init_frame_allocator() {
     use consts::{MEMORY_OFFSET, MEMORY_END};
 
     let mut ba = FRAME_ALLOCATOR.lock();
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
+    //use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     // keep memory for the kernel heap and set other physical memory available in BitAlloc 
-    ba.insert(to_range(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MEMORY_END));
+    //ba.insert(to_range(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MEMORY_END));
+    ba.insert(to_range(end as usize + PAGE_SIZE, MEMORY_END));
     info!("FrameAllocator init end");
 
     /*

@@ -63,6 +63,7 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
+    info!("Come into kmain");
     process::processor().run();
 
 //    thread::test::local_key();

@@ -20,6 +20,7 @@ _binary_user_riscv_img_end:
 
 pub fn shell() {
     // load riscv32/x86_64 user program
+    info!("come into shell!");
     #[cfg(target_arch = "riscv32")]
     let device = {
         extern {

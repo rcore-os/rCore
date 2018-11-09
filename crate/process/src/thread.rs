@@ -40,7 +40,7 @@ pub fn current() -> Thread {
 /// Puts the current thread to sleep for the specified amount of time.
 pub fn sleep(dur: Duration) {
     let time = dur_to_ticks(dur);
-    info!("sleep: {:?} ticks", time);
+    trace!("sleep: {:?} ticks", time);
     processor().manager().sleep(current().id(), time);
     park();
 
@@ -58,7 +58,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         F: Send + 'static + FnOnce() -> T,
         T: Send + 'static,
 {
-    info!("spawn:");
+    trace!("spawn:");
 
     // 注意到下面的问题：
     // Processor只能从入口地址entry+参数arg创建新线程
@@ -108,13 +108,13 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 
 /// Cooperatively gives up a timeslice to the OS scheduler.
 pub fn yield_now() {
-    info!("yield:");
+    trace!("yield:");
     processor().yield_now();
 }
 
 /// Blocks unless or until the current thread's token is made available.
 pub fn park() {
-    info!("park:");
+    trace!("park:");
     processor().manager().sleep(current().id(), 0);
     processor().yield_now();
 }

@@ -28,6 +28,7 @@ pub fn setup_page_table(frame: Frame) {
     // 0x80000000 ~ 8K area
     p2.map_identity(KERNEL_P2_INDEX, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+    p2.map_identity(KERNEL_P2_INDEX + 2, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
 
     use super::riscv::register::satp;
     unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
@@ -356,10 +357,18 @@ impl InactivePageTable0 {
         let e0 = table[0x40];
         let e1 = table[KERNEL_P2_INDEX];
         assert!(!e1.is_unused());
+        // for larger heap memroy
+        let e2 = table[KERNEL_P2_INDEX + 1];
+        assert!(!e2.is_unused());
+        let e3 = table[KERNEL_P2_INDEX + 2];
+        assert!(!e2.is_unused());
 
         self.edit(|_| {
             table[0x40] = e0;
             table[KERNEL_P2_INDEX].set(e1.frame(), EF::VALID | EF::GLOBAL);
+            // for larger heap memroy
+            table[KERNEL_P2_INDEX + 1].set(e2.frame(), EF::VALID | EF::GLOBAL);
+            table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
         });
     }
 }
