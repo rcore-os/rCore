@@ -78,7 +78,7 @@ impl From<Level> for Color {
             Level::Error => Color::Red,
             Level::Warn => Color::Yellow,
             Level::Info => Color::Blue,
-            Level::Debug => Color::LightRed,
+            Level::Debug => Color::Green,
             Level::Trace => Color::DarkGray,
         }
     }

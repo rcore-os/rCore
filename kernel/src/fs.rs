@@ -1,8 +1,10 @@
 use simple_filesystem::*;
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque};
 #[cfg(target_arch = "x86_64")]
 use arch::driver::ide;
-use spin::Mutex;
+use sync::Condvar;
+use sync::SpinNoIrqLock as Mutex;
+use core::any::Any;
 
 // Hard link user program
 #[cfg(target_arch = "riscv32")]
@@ -101,4 +103,72 @@ impl BlockedDevice for ide::IDE {
         let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.write(block_id as u64, 1, buf).is_ok()
     }
+}
+
+#[derive(Default)]
+pub struct Stdin {
+    buf: Mutex<VecDeque<char>>,
+    pushed: Condvar,
+}
+
+impl Stdin {
+    pub fn push(&self, c: char) {
+        self.buf.lock().push_back(c);
+        self.pushed.notify_one();
+    }
+    pub fn pop(&self) -> char {
+        loop {
+            let ret = self.buf.lock().pop_front();
+            match ret {
+                Some(c) => return c,
+                None => self.pushed._wait(),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Stdout;
+
+lazy_static! {
+    pub static ref STDIN: Arc<Stdin> = Arc::new(Stdin::default());
+    pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
+}
+
+// TODO: better way to provide default impl?
+macro_rules! impl_inode {
+    () => {
+        fn info(&self) -> Result<FileInfo> { unimplemented!() }
+        fn sync(&self) -> Result<()> { unimplemented!() }
+        fn resize(&self, len: usize) -> Result<()> { unimplemented!() }
+        fn create(&self, name: &str, type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
+        fn unlink(&self, name: &str) -> Result<()> { unimplemented!() }
+        fn link(&self, name: &str, other: &Arc<INode>) -> Result<()> { unimplemented!() }
+        fn rename(&self, old_name: &str, new_name: &str) -> Result<()> { unimplemented!() }
+        fn move_(&self, old_name: &str, target: &Arc<INode>, new_name: &str) -> Result<()> { unimplemented!() }
+        fn find(&self, name: &str) -> Result<Arc<INode>> { unimplemented!() }
+        fn get_entry(&self, id: usize) -> Result<String> { unimplemented!() }
+        fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
+        fn as_any_ref(&self) -> &Any { self }
+    };
+}
+
+impl INode for Stdin {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        buf[0] = self.pop() as u8;
+        Ok(1)
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> { unimplemented!() }
+    impl_inode!();
+}
+
+impl INode for Stdout {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        use core::str;
+        let s = str::from_utf8(buf).map_err(|_| ())?;
+        print!("{}", s);
+        Ok(buf.len())
+    }
+    impl_inode!();
 }

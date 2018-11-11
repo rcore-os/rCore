@@ -59,27 +59,16 @@ fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    match fd {
-        0 => unimplemented!(),
-        1 | 2 => return Err(SysError::InvalidFile),
-        _ => { get_file(fd)?.lock().read(slice)?; }
-    }
-    Ok(0)
+    let len = get_file(fd)?.lock().read(slice)?;
+    Ok(len as i32)
 }
 
 fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    match fd {
-        0 => return Err(SysError::InvalidFile),
-        1 | 2 => {
-            let s = str::from_utf8(slice).map_err(|_| SysError::InvalidArgument)?;
-            print!("{}", s);
-        },
-        _ => { get_file(fd)?.lock().write(slice)?; }
-    }
-    Ok(0)
+    let len = get_file(fd)?.lock().write(slice)?;
+    Ok(len as i32)
 }
 
 fn sys_open(path: *const u8, flags: usize) -> SysResult {
@@ -87,25 +76,22 @@ fn sys_open(path: *const u8, flags: usize) -> SysResult {
     let path = unsafe { util::from_cstr(path) };
     let flags = VfsFlags::from_ucore_flags(flags);
     info!("open: path: {:?}, flags: {:?}", path, flags);
-    match path {
-        "stdin:" => return Ok(0),
-        "stdout:" => return Ok(1),
-        "stderr:" => return Ok(2),
-        _ => {}
-    }
-    let inode = ::fs::ROOT_INODE.lookup(path)?;
-    let files = &mut process().files;
-    let fd = (3..).find(|i| !files.contains_key(i)).unwrap();
+    let (fd, inode) = match path {
+        "stdin:" => (0, ::fs::STDIN.clone() as Arc<INode>),
+        "stdout:" => (1, ::fs::STDOUT.clone() as Arc<INode>),
+        _ => {
+            let fd = (3..).find(|i| !process().files.contains_key(i)).unwrap();
+            let inode = ::fs::ROOT_INODE.lookup(path)?;
+            (fd, inode)
+        }
+    };
     let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
-    files.insert(fd, Arc::new(Mutex::new(file)));
+    process().files.insert(fd, Arc::new(Mutex::new(file)));
     Ok(fd as i32)
 }
 
 fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
-    if fd < 3 {
-        return Ok(0);
-    }
     match process().files.remove(&fd) {
         Some(_) => Ok(0),
         None => Err(SysError::InvalidFile),

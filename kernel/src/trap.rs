@@ -22,5 +22,5 @@ pub fn error(tf: &TrapFrame) -> ! {
 }
 
 pub fn serial(c: char) {
-    ::console::CONSOLE_INPUT.push(c);
+    ::fs::STDIN.push(c);
 }
