@@ -151,7 +151,7 @@ impl<T> JoinHandle<T> {
         loop {
             match processor().manager().get_status(self.thread.pid) {
                 Some(Status::Exited(exit_code)) => {
-                    processor().manager().remove(self.thread.pid);
+                    processor().manager().wait_done(current().id(), self.thread.pid);
                     // Find return value on the heap from the exit code.
                     return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
                 }

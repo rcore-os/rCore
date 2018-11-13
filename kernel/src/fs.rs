@@ -63,9 +63,11 @@ pub fn shell() {
             //memory_set_map_swappable(processor().get_context_mut(pid).get_memory_set_mut());
             processor().manager().wait(thread::current().id(), pid);
             processor().yield_now();
+            processor().manager().wait_done(thread::current().id(), pid);
         } else {
             println!("Program not exist");
         }
+        //break;
     }
     unsafe { dealloc(buf.as_mut_ptr(), layout) };
 }

@@ -56,8 +56,16 @@ impl ProcessManager {
 
     fn alloc_pid(&self) -> Pid {
         for (i, proc) in self.procs.iter().enumerate() {
-            if proc.lock().is_none() {
+            let mut proc_lock = proc.lock();
+            if proc_lock.is_none() {
                 return i;
+            }
+            match proc_lock.as_mut().unwrap().status {
+                Status::Exited(_) => if self.wait_queue[i].lock().is_empty() {
+                    *proc_lock = None;
+                    return i;
+                },
+                _ => {},
             }
         }
         panic!("Process number exceeded");
@@ -130,7 +138,7 @@ impl ProcessManager {
     fn set_status(&self, pid: Pid, status: Status) {
         let mut proc_lock = self.procs[pid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
-        trace!("process {} {:?} -> {:?}", pid, proc.status, status);
+        //info!("process {} {:?} -> {:?}", pid, proc.status, status);
         {   // limit the lifetime of scheduler
             let mut scheduler = self.scheduler.lock();
             match (&proc.status, &status) {
@@ -157,14 +165,25 @@ impl ProcessManager {
 
 
     pub fn get_status(&self, pid: Pid) -> Option<Status> {
-        self.procs[pid].lock().as_ref().map(|p| p.status.clone())
+        let mut proc_lock = self.procs[pid].lock();
+        if proc_lock.is_none() {
+            return None;
+        }
+        match proc_lock.as_ref().unwrap().status {
+            Status::Exited(_) => if self.wait_queue[pid].lock().is_empty() {
+                *proc_lock = None;
+                return None;
+            },
+            _ => {},
+        }
+        proc_lock.as_ref().map(|p| p.status.clone())
     }
 
-    pub fn remove(&self, pid: Pid) {
-        let mut proc_lock = self.procs[pid].lock();
+    pub fn wait_done(&self, pid: Pid, target: Pid) {
+        let mut proc_lock = self.procs[target].lock();
         let proc = proc_lock.as_ref().expect("process not exist");
         match proc.status {
-            Status::Exited(_) => *proc_lock = None,
+            Status::Exited(_) => self.wait_queue[target].lock().retain(|&i| i != pid),
             _ => panic!("can not remove non-exited process"),
         }
     }
@@ -185,17 +204,28 @@ impl ProcessManager {
         self.set_status(pid, Status::Waiting(target));
         self.wait_queue[target].lock().push(pid);
     }
+    pub fn wait_child(&self, pid: Pid) {
+        self.set_status(pid, Status::Waiting(0));
+    }
+
+    pub fn set_parent(&self, pid: Pid, target: Pid) {
+        self.wait_queue[target].lock().push(pid);
+    }
+    pub fn del_parent(&self, pid: Pid, target: Pid) {
+        self.wait_queue[target].lock().retain(|&i| i != pid);
+    }
 
     pub fn exit(&self, pid: Pid, code: ExitCode) {
+        (self.exit_handler)(pid);
         self.set_status(pid, Status::Exited(code));
     }
      /// Called when a process exit
     fn exit_handler(&self, pid: Pid, proc: &mut Process) {
-        for waiter in self.wait_queue[pid].lock().drain(..) {
-            self.wakeup(waiter);
+        for waiter in self.wait_queue[pid].lock().iter() {
+            self.wakeup(*waiter);
         }
-        proc.context = None;
-        (self.exit_handler)(pid);
+
+        //proc.context = None;
     }
 }
  fn new_vec_default<T: Default>(size: usize) -> Vec<T> {

@@ -36,21 +36,19 @@ static PROCESSORS: [Processor; MAX_CPU_NUM] = [Processor::new(), Processor::new(
 pub struct Process {
     parent: AtomicUsize,
     children: Mutex<Vec<usize>>,
-    subproc_exit: Condvar,  // Trigger parent's when exit
 }
 
 impl Process {
     pub fn new_fork(pid: usize, parent: usize) {
         PROCESS[pid].parent.store(parent, Ordering::Relaxed);
-        PROCESS[pid].subproc_exit._clear();
         PROCESS[parent].children.lock().push(pid);
     }
     pub fn proc_exit(pid: usize) {
-        let parent = PROCESS[pid].parent.load(Ordering::Relaxed);
-        PROCESS[parent].subproc_exit.notify_all();
-    }
-    pub fn wait_child() {
-        Self::current().subproc_exit._wait();
+        info!("proc_exit");
+        for child in PROCESS[pid].children.lock().clone() {
+            info!("del child {}", child);
+            processor().manager().del_parent(pid, child);
+        }
     }
     pub fn get_children() -> Vec<usize> {
         Self::current().children.lock().clone()

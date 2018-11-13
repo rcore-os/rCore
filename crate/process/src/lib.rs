@@ -4,6 +4,7 @@
 #![feature(linkage)]
 #![feature(nll)]
 #![feature(vec_resize_default)]
+#![feature(exact_size_is_empty)]
 
 extern crate alloc;
 #[macro_use]
