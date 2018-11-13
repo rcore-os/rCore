@@ -45,8 +45,12 @@ pub fn shell() {
     // start interaction
     loop {
         print!(">> ");
+
         use console::get_line;
         let name = get_line();
+        //use alloc::prelude::ToString;
+        //let name = "waitkill".to_string();
+
         if name == "" {
             continue;
         }

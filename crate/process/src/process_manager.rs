@@ -26,10 +26,11 @@ pub enum Status {
     Exited(ExitCode),
 }
 
+#[derive(Eq, PartialEq)]
 enum Event {
     Wakeup(Pid),
+    Dropped,
 }
-
 pub trait Context {
     unsafe fn switch_to(&mut self, target: &mut Context);
 }
@@ -84,6 +85,7 @@ impl ProcessManager {
         while let Some(event) = event_hub.pop() {
             match event {
                 Event::Wakeup(pid) => self.set_status(pid, Status::Ready),
+                Event::Dropped => {},
             }
         }
         self.scheduler.lock().tick(pid)
@@ -126,20 +128,22 @@ impl ProcessManager {
     /// Switch the status of a process.
     /// Insert/Remove it to/from scheduler if necessary.
     fn set_status(&self, pid: Pid, status: Status) {
-        let mut scheduler = self.scheduler.lock();
         let mut proc_lock = self.procs[pid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
         trace!("process {} {:?} -> {:?}", pid, proc.status, status);
-        match (&proc.status, &status) {
-            (Status::Ready, Status::Ready) => return,
-            (Status::Ready, _) => scheduler.remove(pid),
-            (Status::Running(_), _) => {},
-            (Status::Exited(_), _) => panic!("can not set status for a exited process"),
-            (Status::Waiting(target), Status::Exited(_)) =>
-                self.wait_queue[*target].lock().retain(|&i| i != pid),
-            // TODO: Sleep -> Exited  Remove wakeup event.
-            (_, Status::Ready) => scheduler.insert(pid),
-            _ => {}
+        {   // limit the lifetime of scheduler
+            let mut scheduler = self.scheduler.lock();
+            match (&proc.status, &status) {
+                (Status::Ready, Status::Ready) => return,
+                (Status::Ready, _) => scheduler.remove(pid),
+                (Status::Running(_), _) => {},
+                (Status::Exited(_), _) => panic!("can not set status for a exited process"),
+                (Status::Waiting(target), Status::Exited(_)) =>
+                    self.wait_queue[*target].lock().retain(|&i| i != pid),
+                (Status::Sleeping, Status::Exited(_)) => self.event_hub.lock().remove(Event::Wakeup(pid)),
+                (_, Status::Ready) => scheduler.insert(pid),
+                _ => {}
+            }
         }
         match proc.status {
             Status::Running(_) => proc.status_after_stop = status,
@@ -165,8 +169,9 @@ impl ProcessManager {
         }
     }
 
-    pub fn sleep(&self, pid: Pid, time: usize) {
+    pub fn sleep(&self, pid: Pid, time_raw: usize) {
         self.set_status(pid, Status::Sleeping);
+        let time = if time_raw >= (1 << 31) {0} else {time_raw};
         if time != 0 {
             self.event_hub.lock().push(time, Event::Wakeup(pid));
         }
@@ -183,7 +188,7 @@ impl ProcessManager {
 
     pub fn exit(&self, pid: Pid, code: ExitCode) {
         self.set_status(pid, Status::Exited(code));
-        }
+    }
      /// Called when a process exit
     fn exit_handler(&self, pid: Pid, proc: &mut Process) {
         for waiter in self.wait_queue[pid].lock().drain(..) {

@@ -113,7 +113,7 @@ fn sys_yield() -> i32 {
 
 /// Kill the process
 fn sys_kill(pid: usize) -> i32 {
-    info!("kill: {}", pid);
+    info!("{} killed: {}", thread::current().id(), pid);
     processor().manager().exit(pid, 0x100);
     if pid == thread::current().id() {
         processor().yield_now();
