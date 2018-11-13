@@ -13,12 +13,12 @@ impl SwapManager for FifoSwapManager {
     fn tick(&mut self) {}
 
     fn push(&mut self, frame: Frame) {
-        debug!("SwapManager push token: {:x?} vaddr: {:x?}", frame.get_token(), frame.get_virtaddr());
+        info!("SwapManager push token: {:x?} vaddr: {:x?}", frame.get_token(), frame.get_virtaddr());
         self.deque.push_back(frame);
     }
 
     fn remove(&mut self, token: usize, addr: VirtAddr) {
-        debug!("SwapManager remove token: {:x?} vaddr: {:x?}", token, addr);
+        info!("SwapManager remove token: {:x?} vaddr: {:x?}", token, addr);
         let id = self.deque.iter()
             .position(|ref x| x.get_virtaddr() == addr && x.get_token() == token)
             .expect("address not found");

@@ -225,7 +225,7 @@ impl ProcessManager {
             self.wakeup(*waiter);
         }
 
-        //proc.context = None;
+        proc.context = None;
     }
 }
  fn new_vec_default<T: Default>(size: usize) -> Vec<T> {

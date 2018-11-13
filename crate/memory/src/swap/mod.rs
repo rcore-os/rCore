@@ -113,7 +113,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
         let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
         let targetpt = &mut *(pt);
         let pttoken = {
-            debug!("the target page table token is {:x?}", targetpt.token());
+            info!("SET_SWAPPABLE: the target page table token is {:x?}, addr is {:x?}", targetpt.token(), addr);
             targetpt.token()
         };
         targetpt.with(||{
@@ -139,14 +139,14 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **  @param alloc_frame:          the function to alloc a free physical frame for once
     */
     pub unsafe fn remove_from_swappable<T2: InactivePageTable>(&mut self, pt: *mut T2, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr){
-        trace!("come into remove_from swappable");
+        info!("come into remove_from swappable");
         let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
         let targetpt = &mut *(pt);
         let pttoken = {
             debug!("the target page table token is {:x?}", targetpt.token());
             targetpt.token()
         };
-        debug!("try to change pagetable");
+        info!("try to change pagetable");
         targetpt.with(||{
             let token = {
                 let entry = page_table.get_entry(addr);
@@ -169,7 +169,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
             let data = page_table.get_page_slice_mut(addr);
             swapper.swap_in(token, data).unwrap();
         });
-        trace!("come outof femove_from swappable");
+        trace!("come out of femove_from swappable");
     }
 
     /*
@@ -301,7 +301,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
                 }
                 if(swapin){
                     unsafe {
-                        self.set_swappable(pt, addr);
+                        self.set_swappable(pt, addr & 0xfffff000);
                     }
                 }
                 //area.get_flags().apply(new_entry); this instruction may be used when hide attr is used

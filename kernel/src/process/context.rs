@@ -130,7 +130,7 @@ impl ContextImpl {
         let mut memory_set = self.memory_set.clone();
         info!("finish mmset clone in fork!");
         // add the new memory set to the recorder
-        debug!("fork! new page table token: {:x?}", memory_set.token());
+        info!("fork! new page table token: {:x?}", memory_set.token());
         let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
         memory_set_record().push_back(mmset_ptr);
         
@@ -179,6 +179,7 @@ impl ContextImpl {
 
 impl Drop for ContextImpl{
     fn drop(&mut self){
+        info!("come in to drop for ContextImpl");
         // remove the new memory set to the recorder (deprecated in the latest version)
         /*
         let id = memory_set_record().iter()
@@ -251,6 +252,7 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
 *   map the memory area in the memory_set swappalbe, specially for the user process
 */
 pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
+    info!("COME INTO memory set map swappable!");
     let pt = unsafe {
         memory_set.get_page_table_mut() as *mut InactivePageTable0
     };
