@@ -105,7 +105,7 @@ fn philosopher(table: Arc<Table>) {
     trace!("philosopher starting finish");
 
     for h in handles {
-        h.join().expect("join expects some value");
+        h.join().expect("handle should not be none");
     }
     println!("philosophers dining end");
 }

@@ -31,7 +31,6 @@ pub fn init() {
 
 static PROCESSORS: [Processor; MAX_CPU_NUM] = [Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new()];
 
-/// Ugly solution for sys_wait(0) (wait for any child)
 #[derive(Default)]
 pub struct Process {
     parent: AtomicUsize,
@@ -39,34 +38,9 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn new_fork(pid: usize, parent: usize) {
-        PROCESS[pid].parent.store(parent, Ordering::Relaxed);
-        PROCESS[parent].children.lock().push(pid);
-    }
     pub fn proc_exit(pid: usize) {
         info!("proc_exit");
-        for child in PROCESS[pid].children.lock().clone() {
-            info!("del child {}", child);
-            processor().manager().del_parent(pid, child);
-        }
     }
-    pub fn get_children() -> Vec<usize> {
-        Self::current().children.lock().clone()
-    }
-    pub fn do_wait(pid: usize) {
-        Self::current().children.lock().retain(|&p| p != pid);
-    }
-    fn current() -> &'static Self {
-        &PROCESS[thread::current().id()]
-    }
-}
-
-lazy_static! {
-    pub static ref PROCESS: Vec<Process> = {
-        let mut vec = Vec::new();
-        vec.resize_default(MAX_PROCESS_NUM);
-        vec
-    };
 }
 
 /// Get current thread struct

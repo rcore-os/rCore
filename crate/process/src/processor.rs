@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use spin::Mutex;
 use core::cell::UnsafeCell;
 use process_manager::*;
+use interrupt;
 
 /// Process executor
 ///
@@ -52,14 +53,15 @@ impl Processor {
     ///   via switch back to the scheduler.
     pub fn run(&self) -> ! {
         let inner = self.inner();
+        unsafe { interrupt::disable_and_store(); }
         loop {
             let proc = inner.manager.run(inner.id);
             trace!("CPU{} begin running process {}", inner.id, proc.0);
             inner.proc = Some(proc);
             unsafe {
-                inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
+                inner.loop_context.switch_to(&mut *inner.proc.as_mut().expect("context should not be None").1);
             }
-            let (pid, context) = inner.proc.take().unwrap();
+            let (pid, context) = inner.proc.take().expect("proc should not be None");
             trace!("CPU{} stop running process {}", inner.id, pid);
             inner.manager.stop(pid, context);
         }
@@ -71,12 +73,17 @@ impl Processor {
         trace!("yield start");
         let inner = self.inner();
         unsafe {
+            let flags = interrupt::disable_and_store();
             inner.proc.as_mut().unwrap().1.switch_to(&mut *inner.loop_context);
+            interrupt::restore(flags);
         }
     }
 
     pub fn pid(&self) -> Pid {
-        self.inner().proc.as_ref().expect("pid should not be none").0
+        if self.inner().proc.is_none() {
+            return 0;
+        }
+        self.inner().proc.as_ref().expect("pid should not be None").0
     }
 
     pub fn context(&self) -> &Context {
@@ -94,3 +101,4 @@ impl Processor {
         }
     }
 }
+

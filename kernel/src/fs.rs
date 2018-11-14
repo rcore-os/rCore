@@ -20,6 +20,12 @@ _binary_user_riscv_img_end:
 
 pub fn shell() {
     // load riscv32/x86_64 user program
+    use sync;
+    /// below are test for sync, uncomment them if need
+    //sync::test::philosopher_using_mutex();
+    //sync::test::philosopher_using_monitor();
+
+
     info!("come into shell!");
     #[cfg(target_arch = "riscv32")]
     let device = {
@@ -43,9 +49,6 @@ pub fn shell() {
     let layout = Layout::from_size_align(BUF_SIZE, 0x1000).unwrap();
     let buf = unsafe{ slice::from_raw_parts_mut(alloc(layout), BUF_SIZE) };
     // start interaction
-    use sync;
-    //sync::test::philosopher_using_mutex();
-    //sync::test::philosopher_using_monitor();
     loop {
         print!(">> ");
 
