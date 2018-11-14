@@ -39,6 +39,7 @@ pub struct ProcessManager {
     procs: Vec<Mutex<Option<Process>>>,
     scheduler: Mutex<Box<Scheduler>>,
     wait_queue: Vec<Mutex<Vec<Pid>>>,
+    children: Vec<Mutex<Vec<Pid>>>,
     event_hub: Mutex<EventHub<Event>>,
     exit_handler: fn(Pid),
 }
@@ -49,6 +50,7 @@ impl ProcessManager {
             procs: new_vec_default(max_proc_num),
             scheduler: Mutex::new(scheduler),
             wait_queue: new_vec_default(max_proc_num),
+            children: new_vec_default(max_proc_num),
             event_hub: Mutex::new(EventHub::new()),
             exit_handler,
         }
@@ -183,7 +185,7 @@ impl ProcessManager {
         let mut proc_lock = self.procs[target].lock();
         let proc = proc_lock.as_ref().expect("process not exist");
         match proc.status {
-            Status::Exited(_) => self.wait_queue[target].lock().retain(|&i| i != pid),
+            Status::Exited(_) => self.del_child(pid, target),
             _ => panic!("can not remove non-exited process"),
         }
     }
@@ -210,13 +212,20 @@ impl ProcessManager {
 
     pub fn set_parent(&self, pid: Pid, target: Pid) {
         self.wait_queue[target].lock().push(pid);
+        self.children[pid].lock().push(target);
     }
-    pub fn del_parent(&self, pid: Pid, target: Pid) {
+    pub fn del_child(&self, pid: Pid, target: Pid) {
         self.wait_queue[target].lock().retain(|&i| i != pid);
+        self.children[pid].lock().retain(|&i| i != target);
+    }
+    pub fn get_children(&self, pid: Pid) -> Vec<Pid>{
+        self.children[pid].lock().clone()
     }
 
     pub fn exit(&self, pid: Pid, code: ExitCode) {
-        (self.exit_handler)(pid);
+        for child in self.children[pid].lock().drain(..) {
+            self.wait_queue[child].lock().retain(|&i| i != pid);
+        }
         self.set_status(pid, Status::Exited(code));
     }
      /// Called when a process exit
@@ -226,6 +235,7 @@ impl ProcessManager {
         }
 
         proc.context = None;
+        (self.exit_handler)(pid);
     }
 }
  fn new_vec_default<T: Default>(size: usize) -> Vec<T> {

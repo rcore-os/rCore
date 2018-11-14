@@ -66,7 +66,6 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
     //memory_set_map_swappable(context.get_memory_set_mut());
     let pid = processor().manager().add(context);
     processor().manager().set_parent(thread::current().id(), pid);
-    Process::new_fork(pid, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
     info!("fork: {} -> {}", thread::current().id(), pid);
     pid as i32
@@ -77,7 +76,7 @@ fn sys_fork(tf: &TrapFrame) -> i32 {
 fn sys_wait(pid: usize, code: *mut i32) -> i32 {
     loop {
         let wait_procs = match pid {
-            0 => Process::get_children(),
+            0 => processor().manager().get_children(thread::current().id()),
             _ => vec![pid],
         };
         if wait_procs.is_empty() {
@@ -90,7 +89,6 @@ fn sys_wait(pid: usize, code: *mut i32) -> i32 {
                         unsafe { code.write(exit_code as i32); }
                     }
                     processor().manager().wait_done(thread::current().id(), pid);
-                    Process::do_wait(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
                     return 0;
                 }

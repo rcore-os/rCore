@@ -20,6 +20,10 @@ _binary_user_riscv_img_end:
 
 pub fn shell() {
     // load riscv32/x86_64 user program
+    use sync;
+    sync::test::philosopher_using_mutex();
+    sync::test::philosopher_using_monitor();
+
     info!("come into shell!");
     #[cfg(target_arch = "riscv32")]
     let device = {

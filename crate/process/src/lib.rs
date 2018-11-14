@@ -4,6 +4,7 @@
 #![feature(linkage)]
 #![feature(nll)]
 #![feature(vec_resize_default)]
+#![feature(asm)]
 #![feature(exact_size_is_empty)]
 
 extern crate alloc;
@@ -16,11 +17,12 @@ extern crate spin;
 #[macro_use]
 extern crate std;
 
-mod process_manager;
+pub mod process_manager;
 mod processor;
 pub mod scheduler;
 pub mod thread;
 mod event_hub;
+mod interrupt;
 
 pub use process_manager::*;
 pub use processor::Processor;

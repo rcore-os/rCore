@@ -103,7 +103,7 @@ fn philosopher(table: Arc<Table>) {
     }).collect();
 
     for h in handles {
-        h.join().unwrap();
+        h.join().expect("handle should not be none");
     }
     println!("philosophers dining end");
 }
