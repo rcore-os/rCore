@@ -68,6 +68,7 @@ impl Processor {
     /// Called by process running on this Processor.
     /// Yield and reschedule.
     pub fn yield_now(&self) {
+        trace!("yield start");
         let inner = self.inner();
         unsafe {
             inner.proc.as_mut().unwrap().1.switch_to(&mut *inner.loop_context);
@@ -75,7 +76,7 @@ impl Processor {
     }
 
     pub fn pid(&self) -> Pid {
-        self.inner().proc.as_ref().unwrap().0
+        self.inner().proc.as_ref().expect("pid should not be none").0
     }
 
     pub fn context(&self) -> &Context {

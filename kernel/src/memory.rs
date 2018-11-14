@@ -123,6 +123,9 @@ pub fn page_fault_handler(addr: usize) -> bool {
     let id = memory_set_record().iter()
             .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
     let mut mmsets = memory_set_record();
+    /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
+    * handle the frame deallocated
+    */
     match id {
         Some(targetid) => {
             info!("get id from memroy set recorder.");
@@ -154,9 +157,9 @@ pub fn page_fault_handler(addr: usize) -> bool {
             }
         },
     };
+    //////////////////////////////////////////////////////////////////////////////
     
     
-
     // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){

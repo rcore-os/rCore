@@ -92,6 +92,7 @@ fn philosopher(table: Arc<Table>) {
 
     let handles: Vec<_> = philosophers.into_iter().map(|p| {
         let table = table.clone();
+        trace!("philosopher start");
 
         thread::spawn(move || {
             for i in 0..5 {
@@ -101,9 +102,10 @@ fn philosopher(table: Arc<Table>) {
             }
         })
     }).collect();
+    trace!("philosopher starting finish");
 
     for h in handles {
-        h.join().unwrap();
+        h.join().expect("join expects some value");
     }
     println!("philosophers dining end");
 }

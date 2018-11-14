@@ -149,6 +149,7 @@ impl<T> JoinHandle<T> {
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
         loop {
+            trace!("{} join", self.thread.pid);
             match processor().manager().get_status(self.thread.pid) {
                 Some(Status::Exited(exit_code)) => {
                     processor().manager().wait_done(current().id(), self.thread.pid);

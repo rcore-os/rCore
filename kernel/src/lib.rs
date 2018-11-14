@@ -64,6 +64,9 @@ pub mod arch;
 
 pub fn kmain() -> ! {
     info!("Come into kmain");
+//    sync::test::philosopher_using_mutex();
+//    sync::test::philosopher_using_monitor();
+//    sync::mpsc::test::test_all();
     process::processor().run();
 
 //    thread::test::local_key();

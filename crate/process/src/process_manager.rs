@@ -138,7 +138,7 @@ impl ProcessManager {
     fn set_status(&self, pid: Pid, status: Status) {
         let mut proc_lock = self.procs[pid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
-        //info!("process {} {:?} -> {:?}", pid, proc.status, status);
+        trace!("process {} {:?} -> {:?}", pid, proc.status, status);
         {   // limit the lifetime of scheduler
             let mut scheduler = self.scheduler.lock();
             match (&proc.status, &status) {

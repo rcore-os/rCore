@@ -43,6 +43,9 @@ pub fn shell() {
     let layout = Layout::from_size_align(BUF_SIZE, 0x1000).unwrap();
     let buf = unsafe{ slice::from_raw_parts_mut(alloc(layout), BUF_SIZE) };
     // start interaction
+    use sync;
+    //sync::test::philosopher_using_mutex();
+    //sync::test::philosopher_using_monitor();
     loop {
         print!(">> ");
 
