@@ -9,7 +9,7 @@
 整合了王润基riscv32下对于堆内存分配方式的修改, 改为了在内核end()后间隔一整个页然后其余位置直到
 MEMORY_END作为可分配物理内存.
 
-修复了框架中原本的map_kernel时复制的页表项与setup_page_table时建立的页表项不一致的问题,同时增加了qemu设置的物理内存大小(16M)以及给内核堆设置的内存空间(10M),使得OS可以正确执行forktest等占用内存资源较多的用户程序.
+修复了框架中原本的map_kernel时复制的页表项与setup_page_table时建立的页表项不一致的问题,同时增加了为qemu设置的物理内存大小(16M)以及给内核堆设置的内存空间(10M),使得OS可以正确执行forktest等占用内存资源较多的用户程序.
 
 ### 1.2 page fault 处理
 Rust OS riscv32中之前并未实现page fault的异常处理, 目前已经加入page fault处理,目前的page fault 处理程序能够处理的内容包括:
