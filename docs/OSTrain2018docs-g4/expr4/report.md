@@ -34,7 +34,7 @@ Rust OS riscv32中之前并未实现page fault的异常处理, 目前已经加�
 
 **在RustOS中启用页面置换**: 仅用户进程地址空间的用户页(MemorySet中所包含虚存页,与允许物理页帧延迟分配的虚存一致)允许被换出.由于实现了物理页帧延迟分配操作,因此目前虚页在page fault处理程序中被映射了对应物理页后会被设为可置换.由于1.3中已经完成了随时获取当前的memory_set,在此处可以通过当前的memory_set直接获取当前的不活跃页表并用于页面置换操作.在进程对应的ContextImpl被释放时会首先将其所拥有的memory set中被换出的物理页换入并设置为不可置换,之后再执行Memory Set的释放(Drop)过程.这里需要注意的一点是由于SwapManager是保存的对应不活跃页表的裸指针,而只有new_user以及fork函数执行结束得到的ContextImpl才是保存在堆中的,因此从MEMORY_SET_RECORD获得memory set并由此得到的不活跃页表是不能被保存在SwapManager中的(函数退出后裸指针将会失效).因此在new_user和和fork执行过程中被分配了物理页的虚页会在函数执行结束前被统一制成swappable.
 
-### 1.5 互斥所的替换
+### 1.5 互斥锁的替换
 将内存管理部分涉及到需要加锁的部分用到的锁从原来的spin::Mutex改为了RustOS框架中实现的sync::SpinNoIrqLock这是为了避免中断可能带来的问题,如切换临时切换页表时被中断或者进行页面换入换出操作时被中断可能导致程序出错.
 
 ### 1.6 TODO
