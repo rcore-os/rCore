@@ -11,6 +11,32 @@ use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, Pag
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
 use aarch64::{regs::*};
 
+// need 1 page
+pub fn setup_page_table(frame: Frame) {
+    let p4 = unsafe { &mut *(frame.start_address().as_u64() as *mut Aarch64PageTable) };
+    p4.zero();
+
+
+    // p4.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
+
+    // Set kernel identity map
+    // 0x10000000 ~ 1K area
+    p4.map_identity(0o777, EF::PRESENT | EF::PXN | EF::UXN);
+
+    // 0x80000000 ~ 8K area
+    p4.map_identity(0, EF::PRESENT);
+    // p2.map_identity(KERNEL_PML4, EF::PRESENT | EF::READABLE | EF::WRITABLE);
+    // p2.map_identity(KERNEL_PML4 + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+
+    // use super::riscv::register::satp;
+    // unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
+    // sfence_vma_all();
+
+    ttbr0_el1_write(frame);
+    tlb_invalidate();
+    info!("setup init page table end");
+}
+
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;
     fn range_of(begin: usize, end: usize) -> PageRange;
@@ -75,7 +101,7 @@ impl PageTable for ActivePageTable {
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap())
+        ActivePageTable(RecursivePageTable::new(&mut *(0xffff_ffff_ffff_f000 as *mut _)).unwrap())
     }
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut Aarch64PageTable)) {
         // Create a temporary page
@@ -238,7 +264,7 @@ impl InactivePageTable for InactivePageTable0 {
 
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
-        let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut Aarch64PageTable) };
+        let mut table = unsafe { &mut *(0xffff_ffff_ffff_f000 as *mut Aarch64PageTable) };
         // Kernel at 0xffff_ff00_0000_0000
         // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
         let e0 = table[0].clone();

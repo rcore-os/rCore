@@ -104,11 +104,10 @@ bitflags! {
         const SHARED =          3 << 8;         /* SH[1:0], inner shareable */
         const BIT_8 =           1 << 8;
         const BIT_9 =           1 << 9;
-        /*
-            pub const ATTRIB_SH_NON_SHAREABLE: usize = 0x0 << 8;
-            pub const ATTRIB_SH_OUTER_SHAREABLE: usize = 0x2 << 8;
-            pub const ATTRIB_SH_INNER_SHAREABLE: usize = 0x3 << 8;
-        */
+
+        // pub const ATTRIB_SH_NON_SHAREABLE: usize = 0x0 << 8;
+        const OUTER_SHAREABLE = 0b10 << 8;
+        const INNER_SHAREABLE = 0b11 << 8;
 
         const ACCESSED =        1 << 10;        /* AF, Access Flag */
         const NONE_GLOBAL =     1 << 11;        /* None Global */
@@ -147,6 +146,13 @@ impl PageTable {
         for entry in self.entries.iter_mut() {
             entry.set_unused();
         }
+    }
+
+    /// Setup identity map: VirtPage at pagenumber -> PhysFrame at pagenumber
+    /// pn: pagenumber = addr>>12 in riscv32.
+    pub fn map_identity(&mut self, p4num: usize, flags: PageTableFlags) {
+        let entry = self.entries[p4num].clone();
+        self.entries[p4num].set_addr(entry.addr(), flags);
     }
 }
 
