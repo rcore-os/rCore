@@ -2,17 +2,19 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use fs::ROOT_INODE;
+use fs::{ROOT_INODE, INodeExt};
 use process::*;
 
+pub fn run_user_shell() {
+    let inode = ROOT_INODE.lookup("sh").unwrap();
+    let data = inode.read_as_vec().unwrap();
+    processor().manager().add(ContextImpl::new_user(data.as_slice(), "sh".split(' ')));
+}
 
 pub fn shell() {
     let files = ROOT_INODE.list().unwrap();
     println!("Available programs: {:?}", files);
 
-    const BUF_SIZE: usize = 0x40000;
-    let mut buf = Vec::with_capacity(BUF_SIZE);
-    unsafe { buf.set_len(BUF_SIZE); }
     loop {
         print!(">> ");
         let cmd = get_line();
@@ -21,10 +23,9 @@ pub fn shell() {
         }
         let name = cmd.split(' ').next().unwrap();
         if let Ok(file) = ROOT_INODE.lookup(name) {
-            let len = file.read_at(0, &mut *buf).unwrap();
-            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len], cmd.split(' ')));
-            processor().manager().wait(thread::current().id(), pid);
-            processor().yield_now();
+            let data = file.read_as_vec().unwrap();
+            let pid = processor().manager().add(ContextImpl::new_user(data.as_slice(), cmd.split(' ')));
+            unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
         } else {
             println!("Program not exist");
         }

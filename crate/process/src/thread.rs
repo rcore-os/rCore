@@ -32,9 +32,7 @@ fn new_kernel_context(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> 
 
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
-    Thread {
-        pid: processor().pid(),
-    }
+    Thread { pid: processor().pid() }
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
@@ -160,6 +158,13 @@ impl<T> JoinHandle<T> {
             }
             processor().manager().wait(current().id(), self.thread.pid);
             processor().yield_now();
+        }
+    }
+    /// Force construct a JoinHandle struct
+    pub unsafe fn _of(pid: Pid) -> JoinHandle<T> {
+        JoinHandle {
+            thread: Thread { pid },
+            mark: PhantomData,
         }
     }
 }

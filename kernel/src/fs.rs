@@ -1,5 +1,5 @@
 use simple_filesystem::*;
-use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque};
+use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
 #[cfg(target_arch = "x86_64")]
 use arch::driver::ide;
 use sync::Condvar;
@@ -139,4 +139,18 @@ impl INode for Stdout {
         Ok(buf.len())
     }
     impl_inode!();
+}
+
+pub trait INodeExt {
+    fn read_as_vec(&self) -> Result<Vec<u8>>;
+}
+
+impl INodeExt for INode {
+    fn read_as_vec(&self) -> Result<Vec<u8>> {
+        let size = self.info()?.size;
+        let mut buf = Vec::with_capacity(size);
+        unsafe { buf.set_len(size); }
+        self.read_at(0, buf.as_mut_slice())?;
+        Ok(buf)
+    }
 }
