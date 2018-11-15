@@ -17,6 +17,7 @@ pub fn init() {
     super::paging::setup_page_table(frame); // set up page table
     // initialize heap and Frame allocator
     init_frame_allocator();
+    // remap the kernel use 4K page
     remap_the_kernel();
     init_heap();
 }
@@ -34,6 +35,7 @@ fn init_frame_allocator() {
     //use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
     // keep memory for the kernel heap and set other physical memory available in BitAlloc 
     //ba.insert(to_range(KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, MEMORY_END));
+    // end here is the end entry of the kernel
     ba.insert(to_range(end as usize + PAGE_SIZE, MEMORY_END));
     info!("FrameAllocator init end");
 
@@ -55,7 +57,7 @@ fn init_frame_allocator() {
 
 /*
 * @brief: 
-*   remmap the kernel memory address
+*   remmap the kernel memory address with 4K page recorded in p1 page table
 */
 fn remap_the_kernel() {
     use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
