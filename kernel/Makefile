@@ -89,6 +89,7 @@ all: $(kernel)
 
 clean:
 	@cargo clean
+	@rm -rf ../riscv-pk/build
 
 doc:
 	@cargo rustdoc -- --document-private-items
