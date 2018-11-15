@@ -5,6 +5,7 @@ use arch::driver::ide;
 use sync::Condvar;
 use sync::SpinNoIrqLock as Mutex;
 use core::any::Any;
+use core::slice;
 
 // Hard link user program
 #[cfg(target_arch = "riscv32")]
@@ -36,33 +37,6 @@ lazy_static! {
     };
 }
 
-pub fn shell() {
-    let files = ROOT_INODE.list().unwrap();
-    println!("Available programs: {:?}", files);
-
-    const BUF_SIZE: usize = 0x40000;
-    let mut buf = Vec::with_capacity(BUF_SIZE);
-    unsafe { buf.set_len(BUF_SIZE); }
-    loop {
-        print!(">> ");
-        use console::get_line;
-        let cmd = get_line();
-        if cmd == "" {
-            continue;
-        }
-        let name = cmd.split(' ').next().unwrap();
-        if let Ok(file) = ROOT_INODE.lookup(name) {
-            use process::*;
-            let len = file.read_at(0, &mut *buf).unwrap();
-            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len], cmd.split(' ')));
-            processor().manager().wait(thread::current().id(), pid);
-            processor().yield_now();
-        } else {
-            println!("Program not exist");
-        }
-    }
-}
-
 struct MemBuf(&'static [u8]);
 
 impl MemBuf {
@@ -83,9 +57,6 @@ impl Device for MemBuf {
         None
     }
 }
-
-use core::slice;
-use alloc::vec::Vec;
 
 #[cfg(target_arch = "x86_64")]
 impl BlockedDevice for ide::IDE {

@@ -51,7 +51,7 @@ mod syscall;
 mod fs;
 mod sync;
 mod trap;
-mod console;
+mod shell;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
