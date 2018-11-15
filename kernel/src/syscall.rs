@@ -8,9 +8,11 @@ use simple_filesystem::{INode, file::File, FileInfo, FileType};
 use core::{slice, str};
 use alloc::sync::Arc;
 use spin::Mutex;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 /// System call dispatcher
-pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
+pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
     let ret = match id {
         // file
         100 => sys_open(args[0] as *const u8, args[1]),
@@ -29,7 +31,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &TrapFrame) -> i32 {
         001 => sys_exit(args[0] as i32),
         002 => sys_fork(tf),
         003 => sys_wait(args[0], args[1] as *mut i32),
-//        004 => sys_exec(),
+        004 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
 //        005 => sys_clone(),
         010 => sys_yield(),
         011 => sys_sleep(args[0]),
@@ -181,6 +183,42 @@ fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
             processor().yield_now();
         }
     }
+}
+
+fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapFrame) -> SysResult {
+    // TODO: check ptr
+    let name = if name.is_null() { "" } else { unsafe { util::from_cstr(name) } };
+    info!("exec: {:?}, argc: {}, argv: {:?}", name, argc, argv);
+    // Copy args to kernel
+    let args: Vec<String> = unsafe {
+        slice::from_raw_parts(argv, argc).iter()
+            .map(|&arg| String::from(util::from_cstr(arg)))
+            .collect()
+    };
+
+    // Read program file
+    let path = args[0].as_str();
+    let inode = ::fs::ROOT_INODE.lookup(path)?;
+    let size = inode.info()?.size;
+    let mut buf = Vec::with_capacity(size);
+    unsafe { buf.set_len(size); }
+    inode.read_at(0, buf.as_mut_slice())?;
+
+    // Make new Context
+    let iter = args.iter().map(|s| s.as_str());
+    let mut context = ContextImpl::new_user(buf.as_slice(), iter);
+
+    // Activate new page table
+    unsafe { context.memory_set.activate(); }
+
+    // Modify the TrapFrame
+    *tf = unsafe { context.arch.get_init_tf() };
+
+    // Swap Context but keep KStack
+    ::core::mem::swap(&mut process().kstack, &mut context.kstack);
+    ::core::mem::swap(process(), &mut *context);
+
+    Ok(0)
 }
 
 fn sys_yield() -> SysResult {

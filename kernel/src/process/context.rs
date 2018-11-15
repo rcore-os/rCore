@@ -7,10 +7,11 @@ use simple_filesystem::file::File;
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
 use spin::Mutex;
 
+// TODO: avoid pub
 pub struct ContextImpl {
-    arch: ArchContext,
-    memory_set: MemorySet,
-    kstack: KernelStack,
+    pub arch: ArchContext,
+    pub memory_set: MemorySet,
+    pub kstack: KernelStack,
     pub files: BTreeMap<usize, Arc<Mutex<File>>>,
     pub cwd: String,
 }
@@ -47,7 +48,9 @@ impl ContextImpl {
     }
 
     /// Make a new user thread from ELF data
-    pub fn new_user(data: &[u8], cmd: &str) -> Box<Context> {
+    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<ContextImpl>
+        where Iter: Iterator<Item=&'a str>
+    {
         // Parse elf
         let elf = ElfFile::new(data).expect("failed to read elf");
         let is32 = match elf.header.pt2 {
@@ -84,7 +87,7 @@ impl ContextImpl {
                     let target = unsafe { slice::from_raw_parts_mut(virt_addr as *mut u8, file_size) };
                     target.copy_from_slice(&data[offset..offset + file_size]);
                 }
-                ustack_top = push_args_at_stack(cmd, ustack_top);
+                ustack_top = push_args_at_stack(args, ustack_top);
             });
         }
 
@@ -150,11 +153,13 @@ unsafe fn push_slice<T: Copy>(mut sp: usize, vs: &[T]) -> usize {
     sp
 }
 
-unsafe fn push_args_at_stack(cmd: &str, stack_top: usize) -> usize {
+unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
+    where Iter: Iterator<Item=&'a str>
+{
     use core::{ptr, slice};
     let mut sp = stack_top;
     let mut argv = Vec::new();
-    for arg in cmd.split(' ') {
+    for arg in args {
         sp = push_slice(sp, &[0u8]);
         sp = push_slice(sp, arg.as_bytes());
         argv.push(sp);

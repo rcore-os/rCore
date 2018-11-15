@@ -180,4 +180,9 @@ impl Context {
             },
         }.push_at(kstack_top)
     }
+    /// Called at a new user context
+    /// To get the init TrapFrame in sys_exec
+    pub unsafe fn get_init_tf(&self) -> TrapFrame {
+        (*(self.0 as *const InitStack)).tf.clone()
+    }
 }

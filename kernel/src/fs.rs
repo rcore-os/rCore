@@ -40,12 +40,9 @@ pub fn shell() {
     let files = ROOT_INODE.list().unwrap();
     println!("Available programs: {:?}", files);
 
-    // Avoid stack overflow in release mode
-    // Equal to: `buf = Box::new([0; 64 << 12])`
-    use alloc::alloc::{alloc, dealloc, Layout};
     const BUF_SIZE: usize = 0x40000;
-    let layout = Layout::from_size_align(BUF_SIZE, 0x1000).unwrap();
-    let buf = unsafe{ slice::from_raw_parts_mut(alloc(layout), BUF_SIZE) };
+    let mut buf = Vec::with_capacity(BUF_SIZE);
+    unsafe { buf.set_len(BUF_SIZE); }
     loop {
         print!(">> ");
         use console::get_line;
@@ -57,14 +54,13 @@ pub fn shell() {
         if let Ok(file) = ROOT_INODE.lookup(name) {
             use process::*;
             let len = file.read_at(0, &mut *buf).unwrap();
-            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len], cmd.as_str()));
+            let pid = processor().manager().add(ContextImpl::new_user(&buf[..len], cmd.split(' ')));
             processor().manager().wait(thread::current().id(), pid);
             processor().yield_now();
         } else {
             println!("Program not exist");
         }
     }
-    unsafe { dealloc(buf.as_mut_ptr(), layout) };
 }
 
 struct MemBuf(&'static [u8]);
@@ -89,6 +85,7 @@ impl Device for MemBuf {
 }
 
 use core::slice;
+use alloc::vec::Vec;
 
 #[cfg(target_arch = "x86_64")]
 impl BlockedDevice for ide::IDE {
