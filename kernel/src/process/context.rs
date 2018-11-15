@@ -83,7 +83,9 @@ impl ContextImpl {
                     let mem_size = ph.mem_size() as usize;
 
                     let target = unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) };
-                    target[..file_size].copy_from_slice(&data[offset..offset + file_size]);
+                    if file_size != 0 {
+                        target[..file_size].copy_from_slice(&data[offset..offset + file_size]);
+                    }
                     target[file_size..].iter_mut().for_each(|x| *x = 0);
                 }
                 ustack_top = push_args_at_stack(args, ustack_top);
