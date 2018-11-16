@@ -1,4 +1,4 @@
-// Rust language features implementions
+// Rust language features implementations
 
 use core::panic::PanicInfo;
 use core::alloc::Layout;

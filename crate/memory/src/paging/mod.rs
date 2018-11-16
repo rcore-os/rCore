@@ -31,8 +31,7 @@ pub trait PageTable {
     **  @param  addr: VirtAddr       the virual address
     **  @retval Entry                the page table entry of the virual address
     */
-    fn get_entry(&mut self, addr: VirtAddr) -> &mut Self::Entry;
-
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Self::Entry>;
     // For testing with mock
     /*
     **  @brief  used for testing with mock

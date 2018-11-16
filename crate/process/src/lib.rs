@@ -17,7 +17,7 @@ extern crate spin;
 #[macro_use]
 extern crate std;
 
-pub mod process_manager;
+mod process_manager;
 mod processor;
 pub mod scheduler;
 pub mod thread;

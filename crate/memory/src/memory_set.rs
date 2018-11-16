@@ -42,7 +42,7 @@ pub trait InactivePageTable {
     **  @param  f: impl FnOnce()     the function to be executed
     **  @retval none
     */
-    unsafe fn with(&self, f: impl FnOnce());
+    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T;
     /*
     **  @brief  get the token of the inactive page table
     **  @retval usize                the token of the inactive page table
@@ -61,13 +61,6 @@ pub trait InactivePageTable {
     **  @retval none
     */
     fn dealloc_frame(target: PhysAddr);
-    /*
-    **  @brief  allocate a stack space
-    **  @retval Stack                the stack allocated
-    */
-    fn alloc_stack() -> Stack;
-
-    unsafe fn with_retval<T>(&self, f: impl FnOnce() -> T) -> T;
 }
 
 /// a continuous memory space when the same attribute
@@ -183,7 +176,7 @@ impl MemoryArea {
                         let entry = pt.map(addr,0);
                         self.flags.apply(entry);
                     }
-                    let entry = pt.get_entry(addr);
+                    let entry = pt.get_entry(addr).unwrap();
                     entry.set_present(false);
                     entry.update();
 
@@ -201,13 +194,13 @@ impl MemoryArea {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             let addr = page.start_address();
             if self.phys_start_addr.is_none() {
-                if pt.get_entry(addr).present(){
-                    let target = pt.get_entry(addr).target();
+                if pt.get_entry(addr).unwrap().present(){
+                    let target = pt.get_entry(addr).unwrap().target();
                     T::dealloc_frame(target);
                 }
                 else{
                     // set valid for pt.unmap function
-                    pt.get_entry(addr).set_present(true);
+                    pt.get_entry(addr).unwrap().set_present(true);
                 }
             }
             pt.unmap(addr);
@@ -290,7 +283,6 @@ impl MemoryAttr {
 pub struct MemorySet<T: InactivePageTable> {
     areas: Vec<MemoryArea>,
     page_table: T,
-    kstack: Stack,
 }
 
 impl<T: InactivePageTable> MemorySet<T> {
@@ -302,23 +294,12 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
             page_table: T::new(),
-            kstack: T::alloc_stack(),
         }
     }
-    /*
-    **  @brief  create a memory set from raw space
-    **          Used for remap_kernel() where heap alloc is unavailable
-    **  @param  slice: &mut [u8]     the initial memory for the Vec in the struct
-    **  @param  kstack: Stack        kernel stack space
-    **  @retval MemorySet<T>         the memory set created
-    */
-    pub unsafe fn new_from_raw_space(slice: &mut [u8], kstack: Stack) -> Self {
-        use core::mem::size_of;
-        let cap = slice.len() / size_of::<MemoryArea>();
+    pub fn new_bare() -> Self {
         MemorySet {
-            areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
+            areas: Vec::<MemoryArea>::new(),
             page_table: T::new_bare(),
-            kstack,
         }
     }
     /*
@@ -372,13 +353,6 @@ impl<T: InactivePageTable> MemorySet<T> {
         self.page_table.token()
     }
     /*
-    **  @brief  get the top of the associated kernel stack
-    **  @retval usize                the top of the associated kernel stack
-    */
-    pub fn kstack_top(&self) -> usize {
-        self.kstack.top
-    }
-    /*
     **  @brief  clear the memory set
     **  @retval none
     */
@@ -394,7 +368,7 @@ impl<T: InactivePageTable> MemorySet<T> {
 
     /*
     **  @brief  get the mutable reference for the inactive page table
-    **  @retval: &mut T                 the mutable reference of the inactive page table 
+    **  @retval: &mut T                 the mutable reference of the inactive page table
     */
     pub fn get_page_table_mut(&mut self) -> &mut T{
         &mut self.page_table
@@ -414,7 +388,6 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
         MemorySet {
             areas: self.areas.clone(),
             page_table,
-            kstack: T::alloc_stack(),
         }
     }
 }
@@ -432,11 +405,4 @@ impl<T: InactivePageTable> Debug for MemorySet<T> {
             .entries(self.areas.iter())
             .finish()
     }
-}
-
-/// the stack structure
-#[derive(Debug)]
-pub struct Stack {
-    pub top: usize,
-    pub bottom: usize,
 }

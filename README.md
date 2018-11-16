@@ -37,7 +37,7 @@ cargo install cargo-xbuild bootimage
 ```
 
 ```bash
-git clone https://github.com/wangrunji0408/RustOS.git --recursive
+git clone https://github.com/wangrunji0408/RustOS.git
 cd RustOS/kernel
 rustup override set nightly-2018-09-18
 make run arch=riscv32|x86_64

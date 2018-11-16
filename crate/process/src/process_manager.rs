@@ -138,22 +138,20 @@ impl ProcessManager {
     /// Switch the status of a process.
     /// Insert/Remove it to/from scheduler if necessary.
     fn set_status(&self, pid: Pid, status: Status) {
+        let mut scheduler = self.scheduler.lock();
         let mut proc_lock = self.procs[pid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
         trace!("process {} {:?} -> {:?}", pid, proc.status, status);
-        {   // limit the lifetime of scheduler
-            let mut scheduler = self.scheduler.lock();
-            match (&proc.status, &status) {
-                (Status::Ready, Status::Ready) => return,
-                (Status::Ready, _) => scheduler.remove(pid),
-                (Status::Running(_), _) => {},
-                (Status::Exited(_), _) => panic!("can not set status for a exited process"),
-                (Status::Waiting(target), Status::Exited(_)) =>
-                    self.wait_queue[*target].lock().retain(|&i| i != pid),
-                (Status::Sleeping, Status::Exited(_)) => self.event_hub.lock().remove(Event::Wakeup(pid)),
-                (_, Status::Ready) => scheduler.insert(pid),
-                _ => {}
-            }
+        match (&proc.status, &status) {
+            (Status::Ready, Status::Ready) => return,
+            (Status::Ready, _) => scheduler.remove(pid),
+            (Status::Running(_), _) => {},
+            (Status::Exited(_), _) => panic!("can not set status for a exited process"),
+            (Status::Waiting(target), Status::Exited(_)) =>
+                self.wait_queue[*target].lock().retain(|&i| i != pid),
+            (Status::Sleeping, Status::Exited(_)) => self.event_hub.lock().remove(Event::Wakeup(pid)),
+            (_, Status::Ready) => scheduler.insert(pid),
+            _ => {}
         }
         match proc.status {
             Status::Running(_) => proc.status_after_stop = status,
@@ -238,7 +236,8 @@ impl ProcessManager {
         (self.exit_handler)(pid);
     }
 }
- fn new_vec_default<T: Default>(size: usize) -> Vec<T> {
+
+fn new_vec_default<T: Default>(size: usize) -> Vec<T> {
     let mut vec = Vec::new();
     vec.resize_default(size);
     vec

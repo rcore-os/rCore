@@ -7,7 +7,7 @@ use memory::MemorySet;
 mod context;
 
 /*
-* @brief: 
+* @brief:
 *   initialize the interrupt status
 */
 pub fn init() {
@@ -29,7 +29,7 @@ pub fn init() {
 }
 
 /*
-* @brief: 
+* @brief:
 *   enable interrupt
 */
 #[inline(always)]
@@ -38,7 +38,7 @@ pub unsafe fn enable() {
 }
 
 /*
-* @brief: 
+* @brief:
 *   store and disable interrupt
 * @retbal:
 *   a usize value store the origin sie
@@ -53,7 +53,7 @@ pub unsafe fn disable_and_store() -> usize {
 /*
 * @param:
 *   flags: input flag
-* @brief: 
+* @brief:
 *   enable interrupt if flags != 0
 */
 #[inline(always)]
@@ -66,15 +66,16 @@ pub unsafe fn restore(flags: usize) {
 /*
 * @param:
 *   TrapFrame: the trapFrame of the Interrupt/Exception/Trap to be processed
-* @brief: 
+* @brief:
 *   process the Interrupt/Exception/Trap
 */
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
-    trace!("Interrupt: {:?}", tf.scause.cause());
+    trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => serial(),
+        Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
@@ -94,8 +95,9 @@ fn ipi() {
     debug!("IPI");
     super::bbl::sbi::clear_ipi();
 }
+
 /*
-* @brief: 
+* @brief:
 *   process timer interrupt
 */
 fn timer() {
@@ -106,7 +108,7 @@ fn timer() {
 /*
 * @param:
 *   TrapFrame: the Trapframe for the syscall
-* @brief: 
+* @brief:
 *   process syscall
 */
 fn syscall(tf: &mut TrapFrame) {
@@ -118,7 +120,7 @@ fn syscall(tf: &mut TrapFrame) {
 /*
 * @param:
 *   TrapFrame: the Trapframe for the illegal inst exception
-* @brief: 
+* @brief:
 *   process IllegalInstruction exception
 */
 fn illegal_inst(tf: &mut TrapFrame) {
@@ -128,9 +130,9 @@ fn illegal_inst(tf: &mut TrapFrame) {
 }
 
 /*
-* @param: 
+* @param:
 *   TrapFrame: the Trapframe for the page fault exception
-* @brief: 
+* @brief:
 *   process page fault exception
 */
 fn page_fault(tf: &mut TrapFrame) {
@@ -149,9 +151,9 @@ fn page_fault(tf: &mut TrapFrame) {
 /*
 * @param:
 *   TrapFrame: the Trapframe for the illegal inst exception
-* @brief: 
+* @brief:
 *   emulate the multiply and divide operation (if not this kind of operation return false)
-* @retval: 
+* @retval:
 *   a bool indicates whether emulate the multiply and divide operation successfully
 */
 fn emulate_mul_div(tf: &mut TrapFrame) -> bool {

@@ -9,7 +9,6 @@ pub fn timer() {
         unsafe { TICK += 1; }
     }
     processor().tick();
-    //info!("finish before return!");
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
@@ -23,5 +22,5 @@ pub fn error(tf: &TrapFrame) -> ! {
 }
 
 pub fn serial(c: char) {
-    ::console::CONSOLE_INPUT.push(c);
-} 
+    ::fs::STDIN.push(c);
+}

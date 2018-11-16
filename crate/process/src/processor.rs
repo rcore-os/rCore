@@ -59,9 +59,9 @@ impl Processor {
             trace!("CPU{} begin running process {}", inner.id, proc.0);
             inner.proc = Some(proc);
             unsafe {
-                inner.loop_context.switch_to(&mut *inner.proc.as_mut().expect("context should not be None").1);
+                inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
             }
-            let (pid, context) = inner.proc.take().expect("proc should not be None");
+            let (pid, context) = inner.proc.take().unwrap();
             trace!("CPU{} stop running process {}", inner.id, pid);
             inner.manager.stop(pid, context);
         }
@@ -70,7 +70,6 @@ impl Processor {
     /// Called by process running on this Processor.
     /// Yield and reschedule.
     pub fn yield_now(&self) {
-        trace!("yield start");
         let inner = self.inner();
         unsafe {
             let flags = interrupt::disable_and_store();
@@ -80,10 +79,7 @@ impl Processor {
     }
 
     pub fn pid(&self) -> Pid {
-        if self.inner().proc.is_none() {
-            return 0;
-        }
-        self.inner().proc.as_ref().expect("pid should not be None").0
+        self.inner().proc.as_ref().unwrap().0
     }
 
     pub fn context(&self) -> &Context {
@@ -101,4 +97,3 @@ impl Processor {
         }
     }
 }
-

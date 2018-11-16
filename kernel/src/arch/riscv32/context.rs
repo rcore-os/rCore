@@ -26,7 +26,7 @@ impl TrapFrame {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[10] = arg; // a0
-        tf.x[2] = sp; 
+        tf.x[2] = sp;
         tf.sepc = entry as usize;
         tf.sstatus = sstatus::read();
         // Supervisor Previous Interrupt Enable
@@ -58,10 +58,6 @@ impl TrapFrame {
         tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }
-
-    pub fn is_user(&self) -> bool {
-        unimplemented!()
-    }
 }
 
 use core::fmt::{Debug, Formatter, Error};
@@ -87,7 +83,8 @@ impl Debug for TrapFrame {
             .finish()
     }
 }
-/// kernel stack contents for a new thread 
+
+/// kernel stack contents for a new thread
 #[derive(Debug)]
 #[repr(C)]
 pub struct InitStack {
@@ -125,7 +122,7 @@ struct ContextData {
 
 impl ContextData {
     fn new(satp: usize) -> Self {
-        // satp(asid) just like cr3, save the physical address for Page directory?  
+        // satp(asid) just like cr3, save the physical address for Page directory?
         ContextData { ra: __trapret as usize, satp, ..ContextData::default() }
     }
 }
@@ -242,9 +239,9 @@ impl Context {
     *   TrapFrame: the trapframe of the forked process(thread)
     *   kstack_top: kernel stack top
     *   cr3: cr3 register, save the physical address of Page directory
-    * @brief: 
+    * @brief:
     *   fork and generate a new process(thread) Context according to the TrapFrame and save it's address at kernel stack top - 1
-    * @retval: 
+    * @retval:
     *   a Context struct with the pointer to the kernel stack top - 1 as its only element
     */
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
@@ -257,5 +254,10 @@ impl Context {
                 tf
             },
         }.push_at(kstack_top)
+    }
+    /// Called at a new user context
+    /// To get the init TrapFrame in sys_exec
+    pub unsafe fn get_init_tf(&self) -> TrapFrame {
+        (*(self.0 as *const InitStack)).tf.clone()
     }
 }

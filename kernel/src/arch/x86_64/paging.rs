@@ -95,6 +95,9 @@ impl ActivePageTable {
         // Unmap the page
         self.unmap(0xcafebabe);
     }
+    pub fn token() -> usize {
+        Cr3::read().0.start_address().as_u64() as usize
+    }
 }
 
 impl Entry for PageEntry {
@@ -206,18 +209,19 @@ impl InactivePageTable for InactivePageTable0 {
         }
     }
 
-    unsafe fn with(&self, f: impl FnOnce()) {
+    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         let old_frame = Cr3::read().0;
         let new_frame = self.p4_frame.clone();
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             Cr3::write(new_frame, Cr3Flags::empty());
         }
-        f();
+        let ret = f();
         debug!("switch table {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
             Cr3::write(old_frame, Cr3Flags::empty());
         }
+        ret
     }
 
     fn token(&self) -> usize {

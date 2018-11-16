@@ -8,7 +8,6 @@ use sync::Condvar;
 use core::sync::atomic::*;
 
 pub mod context;
-
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
     let scheduler = Box::new(scheduler::RRScheduler::new(5));

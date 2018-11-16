@@ -96,17 +96,11 @@ impl<T, S: MutexSupport> Mutex<T, S>
 impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
 {
     fn obtain_lock(&self) {
-        while true {
-            match self.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire) {
-                Ok(X) => break,
-                Err(X) => {
-                    // Wait until the lock looks unlocked before retrying
-                    while self.lock.load(Ordering::Relaxed) {
-                        self.support.cpu_relax();
-                    }
-                },
-            };
-            
+        while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
+            // Wait until the lock looks unlocked before retrying
+            while self.lock.load(Ordering::Relaxed) {
+                self.support.cpu_relax();
+            }
         }
     }
 
@@ -150,13 +144,13 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     /// a guard within Some.
     pub fn try_lock(&self) -> Option<MutexGuard<T, S>> {
         let support_guard = S::before_lock();
-        match self.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire) {
-            Ok(X)   =>
-                Some(MutexGuard {
-                    mutex: self,
-                    support_guard,
-                }), 
-            Err(X)  => None,
+        if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
+            Some(MutexGuard {
+                mutex: self,
+                support_guard,
+            })
+        } else {
+            None
         }
     }
 }
@@ -180,12 +174,12 @@ impl<T: ?Sized + Default, S: MutexSupport> Default for Mutex<T, S> {
 impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S>
 {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { unsafe { &*self.mutex.data.get() } }
+    fn deref(&self) -> &T { unsafe { &*self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S>
 {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { unsafe { &mut *self.mutex.data.get() } }
+    fn deref_mut(&mut self) -> &mut T { unsafe { &mut *self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>

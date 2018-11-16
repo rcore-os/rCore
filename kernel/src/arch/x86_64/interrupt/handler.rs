@@ -80,6 +80,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_PGFLT => page_fault(tf),
         T_IRQ0...63 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
+            super::ack(irq); // must ack before switching
             match irq {
                 IRQ_TIMER => ::trap::timer(),
                 IRQ_KBD => keyboard(),
@@ -88,7 +89,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 IRQ_IDE => ide(),
                 _ => panic!("Invalid IRQ number: {}", irq),
             }
-            super::ack(irq);
         }
         T_SWITCH_TOK => to_kernel(tf),
         T_SWITCH_TOU => to_user(tf),
@@ -131,6 +131,7 @@ fn keyboard() {
 fn com1() {
     use arch::driver::serial::*;
     trace!("\nInterupt: COM1");
+    ::trap::serial(COM1.lock().receive() as char);
 }
 
 fn com2() {

@@ -5,7 +5,7 @@ use consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack, InactivePageTable};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, InactivePageTable};
 use ucore_memory::swap::*;
 //use process::{processor, PROCESSOR};
 use process::{process};
@@ -26,7 +26,7 @@ pub type FrameAlloc = BitAlloc4K;
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
-// record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function 
+// record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function
 // after the process is set we can use use processor() to get the inactive page table
 lazy_static! {
     pub static ref MEMORY_SET_RECORD: SpinNoIrqLock<VecDeque<usize>> = SpinNoIrqLock::new(VecDeque::default());
@@ -49,7 +49,7 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>, SpinNoIrq>
 
 // Page table for swap in and out
 lazy_static!{
-    static ref ACTIVE_TABLE_SWAP: SpinNoIrqLock<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> = 
+    static ref ACTIVE_TABLE_SWAP: SpinNoIrqLock<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> =
         SpinNoIrqLock::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
 }
 
@@ -58,9 +58,9 @@ pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo:
 }
 
 /*
-* @brief: 
+* @brief:
 *   allocate a free physical frame, if no free frame, then swap out one page and reture mapped frame as the free one
-* @retval: 
+* @retval:
 *   the physical address for the allocated frame
 */
 pub fn alloc_frame() -> Option<usize> {
@@ -74,15 +74,6 @@ pub fn alloc_frame() -> Option<usize> {
 pub fn dealloc_frame(target: usize) {
     trace!("Deallocate frame: {:x}", target);
     FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
-}
-
-// alloc from heap
-pub fn alloc_stack() -> Stack {
-    use alloc::alloc::{alloc, Layout};
-    const STACK_SIZE: usize = 0x8000;
-    let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, 0x8000).unwrap()) } as usize;
-    let top = bottom + STACK_SIZE;
-    Stack { top, bottom }
 }
 
 pub struct KernelStack(usize);
@@ -107,13 +98,13 @@ impl Drop for KernelStack {
 }
 
 
-/* 
+/*
 * @param:
 *   addr: the virtual address of the page fault
-* @brief: 
+* @brief:
 *   handle page fault
-* @retval: 
-*   Return true to continue, false to halt  
+* @retval:
+*   Return true to continue, false to halt
 */
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
@@ -131,7 +122,7 @@ pub fn page_fault_handler(addr: usize) -> bool {
             info!("get id from memroy set recorder.");
             let mmset_ptr = mmsets.get(targetid);
             // get current mmset
-            
+
             let current_mmset = unsafe{&mut *(mmset_ptr.unwrap().clone() as *mut MemorySet)};
             //check whether the vma is legal
             if(current_mmset.find_area(addr).is_none()){
@@ -158,8 +149,8 @@ pub fn page_fault_handler(addr: usize) -> bool {
         },
     };
     //////////////////////////////////////////////////////////////////////////////
-    
-    
+
+
     // Handle copy on write (not being used now)
     unsafe { ACTIVE_TABLE.force_unlock(); }
     if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){

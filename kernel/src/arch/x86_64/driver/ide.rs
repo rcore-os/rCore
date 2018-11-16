@@ -2,15 +2,8 @@
 //!
 //! Borrow from Rucore project. Thanks GWord!
 //! Port from ucore C code.
-use spin::Mutex;
 
-lazy_static! {
-    pub static ref DISK0: LockedIde = LockedIde(Mutex::new(IDE::new(0)));
-    pub static ref DISK1: LockedIde = LockedIde(Mutex::new(IDE::new(1)));
-}
 pub const BLOCK_SIZE: usize = 512;
-
-pub struct LockedIde(pub Mutex<IDE>);
 
 pub struct IDE {
     num: u8,

@@ -51,7 +51,7 @@ mod syscall;
 mod fs;
 mod sync;
 mod trap;
-mod console;
+mod shell;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
@@ -63,10 +63,6 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    info!("Come into kmain");
-//    sync::test::philosopher_using_mutex();
-//    sync::test::philosopher_using_monitor();
-//    sync::mpsc::test::test_all();
     process::processor().run();
 
 //    thread::test::local_key();

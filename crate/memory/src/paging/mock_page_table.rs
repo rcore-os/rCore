@@ -77,8 +77,8 @@ impl PageTable for MockPageTable {
         assert!(entry.present);
         entry.present = false;
     }
-    fn get_entry(&mut self, addr: VirtAddr) -> &mut <Self as PageTable>::Entry {
-        &mut self.entries[addr / PAGE_SIZE]
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Self::Entry> {
+        Some(&mut self.entries[addr / PAGE_SIZE])
     }
     fn get_page_slice_mut<'a,'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8] {
         self._read(addr);
@@ -175,7 +175,7 @@ impl MockPageTable {
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloc::arc::Arc;
+    use alloc::sync::Arc;
     use core::cell::RefCell;
 
     #[test]
@@ -198,34 +198,35 @@ mod test {
     fn entry() {
         let mut pt = MockPageTable::new();
         pt.map(0x0, 0x1000);
-        {
-            let entry = pt.get_entry(0);
-            assert!(entry.present());
-            assert!(entry.writable());
-            assert!(!entry.accessed());
-            assert!(!entry.dirty());
-            assert_eq!(entry.target(), 0x1000);
-        }
+
+        let entry = pt.get_entry(0).unwrap();
+        assert!(entry.present());
+        assert!(entry.writable());
+        assert!(!entry.accessed());
+        assert!(!entry.dirty());
+        assert_eq!(entry.target(), 0x1000);
 
         pt.read(0x0);
-        assert!(pt.get_entry(0).accessed());
-        assert!(!pt.get_entry(0).dirty());
+        let entry = pt.get_entry(0).unwrap();
+        assert!(entry.accessed());
+        assert!(!entry.dirty());
 
-        pt.get_entry(0).clear_accessed();
-        assert!(!pt.get_entry(0).accessed());
+        entry.clear_accessed();
+        assert!(!entry.accessed());
 
         pt.write(0x1, 1);
-        assert!(pt.get_entry(0).accessed());
-        assert!(pt.get_entry(0).dirty());
+        let entry = pt.get_entry(0).unwrap();
+        assert!(entry.accessed());
+        assert!(entry.dirty());
 
-        pt.get_entry(0).clear_dirty();
-        assert!(!pt.get_entry(0).dirty());
+        entry.clear_dirty();
+        assert!(!entry.dirty());
 
-        pt.get_entry(0).set_writable(false);
-        assert!(!pt.get_entry(0).writable());
+        entry.set_writable(false);
+        assert!(!entry.writable());
 
-        pt.get_entry(0).set_present(false);
-        assert!(!pt.get_entry(0).present());
+        entry.set_present(false);
+        assert!(!entry.present());
     }
 
     #[test]
