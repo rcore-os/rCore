@@ -41,18 +41,16 @@ pub struct ProcessManager {
     wait_queue: Vec<Mutex<Vec<Pid>>>,
     children: Vec<Mutex<Vec<Pid>>>,
     event_hub: Mutex<EventHub<Event>>,
-    exit_handler: fn(Pid),
 }
 
 impl ProcessManager {
-    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize, exit_handler: fn(Pid)) -> Self {
+    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize) -> Self {
         ProcessManager {
             procs: new_vec_default(max_proc_num),
             scheduler: Mutex::new(scheduler),
             wait_queue: new_vec_default(max_proc_num),
             children: new_vec_default(max_proc_num),
             event_hub: Mutex::new(EventHub::new()),
-            exit_handler,
         }
     }
 
@@ -231,9 +229,7 @@ impl ProcessManager {
         for waiter in self.wait_queue[pid].lock().iter() {
             self.wakeup(*waiter);
         }
-
         proc.context = None;
-        (self.exit_handler)(pid);
     }
 }
 
