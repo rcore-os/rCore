@@ -112,10 +112,12 @@ impl ContextImpl {
         }
 
         let kstack = KernelStack::new();
-
-        let id = memory_set_record().iter()
-            .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-        memory_set_record().remove(id);
+        {
+            let mut mmset_record = memory_set_record();
+            let id = mmset_record.iter()
+                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
+            mmset_record.remove(id);
+        }
 
         let mut ret = Box::new(ContextImpl {
             arch: unsafe {
@@ -165,9 +167,13 @@ impl ContextImpl {
         let kstack = KernelStack::new();
 
         // remove the raw pointer for the memory set in memory_set_record
-        let id = memory_set_record().iter()
-            .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-        memory_set_record().remove(id);
+        {
+            let mut mmset_record = memory_set_record();
+            let id = mmset_record.iter()
+                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
+            mmset_record.remove(id);
+        }
+
 
         let mut ret = Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },

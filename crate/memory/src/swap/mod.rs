@@ -139,14 +139,14 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **  @param alloc_frame:          the function to alloc a free physical frame for once
     */
     pub unsafe fn remove_from_swappable<T2: InactivePageTable>(&mut self, pt: *mut T2, addr: VirtAddr, alloc_frame: impl FnOnce() -> PhysAddr){
-        info!("come into remove_from swappable");
+        //info!("come into remove_from swappable");
         let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
         let targetpt = &mut *(pt);
         let pttoken = {
-            debug!("the target page table token is {:x?}", targetpt.token());
+            info!("SET_UNSWAPPABLE: the target page table token is {:x?}, addr is {:x?}", targetpt.token(), addr);
             targetpt.token()
         };
-        info!("try to change pagetable");
+        //info!("try to change pagetable");
         targetpt.with(||{
             let token = {
                 let entry = page_table.get_entry(addr).unwrap();
