@@ -48,7 +48,6 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     driver::init();
 
     ::process::init();
-    ::thread::spawn(::shell::run_user_shell);
 
     AP_CAN_INIT.store(true, Ordering::Relaxed);
 

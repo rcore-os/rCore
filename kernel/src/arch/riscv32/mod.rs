@@ -25,9 +25,7 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
     interrupt::init();
     memory::init();
     timer::init();
-
     ::process::init();
-    ::thread::spawn(::shell::run_user_shell);
 
     unsafe { cpu::start_others(hart_mask); }
     ::kmain();

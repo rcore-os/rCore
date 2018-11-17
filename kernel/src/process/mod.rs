@@ -13,18 +13,20 @@ pub fn init() {
     let scheduler = Box::new(scheduler::RRScheduler::new(5));
     let manager = Arc::new(ProcessManager::new(scheduler, MAX_PROCESS_NUM));
 
+    unsafe {
+        for cpu_id in 0..MAX_CPU_NUM {
+            PROCESSORS[cpu_id].init(cpu_id, ContextImpl::new_init(), manager.clone());
+        }
+    }
+
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }
     }
     for i in 0..4 {
         manager.add(ContextImpl::new_kernel(idle, i));
     }
+    ::shell::run_user_shell();
 
-    unsafe {
-        for cpu_id in 0..MAX_CPU_NUM {
-            PROCESSORS[cpu_id].init(cpu_id, ContextImpl::new_init(), manager.clone());
-        }
-    }
     info!("process init end");
 }
 
