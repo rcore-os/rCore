@@ -94,8 +94,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 
     // 在Processor中创建新的线程
     let context = new_kernel_context(kernel_thread_entry::<F, T>, f as usize);
-    let pid = processor().manager().add(context);
-    processor().manager().set_parent(0, pid);
+    let pid = processor().manager().add(context, 0);
 
     // 接下来看看`JoinHandle::join()`的实现
     // 了解是如何获取f返回值的
@@ -151,7 +150,7 @@ impl<T> JoinHandle<T> {
             trace!("{} join", self.thread.pid);
             match processor().manager().get_status(self.thread.pid) {
                 Some(Status::Exited(exit_code)) => {
-                    processor().manager().wait_done(current().id(), self.thread.pid);
+                    processor().manager().remove(self.thread.pid);
                     // Find return value on the heap from the exit code.
                     return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
                 }

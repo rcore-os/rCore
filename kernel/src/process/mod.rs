@@ -23,7 +23,7 @@ pub fn init() {
         loop { cpu::halt(); }
     }
     for i in 0..4 {
-        manager.add(ContextImpl::new_kernel(idle, i));
+        manager.add(ContextImpl::new_kernel(idle, i), 0);
     }
     ::shell::run_user_shell();
 

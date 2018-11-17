@@ -11,6 +11,8 @@ struct Process {
     status: Status,
     status_after_stop: Status,
     context: Option<Box<Context>>,
+    parent: Pid,
+    children: Vec<Pid>,
 }
 
 pub type Pid = usize;
@@ -29,8 +31,8 @@ pub enum Status {
 #[derive(Eq, PartialEq)]
 enum Event {
     Wakeup(Pid),
-    Dropped,
 }
+
 pub trait Context {
     unsafe fn switch_to(&mut self, target: &mut Context);
 }
@@ -38,8 +40,6 @@ pub trait Context {
 pub struct ProcessManager {
     procs: Vec<Mutex<Option<Process>>>,
     scheduler: Mutex<Box<Scheduler>>,
-    wait_queue: Vec<Mutex<Vec<Pid>>>,
-    children: Vec<Mutex<Vec<Pid>>>,
     event_hub: Mutex<EventHub<Event>>,
 }
 
@@ -48,39 +48,33 @@ impl ProcessManager {
         ProcessManager {
             procs: new_vec_default(max_proc_num),
             scheduler: Mutex::new(scheduler),
-            wait_queue: new_vec_default(max_proc_num),
-            children: new_vec_default(max_proc_num),
             event_hub: Mutex::new(EventHub::new()),
         }
     }
 
     fn alloc_pid(&self) -> Pid {
         for (i, proc) in self.procs.iter().enumerate() {
-            let mut proc_lock = proc.lock();
-            if proc_lock.is_none() {
+            if proc.lock().is_none() {
                 return i;
-            }
-            match proc_lock.as_mut().unwrap().status {
-                Status::Exited(_) => if self.wait_queue[i].lock().is_empty() {
-                    *proc_lock = None;
-                    return i;
-                },
-                _ => {},
             }
         }
         panic!("Process number exceeded");
     }
 
     /// Add a new process
-    pub fn add(&self, context: Box<Context>) -> Pid {
+    pub fn add(&self, context: Box<Context>, parent: Pid) -> Pid {
         let pid = self.alloc_pid();
         *(&self.procs[pid]).lock() = Some(Process {
             id: pid,
             status: Status::Ready,
             status_after_stop: Status::Ready,
             context: Some(context),
+            parent,
+            children: Vec::new(),
         });
         self.scheduler.lock().insert(pid);
+        self.procs[parent].lock().as_mut().expect("invalid parent proc")
+            .children.push(pid);
         pid
     }
 
@@ -93,7 +87,6 @@ impl ProcessManager {
         while let Some(event) = event_hub.pop() {
             match event {
                 Event::Wakeup(pid) => self.set_status(pid, Status::Ready),
-                Event::Dropped => {},
             }
         }
         self.scheduler.lock().tick(pid)
@@ -113,7 +106,7 @@ impl ProcessManager {
             .expect("failed to select a runnable process");
         scheduler.remove(pid);
         let mut proc_lock = self.procs[pid].lock();
-        let mut proc = proc_lock.as_mut().expect("process not exist");;
+        let mut proc = proc_lock.as_mut().expect("process not exist");
         proc.status = Status::Running(cpu_id);
         (pid, proc.context.take().expect("context not exist"))
     }
@@ -136,19 +129,15 @@ impl ProcessManager {
     /// Switch the status of a process.
     /// Insert/Remove it to/from scheduler if necessary.
     fn set_status(&self, pid: Pid, status: Status) {
-        let mut scheduler = self.scheduler.lock();
         let mut proc_lock = self.procs[pid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
         trace!("process {} {:?} -> {:?}", pid, proc.status, status);
         match (&proc.status, &status) {
             (Status::Ready, Status::Ready) => return,
-            (Status::Ready, _) => scheduler.remove(pid),
-            (Status::Running(_), _) => {},
+            (Status::Ready, _) => self.scheduler.lock().remove(pid),
             (Status::Exited(_), _) => panic!("can not set status for a exited process"),
-            (Status::Waiting(target), Status::Exited(_)) =>
-                self.wait_queue[*target].lock().retain(|&i| i != pid),
             (Status::Sleeping, Status::Exited(_)) => self.event_hub.lock().remove(Event::Wakeup(pid)),
-            (_, Status::Ready) => scheduler.insert(pid),
+            (_, Status::Ready) => self.scheduler.lock().insert(pid),
             _ => {}
         }
         match proc.status {
@@ -161,34 +150,34 @@ impl ProcessManager {
         }
     }
 
-
     pub fn get_status(&self, pid: Pid) -> Option<Status> {
-        let mut proc_lock = self.procs[pid].lock();
-        if proc_lock.is_none() {
-            return None;
-        }
-        match proc_lock.as_ref().unwrap().status {
-            Status::Exited(_) => if self.wait_queue[pid].lock().is_empty() {
-                *proc_lock = None;
-                return None;
-            },
-            _ => {},
-        }
-        proc_lock.as_ref().map(|p| p.status.clone())
+        self.procs[pid].lock().as_ref().map(|p| p.status.clone())
     }
 
-    pub fn wait_done(&self, pid: Pid, target: Pid) {
-        let mut proc_lock = self.procs[target].lock();
+    /// Remove an exited proc `pid`.
+    /// Its all children will be set parent to 0.
+    pub fn remove(&self, pid: Pid) {
+        let mut proc_lock = self.procs[pid].lock();
         let proc = proc_lock.as_ref().expect("process not exist");
         match proc.status {
-            Status::Exited(_) => self.del_child(pid, target),
+            Status::Exited(_) => {}
             _ => panic!("can not remove non-exited process"),
         }
+        // orphan procs
+        for child in proc.children.iter() {
+            (&self.procs[*child]).lock().as_mut().expect("process not exist").parent = 0;
+        }
+        // remove self from parent's children list
+        self.procs[proc.parent].lock().as_mut().expect("process not exist")
+            .children.retain(|&i| i != pid);
+        // release the pid
+        *proc_lock = None;
     }
 
-    pub fn sleep(&self, pid: Pid, time_raw: usize) {
+    /// Sleep `pid` for `time` ticks.
+    /// `time` == 0 means sleep forever
+    pub fn sleep(&self, pid: Pid, time: usize) {
         self.set_status(pid, Status::Sleeping);
-        let time = if time_raw >= (1 << 31) {0} else {time_raw};
         if time != 0 {
             self.event_hub.lock().push(time, Event::Wakeup(pid));
         }
@@ -200,35 +189,28 @@ impl ProcessManager {
 
     pub fn wait(&self, pid: Pid, target: Pid) {
         self.set_status(pid, Status::Waiting(target));
-        self.wait_queue[target].lock().push(pid);
     }
     pub fn wait_child(&self, pid: Pid) {
         self.set_status(pid, Status::Waiting(0));
     }
 
-    pub fn set_parent(&self, pid: Pid, target: Pid) {
-        self.wait_queue[target].lock().push(pid);
-        self.children[pid].lock().push(target);
-    }
-    pub fn del_child(&self, pid: Pid, target: Pid) {
-        self.wait_queue[target].lock().retain(|&i| i != pid);
-        self.children[pid].lock().retain(|&i| i != target);
-    }
-    pub fn get_children(&self, pid: Pid) -> Vec<Pid>{
-        self.children[pid].lock().clone()
+    pub fn get_children(&self, pid: Pid) -> Vec<Pid> {
+        self.procs[pid].lock().as_ref().expect("process not exist").children.clone()
     }
 
     pub fn exit(&self, pid: Pid, code: ExitCode) {
-        for child in self.children[pid].lock().drain(..) {
-            self.wait_queue[child].lock().retain(|&i| i != pid);
-        }
+        // NOTE: if `pid` is running, status change will be deferred.
         self.set_status(pid, Status::Exited(code));
     }
-     /// Called when a process exit
+    /// Called when a process exit
     fn exit_handler(&self, pid: Pid, proc: &mut Process) {
-        for waiter in self.wait_queue[pid].lock().iter() {
-            self.wakeup(*waiter);
+        // wakeup parent if waiting
+        let parent = proc.parent;
+        match self.get_status(parent).expect("process not exist") {
+            Status::Waiting(target) if target == pid || target == 0 => self.wakeup(parent),
+            _ => {}
         }
+        // drop its context
         proc.context = None;
     }
 }

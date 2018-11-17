@@ -143,8 +143,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
 fn sys_fork(tf: &TrapFrame) -> SysResult {
     let mut context = process().fork(tf);
     //memory_set_map_swappable(context.get_memory_set_mut());
-    let pid = processor().manager().add(context);
-    processor().manager().set_parent(thread::current().id(), pid);
+    let pid = processor().manager().add(context, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid as i32)
@@ -168,7 +167,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
                     if !code.is_null() {
                         unsafe { code.write(exit_code as i32); }
                     }
-                    processor().manager().wait_done(thread::current().id(), pid);
+                    processor().manager().remove(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
                     return Ok(0);
                 }
@@ -253,8 +252,12 @@ fn sys_exit(exit_code: i32) -> SysResult {
 }
 
 fn sys_sleep(time: usize) -> SysResult {
-    use core::time::Duration;
-    thread::sleep(Duration::from_millis(time as u64 * 10));
+    if time >= 1 << 31 {
+        thread::park();
+    } else {
+        use core::time::Duration;
+        thread::sleep(Duration::from_millis(time as u64 * 10));
+    }
     Ok(0)
 }
 
