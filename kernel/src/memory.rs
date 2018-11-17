@@ -111,7 +111,8 @@ pub fn page_fault_handler(addr: usize) -> bool {
     unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
     info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
-    let id = memory_set_record().iter()
+    let mmset_record = memory_set_record();
+    let id = mmset_record.iter()
             .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
     /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
     * handle the frame deallocated
@@ -119,7 +120,7 @@ pub fn page_fault_handler(addr: usize) -> bool {
     match id {
         Some(targetid) => {
             info!("get id from memroy set recorder.");
-            let mmset_ptr = memory_set_record().get(targetid).expect("fail to get mmset_ptr").clone();
+            let mmset_ptr = mmset_record.get(targetid).expect("fail to get mmset_ptr").clone();
             // get current mmset
 
             let current_mmset = unsafe{&mut *(mmset_ptr as *mut MemorySet)};
