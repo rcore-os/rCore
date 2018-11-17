@@ -176,7 +176,7 @@ impl MemoryArea {
                         let entry = pt.map(addr,0);
                         self.flags.apply(entry);
                     }
-                    let entry = pt.get_entry(addr).unwrap();
+                    let entry = pt.get_entry(addr).expect("fail to get entry");
                     entry.set_present(false);
                     entry.update();
 
@@ -194,13 +194,13 @@ impl MemoryArea {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             let addr = page.start_address();
             if self.phys_start_addr.is_none() {
-                if pt.get_entry(addr).unwrap().present(){
-                    let target = pt.get_entry(addr).unwrap().target();
+                if pt.get_entry(addr).expect("fail to get entry").present(){
+                    let target = pt.get_entry(addr).expect("fail to get entry").target();
                     T::dealloc_frame(target);
                 }
                 else{
                     // set valid for pt.unmap function
-                    pt.get_entry(addr).unwrap().set_present(true);
+                    pt.get_entry(addr).expect("fail to get entry").set_present(true);
                 }
             }
             pt.unmap(addr);

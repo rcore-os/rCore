@@ -114,7 +114,7 @@ impl ContextImpl {
         let kstack = KernelStack::new();
 
         let id = memory_set_record().iter()
-            .position(|x| x.clone() == mmset_ptr).unwrap();
+            .position(|x| x.clone() == mmset_ptr).expect("id not exist");
         memory_set_record().remove(id);
 
         let mut ret = Box::new(ContextImpl {
@@ -164,9 +164,9 @@ impl ContextImpl {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        // remove the raw pointer for the memory set since it will
+        // remove the raw pointer for the memory set in memory_set_record
         let id = memory_set_record().iter()
-            .position(|x| x.clone() == mmset_ptr).unwrap();
+            .position(|x| x.clone() == mmset_ptr).expect("id not exist");
         memory_set_record().remove(id);
 
         let mut ret = Box::new(ContextImpl {
@@ -191,16 +191,6 @@ impl ContextImpl {
 impl Drop for ContextImpl{
     fn drop(&mut self){
         info!("come in to drop for ContextImpl");
-        // remove the new memory set to the recorder (deprecated in the latest version)
-        /*
-        let id = memory_set_record().iter()
-            .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).token() == self.memory_set.token()});
-        if id.is_some(){
-            info!("remove id {:x?}", id.unwrap());
-            memory_set_record().remove(id.unwrap());
-        }
-        */
-
         //set the user Memory pages in the memory set unswappable
         let Self {ref mut arch, ref mut memory_set, ref mut kstack, ..} = self;
         let pt = {
@@ -210,7 +200,7 @@ impl Drop for ContextImpl{
             for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
                 let addr = page.start_address();
                 unsafe {
-                    active_table_swap().remove_from_swappable(pt, addr, || alloc_frame().unwrap());
+                    active_table_swap().remove_from_swappable(pt, addr, || alloc_frame().expect("alloc frame failed"));
                 }
             }
         }

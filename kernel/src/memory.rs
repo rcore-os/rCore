@@ -68,7 +68,7 @@ pub fn alloc_frame() -> Option<usize> {
     let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
     trace!("Allocate frame: {:x?}", ret);
     //do we need : unsafe { ACTIVE_TABLE_SWAP.force_unlock(); } ???
-    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().unwrap()))
+    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().expect("fail to swap out page")))
 }
 
 pub fn dealloc_frame(target: usize) {
@@ -123,27 +123,27 @@ pub fn page_fault_handler(addr: usize) -> bool {
             let mmset_ptr = mmsets.get(targetid);
             // get current mmset
 
-            let current_mmset = unsafe{&mut *(mmset_ptr.unwrap().clone() as *mut MemorySet)};
+            let current_mmset = unsafe{&mut *(mmset_ptr.expect("fail to get mmset_ptr").clone() as *mut MemorySet)};
             //check whether the vma is legal
-            if(current_mmset.find_area(addr).is_none()){
+            if current_mmset.find_area(addr).is_none(){
                 return false;
             }
 
             let pt = current_mmset.get_page_table_mut();
             info!("pt got!");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().unwrap()){
+            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().expect("fail to alloc frame")){
                 return true;
             }
         },
         None => {
             info!("get pt from processor()");
-            if(process().get_memory_set_mut().find_area(addr).is_none()){
+            if process().get_memory_set_mut().find_area(addr).is_none(){
                 return false;
             }
 
             let pt = process().get_memory_set_mut().get_page_table_mut();
             info!("pt got");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().unwrap()){
+            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
                 return true;
             }
         },
@@ -152,10 +152,12 @@ pub fn page_fault_handler(addr: usize) -> bool {
 
 
     // Handle copy on write (not being used now)
+    /*
     unsafe { ACTIVE_TABLE.force_unlock(); }
-    if active_table().page_fault_handler(addr, || alloc_frame().unwrap()){
+    if active_table().page_fault_handler(addr, || alloc_frame().expect("fail to alloc frame")){
         return true;
     }
+    */
     false
 }
 

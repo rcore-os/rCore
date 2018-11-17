@@ -25,7 +25,7 @@ pub fn setup_page_table(frame: Frame) {
     // Set kernel identity map
     // 0x10000000 ~ 1K area
     p2.map_identity(0x40, EF::VALID | EF::READABLE | EF::WRITABLE);
-    // 0x80000000 ~ 12M area for
+    // 0x80000000 ~ 12M area 
     p2.map_identity(KERNEL_P2_INDEX, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 2, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
@@ -62,7 +62,7 @@ impl PageTable for ActivePageTable {
         // we may need frame allocator to alloc frame for new page table(first/second)
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap().flush();
-        self.get_entry(addr).unwrap()
+        self.get_entry(addr).expect("fail to get entry")
     }
 
     /*

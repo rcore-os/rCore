@@ -117,7 +117,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
             targetpt.token()
         };
         targetpt.with(||{
-            let entry = page_table.get_entry(addr).unwrap();
+            let entry = page_table.get_entry(addr).expect("failed to get page entry when set swappable");
             if entry.present() {
                 let frame = Frame::new(pt as usize, addr, pttoken);
                 swap_manager.push(frame);
@@ -283,7 +283,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
         {
             info!("try handling delayed frame allocator");
             let need_alloc ={
-                let entry = self.page_table.get_entry(addr).unwrap();
+                let entry = self.page_table.get_entry(addr).expect("fail to get entry");
                 //info!("got entry!");
                 !entry.present() && !entry.swapped()
             };
@@ -311,6 +311,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
         }
         // now we didn't attach the cow so the present will be false when swapped(), to enable the cow some changes will be needed
         match self.page_table.get_entry(addr) {
+            // infact the get_entry(addr) should not be None here
             None => return false,
             Some(entry) => if !entry.swapped() { return false; },
         }
