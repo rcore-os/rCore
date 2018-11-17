@@ -111,13 +111,11 @@ fn double_fault(tf: &TrapFrame) {
 fn page_fault(tf: &mut TrapFrame) {
     let addr: usize;
     unsafe { asm!("mov %cr2, $0" : "=r" (addr)); }
-    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
 
-    use memory::page_fault_handler;
-    if page_fault_handler(addr) {
+    if ::memory::page_fault_handler(addr) {
         return;
     }
-
+    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
     error(tf);
 }
 

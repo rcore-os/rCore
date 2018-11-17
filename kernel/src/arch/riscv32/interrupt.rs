@@ -136,13 +136,10 @@ fn illegal_inst(tf: &mut TrapFrame) {
 *   process page fault exception
 */
 fn page_fault(tf: &mut TrapFrame) {
-    let addr: usize;
-    // move stval(i.e. sbadaddr) to addr
-    addr = stval::read();
-    error!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    let addr = stval::read();
+    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    use memory::page_fault_handler;
-    if !page_fault_handler(addr) {
+    if !::memory::page_fault_handler(addr) {
         ::trap::error(tf);
     }
 }
