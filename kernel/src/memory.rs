@@ -108,7 +108,7 @@ impl Drop for KernelStack {
 */
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
-    unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
+    //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
     info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
     let mmset_record = memory_set_record();

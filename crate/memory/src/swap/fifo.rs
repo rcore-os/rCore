@@ -23,6 +23,8 @@ impl SwapManager for FifoSwapManager {
             .position(|ref x| x.get_virtaddr() == addr && x.get_token() == token)
             .expect("address not found");
         self.deque.remove(id);
+        //info!("SwapManager remove token finished: {:x?} vaddr: {:x?}", token, addr);
+        
     }
 
     fn pop<T, S>(&mut self, _: &mut T, _: &mut S) -> Option<Frame>
