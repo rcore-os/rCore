@@ -121,9 +121,10 @@ fn page_fault(tf: &mut TrapFrame) {
 
 fn keyboard() {
     use arch::driver::keyboard;
-    info!("\nInterupt: Keyboard");
-    let c = keyboard::get();
-    info!("Key = '{}' {}", c as u8 as char, c);
+    trace!("\nInterupt: Keyboard");
+    if let Some(c) = keyboard::receive() {
+        ::trap::serial(c);
+    }
 }
 
 fn com1() {

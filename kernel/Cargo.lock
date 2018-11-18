@@ -147,6 +147,11 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "pc-keyboard"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -280,6 +285,7 @@ dependencies = [
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pc-keyboard 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)",
@@ -415,6 +421,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 "checksum once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "931fb7a4cf34610cf6cbe58d52a8ca5ef4c726d4e2e178abd0dc13a6551c6d73"
 "checksum os_bootinfo 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "66481dbeb5e773e7bd85b63cd6042c30786f834338288c5ec4f3742673db360a"
+"checksum pc-keyboard 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fff50ab09ba31bcebc0669f4e64c0952fae1acdca9e6e0587e68e4e8443808ac"
 "checksum pulldown-cmark 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8361e81576d2e02643b04950e487ec172b687180da65c731c03cf336784e6c07"
 "checksum rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8356f47b32624fef5b3301c1be97e5944ecdd595409cc5da11d05f211db6cfbd"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
