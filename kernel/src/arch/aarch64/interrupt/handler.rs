@@ -1,8 +1,9 @@
 //! Trap handler
 
-use arch::board::irq::handle_irq;
+use crate::arch::board::irq::handle_irq;
 use super::context::TrapFrame;
 use super::syndrome::Syndrome;
+use log::*;
 
 global_asm!(include_str!("trap.S"));
 global_asm!(include_str!("vector.S"));
@@ -46,13 +47,12 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
             match syndrome {
                 Syndrome::Brk(brk) => handle_break(brk, tf),
                 Syndrome::Svc(_) => handle_syscall(tf),
-                _ => ::trap::error(tf),
+                _ => crate::trap::error(tf),
             }
         }
         Kind::Irq => handle_irq(tf),
-        _ => ::trap::error(tf),
+        _ => crate::trap::error(tf),
     }
-    ::trap::before_return();
     trace!("Interrupt end");
 }
 
@@ -63,7 +63,7 @@ fn handle_break(num: u16, tf: &mut TrapFrame) {
 
 fn handle_syscall(tf: &mut TrapFrame) {
     // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
-    let ret = ::syscall::syscall(
+    let ret = crate::syscall::syscall(
         tf.x1to29[7] as usize,
         [
             tf.x0,

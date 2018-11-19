@@ -27,3 +27,18 @@ pub unsafe fn restore(flags: usize) {
 pub unsafe fn restore(flags: usize) {
     asm!("csrs 0x100, $0" :: "r"(flags));
 }
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn disable_and_store() -> usize {
+    let daif: u32;
+    asm!("mrs $0, DAIF": "=r"(daif) ::: "volatile");
+    asm!("msr daifset, #2");
+    daif as usize
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn restore(flags: usize) {
+    asm!("msr DAIF, $0" :: "r"(flags as u32) :: "volatile");
+}

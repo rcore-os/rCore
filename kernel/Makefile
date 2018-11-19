@@ -4,7 +4,7 @@
 # 	make justrun				Run the last build
 # 	make doc					Generate docs
 # 	make asm					Open the deassemble file of the last build
-# 	make elf-h					Open 'objdump -h' of the last build
+# 	make header					Open 'objdump -h' of the last build
 # 	make clean					Clean
 #
 # Options:
@@ -18,7 +18,6 @@
 
 arch ?= riscv32
 board ?= raspi3
-prefix ?= $(arch)-none-elf
 mode ?= debug
 LOG  ?= debug
 smp  ?= 4
@@ -83,12 +82,22 @@ endif
 
 
 ### prefix ###
-ld := $(prefix)-ld
-objdump := $(prefix)-objdump
-objcopy := $(prefix)-objcopy
-cc := $(prefix)-gcc
-as := $(prefix)-as
-gdb := $(prefix)-gdb
+ifeq ($(arch), x86_64)
+ifeq ($(uname), Darwin)
+prefix := x86_64-elf-
+endif
+else ifeq ($(arch), riscv32)
+prefix := riscv64-unknown-elf-
+else ifeq ($(arch), aarch64)
+prefix ?= aarch64-none-elf-
+endif
+
+ld := $(prefix)ld
+objdump := $(prefix)objdump
+objcopy := $(prefix)objcopy
+cc := $(prefix)gcc
+as := $(prefix)as
+gdb := $(prefix)gdb
 
 .PHONY: all clean run build asm doc justrun kernel
 
@@ -144,7 +153,7 @@ else
 	cp bbl ../../kernel/$@
 endif
 else ifeq ($(arch), aarch64)
-	$(objcopy) $(kernel) --strip-all -O binary $@
+	@$(objcopy) $(kernel) --strip-all -O binary $@
 endif
 
 kernel:

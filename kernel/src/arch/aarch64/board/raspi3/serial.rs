@@ -1,5 +1,4 @@
-use super::bcm2837::mini_uart::MiniUart;
-
+use bcm2837::mini_uart::MiniUart;
 use core::fmt;
 use spin::Mutex;
 

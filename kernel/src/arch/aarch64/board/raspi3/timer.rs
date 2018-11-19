@@ -1,5 +1,6 @@
-use super::bcm2837::timer;
-use super::bcm2837::interrupt::{Controller, Interrupt};
+use bcm2837::timer;
+use bcm2837::interrupt::{Controller, Interrupt};
+use log::*;
 
 pub fn init() {
     timer::init();

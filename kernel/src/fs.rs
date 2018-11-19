@@ -34,6 +34,8 @@ lazy_static! {
         };
         #[cfg(target_arch = "x86_64")]
         let device = Box::new(ide::IDE::new(1));
+        #[cfg(target_arch = "aarch64")]
+        let device = unimplemented!();
 
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()

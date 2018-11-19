@@ -1,7 +1,5 @@
 //! Raspberry PI 3 Model B/B+
 
-extern crate bcm2837;
-
 pub mod irq;
 pub mod timer;
 pub mod serial;

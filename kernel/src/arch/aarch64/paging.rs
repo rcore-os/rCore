@@ -7,7 +7,7 @@ type VirtAddr = usize;
 type PhysAddr = usize;
 
 use alloc::alloc::{alloc, Layout};
-use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
+use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
 /// TODO
 pub struct ActivePageTable {
@@ -17,6 +17,10 @@ pub struct ActivePageTable {
 impl ActivePageTable {
     /// TODO
     pub unsafe fn new() -> Self {
+        unimplemented!()
+    }
+
+    pub fn token() -> usize {
         unimplemented!()
     }
 }
@@ -31,7 +35,7 @@ impl PageTable for ActivePageTable {
         unimplemented!()
     }
 
-    fn get_entry(&mut self, addr: VirtAddr) -> &mut Self::Entry {
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Self::Entry> {
         unimplemented!()
     }
 
@@ -200,7 +204,7 @@ impl InactivePageTable for InactivePageTable0 {
         unimplemented!()
     }
 
-    unsafe fn with(&self, f: impl FnOnce()) {
+    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         unimplemented!()
     }
 
@@ -214,9 +218,5 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn dealloc_frame(target: PhysAddr) {
         dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
     }
 }

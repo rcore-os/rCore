@@ -1,8 +1,9 @@
 //! Memory initialization for aarch64.
 
 use ucore_memory::PAGE_SIZE;
-use super::atags::atags::Atags;
-use super::super::HEAP_ALLOCATOR;
+use atags::atags::Atags;
+use crate::HEAP_ALLOCATOR;
+use log::*;
 
 /// Memory initialization.
 pub fn init() {
