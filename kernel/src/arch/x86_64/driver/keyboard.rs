@@ -1,14 +1,11 @@
-extern crate pc_keyboard;
-
 use spin::Mutex;
 use x86_64::instructions::port::Port;
-use self::pc_keyboard::{Keyboard, ScancodeSet1, DecodedKey, layouts};
+use pc_keyboard::{Keyboard, ScancodeSet1, DecodedKey, layouts};
+use lazy_static::lazy_static;
 
 pub fn init() {
-	assert_has_not_been_called!("keyboard::init must be called only once");
-
-	use arch::interrupt::consts::*;
-	use arch::interrupt::enable_irq;
+    use crate::arch::interrupt::consts::*;
+    use crate::arch::interrupt::enable_irq;
 	enable_irq(IRQ_KBD);
 }
 

@@ -1,15 +1,14 @@
 use simple_filesystem::*;
 use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
-#[cfg(target_arch = "x86_64")]
-use arch::driver::ide;
-use sync::Condvar;
-use sync::SpinNoIrqLock as Mutex;
 use core::any::Any;
 use core::slice;
-
-use ::memory::{InactivePageTable0, memory_set_record};
-use memory::MemorySet;
-use process::context::memory_set_map_swappable;
+use lazy_static::lazy_static;
+use crate::memory::{MemorySet, InactivePageTable0, memory_set_record};
+use crate::process::context::memory_set_map_swappable;
+#[cfg(target_arch = "x86_64")]
+use crate::arch::driver::ide;
+use crate::sync::Condvar;
+use crate::sync::SpinNoIrqLock as Mutex;
 
 // Hard link user program
 #[cfg(target_arch = "riscv32")]

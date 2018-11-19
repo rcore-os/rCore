@@ -1,15 +1,15 @@
 //! System call
 
-use arch::interrupt::TrapFrame;
-use process::*;
-use thread;
-use util;
 use simple_filesystem::{INode, file::File, FileInfo, FileType};
 use core::{slice, str};
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec, string::String};
 use spin::Mutex;
-use alloc::vec::Vec;
-use alloc::string::String;
+use log::*;
+use bitflags::bitflags;
+use crate::arch::interrupt::TrapFrame;
+use crate::process::*;
+use crate::thread;
+use crate::util;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
@@ -48,7 +48,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
 
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
-            ::trap::error(tf);
+            crate::trap::error(tf);
         }
     };
     match ret {
@@ -79,11 +79,11 @@ fn sys_open(path: *const u8, flags: usize) -> SysResult {
     let flags = VfsFlags::from_ucore_flags(flags);
     info!("open: path: {:?}, flags: {:?}", path, flags);
     let (fd, inode) = match path {
-        "stdin:" => (0, ::fs::STDIN.clone() as Arc<INode>),
-        "stdout:" => (1, ::fs::STDOUT.clone() as Arc<INode>),
+        "stdin:" => (0, crate::fs::STDIN.clone() as Arc<INode>),
+        "stdout:" => (1, crate::fs::STDOUT.clone() as Arc<INode>),
         _ => {
             let fd = (3..).find(|i| !process().files.contains_key(i)).unwrap();
-            let inode = ::fs::ROOT_INODE.lookup(path)?;
+            let inode = crate::fs::ROOT_INODE.lookup(path)?;
             (fd, inode)
         }
     };
@@ -154,6 +154,7 @@ fn sys_fork(tf: &TrapFrame) -> SysResult {
 fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
     // TODO: check ptr
     loop {
+        use alloc::vec;
         let wait_procs = match pid {
             0 => processor().manager().get_children(thread::current().id()),
             _ => vec![pid],
@@ -199,7 +200,7 @@ fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapF
 
     // Read program file
     let path = args[0].as_str();
-    let inode = ::fs::ROOT_INODE.lookup(path)?;
+    let inode = crate::fs::ROOT_INODE.lookup(path)?;
     let size = inode.info()?.size;
     let mut buf = Vec::with_capacity(size);
     unsafe { buf.set_len(size); }
@@ -262,7 +263,7 @@ fn sys_sleep(time: usize) -> SysResult {
 }
 
 fn sys_get_time() -> SysResult {
-    unsafe { Ok(::trap::TICK as i32) }
+    unsafe { Ok(crate::trap::TICK as i32) }
 }
 
 fn sys_lab6_set_priority(priority: usize) -> SysResult {

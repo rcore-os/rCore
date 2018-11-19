@@ -1,7 +1,7 @@
-use super::riscv::register::*;
+use riscv::register::*;
 pub use self::context::*;
-use ::memory::{InactivePageTable0, memory_set_record};
-use memory::MemorySet;
+use crate::memory::{MemorySet, InactivePageTable0, memory_set_record};
+use log::*;
 
 #[path = "context.rs"]
 mod context;
@@ -71,7 +71,7 @@ pub unsafe fn restore(flags: usize) {
 */
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use super::riscv::register::scause::{Trap, Interrupt as I, Exception as E};
+    use riscv::register::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => serial(),
@@ -82,18 +82,18 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         Trap::Exception(E::LoadPageFault) => page_fault(tf),
         Trap::Exception(E::StorePageFault) => page_fault(tf),
         Trap::Exception(E::InstructionPageFault) => page_fault(tf),
-        _ => ::trap::error(tf),
+        _ => crate::trap::error(tf),
     }
     trace!("Interrupt end");
 }
 
 fn serial() {
-    ::trap::serial(super::io::getchar());
+    crate::trap::serial(super::io::getchar());
 }
 
 fn ipi() {
     debug!("IPI");
-    super::bbl::sbi::clear_ipi();
+    bbl::sbi::clear_ipi();
 }
 
 /*
@@ -101,7 +101,7 @@ fn ipi() {
 *   process timer interrupt
 */
 fn timer() {
-    ::trap::timer();
+    crate::trap::timer();
     super::timer::set_next();
 }
 
@@ -113,7 +113,7 @@ fn timer() {
 */
 fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4;   // Must before syscall, because of fork.
-    let ret = ::syscall::syscall(tf.x[10], [tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15], tf.x[16]], tf);
+    let ret = crate::syscall::syscall(tf.x[10], [tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15], tf.x[16]], tf);
     tf.x[10] = ret as usize;
 }
 
@@ -125,7 +125,7 @@ fn syscall(tf: &mut TrapFrame) {
 */
 fn illegal_inst(tf: &mut TrapFrame) {
     if !emulate_mul_div(tf) {
-        ::trap::error(tf);
+        crate::trap::error(tf);
     }
 }
 
@@ -139,8 +139,8 @@ fn page_fault(tf: &mut TrapFrame) {
     let addr = stval::read();
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    if !::memory::page_fault_handler(addr) {
-        ::trap::error(tf);
+    if !crate::memory::page_fault_handler(addr) {
+        crate::trap::error(tf);
     }
 }
 

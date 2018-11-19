@@ -1,7 +1,8 @@
 use core::{slice, mem};
-use memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet};
-use super::riscv::{addr::*, register::sstatus};
+use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
+use log::*;
+use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet};
 
 /*
 * @brief:
@@ -36,7 +37,7 @@ pub fn init_other() {
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
-    use consts::{MEMORY_OFFSET, MEMORY_END};
+    use crate::consts::{MEMORY_OFFSET, MEMORY_END};
 
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(end as usize + PAGE_SIZE, MEMORY_END));

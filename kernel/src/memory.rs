@@ -1,16 +1,16 @@
-pub use arch::paging::*;
+pub use crate::arch::paging::*;
 use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K};
-use consts::MEMORY_OFFSET;
-//use spin::{Mutex, MutexGuard};
+use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
 pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, InactivePageTable};
 use ucore_memory::swap::*;
-//use process::{processor, PROCESSOR};
-use process::{process};
-use sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
+use crate::process::{process};
+use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use alloc::collections::VecDeque;
+use lazy_static::*;
+use log::*;
 
 
 pub type MemorySet = MemorySet_<InactivePageTable0>;
@@ -27,7 +27,7 @@ lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
 // record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function
-// after the process is set we can use use processor() to get the inactive page table
+// after the process is set we can use use crate::processor() to get the inactive page table
 lazy_static! {
     pub static ref MEMORY_SET_RECORD: SpinNoIrqLock<VecDeque<usize>> = SpinNoIrqLock::new(VecDeque::default());
 }
@@ -162,7 +162,7 @@ pub fn page_fault_handler(addr: usize) -> bool {
 }
 
 pub fn init_heap() {
-    use consts::KERNEL_HEAP_SIZE;
+    use crate::consts::KERNEL_HEAP_SIZE;
     static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
     unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
     info!("heap init end");

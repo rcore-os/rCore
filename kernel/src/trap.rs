@@ -1,6 +1,7 @@
-use process::*;
-use arch::interrupt::TrapFrame;
-use arch::cpu;
+use crate::process::*;
+use crate::arch::interrupt::TrapFrame;
+use crate::arch::cpu;
+use log::*;
 
 pub static mut TICK: usize = 0;
 
@@ -22,5 +23,5 @@ pub fn error(tf: &TrapFrame) -> ! {
 }
 
 pub fn serial(c: char) {
-    ::fs::STDIN.push(c);
+    crate::fs::STDIN.push(c);
 }

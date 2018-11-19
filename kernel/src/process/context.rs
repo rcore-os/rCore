@@ -1,14 +1,14 @@
-use arch::interrupt::{TrapFrame, Context as ArchContext};
-use memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame};
+use crate::arch::interrupt::{TrapFrame, Context as ArchContext};
+use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0, memory_set_record};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
-use ucore_process::Context;
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
 use ucore_memory::{Page};
-use ::memory::{InactivePageTable0, memory_set_record};
 use ucore_memory::memory_set::*;
+use ucore_process::Context;
 use simple_filesystem::file::File;
 use spin::Mutex;
+use log::*;
 
 
 // TODO: avoid pub
@@ -72,7 +72,7 @@ impl ContextImpl {
         assert_eq!(elf.header.pt2.type_().as_type(), header::Type::Executable, "ELF is not executable");
 
         // User stack
-        use consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
+        use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
         let (ustack_buttom, mut ustack_top) = match is32 {
             true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
             false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),

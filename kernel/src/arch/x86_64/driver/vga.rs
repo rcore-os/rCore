@@ -1,10 +1,11 @@
-use consts::KERNEL_OFFSET;
 use core::ptr::Unique;
 use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
 use x86_64::instructions::port::Port;
-use logging::Color;
+use crate::logging::Color;
+use crate::consts::KERNEL_OFFSET;
+use lazy_static::lazy_static;
 
 pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe {
     Unique::new_unchecked((KERNEL_OFFSET + 0xb8000) as *mut _)

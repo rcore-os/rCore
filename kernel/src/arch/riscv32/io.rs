@@ -1,6 +1,6 @@
 use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
-use super::bbl::sbi;
+use bbl::sbi;
 
 struct SerialPort;
 

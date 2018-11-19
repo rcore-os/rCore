@@ -1,11 +1,12 @@
 use spin::Mutex;
 pub use self::context::ContextImpl;
 pub use ucore_process::*;
-use consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
-use arch::cpu;
+use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
+use crate::arch::cpu;
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
-use sync::Condvar;
+use crate::sync::Condvar;
 use core::sync::atomic::*;
+use log::*;
 
 pub mod context;
 pub fn init() {
@@ -25,7 +26,7 @@ pub fn init() {
     for i in 0..4 {
         manager.add(ContextImpl::new_kernel(idle, i), 0);
     }
-    ::shell::run_user_shell();
+    crate::shell::run_user_shell();
 
     info!("process init end");
 }

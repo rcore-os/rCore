@@ -1,6 +1,6 @@
 use bit_allocator::{BitAlloc, BitAlloc64K};
 // Depends on kernel
-use memory::{active_table, alloc_frame, dealloc_frame};
+use crate::memory::{active_table, alloc_frame, dealloc_frame};
 use spin::{Mutex, MutexGuard};
 use ucore_memory::cow::CowExt;
 use ucore_memory::memory_set::*;
@@ -12,6 +12,7 @@ use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::{Mapper, PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
 use x86_64::ux::u9;
+use log::*;
 
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;

@@ -1,13 +1,11 @@
-use x86_64;
-
 pub mod consts;
 mod handler;
 mod trapframe;
 
 pub use self::trapframe::*;
 pub use self::handler::*;
-use super::apic::*;
-use consts::KERNEL_OFFSET;
+use apic::*;
+use crate::consts::KERNEL_OFFSET;
 
 #[inline(always)]
 pub unsafe fn enable() {

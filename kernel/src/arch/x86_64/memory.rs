@@ -1,10 +1,12 @@
 use bit_allocator::BitAlloc;
-use consts::KERNEL_OFFSET;
+use crate::consts::KERNEL_OFFSET;
 // Depends on kernel
-use memory::{FRAME_ALLOCATOR, init_heap, active_table};
+use crate::memory::{FRAME_ALLOCATOR, init_heap, active_table};
 use super::{BootInfo, MemoryRegionType};
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
+use once::*;
+use log::*;
 
 pub fn init(boot_info: &BootInfo) {
     assert_has_not_been_called!("memory::init must be called only once");

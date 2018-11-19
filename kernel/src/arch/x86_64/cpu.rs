@@ -1,5 +1,5 @@
-use super::apic::{LocalApic, XApic};
-use super::raw_cpuid::CpuId;
+use apic::{LocalApic, XApic};
+use raw_cpuid::CpuId;
 
 /// Exit qemu
 /// See: https://wiki.osdev.org/Shutdown

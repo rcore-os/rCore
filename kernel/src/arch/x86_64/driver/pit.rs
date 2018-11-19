@@ -1,4 +1,6 @@
-use super::redox_syscall::io::{Io, Pio};
+use x86_64::instructions::port::Port;
+use log::*;
+use once::*;
 
 pub fn init() {
     assert_has_not_been_called!("pit::init must be called only once");
@@ -7,26 +9,28 @@ pub fn init() {
 }
 
 struct Pit {
-    chan0: Pio<u8>,
-    chan1: Pio<u8>,
-    chan2: Pio<u8>,
-    command: Pio<u8>,
+    chan0: Port<u8>,
+    chan1: Port<u8>,
+    chan2: Port<u8>,
+    command: Port<u8>,
 }
 
 impl Pit {
     const fn new(port: u16) -> Self {
         Pit {
-            chan0: Pio::new(port),
-            chan1: Pio::new(port+1),
-            chan2: Pio::new(port+2),
-            command: Pio::new(port+3),
+            chan0: Port::new(port),
+            chan1: Port::new(port + 1),
+            chan2: Port::new(port + 2),
+            command: Port::new(port + 3),
         }
     }
     pub fn init(&mut self, freq: u32) {
-        self.command.write(TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-        let div = Pit::divisor(freq);
-        self.chan0.write((div & 0xFF) as u8);
-        self.chan0.write((div >> 8) as u8);
+        unsafe {
+            self.command.write(TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
+            let div = Pit::divisor(freq);
+            self.chan0.write((div & 0xFF) as u8);
+            self.chan0.write((div >> 8) as u8);
+        }
     }
     fn divisor(freq: u32) -> u16 {
         let div = (TIMER_FREQ + freq / 2) / freq;

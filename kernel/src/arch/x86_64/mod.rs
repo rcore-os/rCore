@@ -1,10 +1,7 @@
-extern crate bootloader;
-extern crate apic;
-extern crate raw_cpuid;
-
-use self::bootloader::bootinfo::{BootInfo, MemoryRegionType};
+use bootloader::bootinfo::{BootInfo, MemoryRegionType};
 use core::sync::atomic::*;
-use consts::KERNEL_OFFSET;
+use log::*;
+use crate::consts::KERNEL_OFFSET;
 
 pub mod driver;
 pub mod cpu;
@@ -30,7 +27,7 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     }
 
     // First init log mod, so that we can print log info.
-    ::logging::init();
+    crate::logging::init();
     info!("Hello world!");
     info!("{:#?}", boot_info);
 
@@ -47,11 +44,11 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     driver::init();
 
-    ::process::init();
+    crate::process::init();
 
     AP_CAN_INIT.store(true, Ordering::Relaxed);
 
-    ::kmain();
+    crate::kmain();
 }
 
 /// The entry point for other processors
@@ -59,5 +56,5 @@ fn other_start() -> ! {
     idt::init();
     gdt::init();
     cpu::init();
-    ::kmain();
+    crate::kmain();
 }

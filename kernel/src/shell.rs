@@ -2,8 +2,8 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use fs::{ROOT_INODE, INodeExt};
-use process::*;
+use crate::fs::{ROOT_INODE, INodeExt};
+use crate::process::*;
 
 pub fn run_user_shell() {
     let inode = ROOT_INODE.lookup("sh").unwrap();
@@ -56,5 +56,5 @@ fn get_line() -> String {
 }
 
 fn get_char() -> char {
-    ::fs::STDIN.pop()
+    crate::fs::STDIN.pop()
 }

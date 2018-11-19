@@ -1,4 +1,4 @@
-extern crate syscall as redox_syscall;
+use once::*;
 
 pub mod vga;
 pub mod serial;

@@ -26,7 +26,7 @@
 //! `MutexSupport`提供了若干接口，它们会在操作锁的不同时间点被调用。
 //! 注意这个接口实际是取了几种实现的并集，并不是很通用。
 
-use arch::interrupt;
+use crate::arch::interrupt;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};

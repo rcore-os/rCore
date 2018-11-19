@@ -1,6 +1,3 @@
-extern crate riscv;
-extern crate bbl;
-
 pub mod io;
 pub mod interrupt;
 pub mod timer;
@@ -21,21 +18,21 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
         unreachable!();
     }
 
-    ::logging::init();
+    crate::logging::init();
     interrupt::init();
     memory::init();
     timer::init();
-    ::process::init();
+    crate::process::init();
 
     unsafe { cpu::start_others(hart_mask); }
-    ::kmain();
+    crate::kmain();
 }
 
 fn others_main() -> ! {
     interrupt::init();
     memory::init_other();
     timer::init();
-    ::kmain();
+    crate::kmain();
 }
 
 #[cfg(feature = "no_bbl")]
