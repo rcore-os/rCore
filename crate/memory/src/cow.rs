@@ -206,7 +206,6 @@ impl FrameRcMap {
 
 pub mod test {
     use super::*;
-    use alloc::boxed::Box;
 
     #[test]
     fn test() {

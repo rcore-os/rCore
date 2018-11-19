@@ -1,15 +1,11 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![feature(alloc)]
 #![feature(nll)]
+#![feature(extern_crate_item_prelude)]
 
+// import macros from log
+use log::*;
 extern crate alloc;
-#[macro_use]
-extern crate log;
-
-// To use `println!` in test
-#[cfg(test)]
-#[macro_use]
-extern crate std;
 
 pub mod paging;
 pub mod cow;
@@ -17,4 +13,4 @@ pub mod swap;
 pub mod memory_set;
 mod addr;
 
-pub use addr::*;
+pub use crate::addr::*;

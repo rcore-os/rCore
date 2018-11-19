@@ -10,7 +10,6 @@ use super::*;
 use super::paging::*;
 use super::memory_set::InactivePageTable;
 use super::addr::Frame;
-use alloc::rc::Rc;
 use core::ops::{Deref, DerefMut};
 
 //pub use self::fifo::FifoSwapManager;

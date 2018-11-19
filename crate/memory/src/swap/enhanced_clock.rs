@@ -2,7 +2,7 @@
 
 use alloc::collections::VecDeque;
 use super::*;
-use paging::Entry;
+use crate::paging::Entry;
 
 #[derive(Default)]
 pub struct EnhancedClockSwapManager {

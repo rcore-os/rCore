@@ -4,7 +4,7 @@
 use alloc::vec::Vec;
 use core::fmt::{Debug, Error, Formatter};
 use super::*;
-use paging::*;
+use crate::paging::*;
 
 /// an inactive page table
 /// Note: InactivePageTable is not a PageTable
