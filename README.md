@@ -2,17 +2,25 @@
 
 [![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/wangrunji0408/RustOS)
 
-Rust port for uCore OS, supporting x86_64 and riscv32i.
+Rust version of THU [uCore OS](https://github.com/chyyuu/ucore_os_lab/).
+
+Going to be the next generation teaching operating system.
+
+Support arch: x86_64, RISCV32I, AArch64 (WIP).
 
 [Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
 
 ## Summary
 
-This is a project of THU Operating System (2018 Spring) && Comprehensive Experiment of Computer System (2018 Summer).
+This is a project of THU courses:
 
-Project wiki (internal access only): [OS](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11), [CECS](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
+* Operating System (2018 Spring) 
+* Comprehensive Experiment of Computer System (2018 Summer)
+* Operating System Train (2018 Autumn)
 
-Reports (in Chinese): [MidReport](./docs/MidReport.md), [FinalReport](./docs/FinalReport.md), [RISCV port note](./docs/RISCV.md)
+Project wiki (internal access only): [OS](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11), [CECS](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05), [OST](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2018)
+
+Reports (in Chinese): [docs](./docs)
 
 
 
@@ -24,10 +32,11 @@ In fact, it's more complicated than we expected to write an OS starting from scr
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2018-09-18
+* [Rust](https://www.rust-lang.org) toolchain at nightly
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild), [bootimage](https://github.com/rust-osdev/bootimage)
 * QEMU >= 2.12.0
 * [RISCV64 GNU toolchain](https://www.sifive.com/products/tools/) (for riscv32)
+* [AArch64 GNU toolchain](https://web.stanford.edu/class/cs140e/assignments/0-blinky/) (for aarch64)
 
 ### How to run
 
@@ -39,10 +48,8 @@ cargo install cargo-xbuild bootimage
 ```bash
 git clone https://github.com/wangrunji0408/RustOS.git
 cd RustOS/kernel
-rustup override set nightly-2018-09-18
-make run arch=riscv32|x86_64
-# For FPGA: 
-# make run arch=riscv32 board=1
+rustup override set nightly
+make run arch=riscv32|x86_64|aarch64
 ```
 
 ## License
