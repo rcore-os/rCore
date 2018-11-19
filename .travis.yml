@@ -16,6 +16,7 @@ env:
   matrix:
     - ARCH="riscv32"
     - ARCH="x86_64"
+    - ARCH="aarch64"
 
 install:
   - if [ $ARCH = riscv32 ]; then
@@ -24,6 +25,12 @@ install:
     tar xf $FILE.tar.gz;
     export PATH=$PATH:$PWD/$FILE/bin;
     fi
+  - if [ $ARCH = aarch64 ]; then
+    wget https://web.stanford.edu/class/cs140e/files/aarch64-none-elf-linux-x64.tar.gz;
+    tar -xzvf aarch64-none-elf-linux-x64.tar.gz;
+    export PATH=$PATH:$PWD/aarch64-none-elf/bin;
+    fi
+
 
 before_script:
   - rustup component add rust-src
