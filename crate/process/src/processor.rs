@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use spin::Mutex;
+use log::*;
 use core::cell::UnsafeCell;
-use process_manager::*;
-use interrupt;
+use crate::process_manager::*;
+use crate::interrupt;
 
 /// Process executor
 ///

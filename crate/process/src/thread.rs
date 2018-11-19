@@ -11,9 +11,10 @@ use alloc::collections::BTreeMap;
 use core::marker::PhantomData;
 use core::ptr;
 use core::time::Duration;
-use processor::*;
-use process_manager::*;
-use scheduler::Scheduler;
+use log::*;
+use crate::processor::*;
+use crate::process_manager::*;
+use crate::scheduler::Scheduler;
 
 #[linkage = "weak"]
 #[no_mangle]
