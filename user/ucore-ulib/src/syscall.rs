@@ -44,6 +44,12 @@ fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4:
             : "{rax}" (id), "{rdi}" (arg0), "{rsi}" (arg1), "{rdx}" (arg2), "{rcx}" (arg3), "{r8}" (arg4), "{r9}" (arg5)
             : "memory"
             : "intel" "volatile");
+        #[cfg(target_arch = "aarch64")]
+            asm!("svc 0"
+            : "={x0}" (ret)
+            : "{x8}" (id), "{x0}" (arg0), "{x1}" (arg1), "{x2}" (arg2), "{x3}" (arg3), "{x4}" (arg4), "{x5}" (arg5)
+            : "memory"
+            : "volatile");
     }
     ret
 }
@@ -68,7 +74,7 @@ pub fn sys_open(path: &str, flags: usize) -> i32 {
 }
 
 pub fn sys_close(fd: usize) -> i32 {
-    sys_call(SYS_CLOSE, fd, 0 , 0, 0, 0, 0)
+    sys_call(SYS_CLOSE, fd, 0, 0, 0, 0, 0)
 }
 
 /// Fork the current process. Return the child's PID.

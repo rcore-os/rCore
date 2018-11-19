@@ -1,0 +1,11 @@
+[package]
+name = "bcm2837"
+version = "0.1.0"
+authors = ["equation314 <equation618@gmail.com>"]
+
+[features]
+use_generic_timer = []
+
+[dependencies]
+volatile = "0.2.4"
+cortex-a = "2.2.2"

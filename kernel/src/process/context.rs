@@ -51,6 +51,15 @@ impl ContextImpl {
         })
     }
 
+    pub fn new_user_test(entry: extern fn(usize) -> !) -> Self {
+        let ms = MemorySet::new();
+        let user_stack = ::memory::alloc_stack();
+        Context {
+            arch: unsafe { ArchContext::new_user_thread(entry as usize, user_stack.top - 8, ms.kstack_top(), false, ms.token()) },
+            memory_set: ms,
+        }
+    }
+
     /// Make a new user thread from ELF data
     /*
     * @param:

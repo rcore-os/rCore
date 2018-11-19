@@ -6,3 +6,8 @@ target
 /crate/bbl/Cargo.lock
 /crate/sync/Cargo.lock
 /crate/process/Cargo.lock
+
+.DS_Store
+
+# for eclipse
+.project

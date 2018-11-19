@@ -23,6 +23,10 @@ pub type FrameAlloc = BitAlloc64K;
 #[cfg(target_arch = "riscv32")]
 pub type FrameAlloc = BitAlloc4K;
 
+// Raspberry Pi 3 has 1G memory
+#[cfg(target_arch = "aarch64")]
+pub type FrameAlloc = BitAlloc64K;
+
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
