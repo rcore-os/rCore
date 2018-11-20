@@ -3,11 +3,14 @@ ENTRY(_start)
 SECTIONS {
   . = 0x80000; /* Raspbery Pi 3 Aarch64 (kernel8.img) load address */
 
-  /* start of the binary */
-  _start = .;
+  .boot : {
+    KEEP(*(.text.boot)) /* from boot.S */
+  }
+
+  . = 0x100000; /* Load the kernel at this address. It's also kernel stack top address */
 
   .text : {
-    KEEP(*(.text.boot)) /* from boot.S */
+    *(.text.entry)
     *(.text .text.* .gnu.linkonce.t*)
   }
 
