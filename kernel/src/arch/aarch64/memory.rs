@@ -1,13 +1,9 @@
 //! Memory initialization for aarch64.
 
-use bit_allocator::BitAlloc;
 use ucore_memory::PAGE_SIZE;
-use memory::{FRAME_ALLOCATOR, init_heap};
+use memory::{FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Stack};
 use super::atags::atags::Atags;
-//use super::super::HEAP_ALLOCATOR;
-use aarch64::{barrier, regs::*, addr::*};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
-use core::ops::Range;
+use aarch64::{barrier, regs::*, addr::*, paging::PhysFrame as Frame};
 
 /// Memory initialization.
 pub fn init() {
@@ -25,12 +21,9 @@ pub fn init() {
     init_mmu();
     init_frame_allocator();
     init_heap();
+    remap_the_kernel();
 
     info!("memory: init end");
-}
-
-extern "C" {
-    static _end: u8;
 }
 
 fn init_frame_allocator() {
@@ -96,12 +89,36 @@ fn init_mmu() {
     info!("mmu enabled");
 }
 
+fn remap_the_kernel() {
+    let (bottom, top) = (0, bootstacktop as usize);
+    let kstack = Stack {
+        top,
+        bottom,
+    };
+    static mut SPACE: [u8; 0x1000] = [0; 0x1000];
+    let mut ms = unsafe { MemorySet::new_from_raw_space(&mut SPACE, kstack) };
+    ms.push(MemoryArea::new_identity(bottom, top, MemoryAttr::default(), "kstack"));
+    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
+    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
+    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
+    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
+
+    // ensure the level 2 page table exists
+    ms.push(MemoryArea::new_identity(0x40000000, 0x40200000, MemoryAttr::default(), "arm_control"));
+    super::paging::remap_device_2mib(&mut ms, 0x3F000000, 0x40200000);
+
+    unsafe { ms.activate(); }
+    use core::mem::forget;
+    forget(ms);
+    info!("kernel remap end");
+}
+
 /// Returns the (start address, end address) of the available memory on this
 /// system if it can be determined. If it cannot, `None` is returned.
 ///
 /// This function is expected to return `Some` under all normal cirumstances.
 fn memory_map() -> Option<(usize, usize)> {
-    let binary_end = unsafe { (&_end as *const u8) as u32 };
+    let binary_end = unsafe { _end as u32 };
 
     let mut atags: Atags = Atags::get();
     while let Some(atag) = atags.next() {
@@ -113,3 +130,16 @@ fn memory_map() -> Option<(usize, usize)> {
     None
 }
 
+extern {
+    fn bootstacktop();
+    fn stext();
+    fn etext();
+    fn sdata();
+    fn edata();
+    fn srodata();
+    fn erodata();
+    fn sbss();
+    fn ebss();
+    fn _start();
+    fn _end();
+}

@@ -239,6 +239,45 @@ impl<'a> RecursivePageTable<'a> {
 
         inner(entry, next_table_page, allocator)
     }
+
+    pub fn p3_ptr<S: PageSize>(&self, page: Page<S>) -> *mut PageTable {
+        self.p3_page(page).start_address().as_mut_ptr()
+    }
+
+    pub fn p2_ptr<S: NotGiantPageSize>(&self, page: Page<S>) -> *mut PageTable {
+        self.p2_page(page).start_address().as_mut_ptr()
+    }
+
+    pub fn p1_ptr(&self, page: Page<Size4KiB>) -> *mut PageTable {
+        self.p1_page(page).start_address().as_mut_ptr()
+    }
+
+    fn p3_page<S: PageSize>(&self, page: Page<S>) -> Page {
+        Page::from_page_table_indices(
+            self.recursive_index,
+            self.recursive_index,
+            self.recursive_index,
+            page.p4_index(),
+        )
+    }
+
+    fn p2_page<S: NotGiantPageSize>(&self, page: Page<S>) -> Page {
+        Page::from_page_table_indices(
+            self.recursive_index,
+            self.recursive_index,
+            page.p4_index(),
+            page.p3_index(),
+        )
+    }
+
+    fn p1_page(&self, page: Page<Size4KiB>) -> Page {
+        Page::from_page_table_indices(
+            self.recursive_index,
+            page.p4_index(),
+            page.p3_index(),
+            page.p2_index(),
+        )
+    }
 }
 
 
@@ -253,15 +292,16 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
     where
         A: FrameAllocator<Size4KiB>,
     {
-        let p4 = &mut self.p4;
+        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let p4 = &mut self_mut.p4;
 
-        let p3_page = p3_page(page, self.recursive_index);
+        let p3_page = self.p3_page(page);
         let p3 = unsafe { Self::create_next_table(&mut p4[page.p4_index()], p3_page, allocator)? };
 
-        let p2_page = p2_page(page, self.recursive_index);
+        let p2_page = self.p2_page(page);
         let p2 = unsafe { Self::create_next_table(&mut p3[page.p3_index()], p2_page, allocator)? };
 
-        let p1_page = p1_page(page, self.recursive_index);
+        let p1_page = self.p1_page(page);
         let p1 = unsafe { Self::create_next_table(&mut p2[page.p2_index()], p1_page, allocator)? };
 
         if !p1[page.p1_index()].is_unused() {
@@ -276,28 +316,30 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         &mut self,
         page: Page<Size4KiB>,
     ) -> Result<(PhysFrame<Size4KiB>, MapperFlush<Size4KiB>), UnmapError> {
-        let p4 = &mut self.p4;
+        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let p4 = &mut self_mut.p4;
+
         let p4_entry = &p4[page.p4_index()];
         p4_entry.frame().map_err(|err| match err {
             FrameError::FrameNotPresent => UnmapError::PageNotMapped,
             FrameError::HugeFrame => UnmapError::ParentEntryHugePage,
         })?;
 
-        let p3 = unsafe { &mut *(p3_ptr(page, self.recursive_index)) };
+        let p3 = unsafe { &mut *(self.p3_ptr(page)) };
         let p3_entry = &p3[page.p3_index()];
         p3_entry.frame().map_err(|err| match err {
             FrameError::FrameNotPresent => UnmapError::PageNotMapped,
             FrameError::HugeFrame => UnmapError::ParentEntryHugePage,
         })?;
 
-        let p2 = unsafe { &mut *(p2_ptr(page, self.recursive_index)) };
+        let p2 = unsafe { &mut *(self.p2_ptr(page)) };
         let p2_entry = &p2[page.p2_index()];
         p2_entry.frame().map_err(|err| match err {
             FrameError::FrameNotPresent => UnmapError::PageNotMapped,
             FrameError::HugeFrame => UnmapError::ParentEntryHugePage,
         })?;
 
-        let p1 = unsafe { &mut *(p1_ptr(page, self.recursive_index)) };
+        let p1 = unsafe { &mut *(self.p1_ptr(page)) };
         let p1_entry = &mut p1[page.p1_index()];
 
         let frame = p1_entry.frame().map_err(|err| match err {
@@ -314,25 +356,26 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         page: Page<Size4KiB>,
         flags: PageTableFlags,
     ) -> Result<MapperFlush<Size4KiB>, FlagUpdateError> {
-        let p4 = &mut self.p4;
+        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let p4 = &mut self_mut.p4;
 
         if p4[page.p4_index()].is_unused() {
             return Err(FlagUpdateError::PageNotMapped);
         }
 
-        let p3 = unsafe { &mut *(p3_ptr(page, self.recursive_index)) };
+        let p3 = unsafe { &mut *(self.p3_ptr(page)) };
 
         if p3[page.p3_index()].is_unused() {
             return Err(FlagUpdateError::PageNotMapped);
         }
 
-        let p2 = unsafe { &mut *(p2_ptr(page, self.recursive_index)) };
+        let p2 = unsafe { &mut *(self.p2_ptr(page)) };
 
         if p2[page.p2_index()].is_unused() {
             return Err(FlagUpdateError::PageNotMapped);
         }
 
-        let p1 = unsafe { &mut *(p1_ptr(page, self.recursive_index)) };
+        let p1 = unsafe { &mut *(self.p1_ptr(page)) };
 
         if p1[page.p1_index()].is_unused() {
             return Err(FlagUpdateError::PageNotMapped);
@@ -344,27 +387,28 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
     }
 
     fn translate_page(&self, page: Page<Size4KiB>) -> Option<PhysFrame<Size4KiB>> {
-        let p4 = &self.p4;
+        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let p4 = &mut self_mut.p4;
 
         if p4[page.p4_index()].is_unused() {
             return None;
         }
 
-        let p3 = unsafe { &*(p3_ptr(page, self.recursive_index)) };
+        let p3 = unsafe { &*(self.p3_ptr(page)) };
         let p3_entry = &p3[page.p3_index()];
 
         if p3_entry.is_unused() {
             return None;
         }
 
-        let p2 = unsafe { &*(p2_ptr(page, self.recursive_index)) };
+        let p2 = unsafe { &*(self.p2_ptr(page)) };
         let p2_entry = &p2[page.p2_index()];
 
         if p2_entry.is_unused() {
             return None;
         }
 
-        let p1 = unsafe { &*(p1_ptr(page, self.recursive_index)) };
+        let p1 = unsafe { &*(self.p1_ptr(page)) };
         let p1_entry = &p1[page.p1_index()];
 
         if p1_entry.is_unused() {
@@ -373,43 +417,4 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
 
         PhysFrame::from_start_address(p1_entry.addr()).ok()
     }
-}
-
-fn p3_ptr<S: PageSize>(page: Page<S>, recursive_index: u9) -> *mut PageTable {
-    p3_page(page, recursive_index).start_address().as_mut_ptr()
-}
-
-fn p3_page<S: PageSize>(page: Page<S>, recursive_index: u9) -> Page {
-    Page::from_page_table_indices(
-        recursive_index,
-        recursive_index,
-        recursive_index,
-        page.p4_index(),
-    )
-}
-
-fn p2_ptr<S: NotGiantPageSize>(page: Page<S>, recursive_index: u9) -> *mut PageTable {
-    p2_page(page, recursive_index).start_address().as_mut_ptr()
-}
-
-fn p2_page<S: NotGiantPageSize>(page: Page<S>, recursive_index: u9) -> Page {
-    Page::from_page_table_indices(
-        recursive_index,
-        recursive_index,
-        page.p4_index(),
-        page.p3_index(),
-    )
-}
-
-fn p1_ptr(page: Page<Size4KiB>, recursive_index: u9) -> *mut PageTable {
-    p1_page(page, recursive_index).start_address().as_mut_ptr()
-}
-
-fn p1_page(page: Page<Size4KiB>, recursive_index: u9) -> Page {
-    Page::from_page_table_indices(
-        recursive_index,
-        page.p4_index(),
-        page.p3_index(),
-        page.p2_index(),
-    )
 }

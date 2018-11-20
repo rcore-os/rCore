@@ -166,6 +166,9 @@ impl<T: InactivePageTable> MemorySet<T> {
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
     }
+    pub fn edit(&mut self, f: impl FnOnce(&mut T::Active)) {
+        self.page_table.edit(f);
+    }
     pub unsafe fn with(&self, f: impl FnOnce()) {
         self.page_table.with(f);
     }

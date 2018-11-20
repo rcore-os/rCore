@@ -8,8 +8,7 @@ use ucore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, ttbr0_el1_read, ttbr0_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
-use aarch64::{regs::*};
+use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB, Size2MiB};
 
 register_bitfields! {u64,
     // AArch64 Reference Manual page 2150
@@ -61,6 +60,11 @@ register_bitfields! {u64,
     ]
 }
 
+mod mair {
+    pub const NORMAL: u64 = 0;
+    pub const DEVICE: u64 = 1;
+}
+
 // need 3 page
 pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
     let p4 = unsafe { &mut *(frame_lvl4.start_address().as_u64() as *mut Aarch64PageTable) };
@@ -69,11 +73,6 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     p4.zero();
     p3.zero();
     p2.zero();
-
-    mod mair {
-        pub const NORMAL: u64 = 0;
-        pub const DEVICE: u64 = 1;
-    }
 
     // Fill the rest of the LVL2 (2MiB) entries as block
     // descriptors. Differentiate between normal and device mem.
@@ -129,28 +128,37 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     info!("setup init page table end");
 }
 
-pub trait PageExt {
-    fn of_addr(address: usize) -> Self;
-    fn range_of(begin: usize, end: usize) -> PageRange;
-}
+/// map the range [start, end) as device memory, insert to the MemorySet
+pub fn remap_device_2mib(ms: &mut MemorySet<InactivePageTable0>, start_addr: usize, end_addr: usize) {
+    ms.edit(|active_table| {
+        let common = STAGE1_DESCRIPTOR::VALID::True
+            + STAGE1_DESCRIPTOR::TYPE::Block
+            + STAGE1_DESCRIPTOR::AP::RW_EL1
+            + STAGE1_DESCRIPTOR::AF::True
+            + STAGE1_DESCRIPTOR::XN::True;
 
-impl PageExt for Page {
-    fn of_addr(address: usize) -> Self {
-        Page::containing_address(VirtAddr::new(address as u64))
-    }
-    fn range_of(begin: usize, end: usize) -> PageRange {
-        Page::range(Page::of_addr(begin), Page::of_addr(end - 1) + 1)
-    }
-}
+        let mem_attr = STAGE1_DESCRIPTOR::SH::OuterShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE);
 
-pub trait FrameExt {
-    fn of_addr(address: usize) -> Self;
-}
+        type Page2MiB = Page<Size2MiB>;
+        for page in Page2MiB::range_of(start_addr, end_addr) {
+            let p2 = unsafe { &mut *active_table.0.p2_ptr(page) };
+            p2[page.p2_index()].entry = (common + mem_attr + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KiB.val(page.start_address().as_u64() >> 21)).value;
+        }
 
-impl FrameExt for Frame {
-    fn of_addr(address: usize) -> Self {
-        Frame::containing_address(PhysAddr::new(address as u64))
-    }
+        // let p2 = unsafe { &mut *(0o777_777_000_000_0000 as *mut Aarch64PageTable) };
+        // for i in 0..512 {
+        //     if p2[i].flags().bits() != 0 {
+        //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
+        //     }
+        // }
+
+        // let p2 = unsafe { &mut *(0o777_777_000_001_0000 as *mut Aarch64PageTable) };
+        // for i in 0..512 {
+        //     if p2[i].flags().bits() != 0 {
+        //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
+        //     }
+        // }
+    });
 }
 
 pub struct ActivePageTable(RecursivePageTable<'static>);
