@@ -9,9 +9,23 @@ use spin::Mutex;
 global_asm!(r#"
     .section .rodata
     .align 12
-_binary_user_riscv_img_start:
+    .global _user_img_start
+    .global _user_img_end
+_user_img_start:
     .incbin "../user/user-riscv.img"
-_binary_user_riscv_img_end:
+_user_img_end:
+"#);
+
+// Hard link user program
+#[cfg(target_arch = "aarch64")]
+global_asm!(r#"
+    .section .rodata
+    .align 12
+    .global _user_img_start
+    .global _user_img_end
+_user_img_start:
+    .incbin "../user/user-riscv.img"
+_user_img_end:
 "#);
 
 const LOGO: &str = r#"
@@ -85,21 +99,17 @@ pub fn test_shell(prefix: &str) -> ! {
 pub fn shell() {
     show_logo();
 
-    #[cfg(target_arch = "riscv32")]
+    #[cfg(any(target_arch = "riscv32", target_arch = "aarch64"))]
     let device = {
         extern {
-            fn _binary_user_riscv_img_start();
-            fn _binary_user_riscv_img_end();
+            fn _user_img_start();
+            fn _user_img_end();
         }
-        Box::new(unsafe { MemBuf::new(_binary_user_riscv_img_start, _binary_user_riscv_img_end) })
+        Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
     };
 
     #[cfg(target_arch = "x86_64")]
     let device = Box::new(&ide::DISK1);
-
-    #[cfg(target_arch = "aarch64")]
-    // TODO
-    let device: Box<dyn Device> = unimplemented!();
 
     let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
     let root = sfs.root_inode();
