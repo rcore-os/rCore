@@ -1,4 +1,4 @@
-use syscall::sys_exit;
+use crate::syscall::sys_exit;
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 
@@ -17,7 +17,7 @@ pub extern fn _start(_argc: isize, _argv: *const *const u8) -> ! {
 #[lang = "eh_personality"]
 fn eh_personality() {}
 
-#[panic_implementation]
+#[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     let location = info.location().unwrap();
     let message = info.message().unwrap();

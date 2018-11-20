@@ -38,4 +38,5 @@ before_script:
   - (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage)
 
 script:
-  - cd kernel && make build arch=$ARCH
+  - cd kernel && make build arch=$ARCH && cd ..
+  - cd user && make arch=$ARCH
