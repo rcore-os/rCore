@@ -4,12 +4,13 @@ use regs::*;
 
 #[inline(always)]
 pub fn tlb_invalidate() {
-    unsafe{
-        asm!("dsb ishst
-              tlbi vmalle1is
-              dsb ish
-              tlbi vmalle1is
-              isb");
+    unsafe {
+        asm!(
+            "dsb ishst
+             tlbi vmalle1is
+             dsb ish
+             isb"
+        );
     }
 }
 
@@ -63,6 +64,15 @@ pub unsafe fn get_ttbr1() -> usize {
     ttbr0
 }
 
+#[inline(always)]
+pub fn address_translate(vaddr: usize) -> usize {
+    let paddr: usize;
+    unsafe {
+        asm!("at S1E1R, $1; mrs $0, par_el1" : "=r"(paddr) : "r"(vaddr));
+    }
+    paddr
+}
+
 /// Returns the SPSel value.
 #[inline(always)]
 pub fn sp_sel() -> u8 {
@@ -93,7 +103,6 @@ pub fn wfi() {
         asm!("wfi" :::: "volatile");
     }
 }
-
 
 /// The classic no-op
 #[inline]
@@ -142,7 +151,7 @@ pub fn eret() -> ! {
 bitflags! {
     /// Controls cache settings for the level 4 page table.
     pub struct ttbr0_el1_Flags: u64 {
-        
+
         const COMMON_NOT_PRIVATE = 1 << 0;
     }
 }
@@ -150,7 +159,7 @@ bitflags! {
 pub fn ttbr0_el1_read() -> (PhysFrame, ttbr0_el1_Flags) {
     let value = TTBR0_EL1.get();
     let flags = ttbr0_el1_Flags::from_bits_truncate(value);
-    let addr = PhysAddr::new(value & 0x_000f_ffff_ffff_f000);
+    let addr = PhysAddr::new(value & 0x_0000_ffff_ffff_f000);
     let frame = PhysFrame::containing_address(addr);
     (frame, flags)
 }

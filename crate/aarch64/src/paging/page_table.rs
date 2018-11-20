@@ -21,7 +21,7 @@ pub enum FrameError {
 #[derive(Clone)]
 #[repr(transparent)]
 pub struct PageTableEntry {
-    entry: u64,
+    pub entry: u64,
 }
 
 impl PageTableEntry {
@@ -42,7 +42,7 @@ impl PageTableEntry {
 
     /// Returns the physical address mapped by this entry, might be zero.
     pub fn addr(&self) -> PhysAddr {
-        PhysAddr::new(self.entry & 0x000fffff_fffff000)
+        PhysAddr::new(self.entry & 0x0000_ffff_ffff_f000)
     }
 
     /// Returns the physical frame mapped by this entry.
@@ -83,6 +83,7 @@ impl PageTableEntry {
 impl fmt::Debug for PageTableEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut f = f.debug_struct("PageTableEntry");
+        f.field("value", &self.entry);
         f.field("addr", &self.addr());
         f.field("flags", &self.flags());
         f.finish()
@@ -94,9 +95,11 @@ bitflags! {
     pub struct PageTableFlags: u64 {
         const ALL =             0xffffffff_ffffffff;
         const TYPE_MASK =       3 << 0;
-        const TYPE_FAULT =      0 << 0;
+        // const TYPE_FAULT =      0 << 0;
         const TYPE_PAGE =       3 << 0;
         const TABLE_BIT =       1 << 1;
+        // const BLOCK_BIT =       0 << 1;
+        const PAGE_BIT =        1 << 1;
 
         const PRESENT =         1 << 0;
         const USER_ACCESSIBLE = 1 << 6;         /* AP[1] */

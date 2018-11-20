@@ -38,10 +38,11 @@ pub struct Info {
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
-    let syndrome = Syndrome::from(esr);
-    trace!("Interrupt: {:?} from: {:?}", syndrome, info);
+    trace!("Interrupt: {:?}, ELR: {:#x?}", info, tf.elr);
     match info.kind {
         Kind::Synchronous => {
+            let syndrome = Syndrome::from(esr);
+            trace!("ESR: {:#x?}, Syndrome: {:?}", esr, syndrome);
             // syndrome is only valid with sync
             match syndrome {
                 Syndrome::Brk(brk) => handle_break(brk, tf),

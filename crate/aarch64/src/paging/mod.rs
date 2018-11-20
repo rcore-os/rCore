@@ -34,34 +34,12 @@ pub trait NotGiantPageSize: PageSize {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Size4KiB {}
 
-/// A “huge” 2MiB page.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Size2MiB {}
-
-/// A “giant” 1GiB page.
-///
-/// (Only available on newer x86_64 CPUs.)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Size1GiB {}
-
 impl PageSize for Size4KiB {
     const SIZE: u64 = 4096;
     const SIZE_AS_DEBUG_STR: &'static str = "4KiB";
 }
 
 impl NotGiantPageSize for Size4KiB {}
-
-impl PageSize for Size2MiB {
-    const SIZE: u64 = Size4KiB::SIZE * 512;
-    const SIZE_AS_DEBUG_STR: &'static str = "2MiB";
-}
-
-impl NotGiantPageSize for Size2MiB {}
-
-impl PageSize for Size1GiB {
-    const SIZE: u64 = Size2MiB::SIZE * 512;
-    const SIZE_AS_DEBUG_STR: &'static str = "1GiB";
-}
 
 /// A virtual memory page.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -125,31 +103,6 @@ impl<S: NotGiantPageSize> Page<S> {
     /// Returns the level 2 page table index of this page.
     pub fn p2_index(&self) -> u9 {
         self.start_address().p2_index()
-    }
-}
-
-impl Page<Size1GiB> {
-    /// Returns the 1GiB memory page with the specified page table indices.
-    pub fn from_page_table_indices_1gib(p4_index: u9, p3_index: u9) -> Self {
-        use bit_field::BitField;
-
-        let mut addr = 0;
-        addr.set_bits(39..48, u64::from(p4_index));
-        addr.set_bits(30..39, u64::from(p3_index));
-        Page::containing_address(VirtAddr::new(addr))
-    }
-}
-
-impl Page<Size2MiB> {
-    /// Returns the 2MiB memory page with the specified page table indices.
-    pub fn from_page_table_indices_2mib(p4_index: u9, p3_index: u9, p2_index: u9) -> Self {
-        use bit_field::BitField;
-
-        let mut addr = 0;
-        addr.set_bits(39..48, u64::from(p4_index));
-        addr.set_bits(30..39, u64::from(p3_index));
-        addr.set_bits(21..30, u64::from(p2_index));
-        Page::containing_address(VirtAddr::new(addr))
     }
 }
 
@@ -242,16 +195,6 @@ impl<S: PageSize> Iterator for PageRange<S> {
             Some(page)
         } else {
             None
-        }
-    }
-}
-
-impl PageRange<Size2MiB> {
-    /// Converts the range of 2MiB pages to a range of 4KiB pages.
-    pub fn as_4kib_page_range(self) -> PageRange<Size4KiB> {
-        PageRange {
-            start: Page::containing_address(self.start.start_address()),
-            end: Page::containing_address(self.end.start_address()),
         }
     }
 }

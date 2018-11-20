@@ -11,64 +11,55 @@ use core::ops::Range;
 
 /// Memory initialization.
 pub fn init() {
-    /*let (start, end) = memory_map().expect("failed to find memory map");
-    unsafe {
-        HEAP_ALLOCATOR.lock().init(start, end - start);
-    }*/
-
-
-
     #[repr(align(4096))]
     struct PageData([u8; PAGE_SIZE]);
-    static PAGE_TABLE_ROOT: PageData = PageData([0; PAGE_SIZE]);
+    static PAGE_TABLE_LVL4: PageData = PageData([0; PAGE_SIZE]);
+    static PAGE_TABLE_LVL3: PageData = PageData([0; PAGE_SIZE]);
+    static PAGE_TABLE_LVL2: PageData = PageData([0; PAGE_SIZE]);
 
-    let frame = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as u64));
-    super::paging::setup_page_table(frame);
+    let frame_lvl4 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL4 as *const _ as u64));
+    let frame_lvl3 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL3 as *const _ as u64));
+    let frame_lvl2 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL2 as *const _ as u64));
+    super::paging::setup_page_table(frame_lvl4, frame_lvl3, frame_lvl2);
 
     init_mmu();
-
     init_frame_allocator();
     init_heap();
 
-    let (start, end) = memory_map().expect("failed to find memory map");
-    let mut v = vec![];
-    for i in 0..(20 + (start & 0xf)) {
-       v.push(i);
-       println!("{:x?} {:x?}", &v[i] as * const _ as usize, v);
-    }
-
+    info!("memory: init end");
 }
 
 extern "C" {
     static _end: u8;
 }
 
-
 fn init_frame_allocator() {
+    use bit_allocator::BitAlloc;
+    use core::ops::Range;
     use consts::{MEMORY_OFFSET};
-    let (start, end) = memory_map().expect("failed to find memory map");
-    info!("{:x?} {:x?}", start, end);
 
+    let (start, end) = memory_map().expect("failed to find memory map");
     let mut ba = FRAME_ALLOCATOR.lock();
-    use core::mem::size_of;
-    use ::memory::FrameAlloc;
-    info!("{:x?} {:x?}", &FRAME_ALLOCATOR as *const _ as usize, size_of::<FrameAlloc>());
-    use consts::{KERNEL_HEAP_OFFSET, KERNEL_HEAP_SIZE};
-    info!("{:x?} {:x?}", KERNEL_HEAP_OFFSET + KERNEL_HEAP_SIZE, end);
     ba.insert(to_range(start, end));
     info!("FrameAllocator init end");
 
+    /*
+    * @param:
+    *   start: start address
+    *   end: end address
+    * @brief:
+    *   transform the memory address to the page number
+    * @retval:
+    *   the page number range from start address to end address
+    */
     fn to_range(start: usize, end: usize) -> Range<usize> {
         let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
         let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;
-        // info!("{:x?} {:x?}", page_start, page_end);
         page_start..page_end
     }
 }
 
 fn init_mmu() {
-    info!("init_mmu");
-
     // device.
     MAIR_EL1.write(
         // Attribute 1
@@ -80,7 +71,6 @@ fn init_mmu() {
     );
     // Configure various settings of stage 1 of the EL1 translation regime.
     let ips = ID_AA64MMFR0_EL1.read(ID_AA64MMFR0_EL1::PARange);
-    info!("{:x?}", ips);
     TCR_EL1.write(
         TCR_EL1::TBI0::Ignored
             + TCR_EL1::IPS.val(ips)
@@ -97,21 +87,20 @@ fn init_mmu() {
     // First, force all previous changes to be seen before the MMU is enabled.
     unsafe { barrier::isb(barrier::SY); }
 
-    info!("{:x?}", TCR_EL1.get());
     // Enable the MMU and turn on data and instruction caching.
     SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
 
     // Force MMU init to complete before next instruction
     unsafe { barrier::isb(barrier::SY); }
 
-    info!("mmu enabled!");
+    info!("mmu enabled");
 }
 
 /// Returns the (start address, end address) of the available memory on this
 /// system if it can be determined. If it cannot, `None` is returned.
 ///
 /// This function is expected to return `Some` under all normal cirumstances.
-pub fn memory_map() -> Option<(usize, usize)> {
+fn memory_map() -> Option<(usize, usize)> {
     let binary_end = unsafe { (&_end as *const u8) as u32 };
 
     let mut atags: Atags = Atags::get();

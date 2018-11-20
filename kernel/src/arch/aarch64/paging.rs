@@ -1,6 +1,6 @@
 //! Page table implementations for aarch64.
-use bit_allocator::{BitAlloc};
 // Depends on kernel
+use consts::{KERNEL_PML4, RECURSIVE_INDEX};
 use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
@@ -11,29 +11,121 @@ use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, Pag
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
 use aarch64::{regs::*};
 
-// need 1 page
-pub fn setup_page_table(frame: Frame) {
-    let p4 = unsafe { &mut *(frame.start_address().as_u64() as *mut Aarch64PageTable) };
+register_bitfields! {u64,
+    // AArch64 Reference Manual page 2150
+    STAGE1_DESCRIPTOR [
+        /// Execute-never
+        XN       OFFSET(54) NUMBITS(1) [
+            False = 0,
+            True = 1
+        ],
+
+        /// Various address fields, depending on use case
+        LVL4_OUTPUT_ADDR_4KiB    OFFSET(39) NUMBITS(9) [], // [47:39]
+        LVL3_OUTPUT_ADDR_4KiB    OFFSET(30) NUMBITS(18) [], // [47:30]
+        LVL2_OUTPUT_ADDR_4KiB    OFFSET(21) NUMBITS(27) [], // [47:21]
+        NEXT_LVL_TABLE_ADDR_4KiB OFFSET(12) NUMBITS(36) [], // [47:12]
+
+        /// Access flag
+        AF       OFFSET(10) NUMBITS(1) [
+            False = 0,
+            True = 1
+        ],
+
+        /// Shareability field
+        SH       OFFSET(8) NUMBITS(2) [
+            OuterShareable = 0b10,
+            InnerShareable = 0b11
+        ],
+
+        /// Access Permissions
+        AP       OFFSET(6) NUMBITS(2) [
+            RW_EL1 = 0b00,
+            RW_EL1_EL0 = 0b01,
+            RO_EL1 = 0b10,
+            RO_EL1_EL0 = 0b11
+        ],
+
+        /// Memory attributes index into the MAIR_EL1 register
+        AttrIndx OFFSET(2) NUMBITS(3) [],
+
+        TYPE     OFFSET(1) NUMBITS(1) [
+            Block = 0,
+            Table = 1
+        ],
+
+        VALID    OFFSET(0) NUMBITS(1) [
+            False = 0,
+            True = 1
+        ]
+    ]
+}
+
+// need 3 page
+pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
+    let p4 = unsafe { &mut *(frame_lvl4.start_address().as_u64() as *mut Aarch64PageTable) };
+    let p3 = unsafe { &mut *(frame_lvl3.start_address().as_u64() as *mut Aarch64PageTable) };
+    let p2 = unsafe { &mut *(frame_lvl2.start_address().as_u64() as *mut Aarch64PageTable) };
     p4.zero();
+    p3.zero();
+    p2.zero();
 
+    mod mair {
+        pub const NORMAL: u64 = 0;
+        pub const DEVICE: u64 = 1;
+    }
 
-    // p4.set_recursive(RECURSIVE_PAGE_PML4, frame.clone());
+    // Fill the rest of the LVL2 (2MiB) entries as block
+    // descriptors. Differentiate between normal and device mem.
+    const MMIO_BASE: u64 = 0x3F000000;
+    let mmio_base: u64 = MMIO_BASE >> 21;
+    let mut common = STAGE1_DESCRIPTOR::VALID::True
+        + STAGE1_DESCRIPTOR::TYPE::Block
+        + STAGE1_DESCRIPTOR::AP::RW_EL1
+        + STAGE1_DESCRIPTOR::AF::True;
+        // + STAGE1_DESCRIPTOR::XN::True;
 
-    // Set kernel identity map
-    // 0x10000000 ~ 1K area
-    p4.map_identity(0o777, EF::PRESENT | EF::PXN | EF::UXN);
+    for i in 0..512 {
+        let j: u64 = i as u64;
 
-    // 0x80000000 ~ 8K area
-    p4.map_identity(0, EF::PRESENT);
-    // p2.map_identity(KERNEL_PML4, EF::PRESENT | EF::READABLE | EF::WRITABLE);
-    // p2.map_identity(KERNEL_PML4 + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
+        let mem_attr = if j >= mmio_base {
+            STAGE1_DESCRIPTOR::SH::OuterShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE)
+        } else {
+            STAGE1_DESCRIPTOR::SH::InnerShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL)
+        };
 
-    // use super::riscv::register::satp;
-    // unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
-    // sfence_vma_all();
+        p2[i].entry = (common + mem_attr + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KiB.val(j)).value;
+    }
 
-    ttbr0_el1_write(frame);
+    common = common + STAGE1_DESCRIPTOR::SH::InnerShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL);
+
+    p3[0].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl2.start_address().as_u64() >> 12)).value;
+    p3[1].entry = (common + STAGE1_DESCRIPTOR::LVL3_OUTPUT_ADDR_4KiB.val(1)).value;
+    p4[0].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl3.start_address().as_u64() >> 12)).value;
+    p4[RECURSIVE_INDEX].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl4.start_address().as_u64() >> 12)).value;
+
+    // warn!("p2");
+    // for i in 0..512 {
+    //     if p2[i].flags().bits() != 0 {
+    //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
+    //     }
+    // }
+    // warn!("p3");
+    // for i in 0..512 {
+    //     if p3[i].flags().bits() != 0 {
+    //         info!("{:x?} {:x?} {:x?}",i, &p3[i] as *const _ as usize, p3[i]);
+    //     }
+    // }
+    // warn!("p4");
+    // for i in 0..512 {
+    //     if p4[i].flags().bits() != 0 {
+    //         info!("{:x?} {:x?} {:x?}",i, &p4[i] as *const _ as usize, p4[i]);
+    //     }
+    // }
+
+    ttbr0_el1_write(frame_lvl4);
     tlb_invalidate();
+
     info!("setup init page table end");
 }
 
@@ -69,7 +161,7 @@ impl PageTable for ActivePageTable {
     type Entry = PageEntry;
 
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
-        let flags = EF::PRESENT | EF::WRITE | EF::UXN;
+        let flags = EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::UXN | EF::PAGE_BIT;
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
         self.get_entry(addr)
@@ -81,7 +173,7 @@ impl PageTable for ActivePageTable {
     }
 
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
-        let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
+        let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39);
         unsafe { &mut *(entry_addr as *mut PageEntry) }
     }
 
@@ -99,9 +191,12 @@ impl PageTable for ActivePageTable {
     }
 }
 
+const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
+    ((RECURSIVE_INDEX << 39) | (RECURSIVE_INDEX << 30) | (RECURSIVE_INDEX << 21) | (RECURSIVE_INDEX << 12)) as *mut Aarch64PageTable;
+
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *(0xffff_ffff_ffff_f000 as *mut _)).unwrap())
+        ActivePageTable(RecursivePageTable::new(&mut *(ROOT_PAGE_TABLE as *mut _)).unwrap())
     }
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut Aarch64PageTable)) {
         // Create a temporary page
@@ -161,7 +256,7 @@ impl Entry for PageEntry {
             let mut addr = self as *const _ as usize;
             for _ in 0..3 {
                 // Upper level entry
-                addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
+                addr = ((addr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39);
                 // set USER_ACCESSIBLE
                 unsafe { (*(addr as *mut EF)).insert(EF::USER_ACCESSIBLE) };
             }
@@ -200,24 +295,24 @@ impl InactivePageTable for InactivePageTable0 {
         active_table().with_temporary_map(&frame, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
-            table[511].set_frame(frame.clone(), EF::PRESENT | EF::WRITE);
+            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::PAGE_BIT);
         });
         InactivePageTable0 { p4_frame: frame }
     }
 
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
         active_table().with_temporary_map(&ttbr0_el1_read().0, |active_table, p4_table: &mut Aarch64PageTable| {
-            let backup = p4_table[0o777].clone();
+            let backup = p4_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
-            p4_table[0o777].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITE);
+            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::PAGE_BIT);
             tlb_invalidate();
 
             // execute f in the new context
             f(active_table);
 
             // restore recursive mapping to original p4 table
-            p4_table[0o777] = backup;
+            p4_table[RECURSIVE_INDEX] = backup;
             tlb_invalidate();
         });
     }
@@ -228,6 +323,7 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(new_frame);
+            tlb_invalidate();
         }
     }
 
@@ -237,11 +333,13 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(new_frame);
+            tlb_invalidate();
         }
         f();
         debug!("switch table {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(old_frame);
+            tlb_invalidate();
         }
     }
 
@@ -264,13 +362,12 @@ impl InactivePageTable for InactivePageTable0 {
 
 impl InactivePageTable0 {
     fn map_kernel(&mut self) {
-        let mut table = unsafe { &mut *(0xffff_ffff_ffff_f000 as *mut Aarch64PageTable) };
-        // Kernel at 0xffff_ff00_0000_0000
-        // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
-        let e0 = table[0].clone();
+        let table = unsafe { &mut *ROOT_PAGE_TABLE };
+        let e0 = table[KERNEL_PML4].clone();
+        assert!(!e0.is_unused());
+
         self.edit(|_| {
-            table[0].set_addr(e0.addr(), e0.flags() & EF::GLOBAL);
-            //table[175].set_addr(estack.addr(), estack.flags() & EF::GLOBAL);
+            table[KERNEL_PML4].set_addr(e0.addr(), e0.flags() & EF::GLOBAL);
         });
     }
 }

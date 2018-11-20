@@ -17,6 +17,8 @@ halt:
 setup:
     # store the desired EL1 stack pointer in x1
     adr     x1, _start
+    # FIXME
+    lsl     x1, x1, #2
 
     # use SP_ELx for Exception level ELx
     msr     SPsel, #1
