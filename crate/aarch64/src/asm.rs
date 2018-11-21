@@ -1,15 +1,27 @@
 use paging::PhysFrame;
-use addr::PhysAddr;
+use addr::{PhysAddr, VirtAddr};
 use regs::*;
 
 #[inline(always)]
-pub fn tlb_invalidate() {
+pub fn tlb_invalidate_all() {
     unsafe {
         asm!(
             "dsb ishst
              tlbi vmalle1is
              dsb ish
              isb"
+        );
+    }
+}
+
+#[inline(always)]
+pub fn tlb_invalidate(vaddr: VirtAddr) {
+    unsafe {
+        asm!(
+            "dsb ishst
+             tlbi vaae1is, $0
+             dsb ish
+             isb" :: "r"(vaddr.as_u64() >> 12)
         );
     }
 }

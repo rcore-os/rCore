@@ -28,7 +28,7 @@ impl<S: PageSize> MapperFlush<S> {
 
     /// Flush the page from the TLB to ensure that the newest mapping is used.
     pub fn flush(self) {
-        tlb_invalidate();
+        tlb_invalidate(self.0.start_address());
     }
 
     /// Don't flush the TLB and silence the “must be used” warning.
@@ -232,6 +232,7 @@ impl<'a> RecursivePageTable<'a> {
             let page_table_ptr = next_table_page.start_address().as_mut_ptr();
             let page_table: &mut PageTable = unsafe { &mut *(page_table_ptr) };
             if created {
+                tlb_invalidate(next_table_page.start_address());
                 page_table.zero();
             }
             Ok(page_table)

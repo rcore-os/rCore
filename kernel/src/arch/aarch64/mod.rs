@@ -17,9 +17,13 @@ pub use self::board::timer;
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main() -> ! {
+    // Enable mmu and paging
+    memory::init_mmu_early();
+
     // Init board to enable serial port.
     board::init();
-    ::logging::init(); // FIXME
+
+    ::logging::init();
     interrupt::init();
     memory::init();
     timer::init();

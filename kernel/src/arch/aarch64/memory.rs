@@ -7,6 +7,14 @@ use aarch64::{barrier, regs::*, addr::*, paging::PhysFrame as Frame};
 
 /// Memory initialization.
 pub fn init() {
+    init_frame_allocator();
+    init_heap();
+    remap_the_kernel();
+    info!("memory: init end");
+}
+
+/// initialize temporary paging and enable mmu immediately after boot. Serial port is disabled at this time.
+pub fn init_mmu_early() {
     #[repr(align(4096))]
     struct PageData([u8; PAGE_SIZE]);
     static PAGE_TABLE_LVL4: PageData = PageData([0; PAGE_SIZE]);
@@ -18,41 +26,6 @@ pub fn init() {
     let frame_lvl2 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL2 as *const _ as u64));
     super::paging::setup_page_table(frame_lvl4, frame_lvl3, frame_lvl2);
 
-    init_mmu();
-    init_frame_allocator();
-    init_heap();
-    remap_the_kernel();
-
-    info!("memory: init end");
-}
-
-fn init_frame_allocator() {
-    use bit_allocator::BitAlloc;
-    use core::ops::Range;
-    use consts::{MEMORY_OFFSET};
-
-    let (start, end) = memory_map().expect("failed to find memory map");
-    let mut ba = FRAME_ALLOCATOR.lock();
-    ba.insert(to_range(start, end));
-    info!("FrameAllocator init end");
-
-    /*
-    * @param:
-    *   start: start address
-    *   end: end address
-    * @brief:
-    *   transform the memory address to the page number
-    * @retval:
-    *   the page number range from start address to end address
-    */
-    fn to_range(start: usize, end: usize) -> Range<usize> {
-        let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
-        let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;
-        page_start..page_end
-    }
-}
-
-fn init_mmu() {
     // device.
     MAIR_EL1.write(
         // Attribute 1
@@ -85,10 +58,35 @@ fn init_mmu() {
 
     // Force MMU init to complete before next instruction
     unsafe { barrier::isb(barrier::SY); }
-
-    info!("mmu enabled");
 }
 
+fn init_frame_allocator() {
+    use bit_allocator::BitAlloc;
+    use core::ops::Range;
+    use consts::{MEMORY_OFFSET};
+
+    let (start, end) = memory_map().expect("failed to find memory map");
+    let mut ba = FRAME_ALLOCATOR.lock();
+    ba.insert(to_range(start, end));
+    info!("FrameAllocator init end");
+
+    /*
+    * @param:
+    *   start: start address
+    *   end: end address
+    * @brief:
+    *   transform the memory address to the page number
+    * @retval:
+    *   the page number range from start address to end address
+    */
+    fn to_range(start: usize, end: usize) -> Range<usize> {
+        let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
+        let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;
+        page_start..page_end
+    }
+}
+
+/// remap kernel page table after all initialization.
 fn remap_the_kernel() {
     let (bottom, top) = (0, bootstacktop as usize);
     let kstack = Stack {

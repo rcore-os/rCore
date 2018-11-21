@@ -5,7 +5,7 @@ use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
-use aarch64::asm::{tlb_invalidate, ttbr0_el1_read, ttbr0_el1_write};
+use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr0_el1_read, ttbr0_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB, Size2MiB};
@@ -123,9 +123,7 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     // }
 
     ttbr0_el1_write(frame_lvl4);
-    tlb_invalidate();
-
-    info!("setup init page table end");
+    tlb_invalidate_all();
 }
 
 /// map the range [start, end) as device memory, insert to the MemorySet
@@ -222,7 +220,8 @@ impl ActivePageTable {
 
 impl Entry for PageEntry {
     fn update(&mut self) {
-        tlb_invalidate();
+        let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
+        tlb_invalidate(addr);
     }
 
     fn present(&self) -> bool { self.0.flags().contains(EF::PRESENT) }
@@ -314,14 +313,14 @@ impl InactivePageTable for InactivePageTable0 {
 
             // overwrite recursive mapping
             p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::PAGE_BIT);
-            tlb_invalidate();
+            tlb_invalidate_all();
 
             // execute f in the new context
             f(active_table);
 
             // restore recursive mapping to original p4 table
             p4_table[RECURSIVE_INDEX] = backup;
-            tlb_invalidate();
+            tlb_invalidate_all();
         });
     }
 
@@ -331,7 +330,7 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(new_frame);
-            tlb_invalidate();
+            tlb_invalidate_all();
         }
     }
 
@@ -341,13 +340,13 @@ impl InactivePageTable for InactivePageTable0 {
         debug!("switch table {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(new_frame);
-            tlb_invalidate();
+            tlb_invalidate_all();
         }
         f();
         debug!("switch table {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
             ttbr0_el1_write(old_frame);
-            tlb_invalidate();
+            tlb_invalidate_all();
         }
     }
 
