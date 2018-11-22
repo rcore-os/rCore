@@ -38,14 +38,25 @@ pub fn init_mmu_early() {
     // Configure various settings of stage 1 of the EL1 translation regime.
     let ips = ID_AA64MMFR0_EL1.read(ID_AA64MMFR0_EL1::PARange);
     TCR_EL1.write(
-        TCR_EL1::TBI0::Ignored
-            + TCR_EL1::IPS.val(ips)
-            + TCR_EL1::TG0::KiB_4 // 4 KiB granule
-            + TCR_EL1::SH0::Inner
-            + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
-            + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
-            + TCR_EL1::EPD0::EnableTTBR0Walks
-            + TCR_EL1::T0SZ.val(16), // Start walks at level 2
+        TCR_EL1::TBI1::Ignored +
+        TCR_EL1::TBI0::Ignored +
+        TCR_EL1::AS::Bits_16 +
+        TCR_EL1::IPS.val(ips) +
+
+        TCR_EL1::TG1::KiB_4 +
+        TCR_EL1::SH1::Inner +
+        TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
+        TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
+        TCR_EL1::EPD1::EnableTTBR1Walks +
+        TCR_EL1::A1::UseTTBR1ASID +
+        TCR_EL1::T1SZ.val(16) +
+
+        TCR_EL1::TG0::KiB_4 +
+        TCR_EL1::SH0::Inner +
+        TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
+        TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
+        TCR_EL1::EPD0::EnableTTBR0Walks +
+        TCR_EL1::T0SZ.val(16),
     );
 
     // Switch the MMU on.
@@ -63,7 +74,7 @@ pub fn init_mmu_early() {
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
-    use consts::{MEMORY_OFFSET};
+    use consts::MEMORY_OFFSET;
 
     let (start, end) = memory_map().expect("failed to find memory map");
     let mut ba = FRAME_ALLOCATOR.lock();
@@ -116,7 +127,7 @@ fn remap_the_kernel() {
 ///
 /// This function is expected to return `Some` under all normal cirumstances.
 fn memory_map() -> Option<(usize, usize)> {
-    let binary_end = unsafe { _end as u32 };
+    let binary_end = _end as u32;
 
     let mut atags: Atags = Atags::get();
     while let Some(atag) = atags.next() {

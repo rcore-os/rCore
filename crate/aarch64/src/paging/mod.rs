@@ -99,6 +99,11 @@ impl<S: PageSize> Page<S> {
     }
 
     /// Returns the level 4 page table index of this page.
+    pub fn va_range_bits(&self) -> u16 {
+        self.start_address().va_range_bits()
+    }
+
+    /// Returns the level 4 page table index of this page.
     pub fn p4_index(&self) -> u9 {
         self.start_address().p4_index()
     }

@@ -142,6 +142,10 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
             ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
             ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
         };
+
+        #[cfg(target_arch = "aarch64")]
+        assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
+
         set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
     }
     set

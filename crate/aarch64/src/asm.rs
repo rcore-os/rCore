@@ -160,24 +160,20 @@ pub fn eret() -> ! {
     }
 }
 
-bitflags! {
-    /// Controls cache settings for the level 4 page table.
-    pub struct ttbr0_el1_Flags: u64 {
-
-        const COMMON_NOT_PRIVATE = 1 << 0;
-    }
+pub fn ttbr_el1_read(which: u8) -> (PhysFrame) {
+    let baddr = match which {
+        0 => TTBR0_EL1.get_baddr(),
+        1 => TTBR1_EL1.get_baddr(),
+        _ => 0,
+    };
+    PhysFrame::containing_address(PhysAddr::new(baddr))
 }
 
-pub fn ttbr0_el1_read() -> (PhysFrame, ttbr0_el1_Flags) {
-    let value = TTBR0_EL1.get();
-    let flags = ttbr0_el1_Flags::from_bits_truncate(value);
-    let addr = PhysAddr::new(value & 0x_0000_ffff_ffff_f000);
-    let frame = PhysFrame::containing_address(addr);
-    (frame, flags)
-}
-
-pub fn ttbr0_el1_write(frame: PhysFrame) {
-    let addr = frame.start_address();
-    let value = addr.as_u64();
-    TTBR0_EL1.set_baddr(value);
+pub fn ttbr_el1_write(which: u8, frame: PhysFrame) {
+    let baddr = frame.start_address().as_u64();
+    match which {
+        0 => TTBR0_EL1.set_baddr(baddr),
+        1 => TTBR1_EL1.set_baddr(baddr),
+        _ => {}
+    };
 }

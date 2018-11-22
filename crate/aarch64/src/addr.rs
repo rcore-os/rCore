@@ -6,6 +6,15 @@ use bit_field::BitField;
 use usize_conversions::FromUsize;
 use ux::*;
 
+#[derive(Debug)]
+#[repr(u8)]
+pub enum VirtAddrRange {
+    /// 0x0000000000000000 to 0x0000FFFFFFFFFFFF
+    BottomRange = 0,
+    /// 0xFFFF000000000000 to 0xFFFFFFFFFFFFFFFF.
+    TopRange = 1,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct VirtAddr(u64);
@@ -103,6 +112,20 @@ impl VirtAddr {
     /// Returns the 12-bit page offset of this virtual address.
     pub fn page_offset(&self) -> u12 {
         u12::new((self.0 & 0xfff).try_into().unwrap())
+    }
+
+    /// Returns the VA range
+    pub fn va_range(&self) -> Result<VirtAddrRange, VirtAddrNotValid> {
+        match self.va_range_bits() {
+            0x0000 => Ok(VirtAddrRange::BottomRange),
+            0xffff => Ok(VirtAddrRange::TopRange),
+            _ => Err(VirtAddrNotValid(self.0)),
+        }
+    }
+
+    /// Returns the top 16 bits
+    pub fn va_range_bits(&self) -> u16 {
+        ((self.0 >> 48) & 0xffff) as u16
     }
 
     /// Returns the 9-bit level 1 page table index.

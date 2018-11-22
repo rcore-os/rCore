@@ -7,7 +7,7 @@ use paging::{
     NotGiantPageSize, Page, PageSize, PhysFrame, Size4KiB,
 };
 use paging::page_table::PageTableFlags as Flags;
-use asm::ttbr0_el1_read;
+use asm::ttbr_el1_read;
 use ux::u9;
 use addr::{PhysAddr, VirtAddr};
 
@@ -162,7 +162,9 @@ impl<'a> RecursivePageTable<'a> {
         {
             return Err(NotRecursivelyMapped);
         }
-        if Ok(ttbr0_el1_read().0) != table[recursive_index].frame() {
+        if Ok(ttbr_el1_read(page.start_address().va_range().unwrap() as u8)) !=
+            table[recursive_index].frame()
+        {
             return Err(NotRecursivelyMapped);
         }
 
@@ -212,7 +214,6 @@ impl<'a> RecursivePageTable<'a> {
         where
             A: FrameAllocator<Size4KiB>,
         {
-
             let created;
 
             if entry.is_unused() {
@@ -281,7 +282,6 @@ impl<'a> RecursivePageTable<'a> {
     }
 }
 
-
 impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
     fn map_to<A>(
         &mut self,
@@ -293,7 +293,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
     where
         A: FrameAllocator<Size4KiB>,
     {
-        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
         let p4 = &mut self_mut.p4;
 
         let p3_page = self.p3_page(page);
@@ -317,7 +317,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         &mut self,
         page: Page<Size4KiB>,
     ) -> Result<(PhysFrame<Size4KiB>, MapperFlush<Size4KiB>), UnmapError> {
-        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
         let p4 = &mut self_mut.p4;
 
         let p4_entry = &p4[page.p4_index()];
@@ -357,7 +357,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         page: Page<Size4KiB>,
         flags: PageTableFlags,
     ) -> Result<MapperFlush<Size4KiB>, FlagUpdateError> {
-        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
         let p4 = &mut self_mut.p4;
 
         if p4[page.p4_index()].is_unused() {
@@ -388,7 +388,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
     }
 
     fn translate_page(&self, page: Page<Size4KiB>) -> Option<PhysFrame<Size4KiB>> {
-        let self_mut = unsafe{ &mut *(self as *const _ as *mut Self) };
+        let self_mut = unsafe { &mut *(self as *const _ as *mut Self) };
         let p4 = &mut self_mut.p4;
 
         if p4[page.p4_index()].is_unused() {

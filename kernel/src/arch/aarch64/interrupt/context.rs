@@ -63,12 +63,12 @@ extern {
 struct ContextData {
     x19to29: [usize; 11],
     lr: usize,
-    ttbr0: usize,
+    ttbr1: usize,
 }
 
 impl ContextData {
-    fn new(ttbr0: usize) -> Self {
-        ContextData { lr: __trapret as usize, ttbr0, ..ContextData::default() }
+    fn new(ttbr1: usize) -> Self {
+        ContextData { lr: __trapret as usize, ttbr1, ..ContextData::default() }
     }
 }
 
@@ -98,7 +98,7 @@ impl Context {
         stp x25, x26, [x8], #16
         stp x27, x28, [x8], #16
         stp x29, lr, [x8], #16
-        mrs x9, ttbr0_el1
+        mrs x9, ttbr1_el1
         str x9, [x8], #8
 
         ldr x8, [x1]
@@ -111,7 +111,8 @@ impl Context {
         ldr x9, [x8], #8
         mov sp, x8
 
-        msr ttbr0_el1, x9           // set new page directory
+        msr ttbr1_el1, x9           // set new page directory
+        // TODO: with ASID we needn't flush TLB
         dsb ishst                   // ensure write has completed
         tlbi vmalle1is              // invalidate the TLB entry for the entry that changes
         dsb ish                     // ensure TLB invalidation is complete
@@ -126,21 +127,21 @@ impl Context {
         Context(0)
     }
 
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, ttbr0: usize) -> Self {
+    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(ttbr),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, ttbr0: usize) -> Self {
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(ttbr), // TODO: set ASID
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
         }.push_at(kstack_top)
     }
-    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, ttbr0: usize) -> Self {
+    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(ttbr), // TODO: set ASID
             tf: {
                 let mut tf = tf.clone();
                 tf.x0 = 0;

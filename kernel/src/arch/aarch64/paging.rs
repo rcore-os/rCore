@@ -5,7 +5,7 @@ use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
-use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr0_el1_read, ttbr0_el1_write};
+use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB, Size2MiB};
@@ -122,7 +122,7 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     //     }
     // }
 
-    ttbr0_el1_write(frame_lvl4);
+    ttbr_el1_write(0, frame_lvl4);
     tlb_invalidate_all();
 }
 
@@ -291,9 +291,9 @@ impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
     fn new() -> Self {
-        let mut pt = Self::new_bare();
-        pt.map_kernel();
-        pt
+        // When the new InactivePageTable is created for the user MemorySet, it's use ttbr1 as the
+        // TTBR. And the kernel TTBR ttbr0 will never changed, so we needn't call map_kernel()
+        Self::new_bare()
     }
 
     fn new_bare() -> Self {
@@ -308,7 +308,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
-        active_table().with_temporary_map(&ttbr0_el1_read().0, |active_table, p4_table: &mut Aarch64PageTable| {
+        active_table().with_temporary_map(&ttbr_el1_read(0), |active_table, p4_table: &mut Aarch64PageTable| {
             let backup = p4_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
@@ -325,33 +325,34 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn activate(&self) {
-        let old_frame = ttbr0_el1_read().0;
+        let old_frame = ttbr_el1_read(0);
         let new_frame = self.p4_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
+        debug!("switch TTBR0 {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
-            ttbr0_el1_write(new_frame);
+            ttbr_el1_write(0, new_frame);
             tlb_invalidate_all();
         }
     }
 
     unsafe fn with(&self, f: impl FnOnce()) {
-        let old_frame = ttbr0_el1_read().0;
+        // Just need to switch the user TTBR
+        let old_frame = ttbr_el1_read(1);
         let new_frame = self.p4_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
+        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
-            ttbr0_el1_write(new_frame);
+            ttbr_el1_write(1, new_frame);
             tlb_invalidate_all();
         }
         f();
-        debug!("switch table {:?} -> {:?}", new_frame, old_frame);
+        debug!("switch TTBR1 {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
-            ttbr0_el1_write(old_frame);
+            ttbr_el1_write(1, old_frame);
             tlb_invalidate_all();
         }
     }
 
     fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as CR3
+        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
     }
 
     fn alloc_frame() -> Option<usize> {

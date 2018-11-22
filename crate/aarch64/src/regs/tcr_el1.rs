@@ -23,6 +23,17 @@ use register::cpu::RegisterReadWrite;
 register_bitfields! {u64,
     TCR_EL1 [
         /// Top Byte ignored - indicates whether the top byte of an address is
+        /// used for address match for the TTBR1_EL1 region, or ignored and used
+        /// for tagged addresses. Defined values are:
+        ///
+        /// 0 Top Byte used in the address calculation.
+        /// 1 Top Byte ignored in the address calculation.
+        TBI1  OFFSET(38) NUMBITS(1) [
+            Used = 0,
+            Ignored = 1
+        ],
+
+        /// Top Byte ignored - indicates whether the top byte of an address is
         /// used for address match for the TTBR0_EL1 region, or ignored and used
         /// for tagged addresses. Defined values are:
         ///
@@ -31,6 +42,20 @@ register_bitfields! {u64,
         TBI0  OFFSET(37) NUMBITS(1) [
             Used = 0,
             Ignored = 1
+        ],
+
+        /// ASID Size. Defined values are:
+        ///
+        /// 0 8 bit - the upper 8 bits of TTBR0_EL1 and TTBR1_EL1 are ignored by
+        ///   hardware for every purpose except reading back the register, and are
+        ///   treated as if they are all zeros for when used for allocation and matching entries in the TLB.
+        /// 1 16 bit - the upper 16 bits of TTBR0_EL1 and TTBR1_EL1 are used for
+        ///   allocation and matching in the TLB.
+        ///
+        /// If the implementation has only 8 bits of ASID, this field is RES0.
+        AS  OFFSET(36) NUMBITS(1) [
+            Bits_8 = 0,
+            Bits_16 = 1
         ],
 
         /// Intermediate Physical Address Size.
@@ -66,6 +91,116 @@ register_bitfields! {u64,
             Bits_48 = 0b101,
             Bits_52 = 0b110
         ],
+
+        /// Granule size for the TTBR1_EL1.
+        ///
+        /// 01 16KiB
+        /// 10 4KiB
+        /// 11 64KiB
+        ///
+        /// Other values are reserved.
+        ///
+        /// If the value is programmed to either a reserved value, or a size
+        /// that has not been implemented, then the hardware will treat the
+        /// field as if it has been programmed to an IMPLEMENTATION DEFINED
+        /// choice of the sizes that has been implemented for all purposes other
+        /// than the value read back from this register.
+        ///
+        /// It is IMPLEMENTATION DEFINED whether the value read back is the
+        /// value programmed or the value that corresponds to the size chosen.
+        TG1   OFFSET(30) NUMBITS(2) [
+            KiB_4 = 0b10,
+            KiB_16 = 0b01,
+            KiB_64 = 0b11
+        ],
+
+        /// Shareability attribute for memory associated with translation table
+        /// walks using TTBR1_EL1.
+        ///
+        /// 00 Non-shareable
+        /// 10 Outer Shareable
+        /// 11 Inner Shareable
+        ///
+        /// Other values are reserved.
+        SH1   OFFSET(28) NUMBITS(2) [
+            None = 0b00,
+            Outer = 0b10,
+            Inner = 0b11
+        ],
+
+        /// Outer cacheability attribute for memory associated with translation
+        /// table walks using TTBR1_EL1.
+        ///
+        /// 00 Normal memory, Outer Non-cacheable
+        ///
+        /// 01 Normal memory, Outer Write-Back Read-Allocate Write-Allocate
+        ///    Cacheable
+        ///
+        /// 10 Normal memory, Outer Write-Through Read-Allocate No
+        ///    Write-Allocate Cacheable
+        ///
+        /// 11 Normal memory, Outer Write-Back Read-Allocate No Write-Allocate
+        ///    Cacheable
+        ORGN1 OFFSET(26) NUMBITS(2) [
+            NonCacheable = 0b00,
+            WriteBack_ReadAlloc_WriteAlloc_Cacheable = 0b01,
+            WriteThrough_ReadAlloc_NoWriteAlloc_Cacheable = 0b10,
+            WriteBack_ReadAlloc_NoWriteAlloc_Cacheable = 0b11
+        ],
+
+        /// Inner cacheability attribute for memory associated with translation
+        /// table walks using TTBR1_EL1.
+        ///
+        /// 00 Normal memory, Inner Non-cacheable
+        ///
+        /// 01 Normal memory, Inner Write-Back Read-Allocate Write-Allocate
+        ///    Cacheable
+        ///
+        /// 10 Normal memory, Inner Write-Through Read-Allocate No
+        ///    Write-Allocate Cacheable
+        ///
+        /// 11 Normal memory, Inner Write-Back Read-Allocate No Write-Allocate
+        ///    Cacheable
+        IRGN1 OFFSET(24) NUMBITS(2) [
+            NonCacheable = 0b00,
+            WriteBack_ReadAlloc_WriteAlloc_Cacheable = 0b01,
+            WriteThrough_ReadAlloc_NoWriteAlloc_Cacheable = 0b10,
+            WriteBack_ReadAlloc_NoWriteAlloc_Cacheable = 0b11
+        ],
+
+        /// Translation table walk disable for translations using
+        /// TTBR1_EL1. This bit controls whether a translation table walk is
+        /// performed on a TLB miss, for an address that is translated using
+        /// TTBR1_EL1. The encoding of this bit is:
+        ///
+        /// 0 Perform translation table walks using TTBR1_EL1.
+        ///
+        /// 1 A TLB miss on an address that is translated using TTBR1_EL1
+        ///   generates a Translation fault. No translation table walk is
+        ///   performed.
+        EPD1  OFFSET(23) NUMBITS(1) [
+            EnableTTBR1Walks = 0,
+            DisableTTBR1Walks = 1
+        ],
+
+        /// Selects whether TTBR0_EL1 or TTBR1_EL1 defines the ASID. The encoding
+        /// of this bit is:
+        ///
+        /// 0 TTBR0_EL1.ASID defines the ASID.
+        ///
+        /// 1 TTBR1_EL1.ASID defines the ASID.
+        A1 OFFSET(22) NUMBITS(1) [
+            UseTTBR0ASID = 0b0,
+            UseTTBR1ASID = 0b1
+        ],
+
+        /// The size offset of the memory region addressed by TTBR1_EL1. The
+        /// region size is 2^(64-T1SZ) bytes.
+        ///
+        /// The maximum and minimum possible values for T1SZ depend on the level
+        /// of translation table and the memory translation granule size, as
+        /// described in the AArch64 Virtual Memory System Architecture chapter.
+        T1SZ  OFFSET(16) NUMBITS(6) [],
 
         /// Granule size for the TTBR0_EL1.
         ///
