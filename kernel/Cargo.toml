@@ -58,7 +58,7 @@ minimum-image-size = 0      # The minimum output file size (in MiB)
 # (the "{}" will be replaced with the path to the bootable disk image)
 run-command = ["qemu-system-x86_64",
     "-drive", "format=raw,file={}",
-    "-drive", "format=raw,file=../user/ucore32.img,media=disk,cache=writeback",
+    "-drive", "format=raw,file=../user/img/ucore-i386-pic.img,media=disk,cache=writeback",
     "-serial", "mon:stdio",
     "-device", "isa-debug-exit",
     "-smp", "4"

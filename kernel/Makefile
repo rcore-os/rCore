@@ -30,7 +30,7 @@ bootimage := target/$(target)/bootimage.bin
 user_bin_path := ../user/target/$(arch)-ucore/debug
 user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
 user_obj := build/$(arch)/user.o
-SFSIMG := ../user/ucore32.img
+SFSIMG := ../user/img/ucore-i386-pic.img
 
 ### qemu options ###
 ifeq ($(arch), x86_64)
