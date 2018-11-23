@@ -177,3 +177,12 @@ pub fn ttbr_el1_write(which: u8, frame: PhysFrame) {
         _ => {}
     };
 }
+
+pub fn ttbr_el1_write_asid(which: u8, asid: u16, frame: PhysFrame) {
+    let baddr = frame.start_address().as_u64();
+    match which {
+        0 => TTBR0_EL1.write(TTBR0_EL1::ASID.val(asid as u64) + TTBR0_EL1::BADDR.val(baddr >> 1)),
+        1 => TTBR1_EL1.write(TTBR1_EL1::ASID.val(asid as u64) + TTBR1_EL1::BADDR.val(baddr >> 1)),
+        _ => {}
+    };
+}

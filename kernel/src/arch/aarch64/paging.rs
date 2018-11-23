@@ -259,15 +259,7 @@ impl Entry for PageEntry {
     fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::SWAPPED, value); }
     fn set_user(&mut self, value: bool) {
         self.as_flags().set(EF::USER_ACCESSIBLE, value);
-        if value {
-            let mut addr = self as *const _ as usize;
-            for _ in 0..3 {
-                // Upper level entry
-                addr = ((addr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39);
-                // set USER_ACCESSIBLE
-                unsafe { (*(addr as *mut EF)).insert(EF::USER_ACCESSIBLE) };
-            }
-        }
+        self.as_flags().set(EF::NONE_GLOBAL, value); // set non-global to use ASID
     }
     fn execute(&self) -> bool { !self.0.flags().contains(EF::UXN) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::UXN, !value); }
