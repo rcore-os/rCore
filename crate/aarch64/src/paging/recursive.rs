@@ -1,13 +1,13 @@
 #![cfg(target_arch = "aarch64")]
 
-use asm::tlb_invalidate;
 use paging::{
     frame_alloc::FrameAllocator,
     page_table::{FrameError, PageTable, PageTableEntry, PageTableFlags},
     NotGiantPageSize, Page, PageSize, PhysFrame, Size4KiB,
 };
 use paging::page_table::PageTableFlags as Flags;
-use asm::ttbr_el1_read;
+use asm::{ttbr_el1_read, tlb_invalidate};
+use barrier;
 use ux::u9;
 use addr::{PhysAddr, VirtAddr};
 
@@ -233,7 +233,7 @@ impl<'a> RecursivePageTable<'a> {
             let page_table_ptr = next_table_page.start_address().as_mut_ptr();
             let page_table: &mut PageTable = unsafe { &mut *(page_table_ptr) };
             if created {
-                tlb_invalidate(next_table_page.start_address());
+                unsafe { barrier::dsb(barrier::ISHST); }
                 page_table.zero();
             }
             Ok(page_table)
