@@ -218,7 +218,7 @@ impl<'a> RecursivePageTable<'a> {
 
             if entry.is_unused() {
                 if let Some(frame) = allocator.alloc() {
-                    entry.set_frame(frame, Flags::PRESENT | Flags::WRITE | Flags::ACCESSED | Flags::PAGE_BIT);
+                    entry.set_frame(frame, Flags::default());
                     created = true;
                 } else {
                     return Err(MapToError::FrameAllocationFailed);
@@ -226,7 +226,8 @@ impl<'a> RecursivePageTable<'a> {
             } else {
                 created = false;
             }
-            if entry.flags().contains(Flags::HUGE_PAGE) {
+            // is a huge page (block)
+            if !entry.flags().contains(Flags::TABLE_OR_PAGE) {
                 return Err(MapToError::ParentEntryHugePage);
             }
 
@@ -382,7 +383,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
             return Err(FlagUpdateError::PageNotMapped);
         }
 
-        p1[page.p1_index()].set_flags(flags);
+        p1[page.p1_index()].modify_flags(flags);
 
         Ok(MapperFlush::new(page))
     }

@@ -8,7 +8,7 @@ use ucore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB, Size2MiB};
+use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB};
 
 register_bitfields! {u64,
     // AArch64 Reference Manual page 2150
@@ -167,7 +167,7 @@ impl PageTable for ActivePageTable {
     type Entry = PageEntry;
 
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
-        let flags = EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::UXN | EF::PAGE_BIT;
+        let flags = EF::default();
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
         self.get_entry(addr)
@@ -224,49 +224,58 @@ impl Entry for PageEntry {
         tlb_invalidate(addr);
     }
 
-    fn present(&self) -> bool { self.0.flags().contains(EF::PRESENT) }
-    fn accessed(&self) -> bool { self.0.flags().contains(EF::ACCESSED) }
+    fn present(&self) -> bool { self.0.flags().contains(EF::VALID) }
+    fn accessed(&self) -> bool { self.0.flags().contains(EF::AF) }
     fn writable(&self) -> bool { self.0.flags().contains(EF::WRITE) }
     fn dirty(&self) -> bool { self.hw_dirty() && self.sw_dirty() }
 
-    fn clear_accessed(&mut self) { self.as_flags().remove(EF::ACCESSED); }
+    fn clear_accessed(&mut self) { self.as_flags().remove(EF::AF); }
     fn clear_dirty(&mut self)
     {
         self.as_flags().remove(EF::DIRTY);
-        self.as_flags().insert(EF::RDONLY);
+        self.as_flags().insert(EF::AP_RO);
     }
     fn set_writable(&mut self, value: bool)
     {
-        self.as_flags().set(EF::RDONLY, !value);
+        self.as_flags().set(EF::AP_RO, !value);
         self.as_flags().set(EF::WRITE, value);
     }
-    fn set_present(&mut self, value: bool) { self.as_flags().set(EF::PRESENT, value); }
+    fn set_present(&mut self, value: bool) { self.as_flags().set(EF::VALID, value); }
     fn target(&self) -> usize { self.0.addr().as_u64() as usize }
     fn set_target(&mut self, target: usize) {
-        let flags = self.0.flags();
-        self.0.set_addr(PhysAddr::new(target as u64), flags);
+        self.0.modify_addr(PhysAddr::new(target as u64));
     }
-    fn writable_shared(&self) -> bool { self.0.flags().contains(EF::BIT_9) }
-    fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::BIT_9) }
+    fn writable_shared(&self) -> bool { self.0.flags().contains(EF::WRITABLE_SHARED) }
+    fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::READONLY_SHARED) }
     fn set_shared(&mut self, writable: bool) {
         let flags = self.as_flags();
-        flags.set(EF::BIT_8, writable);
-        flags.set(EF::BIT_9, writable);
+        flags.set(EF::WRITABLE_SHARED, writable);
+        flags.set(EF::READONLY_SHARED, !writable);
     }
-    fn clear_shared(&mut self) { self.as_flags().remove(EF::BIT_8 | EF::BIT_9); }
-    fn user(&self) -> bool { self.0.flags().contains(EF::USER_ACCESSIBLE) }
+    fn clear_shared(&mut self) { self.as_flags().remove(EF::WRITABLE_SHARED | EF::READONLY_SHARED); }
+    fn user(&self) -> bool { self.0.flags().contains(EF::AP_EL0) }
     fn swapped(&self) -> bool { self.0.flags().contains(EF::SWAPPED) }
     fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::SWAPPED, value); }
     fn set_user(&mut self, value: bool) {
-        self.as_flags().set(EF::USER_ACCESSIBLE, value);
-        self.as_flags().set(EF::NONE_GLOBAL, value); // set non-global to use ASID
+        self.as_flags().set(EF::AP_EL0, value);
+        self.as_flags().set(EF::nG, value); // set non-global to use ASID
     }
-    fn execute(&self) -> bool { !self.0.flags().contains(EF::UXN) }
-    fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::UXN, !value); }
+    fn execute(&self) -> bool {
+        match self.user() {
+            true => !self.0.flags().contains(EF::XN),
+            false => !self.0.flags().contains(EF::PXN),
+        }
+    }
+    fn set_execute(&mut self, value: bool) {
+        match self.user() {
+            true => self.as_flags().set(EF::XN, !value),
+            false => self.as_flags().set(EF::PXN, !value),
+        }
+    }
 }
 
 impl PageEntry {
-    fn read_only(&self) -> bool { self.0.flags().contains(EF::RDONLY) }
+    fn read_only(&self) -> bool { self.0.flags().contains(EF::AP_RO) }
     fn hw_dirty(&self) -> bool { self.writable() && !self.read_only() }
     fn sw_dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
     fn as_flags(&mut self) -> &mut EF {
@@ -294,7 +303,7 @@ impl InactivePageTable for InactivePageTable0 {
         active_table().with_temporary_map(&frame, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
-            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::PAGE_BIT);
+            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default());
         });
         InactivePageTable0 { p4_frame: frame }
     }
@@ -304,7 +313,7 @@ impl InactivePageTable for InactivePageTable0 {
             let backup = p4_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
-            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITE | EF::ACCESSED | EF::PAGE_BIT);
+            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::default());
             tlb_invalidate_all();
 
             // execute f in the new context
@@ -367,7 +376,7 @@ impl InactivePageTable0 {
         assert!(!e0.is_unused());
 
         self.edit(|_| {
-            table[KERNEL_PML4].set_addr(e0.addr(), e0.flags() & EF::GLOBAL);
+            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default());
         });
     }
 }
