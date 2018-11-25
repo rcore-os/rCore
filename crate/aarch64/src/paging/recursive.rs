@@ -5,7 +5,7 @@ use paging::{
     page_table::{FrameError, PageTable, PageTableEntry, PageTableFlags},
     NotGiantPageSize, Page, PageSize, PhysFrame, Size4KiB,
 };
-use paging::page_table::PageTableFlags as Flags;
+use paging::{page_table::PageTableFlags as Flags, PageTableAttribute, memory_attribute::*};
 use asm::{ttbr_el1_read, tlb_invalidate};
 use barrier;
 use ux::u9;
@@ -46,6 +46,7 @@ pub trait Mapper<S: PageSize> {
         page: Page<S>,
         frame: PhysFrame<S>,
         flags: PageTableFlags,
+        attr: PageTableAttribute,
         allocator: &mut A,
     ) -> Result<MapperFlush<S>, MapToError>
     where
@@ -71,6 +72,7 @@ pub trait Mapper<S: PageSize> {
         &mut self,
         frame: PhysFrame<S>,
         flags: PageTableFlags,
+        attr: PageTableAttribute,
         allocator: &mut A,
     ) -> Result<MapperFlush<S>, MapToError>
     where
@@ -79,7 +81,7 @@ pub trait Mapper<S: PageSize> {
         Self: Mapper<S>,
     {
         let page = Page::containing_address(VirtAddr::new(frame.start_address().as_u64()));
-        self.map_to(page, frame, flags, allocator)
+        self.map_to(page, frame, flags, attr, allocator)
     }
 }
 
@@ -218,7 +220,7 @@ impl<'a> RecursivePageTable<'a> {
 
             if entry.is_unused() {
                 if let Some(frame) = allocator.alloc() {
-                    entry.set_frame(frame, Flags::default());
+                    entry.set_frame(frame, Flags::default(), MairNormal::attr_value());
                     created = true;
                 } else {
                     return Err(MapToError::FrameAllocationFailed);
@@ -289,6 +291,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         page: Page<Size4KiB>,
         frame: PhysFrame<Size4KiB>,
         flags: PageTableFlags,
+        attr: PageTableAttribute,
         allocator: &mut A,
     ) -> Result<MapperFlush<Size4KiB>, MapToError>
     where
@@ -309,7 +312,7 @@ impl<'a> Mapper<Size4KiB> for RecursivePageTable<'a> {
         if !p1[page.p1_index()].is_unused() {
             return Err(MapToError::PageAlreadyMapped);
         }
-        p1[page.p1_index()].set_frame(frame, flags);
+        p1[page.p1_index()].set_frame(frame, flags, attr);
 
         Ok(MapperFlush::new(page))
     }

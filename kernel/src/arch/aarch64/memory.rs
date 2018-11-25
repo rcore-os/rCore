@@ -3,7 +3,8 @@
 use ucore_memory::PAGE_SIZE;
 use memory::{FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Stack};
 use super::atags::atags::Atags;
-use aarch64::{barrier, regs::*, addr::*, paging::PhysFrame as Frame};
+use aarch64::{barrier, regs::*, addr::*};
+use aarch64::paging::{PhysFrame as Frame, memory_attribute::*};
 
 /// Memory initialization.
 pub fn init() {
@@ -28,13 +29,11 @@ pub fn init_mmu_early() {
 
     // device.
     MAIR_EL1.write(
-        // Attribute 1
-        MAIR_EL1::Attr1_HIGH::Device
-            + MAIR_EL1::Attr1_LOW_DEVICE::Device_nGnRE
-            // Attribute 0
-            + MAIR_EL1::Attr0_HIGH::Memory_OuterWriteBack_NonTransient_ReadAlloc_WriteAlloc
-            + MAIR_EL1::Attr0_LOW_MEMORY::InnerWriteBack_NonTransient_ReadAlloc_WriteAlloc,
+        MAIR_EL1::Attr0.val(MairDevice::config_value()) +
+        MAIR_EL1::Attr1.val(MairNormal::config_value()) +
+        MAIR_EL1::Attr2.val(MairNormalNonCacheable::config_value()),
     );
+
     // Configure various settings of stage 1 of the EL1 translation regime.
     let ips = ID_AA64MMFR0_EL1.read(ID_AA64MMFR0_EL1::PARange);
     TCR_EL1.write(

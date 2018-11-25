@@ -8,62 +8,8 @@ use ucore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB};
-
-register_bitfields! {u64,
-    // AArch64 Reference Manual page 2150
-    STAGE1_DESCRIPTOR [
-        /// Execute-never
-        XN       OFFSET(54) NUMBITS(1) [
-            False = 0,
-            True = 1
-        ],
-
-        /// Various address fields, depending on use case
-        LVL4_OUTPUT_ADDR_4KiB    OFFSET(39) NUMBITS(9) [], // [47:39]
-        LVL3_OUTPUT_ADDR_4KiB    OFFSET(30) NUMBITS(18) [], // [47:30]
-        LVL2_OUTPUT_ADDR_4KiB    OFFSET(21) NUMBITS(27) [], // [47:21]
-        NEXT_LVL_TABLE_ADDR_4KiB OFFSET(12) NUMBITS(36) [], // [47:12]
-
-        /// Access flag
-        AF       OFFSET(10) NUMBITS(1) [
-            False = 0,
-            True = 1
-        ],
-
-        /// Shareability field
-        SH       OFFSET(8) NUMBITS(2) [
-            OuterShareable = 0b10,
-            InnerShareable = 0b11
-        ],
-
-        /// Access Permissions
-        AP       OFFSET(6) NUMBITS(2) [
-            RW_EL1 = 0b00,
-            RW_EL1_EL0 = 0b01,
-            RO_EL1 = 0b10,
-            RO_EL1_EL0 = 0b11
-        ],
-
-        /// Memory attributes index into the MAIR_EL1 register
-        AttrIndx OFFSET(2) NUMBITS(3) [],
-
-        TYPE     OFFSET(1) NUMBITS(1) [
-            Block = 0,
-            Table = 1
-        ],
-
-        VALID    OFFSET(0) NUMBITS(1) [
-            False = 0,
-            True = 1
-        ]
-    ]
-}
-
-mod mair {
-    pub const NORMAL: u64 = 0;
-    pub const DEVICE: u64 = 1;
-}
+use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB, Size1GiB};
+use aarch64::paging::memory_attribute::*;
 
 // need 3 page
 pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
@@ -74,34 +20,24 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     p3.zero();
     p2.zero();
 
-    // Fill the rest of the LVL2 (2MiB) entries as block
-    // descriptors. Differentiate between normal and device mem.
-    const MMIO_BASE: u64 = 0x3F000000;
-    let mmio_base: u64 = MMIO_BASE >> 21;
-    let mut common = STAGE1_DESCRIPTOR::VALID::True
-        + STAGE1_DESCRIPTOR::TYPE::Block
-        + STAGE1_DESCRIPTOR::AP::RW_EL1
-        + STAGE1_DESCRIPTOR::AF::True;
-        // + STAGE1_DESCRIPTOR::XN::True;
+    let (start_addr, end_addr) = (0, 0x40000000);
+    let block_flags = EF::VALID | EF::AF | EF::WRITE | EF::XN;
+    for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
+        let paddr = PhysAddr::new(page.start_address().as_u64());
 
-    for i in 0..512 {
-        let j: u64 = i as u64;
-
-        let mem_attr = if j >= mmio_base {
-            STAGE1_DESCRIPTOR::SH::OuterShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE)
+        use arch::board::IO_BASE;
+        if paddr.as_u64() >= IO_BASE as u64 {
+            p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
         } else {
-            STAGE1_DESCRIPTOR::SH::InnerShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL)
-        };
-
-        p2[i].entry = (common + mem_attr + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KiB.val(j)).value;
+            p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
+        }
     }
 
-    common = common + STAGE1_DESCRIPTOR::SH::InnerShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL);
+    p3[0].set_frame(frame_lvl2, EF::default(), MairNormal::attr_value());
+    p3[1].set_block::<Size1GiB>(PhysAddr::new(0x40000000), block_flags | EF::PXN, MairDevice::attr_value());
 
-    p3[0].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl2.start_address().as_u64() >> 12)).value;
-    p3[1].entry = (common + STAGE1_DESCRIPTOR::LVL3_OUTPUT_ADDR_4KiB.val(1)).value;
-    p4[0].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl3.start_address().as_u64() >> 12)).value;
-    p4[RECURSIVE_INDEX].entry = (common + STAGE1_DESCRIPTOR::TYPE::Table + STAGE1_DESCRIPTOR::NEXT_LVL_TABLE_ADDR_4KiB.val(frame_lvl4.start_address().as_u64() >> 12)).value;
+    p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
+    p4[RECURSIVE_INDEX].set_frame(frame_lvl4, EF::default(), MairNormal::attr_value());
 
     // warn!("p2");
     // for i in 0..512 {
@@ -129,18 +65,10 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
 /// map the range [start, end) as device memory, insert to the MemorySet
 pub fn remap_device_2mib(ms: &mut MemorySet<InactivePageTable0>, start_addr: usize, end_addr: usize) {
     ms.edit(|active_table| {
-        let common = STAGE1_DESCRIPTOR::VALID::True
-            + STAGE1_DESCRIPTOR::TYPE::Block
-            + STAGE1_DESCRIPTOR::AP::RW_EL1
-            + STAGE1_DESCRIPTOR::AF::True
-            + STAGE1_DESCRIPTOR::XN::True;
-
-        let mem_attr = STAGE1_DESCRIPTOR::SH::OuterShareable + STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE);
-
-        type Page2MiB = Page<Size2MiB>;
-        for page in Page2MiB::range_of(start_addr, end_addr) {
+        for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
+            let paddr = PhysAddr::new(page.start_address().as_u64());
             let p2 = unsafe { &mut *active_table.0.p2_ptr(page) };
-            p2[page.p2_index()].entry = (common + mem_attr + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KiB.val(page.start_address().as_u64() >> 21)).value;
+            p2[page.p2_index()].set_block::<Size2MiB>(paddr, EF::default() - EF::TABLE_OR_PAGE, MairDevice::attr_value());
         }
 
         // let p2 = unsafe { &mut *(0o777_777_000_000_0000 as *mut Aarch64PageTable) };
@@ -168,7 +96,8 @@ impl PageTable for ActivePageTable {
 
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
         let flags = EF::default();
-        self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForAarch64)
+        let attr = MairNormal::attr_value();
+        self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, attr, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
         self.get_entry(addr)
     }
@@ -303,7 +232,7 @@ impl InactivePageTable for InactivePageTable0 {
         active_table().with_temporary_map(&frame, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
-            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default());
+            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default(), MairNormal::attr_value());
         });
         InactivePageTable0 { p4_frame: frame }
     }
@@ -313,7 +242,7 @@ impl InactivePageTable for InactivePageTable0 {
             let backup = p4_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
-            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::default());
+            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::default(), MairNormal::attr_value());
             tlb_invalidate_all();
 
             // execute f in the new context
@@ -376,7 +305,7 @@ impl InactivePageTable0 {
         assert!(!e0.is_unused());
 
         self.edit(|_| {
-            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default());
+            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
         });
     }
 }

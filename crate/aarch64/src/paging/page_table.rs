@@ -1,7 +1,7 @@
 use core::fmt;
 use core::ops::{Index, IndexMut};
 
-use super::PhysFrame;
+use super::{PhysFrame, PageSize};
 use addr::PhysAddr;
 
 use usize_conversions::usize_from;
@@ -19,8 +19,7 @@ const ADDR_MASK: u64 = 0x0000_ffff_ffff_f000;
 const FLAGS_MASK: u64 = !(MEMORY_ATTR_MASK | ADDR_MASK);
 
 /// Memory attribute fields
-type PageTableAttributeFieldValue = FieldValue<u64, MEMORY_ATTRIBUTE::Register>;
-pub struct PageTableAttribute(PageTableAttributeFieldValue);
+pub type PageTableAttribute = FieldValue<u64, MEMORY_ATTRIBUTE::Register>;
 
 /// The error returned by the `PageTableEntry::frame` method.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,32 +52,33 @@ impl RegisterReadWrite<u64, MEMORY_ATTRIBUTE::Register> for PageTableEntry {
 
 impl PageTableEntry {
     /// Returns whether this entry is zero.
+    #[inline]
     pub fn is_unused(&self) -> bool {
         self.entry == 0
     }
 
     /// Sets this entry to zero.
+    #[inline]
     pub fn set_unused(&mut self) {
         self.entry = 0;
     }
 
     /// Returns the flags of this entry.
+    #[inline]
     pub fn flags(&self) -> PageTableFlags {
         PageTableFlags::from_bits_truncate(self.entry)
     }
 
     /// Returns the physical address mapped by this entry, might be zero.
+    #[inline]
     pub fn addr(&self) -> PhysAddr {
         PhysAddr::new(self.entry & ADDR_MASK)
     }
 
     /// Returns the memory attribute fields of this entry.
+    #[inline]
     pub fn attr(&self) -> PageTableAttribute {
-        PageTableAttribute(PageTableAttributeFieldValue::new(
-            MEMORY_ATTR_MASK,
-            0,
-            self.entry & MEMORY_ATTR_MASK,
-        ))
+        PageTableAttribute::new(MEMORY_ATTR_MASK, 0, self.entry & MEMORY_ATTR_MASK)
     }
 
     /// Returns the physical frame mapped by this entry.
@@ -99,11 +99,19 @@ impl PageTableEntry {
         }
     }
 
-    /// Map the entry to the specified physical frame with the specified flags.
-    pub fn set_frame(&mut self, frame: PhysFrame, flags: PageTableFlags) {
-        // is not a huge page (block)
+    /// Map the entry to the specified physical frame with the specified flags and memory attribute.
+    pub fn set_frame(&mut self, frame: PhysFrame, flags: PageTableFlags, attr: PageTableAttribute) {
+        // is not a block
         assert!(flags.contains(PageTableFlags::TABLE_OR_PAGE));
-        self.set(frame.start_address().as_u64() | flags.bits());
+        self.set(frame.start_address().as_u64() | flags.bits() | attr.value);
+    }
+
+    /// The descriptor gives the base address of a block of memory, and the attributes for that
+    /// memory region.
+    pub fn set_block<S: PageSize>(&mut self, addr: PhysAddr, flags: PageTableFlags, attr: PageTableAttribute) {
+        // is a block
+        assert!(!flags.contains(PageTableFlags::TABLE_OR_PAGE));
+        self.set(addr.align_down(S::SIZE).as_u64() | flags.bits() | attr.value);
     }
 
     /// Map the entry to the specified physical address with the specified flags.
@@ -118,7 +126,7 @@ impl PageTableEntry {
 
     /// Sets the flags of this entry.
     pub fn modify_attr(&mut self, attr: PageTableAttribute) {
-        self.entry = (self.entry & !MEMORY_ATTR_MASK) | attr.0.value;
+        self.entry = (self.entry & !MEMORY_ATTR_MASK) | attr.value;
     }
 }
 
@@ -128,6 +136,7 @@ impl fmt::Debug for PageTableEntry {
         f.field("value", &self.entry);
         f.field("addr", &self.addr());
         f.field("flags", &self.flags());
+        f.field("attr", &self.attr().value);
         f.finish()
     }
 }
@@ -150,14 +159,6 @@ register_bitfields! {u64,
 bitflags! {
     /// Possible flags for a page table entry.
     pub struct PageTableFlags: u64 {
-        // const SHARED =          3 << 8;         /* SH[1:0], inner shareable */
-        // const BIT_8 =           1 << 8;
-        // const BIT_9 =           1 << 9;
-
-        // pub const ATTRIB_SH_NON_SHAREABLE: usize = 0x0 << 8;
-        // const OUTER_SHAREABLE = 0b10 << 8;
-        // const INNER_SHAREABLE = 0b11 << 8;
-
         /// identifies whether the descriptor is valid
         const VALID =           1 << 0;
         /// the descriptor type
@@ -202,6 +203,7 @@ bitflags! {
 }
 
 impl Default for PageTableFlags {
+    #[inline]
     fn default() -> Self {
         Self::VALID | Self::TABLE_OR_PAGE | Self::AF | Self::WRITE | Self::PXN | Self::XN
     }
@@ -228,13 +230,6 @@ impl PageTable {
             entry.set_unused();
         }
     }
-
-    // Setup identity map: VirtPage at pagenumber -> PhysFrame at pagenumber
-    // pn: pagenumber = addr>>12 in riscv32.
-    // pub fn map_identity(&mut self, p4num: usize, flags: PageTableFlags) {
-    //     let entry = self.entries[p4num].clone();
-    //     self.entries[p4num].set_addr(entry.addr(), flags);
-    // }
 }
 
 impl Index<usize> for PageTable {

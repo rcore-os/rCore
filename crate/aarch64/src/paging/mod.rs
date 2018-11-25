@@ -18,6 +18,8 @@ mod frame_alloc;
 mod page_table;
 mod recursive;
 
+pub mod memory_attribute;
+
 /// Trait for abstracting over the three possible block/page sizes on aarch64, 4KiB, 2MiB, 1GiB.
 pub trait PageSize: Copy + Eq + PartialOrd + Ord {
     /// The page size in bytes.
@@ -365,6 +367,10 @@ impl<S: PageSize> PhysFrame<S> {
 
     pub fn of_addr(address: usize) -> Self {
         Self::containing_address(PhysAddr::new(address as u64))
+    }
+
+    pub fn range_of(begin: usize, end: usize) -> PhysFrameRange<S> {
+        Self::range(Self::of_addr(begin), Self::of_addr(end - 1) + 1)
     }
 }
 

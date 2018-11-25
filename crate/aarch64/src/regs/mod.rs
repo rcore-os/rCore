@@ -40,7 +40,7 @@ pub use self::daif::DAIF;
 pub use self::elr_el2::ELR_EL2;
 pub use self::hcr_el2::HCR_EL2;
 pub use self::id_aa64mmfr0_el1::ID_AA64MMFR0_EL1;
-pub use self::mair_el1::MAIR_EL1;
+pub use self::mair_el1::{MAIR_EL1, MAIR_ATTR};
 pub use self::mpidr_el1::MPIDR_EL1;
 pub use self::sctlr_el1::SCTLR_EL1;
 pub use self::sp::SP;
