@@ -126,6 +126,8 @@ impl Entry for PageEntry {
     fn set_user(&mut self, value: bool) { self.as_flags().set(EF::USER, value); }
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::EXECUTABLE, value); }
+    fn mmio(&self) -> bool { unimplemented!() }
+    fn set_mmio(&mut self, value: bool) { unimplemented!() }
 }
 
 impl PageEntry {

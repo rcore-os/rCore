@@ -25,7 +25,7 @@ pub fn init_mmu_early() {
     let frame_lvl4 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL4 as *const _ as u64));
     let frame_lvl3 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL3 as *const _ as u64));
     let frame_lvl2 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL2 as *const _ as u64));
-    super::paging::setup_page_table(frame_lvl4, frame_lvl3, frame_lvl2);
+    super::paging::setup_temp_page_table(frame_lvl4, frame_lvl3, frame_lvl2);
 
     // device.
     MAIR_EL1.write(
@@ -111,9 +111,8 @@ fn remap_the_kernel() {
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
 
-    // ensure the level 2 page table exists
-    ms.push(MemoryArea::new_identity(0x40000000, 0x40200000, MemoryAttr::default(), "arm_control"));
-    super::paging::remap_device_2mib(&mut ms, 0x3F000000, 0x40200000);
+    use arch::board::{IO_REMAP_BASE, IO_REMAP_END};
+    ms.push(MemoryArea::new_identity(IO_REMAP_BASE, IO_REMAP_END, MemoryAttr::default().mmio(), "io_remap"));
 
     unsafe { ms.activate(); }
     use core::mem::forget;

@@ -12,7 +12,7 @@ use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame
 use aarch64::paging::memory_attribute::*;
 
 // need 3 page
-pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
+pub fn setup_temp_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
     let p4 = unsafe { &mut *(frame_lvl4.start_address().as_u64() as *mut Aarch64PageTable) };
     let p3 = unsafe { &mut *(frame_lvl3.start_address().as_u64() as *mut Aarch64PageTable) };
     let p2 = unsafe { &mut *(frame_lvl2.start_address().as_u64() as *mut Aarch64PageTable) };
@@ -25,8 +25,8 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
         let paddr = PhysAddr::new(page.start_address().as_u64());
 
-        use arch::board::IO_BASE;
-        if paddr.as_u64() >= IO_BASE as u64 {
+        use arch::board::IO_REMAP_BASE;
+        if paddr.as_u64() >= IO_REMAP_BASE as u64 {
             p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
         } else {
             p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
@@ -39,52 +39,8 @@ pub fn setup_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame)
     p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
     p4[RECURSIVE_INDEX].set_frame(frame_lvl4, EF::default(), MairNormal::attr_value());
 
-    // warn!("p2");
-    // for i in 0..512 {
-    //     if p2[i].flags().bits() != 0 {
-    //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
-    //     }
-    // }
-    // warn!("p3");
-    // for i in 0..512 {
-    //     if p3[i].flags().bits() != 0 {
-    //         info!("{:x?} {:x?} {:x?}",i, &p3[i] as *const _ as usize, p3[i]);
-    //     }
-    // }
-    // warn!("p4");
-    // for i in 0..512 {
-    //     if p4[i].flags().bits() != 0 {
-    //         info!("{:x?} {:x?} {:x?}",i, &p4[i] as *const _ as usize, p4[i]);
-    //     }
-    // }
-
     ttbr_el1_write(0, frame_lvl4);
     tlb_invalidate_all();
-}
-
-/// map the range [start, end) as device memory, insert to the MemorySet
-pub fn remap_device_2mib(ms: &mut MemorySet<InactivePageTable0>, start_addr: usize, end_addr: usize) {
-    ms.edit(|active_table| {
-        for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
-            let paddr = PhysAddr::new(page.start_address().as_u64());
-            let p2 = unsafe { &mut *active_table.0.p2_ptr(page) };
-            p2[page.p2_index()].set_block::<Size2MiB>(paddr, EF::default() - EF::TABLE_OR_PAGE, MairDevice::attr_value());
-        }
-
-        // let p2 = unsafe { &mut *(0o777_777_000_000_0000 as *mut Aarch64PageTable) };
-        // for i in 0..512 {
-        //     if p2[i].flags().bits() != 0 {
-        //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
-        //     }
-        // }
-
-        // let p2 = unsafe { &mut *(0o777_777_000_001_0000 as *mut Aarch64PageTable) };
-        // for i in 0..512 {
-        //     if p2[i].flags().bits() != 0 {
-        //         info!("{:x?} {:x?} {:x?}",i, &p2[i] as *const _ as usize, p2[i]);
-        //     }
-        // }
-    });
 }
 
 pub struct ActivePageTable(RecursivePageTable<'static>);
@@ -201,6 +157,8 @@ impl Entry for PageEntry {
             false => self.as_flags().set(EF::PXN, !value),
         }
     }
+    fn mmio(&self) -> bool { self.0.attr().value == MairDevice::attr_value().value }
+    fn set_mmio(&mut self, value: bool) { self.0.modify_attr(MairDevice::attr_value()); }
 }
 
 impl PageEntry {
