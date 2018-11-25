@@ -1,7 +1,6 @@
 //! Entrance and initialization for aarch64.
 
 extern crate atags;
-extern crate cortex_a;
 
 pub mod io;
 pub mod paging;

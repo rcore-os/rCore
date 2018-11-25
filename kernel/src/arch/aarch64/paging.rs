@@ -146,19 +146,29 @@ impl Entry for PageEntry {
         self.as_flags().set(EF::nG, value); // set non-global to use ASID
     }
     fn execute(&self) -> bool {
-        match self.user() {
-            true => !self.0.flags().contains(EF::XN),
-            false => !self.0.flags().contains(EF::PXN),
+        if self.user() {
+            !self.0.flags().contains(EF::XN)
+        } else {
+            !self.0.flags().contains(EF::PXN)
         }
     }
     fn set_execute(&mut self, value: bool) {
-        match self.user() {
-            true => self.as_flags().set(EF::XN, !value),
-            false => self.as_flags().set(EF::PXN, !value),
+        if self.user() {
+            self.as_flags().set(EF::XN, !value)
+        } else {
+            self.as_flags().set(EF::PXN, !value)
         }
     }
-    fn mmio(&self) -> bool { self.0.attr().value == MairDevice::attr_value().value }
-    fn set_mmio(&mut self, value: bool) { self.0.modify_attr(MairDevice::attr_value()); }
+    fn mmio(&self) -> bool {
+        self.0.attr().value == MairDevice::attr_value().value
+    }
+    fn set_mmio(&mut self, value: bool) {
+        if value {
+            self.0.modify_attr(MairDevice::attr_value())
+        } else {
+            self.0.modify_attr(MairNormal::attr_value())
+        }
+    }
 }
 
 impl PageEntry {

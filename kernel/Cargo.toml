@@ -32,7 +32,6 @@ bit-allocator = { path = "../crate/bit-allocator" }
 ucore-memory = { path = "../crate/memory" }
 ucore-process = { path = "../crate/process" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
-register="0.1.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = "0.3"
@@ -45,7 +44,6 @@ riscv = { path = "../crate/riscv" }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-cortex-a = "2.2.1"
 aarch64 = { path = "../crate/aarch64" }
 atags = { path = "../crate/atags" }
 bcm2837 = { path = "../crate/bcm2837", features = ["use_generic_timer"] }

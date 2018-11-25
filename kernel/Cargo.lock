@@ -5,7 +5,6 @@ dependencies = [
  "bare-metal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "os_bootinfo 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "usize_conversions 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -179,14 +178,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "register"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "tock-registers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "register"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -249,11 +240,6 @@ dependencies = [
 
 [[package]]
 name = "tock-registers"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "tock-registers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
@@ -279,13 +265,11 @@ dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bootloader 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-a 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "register 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "riscv 0.3.0",
  "simple-filesystem 0.0.1 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
  "spin 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -399,7 +383,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum pulldown-cmark 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8361e81576d2e02643b04950e487ec172b687180da65c731c03cf336784e6c07"
 "checksum rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8356f47b32624fef5b3301c1be97e5944ecdd595409cc5da11d05f211db6cfbd"
 "checksum redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "c214e91d3ecf43e9a4e41e578973adeb14b474f2bee858742d127af75a0112b1"
-"checksum register 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0e985243ba7e1c336b62444ef2a10d7bd87cf41a222285ae3de605c859006479"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
 "checksum simple-filesystem 0.0.1 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)" = "<none>"
@@ -407,7 +390,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum spin 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)" = "37b5646825922b96b5d7d676b5bb3458a54498e96ed7b0ce09dc43a07038fea4"
 "checksum static_assertions 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c19be23126415861cb3a23e501d34a708f7f9b2183c5252d690941c2e69199d5"
 "checksum tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
-"checksum tock-registers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2acc33f980e23cee18d234a32d0637fbc1ea55e13ab04012fa857b899fa1b7a9"
 "checksum tock-registers 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 "checksum uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "269f953d8de3226f7c065c589c7b4a3e83d10a419c7c3b5e2e0f197e6acc966e"
 "checksum unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
