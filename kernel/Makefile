@@ -52,7 +52,8 @@ qemu_opts := \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
 	-nographic \
-	-kernel $(bin)
+	-kernel $(bin) \
+	-smp cores=$(smp)
 endif
 
 ifdef d
@@ -66,10 +67,8 @@ features := $(features) no_bbl
 endif
 endif
 
-# Link user binaries at ../user
-ifdef link_user
-features := $(features) link_user_program
-assembly_object_files := $(assembly_object_files) $(user_obj)
+ifdef nommu
+features := $(features) no_mmu
 endif
 
 features := $(features) board_$(board)

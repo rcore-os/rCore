@@ -4,16 +4,20 @@ use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, InactivePageTable};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, InactivePageTable};
 use ucore_memory::swap::*;
 use crate::process::{process};
 use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use alloc::collections::VecDeque;
 use lazy_static::*;
 use log::*;
+use linked_list_allocator::LockedHeap;
 
+#[cfg(not(feature = "no_mmu"))]
+pub type MemorySet = ucore_memory::memory_set::MemorySet<InactivePageTable0>;
 
-pub type MemorySet = MemorySet_<InactivePageTable0>;
+#[cfg(feature = "no_mmu")]
+pub type MemorySet = ucore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 
 // x86_64 support up to 256M memory
 #[cfg(target_arch = "x86_64")]
@@ -101,6 +105,7 @@ impl Drop for KernelStack {
 * @retval:
 *   Return true to continue, false to halt
 */
+#[cfg(not(feature = "no_mmu"))]
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
@@ -139,6 +144,25 @@ pub fn init_heap() {
     unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
     info!("heap init end");
 }
+
+/// Allocator for the rest memory space on NO-MMU case.
+pub static MEMORY_ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+#[derive(Debug, Clone, Copy)]
+pub struct NoMMUSupportImpl;
+
+impl ucore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
+    type Alloc = LockedHeap;
+    fn allocator() -> &'static Self::Alloc {
+        &MEMORY_ALLOCATOR
+    }
+}
+
+#[cfg(feature = "no_mmu")]
+pub fn page_fault_handler(_addr: usize) -> bool {
+    unreachable!()
+}
+
 
 //pub mod test {
 //    pub fn cow() {

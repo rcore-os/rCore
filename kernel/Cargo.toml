@@ -5,8 +5,8 @@ authors = ["Runji Wang <wangrunji0408@163.com>"]
 edition = "2018"
 
 [features]
-link_user_program = []
 no_bbl = []
+no_mmu = []
 board_raspi3 = []
 
 [profile.dev]

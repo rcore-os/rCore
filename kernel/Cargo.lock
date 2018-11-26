@@ -37,7 +37,7 @@ name = "bcm2837"
 version = "0.1.0"
 dependencies = [
  "cortex-a 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -65,7 +65,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "bootloader"
 version = "0.3.4"
-source = "git+https://github.com/wangrunji0408/bootloader#dd5723c3d7d50856073a5003e0a355ea0fc3d46c"
+source = "git+https://github.com/wangrunji0408/bootloader#24bdcafc302e7d2659ac126049a45571462907d9"
 dependencies = [
  "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.43"
+version = "0.2.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -185,7 +185,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -324,7 +324,7 @@ dependencies = [
  "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ucore-memory 0.1.0",
  "ucore-process 0.1.0",
- "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -361,7 +361,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "volatile"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -446,7 +446,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum fuchsia-zircon-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
 "checksum lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a374c89b9db55895453a74c1e38861d9deec0b01b405a82516e9d5de4820dea1"
-"checksum libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)" = "76e3a3ef172f1a0b9a9ff0dd1491ae5e6c948b94479a3021819ba7d860c8645d"
+"checksum libc 0.2.44 (registry+https://github.com/rust-lang/crates.io-index)" = "10923947f84a519a45c8fefb7dd1b3e8c08747993381adee176d7a82b4195311"
 "checksum linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "655d57c71827fe0891ce72231b6aa5e14033dae3f604609e6a6f807267c1678d"
 "checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
@@ -472,7 +472,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
 "checksum usize_conversions 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f70329e2cbe45d6c97a5112daad40c34cd9a4e18edb5a2a18fefeb584d8d25e5"
 "checksum ux 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "53d8df5dd8d07fedccd202de1887d94481fadaea3db70479f459e8163a1fab41"
-"checksum volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "54d4343a2df2d65144a874f95950754ee7b7e8594f6027aae8c7d0f4858a3fe8"
+"checksum volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ca391c55768e479d5c2f8beb40c136df09257292a809ea514e82cfdfc15d00"
 "checksum winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "92c1eb33641e276cfa214a0522acad57be5c56b10cb348b3c5117db75f3ac4b0"
 "checksum winapi-i686-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"

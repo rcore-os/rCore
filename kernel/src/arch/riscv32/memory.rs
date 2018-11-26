@@ -2,12 +2,24 @@ use core::{slice, mem};
 use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 use log::*;
-use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet};
+use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR};
+use crate::consts::{MEMORY_OFFSET, MEMORY_END};
+
+#[cfg(feature = "no_mmu")]
+pub fn init() {
+    init_heap();
+
+    let heap_bottom = end as usize;
+    let heap_size = MEMORY_END - heap_bottom;
+    unsafe { MEMORY_ALLOCATOR.lock().init(heap_bottom, heap_size); }
+    info!("available memory: [{:#x}, {:#x})", heap_bottom, MEMORY_END);
+}
 
 /*
 * @brief:
 *   Init the mermory management module, allow memory access and set up page table and init heap and frame allocator
 */
+#[cfg(not(feature = "no_mmu"))]
 pub fn init() {
     #[repr(align(4096))]  // align the PageData struct to 4096 bytes
     struct PageData([u8; PAGE_SIZE]);
@@ -37,7 +49,6 @@ pub fn init_other() {
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
-    use crate::consts::{MEMORY_OFFSET, MEMORY_END};
 
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(end as usize + PAGE_SIZE, MEMORY_END));
@@ -63,6 +74,7 @@ fn init_frame_allocator() {
 * @brief:
 *   remmap the kernel memory address with 4K page recorded in p1 page table
 */
+#[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel() {
     let mut ms = MemorySet::new_bare();
     #[cfg(feature = "no_bbl")]
