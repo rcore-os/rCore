@@ -1,6 +1,6 @@
 use riscv::register::*;
 pub use self::context::*;
-use crate::memory::{MemorySet, InactivePageTable0, memory_set_record};
+use crate::memory::{MemorySet, InactivePageTable0};
 use log::*;
 
 #[path = "context.rs"]

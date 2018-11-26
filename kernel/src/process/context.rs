@@ -1,5 +1,5 @@
 use crate::arch::interrupt::{TrapFrame, Context as ArchContext};
-use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0, memory_set_record};
+use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
 use core::fmt::{Debug, Error, Formatter};
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
@@ -66,14 +66,6 @@ impl ContextImpl {
     }
 
     /// Make a new user thread from ELF data
-    /*
-    * @param:
-    *   data: the ELF data stream
-    * @brief:
-    *   make a new thread from ELF data
-    * @retval:
-    *   the new user thread Context
-    */
     pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<ContextImpl>
         where Iter: Iterator<Item=&'a str>
     {
@@ -94,12 +86,6 @@ impl ContextImpl {
 
         // Make page table
         let mut memory_set = memory_set_from(&elf);
-
-        // add the new memory set to the recorder
-        let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
-        memory_set_record().push_back(mmset_ptr);
-        //let id = memory_set_record().iter()
-        //    .position(|x| unsafe { info!("current memory set record include {:x?}, {:x?}", x, (*(x.clone() as *mut MemorySet)).get_page_table_mut().token()); false });
 
         memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
@@ -126,14 +112,11 @@ impl ContextImpl {
         }
 
         let kstack = KernelStack::new();
-        {
-            let mut mmset_record = memory_set_record();
-            let id = mmset_record.iter()
-                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-            mmset_record.remove(id);
-        }
 
-        let mut ret = Box::new(ContextImpl {
+        //set the user Memory pages in the memory set swappable
+        memory_set_map_swappable(&mut memory_set);
+
+        Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
                     entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
@@ -142,10 +125,7 @@ impl ContextImpl {
             kstack,
             files: BTreeMap::default(),
             cwd: String::new(),
-        });
-        //set the user Memory pages in the memory set swappable
-        memory_set_map_swappable(ret.get_memory_set_mut());
-        ret
+        })
     }
 
     /// Fork
@@ -154,10 +134,6 @@ impl ContextImpl {
         // Clone memory set, make a new page table
         let mut memory_set = self.memory_set.clone();
         info!("finish mmset clone in fork!");
-        // add the new memory set to the recorder
-        info!("fork! new page table token: {:x?}", memory_set.token());
-        let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
-        memory_set_record().push_back(mmset_ptr);
 
         info!("before copy data to temp space");
         // Copy data to temp space
@@ -180,32 +156,17 @@ impl ContextImpl {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        // remove the raw pointer for the memory set in memory_set_record
-        {
-            let mut mmset_record = memory_set_record();
-            let id = mmset_record.iter()
-                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-            mmset_record.remove(id);
-        }
+        memory_set_map_swappable(&mut memory_set);
+        info!("FORK() finsihed!");
 
-
-        let mut ret = Box::new(ContextImpl {
+        Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
             files: BTreeMap::default(),
             cwd: String::new(),
-        });
-
-        memory_set_map_swappable(ret.get_memory_set_mut());
-        info!("FORK() finsihed!");
-        ret
+        })
     }
-
-    pub fn get_memory_set_mut(&mut self) -> &mut MemorySet {
-        &mut self.memory_set
-    }
-
 }
 
 impl Drop for ContextImpl{

@@ -30,15 +30,6 @@ pub type FrameAlloc = BitAlloc64K;
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
-// record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function
-// after the process is set we can use use crate::processor() to get the inactive page table
-lazy_static! {
-    pub static ref MEMORY_SET_RECORD: SpinNoIrqLock<VecDeque<usize>> = SpinNoIrqLock::new(VecDeque::default());
-}
-
-pub fn memory_set_record() -> MutexGuard<'static, VecDeque<usize>, SpinNoIrq> {
-    MEMORY_SET_RECORD.lock()
-}
 
 lazy_static! {
     static ref ACTIVE_TABLE: SpinNoIrqLock<CowExt<ActivePageTable>> = SpinNoIrqLock::new(unsafe {
@@ -115,43 +106,20 @@ pub fn page_fault_handler(addr: usize) -> bool {
     //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
     info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
-    let mmset_record = memory_set_record();
-    let id = mmset_record.iter()
-            .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
     /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
     * handle the frame deallocated
     */
-    match id {
-        Some(targetid) => {
-            info!("get id from memroy set recorder.");
-            let mmset_ptr = mmset_record.get(targetid).expect("fail to get mmset_ptr").clone();
-            // get current mmset
 
-            let current_mmset = unsafe{&mut *(mmset_ptr as *mut MemorySet)};
-            //check whether the vma is legal
-            if current_mmset.find_area(addr).is_none(){
-                return false;
-            }
+    info!("get pt from processor()");
+    if process().memory_set.find_area(addr).is_none(){
+        return false;
+    }
 
-            let pt = current_mmset.get_page_table_mut();
-            info!("pt got!");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().expect("fail to alloc frame")){
-                return true;
-            }
-        },
-        None => {
-            info!("get pt from processor()");
-            if process().get_memory_set_mut().find_area(addr).is_none(){
-                return false;
-            }
-
-            let pt = process().get_memory_set_mut().get_page_table_mut();
-            info!("pt got");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
-                return true;
-            }
-        },
-    };
+    let pt = process().memory_set.get_page_table_mut();
+    info!("pt got");
+    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
+        return true;
+    }
     //////////////////////////////////////////////////////////////////////////////
 
 

@@ -3,8 +3,6 @@ use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::V
 use core::any::Any;
 use core::slice;
 use lazy_static::lazy_static;
-use crate::memory::{MemorySet, InactivePageTable0, memory_set_record};
-use crate::process::context::memory_set_map_swappable;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
 use crate::sync::Condvar;

@@ -48,12 +48,6 @@ pub mod arch;
 
 pub fn kmain() -> ! {
     processor().run();
-
-//    thread::test::local_key();
-//    thread::test::unpack();
-//    sync::test::philosopher_using_mutex();
-//    sync::test::philosopher_using_monitor();
-//    sync::mpsc::test::test_all();
 }
 
 /// Global heap allocator

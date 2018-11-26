@@ -166,22 +166,17 @@ impl MemoryArea {
                 }
             }
             None => {
-                info!("map delayed!");
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let addr = page.start_address();
-                    //let target = T::alloc_frame().expect("failed to allocate frame");
-                    //self.flags.apply(pt.map(addr, target));
+                    let target = T::alloc_frame().expect("failed to allocate frame");
+                    self.flags.apply(pt.map(addr, target));
                     // for frame delayed allocation
-                    {
-                        let entry = pt.map(addr,0);
-                        self.flags.apply(entry);
-                    }
-                    let entry = pt.get_entry(addr).expect("fail to get entry");
-                    entry.set_present(false);
-                    entry.update();
-
+//                    let entry = pt.map(addr,0);
+//                    self.flags.apply(entry);
+//                    let entry = pt.get_entry(addr).expect("fail to get entry");
+//                    entry.set_present(false);
+//                    entry.update();
                 }
-                info!("finish map delayed!");
             }
         };
     }
