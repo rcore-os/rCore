@@ -10,8 +10,8 @@ pub unsafe fn disable_and_store() -> usize {
 #[cfg(target_arch = "riscv32")]
 pub unsafe fn disable_and_store() -> usize {
     let sstatus: usize;
-    asm!("csrrci $0, 0x100, 1" : "=r"(sstatus));
-    sstatus & 1
+    asm!("csrrci $0, 0x100, 2" : "=r"(sstatus));
+    sstatus & 2
 }
 
 #[inline(always)]

@@ -92,7 +92,10 @@ impl Processor {
     }
 
     pub fn tick(&self) {
+        let flags = unsafe { interrupt::disable_and_store() };
         let need_reschedule = self.manager().tick(self.pid());
+        unsafe { interrupt::restore(flags); }
+
         if need_reschedule {
             self.yield_now();
         }
