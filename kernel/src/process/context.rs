@@ -86,7 +86,7 @@ impl ContextImpl {
         }
 
         // Make page table
-        let mut memory_set = memory_set_from(&elf);
+        let (mut memory_set, entry_addr) = memory_set_from(&elf);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
@@ -108,7 +108,6 @@ impl ContextImpl {
 
         trace!("{:#x?}", memory_set);
 
-        let entry_addr = elf.header.pt2.entry_point() as usize;
         let kstack = KernelStack::new();
 
         //set the user Memory pages in the memory set swappable
@@ -215,17 +214,12 @@ unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
 }
 
 
-/*
-* @param:
-*   elf: the source ELF file
-* @brief:
-*   generate a memory set according to the elf file
-* @retval:
-*   the new memory set
-*/
-fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
+/// Generate a MemorySet according to the ELF file.
+/// Also return the real entry point address.
+fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
     debug!("come in to memory_set_from");
     let mut ms = MemorySet::new();
+    let mut entry = None;
     for ph in elf.program_iter() {
         if ph.get_type() != Ok(Type::Load) {
             continue;
@@ -251,8 +245,13 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
                 target[file_size..].iter_mut().for_each(|x| *x = 0);
             });
         }
+        // Find real entry point
+        if ph.flags().is_execute() {
+            let origin_entry = elf.header.pt2.entry_point() as usize;
+            entry = Some(origin_entry - virt_addr + target.as_ptr() as usize);
+        }
     }
-    ms
+    (ms, entry.unwrap())
 }
 
 fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
