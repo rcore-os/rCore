@@ -47,6 +47,9 @@ qemu_opts := \
 	-kernel $(bin) \
 	-nographic \
 	-smp cores=$(smp)
+ifdef nommu
+qemu_opts := $(qemu_opts) -cpu rv32imacu-nommu
+endif
 else ifeq ($(arch), aarch64)
 qemu_opts := \
 	-machine $(board) \
@@ -143,8 +146,7 @@ else
 	mkdir -p build && \
 	cd build && \
 	../configure \
-		--enable-32bit \
-		--enable-logo \
+		--with-arch=rv32imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
