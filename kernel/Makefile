@@ -12,6 +12,7 @@
 #   d    = int | in_asm | ...	QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
+#   SFSIMG = SFS image path of user programs
 #   smp                         SMP core number
 #   board = fpga				Only available on riscv32, build without bbl, run on board
 #         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
@@ -31,6 +32,7 @@ user_dir := ../user
 user_bin_path := $(user_dir)/target/$(arch)-ucore/debug
 user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
 user_obj := build/$(arch)/user.o
+sfsroot := $(user_dir)/build/sfsroot-$(arch)
 sfsimg := $(user_dir)/build/user-$(arch).img
 
 export ARCH = $(arch)
@@ -40,7 +42,7 @@ export SFSIMG = $(sfsimg)
 ifeq ($(arch), x86_64)
 qemu_opts := \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=raw,file=$(sfsimg),media=disk,cache=writeback \
+	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
 	-smp cores=$(smp) \
 	-serial mon:stdio \
 	-device isa-debug-exit \
@@ -176,7 +178,7 @@ endif
 
 
 ### user programs ###
-$(sfsimg):
+$(sfsimg): $(sfsroot)
 	@cd $(user_dir) && make sfsimg
 
 # make user.o from binary files
