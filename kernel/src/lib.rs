@@ -1,16 +1,10 @@
-#![feature(ptr_internals)]
 #![feature(lang_items)]
-#![feature(const_fn)]
 #![feature(alloc)]
 #![feature(naked_functions)]
 #![feature(asm)]
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
-#![feature(compiler_builtins_lib)]
-#![feature(raw)]
-#![feature(vec_resize_default)]
-#![feature(extern_crate_item_prelude)]
 #![no_std]
 
 // just keep it ...
