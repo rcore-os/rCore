@@ -127,7 +127,7 @@ impl MemoryAttr {
         if self.user { entry.set_user(true); }
         if self.readonly { entry.set_writable(false); }
         if self.execute { entry.set_execute(true); }
-        if self.mmio { entry.set_mmio(false); }
+        if self.mmio { entry.set_mmio(true); }
         if self.hide { entry.set_present(false); }
         if self.user || self.readonly || self.execute || self.mmio || self.hide { entry.update(); }
     }

@@ -38,10 +38,6 @@ extern crate aarch64;
 
 use linked_list_allocator::LockedHeap;
 
-
-#[macro_use]
-extern crate register;
-
 #[macro_use]    // print!
 pub mod logging;
 mod memory;

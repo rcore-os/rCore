@@ -59,6 +59,6 @@ impl MairType for MairNormalNonCacheable {
 
     #[inline]
     fn attr_value() -> PageTableAttribute {
-        MEMORY_ATTRIBUTE::SH::NonShareable + MEMORY_ATTRIBUTE::AttrIndx.val(Self::INDEX)
+        MEMORY_ATTRIBUTE::SH::OuterShareable + MEMORY_ATTRIBUTE::AttrIndx.val(Self::INDEX)
     }
 }
