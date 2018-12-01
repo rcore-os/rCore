@@ -68,14 +68,9 @@ pub mod arch;
 
 pub fn kmain() -> ! {
     process::init();
-
-    use process::*;
-    processor().add(Context::new_kernel(kernel_proc2, 2333));
-    processor().add(Context::new_user_test(kernel_proc3));
-
     unsafe { arch::interrupt::enable(); }
 
-    // fs::shell();
+    fs::shell();
 
 //    thread::test::local_key();
 //    thread::test::unpack();
@@ -93,12 +88,3 @@ pub fn kmain() -> ! {
 /// It should be defined in memory mod, but in Rust `global_allocator` must be in root mod.
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-
-pub extern "C" fn kernel_proc2(arg: usize) -> ! {
-    fs::test_shell(&format!("proc2-{}>> ", arg));
-}
-
-pub extern "C" fn kernel_proc3(arg: usize) -> ! {
-    fs::test_shell(&format!("proc3-{}$ ", arg));
-}
