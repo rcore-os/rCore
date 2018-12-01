@@ -5,7 +5,7 @@ use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
-use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
+use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, flush_icache_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB, Size1GiB};
@@ -246,6 +246,7 @@ impl InactivePageTable for InactivePageTable0 {
         if old_frame != new_frame {
             ttbr_el1_write(1, old_frame);
             tlb_invalidate_all();
+            flush_icache_all();
         }
     }
 

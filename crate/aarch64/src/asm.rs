@@ -105,6 +105,18 @@ pub fn tlb_invalidate(vaddr: VirtAddr) {
     }
 }
 
+/// Invalidate all instruction caches in Inner Shareable domain to Point of Unification.
+#[inline(always)]
+pub fn flush_icache_all() {
+    unsafe {
+        asm!(
+            "ic ialluis
+             dsb ish
+             isb"
+        );
+    }
+}
+
 /// Address Translate.
 #[inline(always)]
 pub fn address_translate(vaddr: usize) -> usize {
