@@ -93,7 +93,7 @@ set_stack:
 
 zero_bss:
     # load the start address and number of bytes in BSS section
-    ldr     x1, =__bss_start
+    ldr     x1, =sbss
     ldr     x2, =__bss_length
 
 zero_bss_loop:

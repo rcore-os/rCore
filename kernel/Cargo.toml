@@ -44,7 +44,7 @@ riscv = { path = "../crate/riscv" }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-cortex-a = "2.2.1"
+aarch64 = { git = "https://github.com/equation314/aarch64" }
 atags = { path = "../crate/atags" }
 bcm2837 = { path = "../crate/bcm2837", features = ["use_generic_timer"] }
 

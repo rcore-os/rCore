@@ -20,8 +20,7 @@ impl SerialPort {
 
     /// Init a newly created SerialPort, can only be called once.
     pub fn init(&mut self) {
-        // FIXME
-        // assert_has_not_been_called!("SerialPort::init must be called only once");
+        assert_has_not_been_called!("SerialPort::init must be called only once");
         self.mu = Some(MiniUart::new());
     }
 
@@ -71,7 +70,4 @@ impl fmt::Write for SerialPort {
     }
 }
 
-// FIXME
-// pub static SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
-pub static mut SERIAL_PORT: SerialPort = SerialPort::new();
-
+pub static SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());

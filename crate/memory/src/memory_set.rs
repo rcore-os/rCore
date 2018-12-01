@@ -98,6 +98,7 @@ pub struct MemoryAttr {
     user: bool,
     readonly: bool,
     execute: bool,
+    mmio: bool,
     hide: bool,
 }
 
@@ -114,6 +115,10 @@ impl MemoryAttr {
         self.execute = true;
         self
     }
+    pub fn mmio(mut self) -> Self {
+        self.mmio = true;
+        self
+    }
     pub fn hide(mut self) -> Self {
         self.hide = true;
         self
@@ -122,8 +127,9 @@ impl MemoryAttr {
         if self.user { entry.set_user(true); }
         if self.readonly { entry.set_writable(false); }
         if self.execute { entry.set_execute(true); }
+        if self.mmio { entry.set_mmio(true); }
         if self.hide { entry.set_present(false); }
-        if self.user || self.readonly || self.execute || self.hide { entry.update(); }
+        if self.user || self.readonly || self.execute || self.mmio || self.hide { entry.update(); }
     }
 }
 
@@ -165,6 +171,9 @@ impl<T: InactivePageTable> MemorySet<T> {
     }
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
+    }
+    pub fn edit(&mut self, f: impl FnOnce(&mut T::Active)) {
+        self.page_table.edit(f);
     }
     pub unsafe fn with(&self, f: impl FnOnce()) {
         self.page_table.with(f);
