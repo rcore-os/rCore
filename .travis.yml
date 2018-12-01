@@ -1,14 +1,23 @@
-sudo: required
+sudo: false
 
 language: rust
 
 rust: nightly
 
+os:
+  - linux
+  - osx
+
 cache:
   cargo: true
+  directories:
+    - $HOME/Library/Caches/Homebrew
 
 addons:
   apt:
+    packages:
+      - qemu
+  homebrew:
     packages:
       - qemu
 
@@ -21,15 +30,21 @@ env:
 
 install:
   - if [ $ARCH = riscv32 ]; then
-    export FILE="riscv64-unknown-elf-gcc-20181030-x86_64-linux-ubuntu14";
-    wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
-    tar xf $FILE.tar.gz;
-    export PATH=$PATH:$PWD/$FILE/bin;
+      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-linux-ubuntu14";
+      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-apple-darwin";
+      wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
+      tar xf $FILE.tar.gz;
+      export PATH=$PATH:$PWD/$FILE/bin;
     fi
   - if [ $ARCH = aarch64 ]; then
-    wget https://web.stanford.edu/class/cs140e/files/aarch64-none-elf-linux-x64.tar.gz;
-    tar -xzvf aarch64-none-elf-linux-x64.tar.gz;
-    export PATH=$PATH:$PWD/aarch64-none-elf/bin;
+    if [ $TRAVIS_OS_NAME = linux ]; then
+      wget https://web.stanford.edu/class/cs140e/files/aarch64-none-elf-linux-x64.tar.gz;
+      tar -xzvf aarch64-none-elf-linux-x64.tar.gz;
+      export PATH=$PATH:$PWD/aarch64-none-elf/bin;
+    elif [ $TRAVIS_OS_NAME = osx ]; then
+      brew tap SergioBenitez/osxct;
+      brew install aarch64-none-elf;
+    fi;
     fi
 
 
