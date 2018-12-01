@@ -110,7 +110,6 @@ pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
-    info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
     /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
     * handle the frame deallocated
     */

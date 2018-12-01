@@ -34,7 +34,7 @@ _user_img_end:
 
 lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
-        #[cfg(target_arch = "riscv32")]
+        #[cfg(any(target_arch = "riscv32", target_arch = "aarch64"))]
         let device = {
             extern {
                 fn _user_img_start();
@@ -44,8 +44,6 @@ lazy_static! {
         };
         #[cfg(target_arch = "x86_64")]
         let device = Box::new(ide::IDE::new(1));
-        #[cfg(target_arch = "aarch64")]
-        let device = unimplemented!();
 
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()

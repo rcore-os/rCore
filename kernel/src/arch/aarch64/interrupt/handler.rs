@@ -55,7 +55,7 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                     Fault::Translation | Fault::AccessFlag | Fault::Permission => {
                         handle_page_fault(tf)
                     }
-                    _ => ::trap::error(tf),
+                    _ => crate::trap::error(tf),
                 },
                 _ => crate::trap::error(tf),
             }
@@ -73,7 +73,7 @@ fn handle_break(_num: u16, tf: &mut TrapFrame) {
 
 fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     if num != 0 {
-        ::trap::error(tf);
+        crate::trap::error(tf);
     }
 
     // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
@@ -96,5 +96,5 @@ fn handle_page_fault(tf: &mut TrapFrame) {
     let addr = FAR_EL1.get();
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    ::trap::error(tf);
+    crate::trap::error(tf);
 }

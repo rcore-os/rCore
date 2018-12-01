@@ -1,6 +1,7 @@
 use bcm2837::mini_uart::MiniUart;
 use core::fmt;
 use spin::Mutex;
+use once::*;
 
 /// Struct to get a global SerialPort interface
 pub struct SerialPort {

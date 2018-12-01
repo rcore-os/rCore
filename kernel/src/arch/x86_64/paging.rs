@@ -96,9 +96,6 @@ impl ActivePageTable {
         // Unmap the page
         self.unmap(0xcafebabe);
     }
-    pub fn token() -> usize {
-        Cr3::read().0.start_address().as_u64() as usize
-    }
 }
 
 impl Entry for PageEntry {

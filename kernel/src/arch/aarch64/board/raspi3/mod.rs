@@ -1,5 +1,7 @@
 //! Raspberry PI 3 Model B/B+
 
+use once::*;
+
 pub mod irq;
 pub mod timer;
 pub mod serial;

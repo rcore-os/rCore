@@ -1,7 +1,4 @@
 //! Page table implementations for aarch64.
-// Depends on kernel
-use consts::{KERNEL_PML4, RECURSIVE_INDEX};
-use memory::{active_table, alloc_frame, alloc_stack, dealloc_frame};
 use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
@@ -10,6 +7,10 @@ use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB, Size1GiB};
 use aarch64::paging::memory_attribute::*;
+use log::*;
+// Depends on kernel
+use crate::consts::{KERNEL_PML4, RECURSIVE_INDEX};
+use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
 // need 3 page
 pub fn setup_temp_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
@@ -25,7 +26,7 @@ pub fn setup_temp_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: F
     for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
         let paddr = PhysAddr::new(page.start_address().as_u64());
 
-        use arch::board::IO_REMAP_BASE;
+        use super::board::IO_REMAP_BASE;
         if paddr.as_u64() >= IO_REMAP_BASE as u64 {
             p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
         } else {
@@ -55,7 +56,7 @@ impl PageTable for ActivePageTable {
         let attr = MairNormal::attr_value();
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, attr, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
-        self.get_entry(addr)
+        self.get_entry(addr).expect("fail to get entry")
     }
 
     fn unmap(&mut self, addr: usize) {
@@ -241,13 +242,14 @@ impl InactivePageTable for InactivePageTable0 {
             ttbr_el1_write(1, new_frame);
             tlb_invalidate_all();
         }
-        f();
+        let ret = f();
         debug!("switch TTBR1 {:?} -> {:?}", new_frame, old_frame);
         if old_frame != new_frame {
             ttbr_el1_write(1, old_frame);
             tlb_invalidate_all();
             flush_icache_all();
         }
+        ret
     }
 
     fn token(&self) -> usize {

@@ -1,10 +1,11 @@
 //! Memory initialization for aarch64.
 
+use log::*;
 use ucore_memory::PAGE_SIZE;
-use memory::{FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Stack};
-use super::atags::atags::Atags;
+use atags::atags::Atags;
 use aarch64::{barrier, regs::*, addr::*};
 use aarch64::paging::{PhysFrame as Frame, memory_attribute::*};
+use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet};
 
 /// Memory initialization.
 pub fn init() {
@@ -73,7 +74,7 @@ pub fn init_mmu_early() {
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
-    use consts::MEMORY_OFFSET;
+    use crate::consts::MEMORY_OFFSET;
 
     let (start, end) = memory_map().expect("failed to find memory map");
     let mut ba = FRAME_ALLOCATOR.lock();
@@ -98,20 +99,14 @@ fn init_frame_allocator() {
 
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
-    let (bottom, top) = (0, bootstacktop as usize);
-    let kstack = Stack {
-        top,
-        bottom,
-    };
-    static mut SPACE: [u8; 0x1000] = [0; 0x1000];
-    let mut ms = unsafe { MemorySet::new_from_raw_space(&mut SPACE, kstack) };
-    ms.push(MemoryArea::new_identity(bottom, top, MemoryAttr::default(), "kstack"));
+    let mut ms = unsafe { MemorySet::new_bare() };
+    ms.push(MemoryArea::new_identity(0, bootstacktop as usize, MemoryAttr::default(), "kstack"));
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
 
-    use arch::board::{IO_REMAP_BASE, IO_REMAP_END};
+    use super::board::{IO_REMAP_BASE, IO_REMAP_END};
     ms.push(MemoryArea::new_identity(IO_REMAP_BASE, IO_REMAP_END, MemoryAttr::default().mmio(), "io_remap"));
 
     unsafe { ms.activate(); }

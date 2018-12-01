@@ -1,8 +1,7 @@
 //! TrapFrame and context definitions for aarch64.
 
-extern crate aarch64;
-
-use spin::{Mutex};
+use spin::Mutex;
+use lazy_static::lazy_static;
 use aarch64::barrier;
 use aarch64::addr::PhysAddr;
 use aarch64::paging::PhysFrame;
@@ -169,7 +168,7 @@ impl Context {
     /// Called at a new user context
     /// To get the init TrapFrame in sys_exec
     pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.0 as *const InitStack)).tf.clone()
+        (*(self.stack_top as *const InitStack)).tf.clone()
     }
 
 }

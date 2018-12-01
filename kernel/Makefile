@@ -142,7 +142,7 @@ ifeq ($(arch), riscv32)
 ifeq ($(board), fpga)
 	@cp $(kernel) $@
 else
-	@cd ../tools/riscv-pk && \
+	@cd ../riscv-pk && \
 	mkdir -p build && \
 	cd build && \
 	../configure \
@@ -152,7 +152,7 @@ else
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
 	make && \
-	cp bbl ../../../kernel/$@
+	cp bbl ../../kernel/$@
 endif
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(kernel) --strip-all -O binary $@
