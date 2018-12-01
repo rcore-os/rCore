@@ -2,8 +2,7 @@
 
 .section .text.boot
 
-.global _start
-_start:
+boot:
     # read cpu affinity, start core 0, halt rest
     mrs     x1, mpidr_el1
     and     x1, x1, #3
@@ -16,7 +15,7 @@ halt:
 
 setup:
     # store the desired EL1 stack pointer in x1
-    adr     x1, _start
+    ldr     x1, =_start
 
     # use SP_ELx for Exception level ELx
     msr     SPsel, #1
@@ -94,17 +93,22 @@ set_stack:
 
 zero_bss:
     # load the start address and number of bytes in BSS section
-    ldr     x1, =__bss_start
+    ldr     x1, =sbss
     ldr     x2, =__bss_length
 
 zero_bss_loop:
     # zero out the BSS section, 64-bits at a time
-    cbz     x2, go_kmain
+    cbz     x2, zero_bss_loop_end
     str     xzr, [x1], #8
     sub     x2, x2, #8
     cbnz    x2, zero_bss_loop
 
-go_kmain:
+zero_bss_loop_end:
+    b       _start
+
+.section .text.entry
+.globl _start
+_start:
     # jump to rust_main, which shouldn't return. halt if it does
     bl      rust_main
     b       halt

@@ -20,6 +20,18 @@ _user_img_start:
 _user_img_end:
 "#);
 
+// Hard link user program
+#[cfg(target_arch = "aarch64")]
+global_asm!(r#"
+    .section .rodata
+    .align 12
+    .global _user_img_start
+    .global _user_img_end
+_user_img_start:
+    .incbin "../user/user-aarch64.img"
+_user_img_end:
+"#);
+
 lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
         #[cfg(target_arch = "riscv32")]

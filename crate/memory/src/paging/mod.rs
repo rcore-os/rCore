@@ -195,4 +195,6 @@ pub trait Entry {
     **  @retval none
     */
     fn set_execute(&mut self, value: bool);
+    fn mmio(&self) -> bool;
+    fn set_mmio(&mut self, value: bool);
 }

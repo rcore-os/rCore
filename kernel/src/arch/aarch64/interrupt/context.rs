@@ -1,12 +1,20 @@
 //! TrapFrame and context definitions for aarch64.
 
+extern crate aarch64;
+
+use spin::{Mutex};
+use aarch64::barrier;
+use aarch64::addr::PhysAddr;
+use aarch64::paging::PhysFrame;
+use aarch64::asm::{tlb_invalidate_all, ttbr_el1_write_asid};
+
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TrapFrame {
     pub elr: usize,
     pub spsr: usize,
     pub sp: usize,
-    pub tpidr: usize,
+    pub tpidr: usize, // currently unused
     // pub q0to31: [u128; 32], // disable SIMD/FP registers
     pub x1to29: [usize; 29],
     pub __reserved: usize,
@@ -47,10 +55,14 @@ pub struct InitStack {
 }
 
 impl InitStack {
-    unsafe fn push_at(self, stack_top: usize) -> Context {
+    unsafe fn push_at(self, stack_top: usize, ttbr: usize) -> Context {
         let ptr = (stack_top as *mut Self).offset(-1);
         *ptr = self;
-        Context(ptr as usize)
+        Context {
+            stack_top: ptr as usize,
+            ttbr: PhysFrame::containing_address(PhysAddr::new(ttbr as u64)),
+            asid: Asid::default(),
+        }
     }
 }
 
@@ -63,18 +75,20 @@ extern {
 struct ContextData {
     x19to29: [usize; 11],
     lr: usize,
-    ttbr0: usize,
 }
 
 impl ContextData {
-    fn new(ttbr0: usize) -> Self {
-        ContextData { lr: __trapret as usize, ttbr0, ..ContextData::default() }
+    fn new() -> Self {
+        ContextData { lr: __trapret as usize, ..ContextData::default() }
     }
 }
 
-
 #[derive(Debug)]
-pub struct Context(usize);
+pub struct Context {
+    stack_top: usize,
+    ttbr: PhysFrame,
+    asid: Asid,
+}
 
 impl Context {
     /// Switch to another kernel thread.
@@ -86,10 +100,10 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    pub unsafe extern fn switch(&mut self, target: &mut Self) {
+    unsafe extern fn __switch(self_stack: &mut usize, target_stack: &mut usize) {
         asm!(
         "
-        mov x10, #-(13 * 8)
+        mov x10, #-(12 * 8)
         add x8, sp, x10
         str x8, [x0]
         stp x19, x20, [x8], #16     // store callee-saved registers
@@ -98,8 +112,6 @@ impl Context {
         stp x25, x26, [x8], #16
         stp x27, x28, [x8], #16
         stp x29, lr, [x8], #16
-        mrs x9, ttbr0_el1
-        str x9, [x8], #8
 
         ldr x8, [x1]
         ldp x19, x20, [x8], #16     // restore callee-saved registers
@@ -108,45 +120,51 @@ impl Context {
         ldp x25, x26, [x8], #16
         ldp x27, x28, [x8], #16
         ldp x29, lr, [x8], #16
-        ldr x9, [x8], #8
         mov sp, x8
-
-        msr ttbr0_el1, x9           // set new page directory
-        dsb ishst                   // ensure write has completed
-        tlbi vmalle1is              // invalidate the TLB entry for the entry that changes
-        dsb ish                     // ensure TLB invalidation is complete
-        isb                         // synchronize context on this processor
 
         str xzr, [x1]
         ret"
         : : : : "volatile" );
     }
 
-    pub unsafe fn null() -> Self {
-        Context(0)
+    pub unsafe fn switch(&mut self, target: &mut Self) {
+        target.asid = ASID_ALLOCATOR.lock().alloc(target.asid);
+
+        // with ASID we needn't flush TLB frequently
+        ttbr_el1_write_asid(1, target.asid.value, target.ttbr);
+        barrier::dsb(barrier::ISH);
+        Self::__switch(&mut self.stack_top, &mut target.stack_top);
     }
 
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, ttbr0: usize) -> Self {
+    pub unsafe fn null() -> Self {
+        Context {
+            stack_top: 0,
+            ttbr: PhysFrame::containing_address(PhysAddr::new(0)),
+            asid: Asid::default(),
+        }
+    }
+
+    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
-        }.push_at(kstack_top)
+        }.push_at(kstack_top, ttbr)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, ttbr0: usize) -> Self {
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
-        }.push_at(kstack_top)
+        }.push_at(kstack_top, ttbr)
     }
-    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, ttbr0: usize) -> Self {
+    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, ttbr: usize) -> Self {
         InitStack {
-            context: ContextData::new(ttbr0),
+            context: ContextData::new(),
             tf: {
                 let mut tf = tf.clone();
                 tf.x0 = 0;
                 tf
             },
-        }.push_at(kstack_top)
+        }.push_at(kstack_top, ttbr)
     }
     /// Called at a new user context
     /// To get the init TrapFrame in sys_exec
@@ -154,4 +172,42 @@ impl Context {
         (*(self.0 as *const InitStack)).tf.clone()
     }
 
+}
+
+const ASID_MASK: u16 = 0xffff;
+
+#[derive(Debug, Copy, Clone, Default)]
+#[repr(C)]
+struct Asid {
+    value: u16,
+    generation: u16,
+}
+
+struct AsidAllocator(Asid);
+
+impl AsidAllocator {
+    fn new() -> Self {
+        AsidAllocator(Asid { value: 0, generation: 1 })
+    }
+
+    fn alloc(&mut self, old_asid: Asid) -> Asid {
+        if self.0.generation == old_asid.generation {
+            return old_asid;
+        }
+
+        if self.0.value == ASID_MASK {
+            self.0.value = 0;
+            self.0.generation = self.0.generation.wrapping_add(1);
+            if self.0.generation == 0 {
+                self.0.generation += 1;
+            }
+            tlb_invalidate_all();
+        }
+        self.0.value += 1;
+        return self.0;
+    }
+}
+
+lazy_static! {
+    static ref ASID_ALLOCATOR: Mutex<AsidAllocator> = Mutex::new(AsidAllocator::new());
 }

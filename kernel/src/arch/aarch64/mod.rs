@@ -18,9 +18,13 @@ global_asm!(include_str!("boot/boot.S"));
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main() -> ! {
+    // Enable mmu and paging
+    memory::init_mmu_early();
+
     // Init board to enable serial port.
     board::init();
-    crate::logging::init(); // FIXME
+
+    crate::logging::init();
     interrupt::init();
     memory::init();
     timer::init();

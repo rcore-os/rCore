@@ -51,20 +51,6 @@ impl ContextImpl {
         })
     }
 
-    /// Temp for aarch64
-    pub fn new_user_test(entry: extern fn(usize) -> !) -> Box<Context> {
-        let memory_set = MemorySet::new();
-        let kstack = KernelStack::new();
-        let ustack = KernelStack::new();
-        Box::new(ContextImpl {
-            arch: unsafe { ArchContext::new_user_thread(entry as usize, ustack.top(), kstack.top(), false, memory_set.token()) },
-            memory_set,
-            kstack,
-            files: BTreeMap::default(),
-            cwd: String::new(),
-        })
-    }
-
     /// Make a new user thread from ELF data
     pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<ContextImpl>
         where Iter: Iterator<Item=&'a str>
@@ -228,6 +214,10 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
         let offset = ph.offset() as usize;
         let file_size = ph.file_size() as usize;
         let mem_size = ph.mem_size() as usize;
+
+        #[cfg(target_arch = "aarch64")]
+        assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
+
         // Get target slice
         #[cfg(feature = "no_mmu")]
         let target = ms.push(mem_size);
