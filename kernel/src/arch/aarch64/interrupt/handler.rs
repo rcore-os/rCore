@@ -2,7 +2,9 @@
 
 use arch::board::irq::handle_irq;
 use super::context::TrapFrame;
-use super::syndrome::Syndrome;
+use super::syndrome::{Fault, Syndrome};
+
+use aarch64::regs::*;
 
 global_asm!(include_str!("trap.S"));
 global_asm!(include_str!("vector.S"));
@@ -46,7 +48,14 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
             // syndrome is only valid with sync
             match syndrome {
                 Syndrome::Brk(brk) => handle_break(brk, tf),
-                Syndrome::Svc(_) => handle_syscall(tf),
+                Syndrome::Svc(svc) => handle_syscall(svc, tf),
+                Syndrome::DataAbort { kind, level: _ }
+                | Syndrome::InstructionAbort { kind, level: _ } => match kind {
+                    Fault::Translation | Fault::AccessFlag | Fault::Permission => {
+                        handle_page_fault(tf)
+                    }
+                    _ => ::trap::error(tf),
+                },
                 _ => ::trap::error(tf),
             }
         }
@@ -57,12 +66,16 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
     trace!("Interrupt end");
 }
 
-fn handle_break(num: u16, tf: &mut TrapFrame) {
+fn handle_break(_num: u16, tf: &mut TrapFrame) {
     // Skip the current brk instruction (ref: J1.1.2, page 6147)
     tf.elr += 4;
 }
 
-fn handle_syscall(tf: &mut TrapFrame) {
+fn handle_syscall(num: u16, tf: &mut TrapFrame) {
+    if num != 0 {
+        ::trap::error(tf);
+    }
+
     // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
     let ret = ::syscall::syscall(
         tf.x1to29[7] as usize,
@@ -77,4 +90,11 @@ fn handle_syscall(tf: &mut TrapFrame) {
         tf,
     );
     tf.x0 = ret as usize;
+}
+
+fn handle_page_fault(tf: &mut TrapFrame) {
+    let addr = FAR_EL1.get();
+    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+
+    ::trap::error(tf);
 }
