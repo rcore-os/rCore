@@ -15,14 +15,16 @@
 #   smp  = 1 | 2 | ...          SMP core number
 #   board = fpga				Only available on riscv32, build without bbl, run on board
 #         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   nommu						Only available on riscv32, build for M-Mode, without MMU
+#   m_mode						Only available on riscv32, build for M-Mode, without MMU
 
 arch ?= riscv32
 board ?= raspi3
 mode ?= debug
 LOG  ?= debug
 smp  ?= 4
-nommu ?=
+# NOTE: crate 'process' use this name 'm_mode' as an environment
+#		to set interrupt (MIE or SIE)
+m_mode ?=
 
 target := $(arch)-blog_os
 kernel := target/$(target)/$(mode)/ucore
@@ -45,7 +47,7 @@ else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
 	-kernel $(bin)
-ifdef nommu
+ifdef m_mode
 qemu_opts += -cpu rv32imacu-nommu
 endif
 
@@ -67,8 +69,8 @@ features += no_bbl
 endif
 endif
 
-ifdef nommu
-features += no_mmu
+ifdef m_mode
+features += no_mmu m_mode
 bbl_m_mode := --enable-boot-machine
 endif
 

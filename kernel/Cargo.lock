@@ -218,7 +218,7 @@ dependencies = [
 [[package]]
 name = "riscv"
 version = "0.3.0"
-source = "git+https://github.com/riscv-and-rust-and-decaf/riscv#f358204af01f2374ab6ed6ea059f724cd5f2fe6f"
+source = "git+https://github.com/riscv-and-rust-and-decaf/riscv#966eb26d5e8d77677f645d5e32877c678dcee572"
 dependencies = [
  "bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",

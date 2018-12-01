@@ -20,23 +20,29 @@ impl Write for SerialPort {
 }
 
 fn putchar(c: u8) {
-    #[cfg(feature = "no_bbl")]
-    unsafe {
-        while read_volatile(STATUS) & CAN_WRITE == 0 {}
-        write_volatile(DATA, c as u8);
+    if cfg!(feature = "no_bbl") {
+        unsafe {
+            while read_volatile(STATUS) & CAN_WRITE == 0 {}
+            write_volatile(DATA, c as u8);
+        }
+    } else if cfg!(feature = "m_mode") {
+        (super::BBL.mcall_console_putchar)(c);
+    } else {
+        sbi::console_putchar(c as usize);
     }
-    #[cfg(not(feature = "no_bbl"))]
-    sbi::console_putchar(c as usize);
 }
 
 pub fn getchar() -> char {
-    #[cfg(feature = "no_bbl")]
-    let c = unsafe {
-        while read_volatile(STATUS) & CAN_READ == 0 {}
-        read_volatile(DATA)
+    let c = if cfg!(feature = "no_bbl") {
+        unsafe {
+            // while read_volatile(STATUS) & CAN_READ == 0 {}
+            read_volatile(DATA)
+        }
+    } else if cfg!(feature = "m_mode") {
+        (super::BBL.mcall_console_getchar)() as u8
+    } else {
+        sbi::console_getchar() as u8
     };
-    #[cfg(not(feature = "no_bbl"))]
-    let c = sbi::console_getchar() as u8;
 
     match c {
         255 => '\0',   // null

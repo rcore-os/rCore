@@ -1,4 +1,16 @@
-use riscv::register::*;
+#[cfg(feature = "m_mode")]
+use riscv::register::{
+    mstatus as xstatus,
+    mscratch as xscratch,
+    mtvec as xtvec,
+};
+#[cfg(not(feature = "m_mode"))]
+use riscv::register::{
+    sstatus as xstatus,
+    sscratch as xscratch,
+    stvec as xtvec,
+};
+use riscv::register::{mcause, mepc, sie};
 pub use self::context::*;
 use crate::memory::{MemorySet, InactivePageTable0};
 use log::*;
@@ -17,13 +29,16 @@ pub fn init() {
     unsafe {
         // Set sscratch register to 0, indicating to exception vector that we are
         // presently executing in the kernel
-        sscratch::write(0);
+        xscratch::write(0);
         // Set the exception vector address
-        stvec::write(__alltraps as usize, stvec::TrapMode::Direct);
+        xtvec::write(__alltraps as usize, xtvec::TrapMode::Direct);
         // Enable IPI
         sie::set_ssoft();
         // Enable serial interrupt
         sie::set_sext();
+        // NOTE: In M-mode: mie.MSIE is set by BBL.
+        //                  mie.MEIE can not be set in QEMU v3.0
+        //                  (seems like a bug)
     }
     info!("interrupt: init end");
 }
@@ -34,7 +49,7 @@ pub fn init() {
 */
 #[inline(always)]
 pub unsafe fn enable() {
-    sstatus::set_sie();
+    xstatus::set_xie();
 }
 
 /*
@@ -45,8 +60,8 @@ pub unsafe fn enable() {
 */
 #[inline(always)]
 pub unsafe fn disable_and_store() -> usize {
-    let e = sstatus::read().sie() as usize;
-    sstatus::clear_sie();
+    let e = xstatus::read().xie() as usize;
+    xstatus::clear_xie();
     e
 }
 
@@ -59,7 +74,7 @@ pub unsafe fn disable_and_store() -> usize {
 #[inline(always)]
 pub unsafe fn restore(flags: usize) {
     if flags != 0 {
-        sstatus::set_sie();
+        xstatus::set_xie();
     }
 }
 
@@ -71,9 +86,15 @@ pub unsafe fn restore(flags: usize) {
 */
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use riscv::register::scause::{Trap, Interrupt as I, Exception as E};
+    use self::mcause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
+        // M-mode only
+        Trap::Interrupt(I::MachineExternal) => serial(),
+        Trap::Interrupt(I::MachineSoft) => ipi(),
+        Trap::Interrupt(I::MachineTimer) => timer(),
+        Trap::Exception(E::MachineEnvCall) => sbi(tf),
+
         Trap::Interrupt(I::SupervisorExternal) => serial(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
@@ -85,6 +106,12 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         _ => crate::trap::error(tf),
     }
     trace!("Interrupt end");
+}
+
+/// Call BBL SBI functions for M-mode kernel
+fn sbi(tf: &mut TrapFrame) {
+    (super::BBL.mcall_trap)(tf.x.as_ptr(), tf.scause.bits(), tf.sepc);
+    tf.sepc += 4;
 }
 
 fn serial() {
@@ -101,8 +128,8 @@ fn ipi() {
 *   process timer interrupt
 */
 fn timer() {
-    crate::trap::timer();
     super::timer::set_next();
+    crate::trap::timer();
 }
 
 /*
@@ -124,9 +151,8 @@ fn syscall(tf: &mut TrapFrame) {
 *   process IllegalInstruction exception
 */
 fn illegal_inst(tf: &mut TrapFrame) {
-    if !emulate_mul_div(tf) {
-        crate::trap::error(tf);
-    }
+    (super::BBL.illegal_insn_trap)(tf.x.as_ptr(), tf.scause.bits(), tf.sepc);
+    tf.sepc = mepc::read();
 }
 
 /*
@@ -136,73 +162,10 @@ fn illegal_inst(tf: &mut TrapFrame) {
 *   process page fault exception
 */
 fn page_fault(tf: &mut TrapFrame) {
-    let addr = stval::read();
+    let addr = tf.stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     if !crate::memory::page_fault_handler(addr) {
         crate::trap::error(tf);
     }
-}
-
-/// Migrate from riscv-pk
-/*
-* @param:
-*   TrapFrame: the Trapframe for the illegal inst exception
-* @brief:
-*   emulate the multiply and divide operation (if not this kind of operation return false)
-* @retval:
-*   a bool indicates whether emulate the multiply and divide operation successfully
-*/
-fn emulate_mul_div(tf: &mut TrapFrame) -> bool {
-    let insn = unsafe { *(tf.sepc as *const usize) };
-    let rs1 = tf.x[get_reg(insn, RS1)];
-    let rs2 = tf.x[get_reg(insn, RS2)];
-
-    let rd = if (insn & MASK_MUL) == MATCH_MUL {
-        rs1 * rs2
-    } else if (insn & MASK_DIV) == MATCH_DIV {
-        ((rs1 as i32) / (rs2 as i32)) as usize
-    } else if (insn & MASK_DIVU) == MATCH_DIVU {
-        rs1 / rs2
-    } else if (insn & MASK_REM) == MATCH_REM {
-        ((rs1 as i32) % (rs2 as i32)) as usize
-    } else if (insn & MASK_REMU) == MATCH_REMU {
-        rs1 % rs2
-    } else if (insn & MASK_MULH) == MATCH_MULH {
-        (((rs1 as i32 as i64) * (rs2 as i32 as i64)) >> 32) as usize
-    } else if (insn & MASK_MULHU) == MATCH_MULHU {
-        (((rs1 as i64) * (rs2 as i64)) >> 32) as usize
-    } else if (insn & MASK_MULHSU) == MATCH_MULHSU {
-        (((rs1 as i32 as i64) * (rs2 as i64)) >> 32) as usize
-    } else {
-        return false;
-    };
-    tf.x[get_reg(insn, RD)] = rd;
-    tf.sepc += 4; // jump to next instruction
-    return true;
-
-    fn get_reg(inst: usize, offset: usize) -> usize {
-        (inst >> offset) & 0x1f
-    }
-
-    const RS1: usize = 15;
-    const RS2: usize = 20;
-    const RD: usize = 7;
-
-    const MATCH_MUL: usize = 0x2000033;
-    const MASK_MUL: usize = 0xfe00707f;
-    const MATCH_MULH: usize = 0x2001033;
-    const MASK_MULH: usize = 0xfe00707f;
-    const MATCH_MULHSU: usize = 0x2002033;
-    const MASK_MULHSU: usize = 0xfe00707f;
-    const MATCH_MULHU: usize = 0x2003033;
-    const MASK_MULHU: usize = 0xfe00707f;
-    const MATCH_DIV: usize = 0x2004033;
-    const MASK_DIV: usize = 0xfe00707f;
-    const MATCH_DIVU: usize = 0x2005033;
-    const MASK_DIVU: usize = 0xfe00707f;
-    const MATCH_REM: usize = 0x2006033;
-    const MASK_REM: usize = 0xfe00707f;
-    const MATCH_REMU: usize = 0x2007033;
-    const MASK_REMU: usize = 0xfe00707f;
 }

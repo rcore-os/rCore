@@ -7,14 +7,6 @@ pub unsafe fn disable_and_store() -> usize {
 }
 
 #[inline(always)]
-#[cfg(target_arch = "riscv32")]
-pub unsafe fn disable_and_store() -> usize {
-    let sstatus: usize;
-    asm!("csrrci $0, 0x100, 2" : "=r"(sstatus));
-    sstatus & 2
-}
-
-#[inline(always)]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn restore(flags: usize) {
     if flags != 0 {
@@ -24,8 +16,26 @@ pub unsafe fn restore(flags: usize) {
 
 #[inline(always)]
 #[cfg(target_arch = "riscv32")]
+pub unsafe fn disable_and_store() -> usize {
+    if option_env!("m_mode").is_some() {
+        let mstatus: usize;
+        asm!("csrrci $0, 0x300, 1 << 3" : "=r"(mstatus));
+        mstatus & (1 << 3)
+    } else {
+        let sstatus: usize;
+        asm!("csrrci $0, 0x100, 1 << 1" : "=r"(sstatus));
+        sstatus & (1 << 1)
+    }
+}
+
+#[inline(always)]
+#[cfg(target_arch = "riscv32")]
 pub unsafe fn restore(flags: usize) {
-    asm!("csrs 0x100, $0" :: "r"(flags));
+    if option_env!("m_mode").is_some() {
+        asm!("csrs 0x300, $0" :: "r"(flags));
+    } else {
+        asm!("csrs 0x100, $0" :: "r"(flags));
+    }
 }
 
 #[inline(always)]

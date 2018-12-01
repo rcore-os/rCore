@@ -5,8 +5,13 @@ authors = ["Runji Wang <wangrunji0408@163.com>"]
 edition = "2018"
 
 [features]
+# Without BBL (for riscv32 FPGA board)
 no_bbl = []
+# Disable paging (for riscv32)
 no_mmu = []
+# Kernel in M-mode (for riscv32)
+m_mode = ["no_mmu"]
+# (for aarch64 RaspberryPi3)
 board_raspi3 = []
 
 [profile.dev]
