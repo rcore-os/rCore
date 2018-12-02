@@ -35,16 +35,20 @@ build-c:
 
 build: build-rust build-c
 
+$(user_rust_bins): build-rust
+
+$(user_c_bins): build-c
+
 mksfs:
 ifeq ($(shell which $(mksfs)),)
 	@cargo install --git https://github.com/wangrunji0408/SimpleFileSystem-Rust --features="std"
 endif
 
-$(sfsroot): build
-	@mkdir -p $(sfsroot)/
-	@cp $(user_bins) $(sfsroot)/
+$(sfsroot): $(user_bins)
+	@mkdir -p $@
+	@cp $^ $@/
 
-$(sfsimg): mksfs $(sfsroot)
+$(sfsimg): $(user_bins) $(sfsroot) | mksfs
 	@echo Creating SFS image at $@
 	@$(mksfs) zip $(sfsroot) $@
 

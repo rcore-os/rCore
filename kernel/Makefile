@@ -32,11 +32,9 @@ user_dir := ../user
 user_bin_path := $(user_dir)/target/$(arch)-ucore/debug
 user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
 user_obj := build/$(arch)/user.o
-sfsroot := $(user_dir)/build/sfsroot-$(arch)
-sfsimg := $(user_dir)/build/user-$(arch).img
 
 export ARCH = $(arch)
-export SFSIMG = $(sfsimg)
+export SFSIMG = $(user_dir)/build/user-$(arch).img
 
 ### qemu options ###
 ifeq ($(arch), x86_64)
@@ -105,7 +103,7 @@ cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
 
-.PHONY: all clean run build asm doc justrun debug kernel install
+.PHONY: all clean run build asm doc justrun debug kernel sfsimg install
 
 all: kernel
 
@@ -116,12 +114,12 @@ clean:
 doc:
 	@cargo rustdoc -- --document-private-items
 
-run: build justrun
+run: build sfsimg justrun
 
-justrun: $(sfsimg)
+justrun:
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
 
-debug: $(kernel) $(bin) $(sfsimg)
+debug: $(kernel) $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
@@ -166,7 +164,7 @@ ifeq ($(arch), x86_64)
 kernel:
 	@bootimage build $(build_args)
 else
-kernel: $(sfsimg)
+kernel: sfsimg
 ifeq ($(arch), riscv32)
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
@@ -178,7 +176,7 @@ endif
 
 
 ### user programs ###
-$(sfsimg): $(sfsroot)
+sfsimg:
 	@cd $(user_dir) && make sfsimg
 
 # make user.o from binary files
