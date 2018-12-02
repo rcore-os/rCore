@@ -28,7 +28,7 @@ global_asm!(r#"
     .global _user_img_start
     .global _user_img_end
 _user_img_start:
-    .incbin "../user/user-aarch64.img"
+    .incbin "../user/img/ucore-aarch64.img"
 _user_img_end:
 "#);
 
