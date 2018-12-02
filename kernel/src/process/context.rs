@@ -110,6 +110,10 @@ impl ContextImpl {
         unsafe {
             memory_set.with(|| {
                 for ph in elf.program_iter() {
+                    if ph.get_type() != Ok(Type::Load) {
+                        continue;
+                    }
+
                     let virt_addr = ph.virtual_addr() as usize;
                     let offset = ph.offset() as usize;
                     let file_size = ph.file_size() as usize;

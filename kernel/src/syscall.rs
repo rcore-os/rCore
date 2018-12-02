@@ -284,6 +284,7 @@ fn get_file(fd: usize) -> Result<&'static Arc<Mutex<File>>, SysError> {
 pub type SysResult = Result<i32, SysError>;
 
 #[repr(i32)]
+#[derive(Debug)]
 pub enum SysError {
     VfsError,
     InvalidFile,

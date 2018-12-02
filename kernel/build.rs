@@ -33,7 +33,7 @@ fn main() {
 		}
 		"aarch64" => {
 			if let Ok(file_path) = gen_sfsimg_asm() {
-				cc::Build::new().file(&file_path).compile("cobj");
+				cc::Build::new().file(&file_path).compile("sfsimg");
 			}
 		}
 		_ => panic!("Unknown arch {}", arch),
