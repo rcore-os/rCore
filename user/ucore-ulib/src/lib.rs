@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(asm)]
 #![feature(lang_items)]
-#![feature(panic_implementation)]
 #![feature(panic_info_message)]
 #![feature(linkage)]
 #![feature(compiler_builtins_lib)]

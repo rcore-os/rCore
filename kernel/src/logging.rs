@@ -1,6 +1,6 @@
 use core::fmt;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
-use spin::Mutex;
+use crate::sync::SpinNoIrqLock as Mutex;
 use lazy_static::lazy_static;
 
 lazy_static! {

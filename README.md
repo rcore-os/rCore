@@ -6,7 +6,9 @@ Rust version of THU [uCore OS](https://github.com/chyyuu/ucore_os_lab/).
 
 Going to be the next generation teaching operating system.
 
-Support arch: x86_64, RISCV32I, AArch64 (WIP).
+Supported architectures: x86_64, RISCV32IMA(S/M), AArch64
+
+Tested boards: QEMU, Raspberry Pi 3B+
 
 [Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
 
@@ -46,7 +48,7 @@ cargo install cargo-xbuild bootimage
 ```
 
 ```bash
-git clone https://github.com/wangrunji0408/RustOS.git
+git clone https://github.com/wangrunji0408/RustOS.git --recursive
 cd RustOS/kernel
 rustup override set nightly
 make run arch=riscv32|x86_64|aarch64

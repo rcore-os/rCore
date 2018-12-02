@@ -1,19 +1,23 @@
 pub use crate::arch::paging::*;
-use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K};
+use bit_allocator::{BitAlloc, BitAlloc4K, BitAlloc64K, BitAlloc1M};
 use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, InactivePageTable};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, InactivePageTable};
 use ucore_memory::swap::*;
 use crate::process::{process};
 use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use alloc::collections::VecDeque;
 use lazy_static::*;
 use log::*;
+use linked_list_allocator::LockedHeap;
 
+#[cfg(not(feature = "no_mmu"))]
+pub type MemorySet = ucore_memory::memory_set::MemorySet<InactivePageTable0>;
 
-pub type MemorySet = MemorySet_<InactivePageTable0>;
+#[cfg(feature = "no_mmu")]
+pub type MemorySet = ucore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 
 // x86_64 support up to 256M memory
 #[cfg(target_arch = "x86_64")]
@@ -25,19 +29,10 @@ pub type FrameAlloc = BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory
 #[cfg(target_arch = "aarch64")]
-pub type FrameAlloc = BitAlloc64K;
+pub type FrameAlloc = BitAlloc1M;
 
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
-}
-// record the user memory set for pagefault function (swap in/out and frame delayed allocate) temporarily when page fault in new_user() or fork() function
-// after the process is set we can use use crate::processor() to get the inactive page table
-lazy_static! {
-    pub static ref MEMORY_SET_RECORD: SpinNoIrqLock<VecDeque<usize>> = SpinNoIrqLock::new(VecDeque::default());
-}
-
-pub fn memory_set_record() -> MutexGuard<'static, VecDeque<usize>, SpinNoIrq> {
-    MEMORY_SET_RECORD.lock()
 }
 
 lazy_static! {
@@ -110,48 +105,25 @@ impl Drop for KernelStack {
 * @retval:
 *   Return true to continue, false to halt
 */
+#[cfg(not(feature = "no_mmu"))]
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
     //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
-    info!("active page table token in pg fault is {:x?}", ActivePageTable::token());
-    let mmset_record = memory_set_record();
-    let id = mmset_record.iter()
-            .position(|x| unsafe{(*(x.clone() as *mut MemorySet)).get_page_table_mut().token() == ActivePageTable::token()});
     /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
     * handle the frame deallocated
     */
-    match id {
-        Some(targetid) => {
-            info!("get id from memroy set recorder.");
-            let mmset_ptr = mmset_record.get(targetid).expect("fail to get mmset_ptr").clone();
-            // get current mmset
 
-            let current_mmset = unsafe{&mut *(mmset_ptr as *mut MemorySet)};
-            //check whether the vma is legal
-            if current_mmset.find_area(addr).is_none(){
-                return false;
-            }
+    info!("get pt from processor()");
+    if process().memory_set.find_area(addr).is_none(){
+        return false;
+    }
 
-            let pt = current_mmset.get_page_table_mut();
-            info!("pt got!");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, false, || alloc_frame().expect("fail to alloc frame")){
-                return true;
-            }
-        },
-        None => {
-            info!("get pt from processor()");
-            if process().get_memory_set_mut().find_area(addr).is_none(){
-                return false;
-            }
-
-            let pt = process().get_memory_set_mut().get_page_table_mut();
-            info!("pt got");
-            if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
-                return true;
-            }
-        },
-    };
+    let pt = process().memory_set.get_page_table_mut();
+    info!("pt got");
+    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
+        return true;
+    }
     //////////////////////////////////////////////////////////////////////////////
 
 
@@ -171,6 +143,25 @@ pub fn init_heap() {
     unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
     info!("heap init end");
 }
+
+/// Allocator for the rest memory space on NO-MMU case.
+pub static MEMORY_ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+#[derive(Debug, Clone, Copy)]
+pub struct NoMMUSupportImpl;
+
+impl ucore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
+    type Alloc = LockedHeap;
+    fn allocator() -> &'static Self::Alloc {
+        &MEMORY_ALLOCATOR
+    }
+}
+
+#[cfg(feature = "no_mmu")]
+pub fn page_fault_handler(_addr: usize) -> bool {
+    unreachable!()
+}
+
 
 //pub mod test {
 //    pub fn cow() {

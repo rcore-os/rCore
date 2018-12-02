@@ -161,10 +161,6 @@ impl ActivePageTable {
         // Unmap the page
         self.unmap(0xcafebabe);
     }
-
-    pub fn token() -> usize {
-        satp::read().frame().number() | (1 << 31)
-    }
 }
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
@@ -200,6 +196,8 @@ impl Entry for PageEntry {
     fn set_user(&mut self, value: bool) { self.as_flags().set(EF::USER, value); }
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::EXECUTABLE, value); }
+    fn mmio(&self) -> bool { unimplemented!() }
+    fn set_mmio(&mut self, value: bool) { unimplemented!() }
 }
 
 impl PageEntry {

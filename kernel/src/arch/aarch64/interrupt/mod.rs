@@ -4,7 +4,8 @@ mod handler;
 mod context;
 mod syndrome;
 
-use cortex_a::regs::*;
+use aarch64::regs::*;
+
 pub use self::context::*;
 pub use self::handler::*;
 

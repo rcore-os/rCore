@@ -13,15 +13,19 @@
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = SFS image path of user programs
-#   smp                         SMP core number
+#   smp  = 1 | 2 | ...          SMP core number
 #   board = fpga				Only available on riscv32, build without bbl, run on board
 #         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
+#   m_mode						Only available on riscv32, build for M-Mode, without MMU
 
 arch ?= riscv32
 board ?= raspi3
 mode ?= debug
 LOG  ?= debug
 smp  ?= 4
+# NOTE: crate 'process' use this name 'm_mode' as an environment
+#		to set interrupt (MIE or SIE)
+m_mode ?=
 
 target := $(arch)-blog_os
 kernel := target/$(target)/$(mode)/ucore
@@ -37,50 +41,53 @@ export ARCH = $(arch)
 export SFSIMG = $(user_dir)/build/user-$(arch).img
 
 ### qemu options ###
-ifeq ($(arch), x86_64)
 qemu_opts := \
-	-drive format=raw,file=$(bootimage) \
-	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
 	-smp cores=$(smp) \
-	-serial mon:stdio \
-	-device isa-debug-exit \
 	-nographic
+
+ifeq ($(arch), x86_64)
+qemu_opts += \
+	-drive format=raw,file=$(bootimage) \
+	-drive format=raw,file="../user/img/ucore-i386-pic.img",media=disk,cache=writeback \
+	-serial mon:stdio \
+	-device isa-debug-exit
+
 else ifeq ($(arch), riscv32)
-qemu_opts := \
+qemu_opts += \
 	-machine virt \
-	-kernel $(bin) \
-	-nographic \
-	-smp cores=$(smp)
+	-kernel $(bin)
+ifdef m_mode
+qemu_opts += -cpu rv32imacu-nommu
+endif
+
 else ifeq ($(arch), aarch64)
-qemu_opts := \
+qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
-	-nographic \
 	-kernel $(bin)
 endif
 
 ifdef d
-qemu_opts := $(qemu_opts) -d $(d)
+qemu_opts += -d $(d)
 endif
 
 ### build args ###
 ifeq ($(arch), riscv32)
 ifeq ($(board), fpga)
-features := $(features) no_bbl
+features += no_bbl
 endif
 endif
 
-# Link user binaries at ../user
-ifdef link_user
-features := $(features) link_user_program
-assembly_object_files := $(assembly_object_files) $(user_obj)
+ifdef m_mode
+features += no_mmu m_mode
+bbl_m_mode := --enable-boot-machine
 endif
 
-features := $(features) board_$(board)
+features += board_$(board)
 build_args := --target $(target).json --features "$(features)"
 
 ifeq ($(mode), release)
-build_args := $(build_args) --release
+build_args += --release
 endif
 
 
@@ -149,8 +156,8 @@ else
 	mkdir -p build && \
 	cd build && \
 	../configure \
-		--enable-32bit \
-		--enable-logo \
+		$(bbl_m_mode) \
+		--with-arch=rv32imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
@@ -175,7 +182,6 @@ endif
 endif
 
 
-
 ### user programs ###
 sfsimg:
 	@cd $(user_dir) && make sfsimg
@@ -184,7 +190,6 @@ sfsimg:
 $(user_obj): $(user_bins)
 	@cd $(user_bin_path) && \
 		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
-
 
 
 ### install ###

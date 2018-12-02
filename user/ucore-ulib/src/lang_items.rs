@@ -49,7 +49,7 @@ pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> ! {
 #[lang = "eh_personality"]
 fn eh_personality() {}
 
-#[panic_implementation]
+#[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     let location = info.location().unwrap();
     let message = info.message().unwrap();

@@ -1,6 +1,6 @@
 use crate::arch::interrupt::{TrapFrame, Context as ArchContext};
-use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0, memory_set_record};
-use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type}};
+use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0};
+use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type, SegmentData}};
 use core::fmt::{Debug, Error, Formatter};
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
 use ucore_memory::{Page};
@@ -51,29 +51,7 @@ impl ContextImpl {
         })
     }
 
-    /// Temp for aarch64
-    pub fn new_user_test(entry: extern fn(usize) -> !) -> Box<Context> {
-        let memory_set = MemorySet::new();
-        let kstack = KernelStack::new();
-        let ustack = KernelStack::new();
-        Box::new(ContextImpl {
-            arch: unsafe { ArchContext::new_user_thread(entry as usize, ustack.top(), kstack.top(), false, memory_set.token()) },
-            memory_set,
-            kstack,
-            files: BTreeMap::default(),
-            cwd: String::new(),
-        })
-    }
-
     /// Make a new user thread from ELF data
-    /*
-    * @param:
-    *   data: the ELF data stream
-    * @brief:
-    *   make a new thread from ELF data
-    * @retval:
-    *   the new user thread Context
-    */
     pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<ContextImpl>
         where Iter: Iterator<Item=&'a str>
     {
@@ -83,61 +61,45 @@ impl ContextImpl {
             header::HeaderPt2::Header32(_) => true,
             header::HeaderPt2::Header64(_) => false,
         };
-        assert_eq!(elf.header.pt2.type_().as_type(), header::Type::Executable, "ELF is not executable");
+
+        match elf.header.pt2.type_().as_type() {
+            header::Type::Executable => {
+//                #[cfg(feature = "no_mmu")]
+//                panic!("ELF is not shared object");
+            },
+            header::Type::SharedObject => {},
+            _ => panic!("ELF is not executable or shared object"),
+        }
+
+        // Make page table
+        let (mut memory_set, entry_addr) = memory_set_from(&elf);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
-        let (ustack_buttom, mut ustack_top) = match is32 {
-            true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
-            false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
+        #[cfg(not(feature = "no_mmu"))]
+        let mut ustack_top = {
+            let (ustack_buttom, ustack_top) = match is32 {
+                true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
+                false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
+            };
+            memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
+            ustack_top
         };
+        #[cfg(feature = "no_mmu")]
+        let mut ustack_top = memory_set.push(USER_STACK_SIZE).as_ptr() as usize + USER_STACK_SIZE;
 
-        // Make page table
-        let mut memory_set = memory_set_from(&elf);
+        unsafe {
+            memory_set.with(|| { ustack_top = push_args_at_stack(args, ustack_top) });
+        }
 
-        // add the new memory set to the recorder
-        let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
-        memory_set_record().push_back(mmset_ptr);
-        //let id = memory_set_record().iter()
-        //    .position(|x| unsafe { info!("current memory set record include {:x?}, {:x?}", x, (*(x.clone() as *mut MemorySet)).get_page_table_mut().token()); false });
-
-        memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
         trace!("{:#x?}", memory_set);
 
-        let entry_addr = elf.header.pt2.entry_point() as usize;
-
-        // Temporary switch to it, in order to copy data
-        unsafe {
-            memory_set.with(|| {
-                for ph in elf.program_iter() {
-                    if ph.get_type() != Ok(Type::Load) {
-                        continue;
-                    }
-
-                    let virt_addr = ph.virtual_addr() as usize;
-                    let offset = ph.offset() as usize;
-                    let file_size = ph.file_size() as usize;
-                    let mem_size = ph.mem_size() as usize;
-
-                    let target = unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) };
-                    if file_size != 0 {
-                        target[..file_size].copy_from_slice(&data[offset..offset + file_size]);
-                    }
-                    target[file_size..].iter_mut().for_each(|x| *x = 0);
-                }
-                ustack_top = push_args_at_stack(args, ustack_top);
-            });
-        }
-
         let kstack = KernelStack::new();
-        {
-            let mut mmset_record = memory_set_record();
-            let id = mmset_record.iter()
-                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-            mmset_record.remove(id);
-        }
 
-        let mut ret = Box::new(ContextImpl {
+        //set the user Memory pages in the memory set swappable
+        memory_set_map_swappable(&mut memory_set);
+
+        Box::new(ContextImpl {
             arch: unsafe {
                 ArchContext::new_user_thread(
                     entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
@@ -146,10 +108,7 @@ impl ContextImpl {
             kstack,
             files: BTreeMap::default(),
             cwd: String::new(),
-        });
-        //set the user Memory pages in the memory set swappable
-        memory_set_map_swappable(ret.get_memory_set_mut());
-        ret
+        })
     }
 
     /// Fork
@@ -158,61 +117,36 @@ impl ContextImpl {
         // Clone memory set, make a new page table
         let mut memory_set = self.memory_set.clone();
         info!("finish mmset clone in fork!");
-        // add the new memory set to the recorder
-        info!("fork! new page table token: {:x?}", memory_set.token());
-        let mmset_ptr = ((&mut memory_set) as * mut MemorySet) as usize;
-        memory_set_record().push_back(mmset_ptr);
 
-        info!("before copy data to temp space");
-        // Copy data to temp space
-        use alloc::vec::Vec;
-        let datas: Vec<Vec<u8>> = memory_set.iter().map(|area| {
-            Vec::from(unsafe { area.as_slice() })
-        }).collect();
-
-        info!("Finish copy data to temp space.");
-
-        // Temporarily switch to it, in order to copy data
-        unsafe {
-            memory_set.with(|| {
-                for (area, data) in memory_set.iter().zip(datas.iter()) {
-                    area.as_slice_mut().copy_from_slice(data.as_slice())
-                }
-            });
+        // MMU:   copy data to the new space
+        // NoMMU: coping data has been done in `memory_set.clone()`
+        #[cfg(not(feature = "no_mmu"))]
+        for area in memory_set.iter() {
+            let data = Vec::<u8>::from(unsafe { area.as_slice() });
+            unsafe { memory_set.with(|| {
+                area.as_slice_mut().copy_from_slice(data.as_slice())
+            }) }
         }
 
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        // remove the raw pointer for the memory set in memory_set_record
-        {
-            let mut mmset_record = memory_set_record();
-            let id = mmset_record.iter()
-                .position(|x| x.clone() == mmset_ptr).expect("id not exist");
-            mmset_record.remove(id);
-        }
+        memory_set_map_swappable(&mut memory_set);
+        info!("FORK() finsihed!");
 
-
-        let mut ret = Box::new(ContextImpl {
+        Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
             files: BTreeMap::default(),
             cwd: String::new(),
-        });
-
-        memory_set_map_swappable(ret.get_memory_set_mut());
-        info!("FORK() finsihed!");
-        ret
+        })
     }
-
-    pub fn get_memory_set_mut(&mut self) -> &mut MemorySet {
-        &mut self.memory_set
-    }
-
 }
 
-impl Drop for ContextImpl{
+#[cfg(not(feature = "no_mmu"))]
+#[cfg(not(target_arch = "aarch64"))]
+impl Drop for ContextImpl {
     fn drop(&mut self){
         info!("come in to drop for ContextImpl");
         //set the user Memory pages in the memory set unswappable
@@ -265,29 +199,48 @@ unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
 }
 
 
-/*
-* @param:
-*   elf: the source ELF file
-* @brief:
-*   generate a memory set according to the elf file
-* @retval:
-*   the new memory set
-*/
-fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> MemorySet {
+/// Generate a MemorySet according to the ELF file.
+/// Also return the real entry point address.
+fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
     debug!("come in to memory_set_from");
-    let mut set = MemorySet::new();
+    let mut ms = MemorySet::new();
+    let mut entry = None;
     for ph in elf.program_iter() {
         if ph.get_type() != Ok(Type::Load) {
             continue;
         }
-        let (virt_addr, mem_size, flags) = match ph {
-            ProgramHeader::Ph32(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-            ProgramHeader::Ph64(ph) => (ph.virtual_addr as usize, ph.mem_size as usize, ph.flags),
-        };
-        set.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(flags), ""));
+        let virt_addr = ph.virtual_addr() as usize;
+        let offset = ph.offset() as usize;
+        let file_size = ph.file_size() as usize;
+        let mem_size = ph.mem_size() as usize;
 
+        #[cfg(target_arch = "aarch64")]
+        assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
+
+        // Get target slice
+        #[cfg(feature = "no_mmu")]
+        let target = ms.push(mem_size);
+        #[cfg(not(feature = "no_mmu"))]
+        let target = {
+            ms.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(ph.flags()), ""));
+            unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
+        };
+        // Copy data
+        unsafe {
+            ms.with(|| {
+                if file_size != 0 {
+                    target[..file_size].copy_from_slice(&elf.input[offset..offset + file_size]);
+                }
+                target[file_size..].iter_mut().for_each(|x| *x = 0);
+            });
+        }
+        // Find real entry point
+        if ph.flags().is_execute() {
+            let origin_entry = elf.header.pt2.entry_point() as usize;
+            entry = Some(origin_entry - virt_addr + target.as_ptr() as usize);
+        }
     }
-    set
+    (ms, entry.unwrap())
 }
 
 fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
@@ -303,7 +256,8 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
 * @brief:
 *   map the memory area in the memory_set swappalbe, specially for the user process
 */
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
+#[cfg(not(any(feature = "no_mmu", target_arch = "aarch64")))]
+pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
     info!("COME INTO memory set map swappable!");
     let pt = unsafe {
         memory_set.get_page_table_mut() as *mut InactivePageTable0
@@ -317,3 +271,8 @@ pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
     info!("Finishing setting pages swappable");
 }
 
+#[cfg(any(feature = "no_mmu", target_arch = "aarch64"))]
+pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
+    // FIXME: Page Fault on aarch64
+    // NOTE:  This function may disappear after refactor memory crate
+}

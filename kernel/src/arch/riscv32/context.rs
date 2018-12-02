@@ -1,13 +1,24 @@
-use riscv::register::*;
+#[cfg(feature = "m_mode")]
+use riscv::register::{
+    mstatus as xstatus,
+    mstatus::Mstatus as Xstatus,
+    mcause::Mcause,
+};
+#[cfg(not(feature = "m_mode"))]
+use riscv::register::{
+    sstatus as xstatus,
+    sstatus::Sstatus as Xstatus,
+    mcause::Mcause,
+};
 
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
     pub x: [usize; 32], // general registers
-    pub sstatus: sstatus::Sstatus, // Supervisor Status Register
+    pub sstatus: Xstatus, // Supervisor Status Register
     pub sepc: usize, // Supervisor exception program counter, save the trap virtual address (here is used to save the process program entry addr?)
-    pub sbadaddr: usize, // Supervisor bad address
-    pub scause: scause::Scause, // scause register: record the cause of exception/interrupt/trap
+    pub stval: usize, // Supervisor trap value
+    pub scause: Mcause, // scause register: record the cause of exception/interrupt/trap
 }
 
 /// Generate the trapframe for building new thread in kernel
@@ -28,13 +39,13 @@ impl TrapFrame {
         tf.x[10] = arg; // a0
         tf.x[2] = sp;
         tf.sepc = entry as usize;
-        tf.sstatus = sstatus::read();
-        // Supervisor Previous Interrupt Enable
-        tf.sstatus.set_spie(true);
-        // Supervisor Interrupt Disable
-        tf.sstatus.set_sie(false);
-        // Supervisor Previous Privilege Mode is Supervisor
-        tf.sstatus.set_spp(sstatus::SPP::Supervisor);
+        tf.sstatus = xstatus::read();
+        tf.sstatus.set_xpie(true);
+        tf.sstatus.set_xie(false);
+        #[cfg(feature = "m_mode")]
+        tf.sstatus.set_mpp(xstatus::MPP::Machine);
+        #[cfg(not(feature = "m_mode"))]
+        tf.sstatus.set_spp(xstatus::SPP::Supervisor);
         tf
     }
 
@@ -52,10 +63,13 @@ impl TrapFrame {
         let mut tf: Self = unsafe { zeroed() };
         tf.x[2] = sp;
         tf.sepc = entry_addr;
-        tf.sstatus = sstatus::read();
-        tf.sstatus.set_spie(true);
-        tf.sstatus.set_sie(false);
-        tf.sstatus.set_spp(sstatus::SPP::User);
+        tf.sstatus = xstatus::read();
+        tf.sstatus.set_xpie(true);
+        tf.sstatus.set_xie(false);
+        #[cfg(feature = "m_mode")]
+        tf.sstatus.set_mpp(xstatus::MPP::User);
+        #[cfg(not(feature = "m_mode"))]
+        tf.sstatus.set_spp(xstatus::SPP::User);
         tf
     }
 }
@@ -78,7 +92,7 @@ impl Debug for TrapFrame {
             .field("regs", &Regs(&self.x))
             .field("sstatus", &self.sstatus)
             .field("sepc", &self.sepc)
-            .field("sbadaddr", &self.sbadaddr)
+            .field("stval", &self.stval)
             .field("scause", &self.scause)
             .finish()
     }

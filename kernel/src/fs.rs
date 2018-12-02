@@ -3,8 +3,6 @@ use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::V
 use core::any::Any;
 use core::slice;
 use lazy_static::lazy_static;
-use crate::memory::{MemorySet, InactivePageTable0, memory_set_record};
-use crate::process::context::memory_set_map_swappable;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
 use crate::sync::Condvar;
@@ -77,6 +75,15 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
+        // QEMU v3.0 don't support M-mode external interrupt (bug?)
+        // So we have to use polling.
+        // TODO: serial interrupt on aarch64
+        #[cfg(any(feature = "m_mode", target_arch = "aarch64"))]
+        loop {
+            let c = crate::arch::io::getchar();
+            if c != '\0' { return c; }
+        }
+        #[cfg(not(any(feature = "m_mode", target_arch = "aarch64")))]
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {

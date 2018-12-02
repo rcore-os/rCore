@@ -166,22 +166,17 @@ impl MemoryArea {
                 }
             }
             None => {
-                info!("map delayed!");
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let addr = page.start_address();
-                    //let target = T::alloc_frame().expect("failed to allocate frame");
-                    //self.flags.apply(pt.map(addr, target));
+                    let target = T::alloc_frame().expect("failed to allocate frame");
+                    self.flags.apply(pt.map(addr, target));
                     // for frame delayed allocation
-                    {
-                        let entry = pt.map(addr,0);
-                        self.flags.apply(entry);
-                    }
-                    let entry = pt.get_entry(addr).expect("fail to get entry");
-                    entry.set_present(false);
-                    entry.update();
-
+//                    let entry = pt.map(addr,0);
+//                    self.flags.apply(entry);
+//                    let entry = pt.get_entry(addr).expect("fail to get entry");
+//                    entry.set_present(false);
+//                    entry.update();
                 }
-                info!("finish map delayed!");
             }
         };
     }
@@ -227,6 +222,7 @@ pub struct MemoryAttr {
     user: bool,
     readonly: bool,
     execute: bool,
+    mmio: bool,
     hide: bool,
 }
 
@@ -255,6 +251,10 @@ impl MemoryAttr {
         self.execute = true;
         self
     }
+    pub fn mmio(mut self) -> Self {
+        self.mmio = true;
+        self
+    }
     /*
     **  @brief  set the memory attribute's hide bit
     **  @retval MemoryAttr           the memory attribute itself
@@ -273,8 +273,9 @@ impl MemoryAttr {
         if self.user { entry.set_user(true); }
         if self.readonly { entry.set_writable(false); }
         if self.execute { entry.set_execute(true); }
+        if self.mmio { entry.set_mmio(true); }
         if self.hide { entry.set_present(false); }
-        if self.user || self.readonly || self.execute || self.hide { entry.update(); }
+        if self.user || self.readonly || self.execute || self.mmio || self.hide { entry.update(); }
     }
 }
 
@@ -329,6 +330,9 @@ impl<T: InactivePageTable> MemorySet<T> {
     */
     pub fn iter(&self) -> impl Iterator<Item=&MemoryArea> {
         self.areas.iter()
+    }
+    pub fn edit(&mut self, f: impl FnOnce(&mut T::Active)) {
+        self.page_table.edit(f);
     }
     /*
     **  @brief  execute function with the associated page table

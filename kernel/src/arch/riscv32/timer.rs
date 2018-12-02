@@ -33,6 +33,9 @@ pub fn get_cycle() -> u64 {
 */
 pub fn init() {
     // Enable supervisor timer interrupt
+    #[cfg(feature = "m_mode")]
+    unsafe { mie::set_mtimer(); }
+    #[cfg(not(feature = "m_mode"))]
     unsafe { sie::set_stimer(); }
 
     set_next();
