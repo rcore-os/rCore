@@ -27,7 +27,6 @@ pub fn init() {
     for i in 0..4 {
         manager.add(ContextImpl::new_kernel(idle, i), 0);
     }
-    #[cfg(not(target_arch = "aarch64"))]
     crate::shell::run_user_shell();
 
     info!("process init end");

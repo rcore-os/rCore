@@ -109,9 +109,8 @@ fn remap_the_kernel() {
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
     ms.push(MemoryArea::new_identity(IO_REMAP_BASE, IO_REMAP_END, MemoryAttr::default().mmio(), "io_remap"));
 
-    unsafe { ms.activate(); }
-    use core::mem::forget;
-    forget(ms);
+    unsafe { ms.get_page_table_mut().activate_as_kernel(); }
+    ::core::mem::forget(ms);
     info!("kernel remap end");
 }
 

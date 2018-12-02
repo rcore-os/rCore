@@ -224,11 +224,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn activate(&self) {
-        let old_frame = ttbr_el1_read(0);
+        let old_frame = ttbr_el1_read(1);
         let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR0 {:?} -> {:?}", old_frame, new_frame);
+        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
         if old_frame != new_frame {
-            ttbr_el1_write(0, new_frame);
+            ttbr_el1_write(1, new_frame);
             tlb_invalidate_all();
         }
     }
@@ -274,6 +274,17 @@ impl InactivePageTable0 {
         self.edit(|_| {
             table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
         });
+    }
+    /// Activate as kernel page table (TTBR0).
+    /// Used in `arch::memory::remap_the_kernel()`.
+    pub unsafe fn activate_as_kernel(&self) {
+        let old_frame = ttbr_el1_read(0);
+        let new_frame = self.p4_frame.clone();
+        debug!("switch TTBR0 {:?} -> {:?}", old_frame, new_frame);
+        if old_frame != new_frame {
+            ttbr_el1_write(0, new_frame);
+            tlb_invalidate_all();
+        }
     }
 }
 

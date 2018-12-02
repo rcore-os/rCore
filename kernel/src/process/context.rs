@@ -97,7 +97,6 @@ impl ContextImpl {
         let kstack = KernelStack::new();
 
         //set the user Memory pages in the memory set swappable
-        #[cfg(not(feature = "no_mmu"))]
         memory_set_map_swappable(&mut memory_set);
 
         Box::new(ContextImpl {
@@ -132,7 +131,6 @@ impl ContextImpl {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        #[cfg(not(feature = "no_mmu"))]
         memory_set_map_swappable(&mut memory_set);
         info!("FORK() finsihed!");
 
@@ -147,6 +145,7 @@ impl ContextImpl {
 }
 
 #[cfg(not(feature = "no_mmu"))]
+#[cfg(not(target_arch = "aarch64"))]
 impl Drop for ContextImpl {
     fn drop(&mut self){
         info!("come in to drop for ContextImpl");
@@ -257,8 +256,8 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
 * @brief:
 *   map the memory area in the memory_set swappalbe, specially for the user process
 */
-#[cfg(not(feature = "no_mmu"))]
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
+#[cfg(not(any(feature = "no_mmu", target_arch = "aarch64")))]
+pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
     info!("COME INTO memory set map swappable!");
     let pt = unsafe {
         memory_set.get_page_table_mut() as *mut InactivePageTable0
@@ -272,3 +271,8 @@ pub fn memory_set_map_swappable(memory_set: &mut MemorySet){
     info!("Finishing setting pages swappable");
 }
 
+#[cfg(any(feature = "no_mmu", target_arch = "aarch64"))]
+pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
+    // FIXME: Page Fault on aarch64
+    // NOTE:  This function may disappear after refactor memory crate
+}

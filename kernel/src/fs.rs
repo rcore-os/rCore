@@ -100,12 +100,13 @@ impl Stdin {
     pub fn pop(&self) -> char {
         // QEMU v3.0 don't support M-mode external interrupt (bug?)
         // So we have to use polling.
-        #[cfg(feature = "m_mode")]
+        // TODO: serial interrupt on aarch64
+        #[cfg(any(feature = "m_mode", target_arch = "aarch64"))]
         loop {
             let c = crate::arch::io::getchar();
             if c != '\0' { return c; }
         }
-        #[cfg(not(feature = "m_mode"))]
+        #[cfg(not(any(feature = "m_mode", target_arch = "aarch64")))]
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {
