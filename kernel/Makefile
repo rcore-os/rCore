@@ -109,6 +109,7 @@ all: kernel
 
 clean:
 	@cargo clean
+	@cd $(user_dir) && make clean
 	@rm -rf ../riscv-pk/build
 
 doc:
