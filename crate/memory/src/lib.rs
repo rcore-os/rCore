@@ -1,7 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(alloc)]
 #![feature(nll)]
-#![feature(extern_crate_item_prelude)]
 
 // import macros from log
 use log::*;
