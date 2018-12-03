@@ -145,7 +145,6 @@ impl ContextImpl {
 }
 
 #[cfg(not(feature = "no_mmu"))]
-#[cfg(not(target_arch = "aarch64"))]
 impl Drop for ContextImpl {
     fn drop(&mut self){
         info!("come in to drop for ContextImpl");
@@ -256,7 +255,7 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
 * @brief:
 *   map the memory area in the memory_set swappalbe, specially for the user process
 */
-#[cfg(not(any(feature = "no_mmu", target_arch = "aarch64")))]
+#[cfg(not(feature = "no_mmu"))]
 pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
     info!("COME INTO memory set map swappable!");
     let pt = unsafe {
@@ -271,8 +270,7 @@ pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
     info!("Finishing setting pages swappable");
 }
 
-#[cfg(any(feature = "no_mmu", target_arch = "aarch64"))]
+#[cfg(feature = "no_mmu")]
 pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
-    // FIXME: Page Fault on aarch64
     // NOTE:  This function may disappear after refactor memory crate
 }
