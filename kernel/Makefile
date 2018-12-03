@@ -48,7 +48,7 @@ qemu_opts := \
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=raw,file="../user/img/ucore-i386-pic.img",media=disk,cache=writeback \
+	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
 	-serial mon:stdio \
 	-device isa-debug-exit
 

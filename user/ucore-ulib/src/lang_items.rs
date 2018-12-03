@@ -1,5 +1,5 @@
-use syscall::{sys_close, sys_dup, sys_exit, sys_open};
-use syscall::{O_RDONLY, O_WRONLY};
+use crate::syscall::{sys_close, sys_dup, sys_exit, sys_open};
+use crate::syscall::{O_RDONLY, O_WRONLY};
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 
