@@ -6,12 +6,15 @@ use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
 
 pub fn run_user_shell() {
-    let inode = ROOT_INODE.lookup("sh").unwrap();
-    let data = inode.read_as_vec().unwrap();
-    processor().manager().add(ContextImpl::new_user(data.as_slice(), "sh".split(' ')), 0);
+    if let Ok(inode) = ROOT_INODE.lookup("sh") {
+        let data = inode.read_as_vec().unwrap();
+        processor().manager().add(ContextImpl::new_user(data.as_slice(), "sh".split(' ')), 0);
+    } else {
+        processor().manager().add(ContextImpl::new_kernel(shell, 0), 0);
+    }
 }
 
-pub fn shell() {
+pub extern fn shell(_arg: usize) -> ! {
     let files = ROOT_INODE.list().unwrap();
     println!("Available programs: {:?}", files);
 

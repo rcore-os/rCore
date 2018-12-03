@@ -11,6 +11,11 @@
   "max-atomic-width": "32",
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/riscv32/user.ld"
+    ]
+  },
   "executables": true,
   "panic-strategy": "abort",
   "relocation-model": "static",

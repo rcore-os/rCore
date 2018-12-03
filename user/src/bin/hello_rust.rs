@@ -7,5 +7,7 @@ extern crate ucore_ulib;
 // IMPORTANT: Must define main() like this
 #[no_mangle]
 pub fn main() {
-    println!("Hello uCore!");
+    println!("Hello Rust uCore!");
+    println!("I am process {}.", ucore_ulib::syscall::sys_getpid());
+    println!("hello pass.");
 }
