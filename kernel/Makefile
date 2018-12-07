@@ -1,25 +1,26 @@
 # Commands:
-#   make build					Build
-# 	make run					Build and run in QEMU
-# 	make justrun				Run the last build
-# 	make doc					Generate docs
-# 	make asm					Open the deassemble file of the last build
-# 	make header					Open 'objdump -h' of the last build
-# 	make clean					Clean
+#   make build                  Build
+#   make run                    Build and run in QEMU
+#   make justrun                Run the last build
+#   make doc                    Generate docs
+#   make asm                    Open the deassemble file of the last build
+#   make header                 Open 'objdump -h' of the last build
+#   make clean                  Clean
 #
 # Options:
 #   arch = x86_64 | riscv32 | aarch64
-#   d    = int | in_asm | ...	QEMU debug info
+#   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = SFS image path of user programs
 #   smp  = 1 | 2 | ...          SMP core number
-#   board = fpga				Only available on riscv32, build without bbl, run on board
-#         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   m_mode						Only available on riscv32, build for M-Mode, without MMU
+#   board = none                Running on qemu
+#         | fpga                Only available on riscv32, build without bbl, run on board
+#         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
+#   m_mode                      Only available on riscv32, build for M-Mode, without MMU
 
 arch ?= riscv32
-board ?= raspi3
+board ?= none
 mode ?= debug
 LOG  ?= debug
 smp  ?= 4
@@ -83,7 +84,9 @@ features += no_mmu m_mode
 bbl_m_mode := --enable-boot-machine
 endif
 
+ifneq ($(board), none)
 features += board_$(board)
+endif
 build_args := --target $(target).json --features "$(features)"
 
 ifeq ($(mode), release)
@@ -98,7 +101,7 @@ ifeq ($(uname), Darwin)
 prefix := x86_64-elf-
 endif
 else ifeq ($(arch), riscv32)
-prefix := riscv64-unknown-elf-
+prefix := riscv32-unknown-elf-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 endif
@@ -159,7 +162,7 @@ else
 		$(bbl_m_mode) \
 		--with-arch=rv32imac \
 		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
+		--host=riscv32-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
 	make && \
 	cp bbl ../../kernel/$@
