@@ -1,5 +1,5 @@
 use crate::arch::interrupt::{TrapFrame, Context as ArchContext};
-use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0};
+use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, InactivePageTable0, GlobalFrameAlloc, FrameAllocator};
 use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type, SegmentData}};
 use core::fmt::{Debug, Error, Formatter};
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
@@ -82,7 +82,7 @@ impl ContextImpl {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
                 false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
             };
-            memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
+            memory_set.push(ustack_buttom, ustack_top,  handler::ByFrame::new(MemoryAttr::default().user(), GlobalFrameAlloc), "user_stack");
             ustack_top
         };
         #[cfg(feature = "no_mmu")]
@@ -95,9 +95,6 @@ impl ContextImpl {
         trace!("{:#x?}", memory_set);
 
         let kstack = KernelStack::new();
-
-        //set the user Memory pages in the memory set swappable
-        memory_set_map_swappable(&mut memory_set);
 
         Box::new(ContextImpl {
             arch: unsafe {
@@ -131,9 +128,6 @@ impl ContextImpl {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        memory_set_map_swappable(&mut memory_set);
-        info!("FORK() finsihed!");
-
         Box::new(ContextImpl {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
@@ -141,28 +135,6 @@ impl ContextImpl {
             files: BTreeMap::default(),
             cwd: String::new(),
         })
-    }
-}
-
-#[cfg(not(feature = "no_mmu"))]
-#[cfg(not(target_arch = "aarch64"))]
-impl Drop for ContextImpl {
-    fn drop(&mut self){
-        info!("come in to drop for ContextImpl");
-        //set the user Memory pages in the memory set unswappable
-        let Self {ref mut arch, ref mut memory_set, ref mut kstack, ..} = self;
-        let pt = {
-            memory_set.get_page_table_mut() as *mut InactivePageTable0
-        };
-        for area in memory_set.iter(){
-            for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
-                let addr = page.start_address();
-                unsafe {
-                    active_table_swap().remove_from_swappable(pt, addr, || alloc_frame().expect("alloc frame failed"));
-                }
-            }
-        }
-        debug!("Finishing setting pages unswappable");
     }
 }
 
@@ -222,7 +194,7 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
         let target = ms.push(mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
-            ms.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(ph.flags()), ""));
+            ms.push(virt_addr, virt_addr + mem_size, handler::ByFrame::new(memory_attr_from(ph.flags()), GlobalFrameAlloc), "");
             unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
         };
         // Copy data
@@ -248,31 +220,4 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
     // TODO: handle readonly
     if elf_flags.is_execute() { flags = flags.execute(); }
     flags
-}
-
-/*
-* @param:
-*   memory_set: the target MemorySet to set swappable
-* @brief:
-*   map the memory area in the memory_set swappalbe, specially for the user process
-*/
-#[cfg(not(any(feature = "no_mmu", target_arch = "aarch64")))]
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
-    info!("COME INTO memory set map swappable!");
-    let pt = unsafe {
-        memory_set.get_page_table_mut() as *mut InactivePageTable0
-    };
-    for area in memory_set.iter(){
-        for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
-            let addr = page.start_address();
-            unsafe { active_table_swap().set_swappable(pt, addr); }
-        }
-    }
-    info!("Finishing setting pages swappable");
-}
-
-#[cfg(any(feature = "no_mmu", target_arch = "aarch64"))]
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
-    // FIXME: Page Fault on aarch64
-    // NOTE:  This function may disappear after refactor memory crate
 }

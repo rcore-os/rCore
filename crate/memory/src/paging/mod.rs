@@ -12,14 +12,14 @@ mod mock_page_table;
 
 // trait for PageTable
 pub trait PageTable {
-    type Entry: Entry;
+//    type Entry: Entry;
     /*
     **  @brief  map a virual address to the target physics address
     **  @param  addr: VirtAddr       the virual address to map
     **  @param  target: VirtAddr     the target physics address
     **  @retval Entry                the page table entry of the mapped virual address
     */
-    fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Self::Entry;
+    fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Entry;
     /*
     **  @brief  unmap a virual address from physics address
     **  @param  addr: VirtAddr       the virual address to unmap
@@ -31,7 +31,7 @@ pub trait PageTable {
     **  @param  addr: VirtAddr       the virual address
     **  @retval Entry                the page table entry of the virual address
     */
-    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Self::Entry>;
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Entry>;
     // For testing with mock
     /*
     **  @brief  used for testing with mock

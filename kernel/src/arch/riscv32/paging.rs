@@ -42,8 +42,6 @@ pub struct ActivePageTable(RecursivePageTable<'static>);
 pub struct PageEntry(PageTableEntry);
 
 impl PageTable for ActivePageTable {
-    type Entry = PageEntry;
-
     /*
     * @param:
     *   addr: the virtual addr to be matched
@@ -53,7 +51,7 @@ impl PageTable for ActivePageTable {
     * @retval:
     *   the matched PageEntry
     */
-    fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         // the flag for the new page entry
         let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
         // here page is for the virtual address while frame is for the physical, both of them is 4096 bytes align
@@ -86,7 +84,7 @@ impl PageTable for ActivePageTable {
     * @retval:
     *   a mutable PageEntry reference of 'addr'
     */
-    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
+    fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
         if unsafe { !(*ROOT_PAGE_TABLE)[addr >> 22].flags().contains(EF::VALID) } {
             return None;
         }
@@ -149,7 +147,7 @@ impl ActivePageTable {
     * @brief:
     *   do something on the target physical frame?
     */
-    fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
+    fn with_temporary_map<T>(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable) -> T) -> T {
         // Create a temporary page
         let page = Page::of_addr(VirtAddr::new(0xcafebabe));
         assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
@@ -157,9 +155,10 @@ impl ActivePageTable {
         self.map(page.start_address().as_usize(), frame.start_address().as_u32() as usize);
         // Call f
         let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
-        f(self, table);
+        let ret = f(self, table);
         // Unmap the page
         self.unmap(0xcafebabe);
+        ret
     }
 }
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
@@ -233,7 +232,7 @@ impl InactivePageTable for InactivePageTable0 {
     *   the inactive page table
     */
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
+        let frame = alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
             table.zero();
@@ -248,7 +247,7 @@ impl InactivePageTable for InactivePageTable0 {
     * @brief:
     *   temporarily map the inactive pagetable as an active p2page and apply f on the temporary modified active page table
     */
-    fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
         active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
             let backup = p2_table[RECURSIVE_INDEX].clone();
 
@@ -257,12 +256,14 @@ impl InactivePageTable for InactivePageTable0 {
             sfence_vma_all();
 
             // execute f in the new context
-            f(active_table);
+            let ret = f(active_table);
 
             // restore recursive mapping to original p2 table
             p2_table[RECURSIVE_INDEX] = backup;
             sfence_vma_all();
-        });
+
+            ret
+        })
     }
 
     /*
@@ -313,14 +314,6 @@ impl InactivePageTable for InactivePageTable0 {
     fn token(&self) -> usize {
         self.p2_frame.number() | (1 << 31) // as satp
     }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
-    }
 }
 
 impl InactivePageTable0 {
@@ -332,17 +325,15 @@ impl InactivePageTable0 {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
         let e1 = table[KERNEL_P2_INDEX];
-        assert!(!e1.is_unused());
-        // for larger heap memroy
         let e2 = table[KERNEL_P2_INDEX + 1];
-        assert!(!e2.is_unused());
         let e3 = table[KERNEL_P2_INDEX + 2];
+        assert!(!e1.is_unused());
         assert!(!e2.is_unused());
+        assert!(!e3.is_unused());
 
         self.edit(|_| {
             table[0x40] = e0;
             table[KERNEL_P2_INDEX].set(e1.frame(), EF::VALID | EF::GLOBAL);
-            // for larger heap memroy
             table[KERNEL_P2_INDEX + 1].set(e2.frame(), EF::VALID | EF::GLOBAL);
             table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
         });
@@ -352,7 +343,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p2_frame.start_address().as_u32() as usize);
+        dealloc_frame(self.p2_frame.start_address().as_u32() as usize);
     }
 }
 

@@ -1,4 +1,3 @@
-use bit_allocator::{BitAlloc, BitAlloc64K};
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 use spin::{Mutex, MutexGuard};
@@ -44,9 +43,7 @@ pub struct ActivePageTable(RecursivePageTable<'static>);
 pub struct PageEntry(PageTableEntry);
 
 impl PageTable for ActivePageTable {
-    type Entry = PageEntry;
-
-    fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
             .unwrap().flush();
@@ -58,7 +55,7 @@ impl PageTable for ActivePageTable {
         flush.flush();
     }
 
-    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
+    fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
         for level in 0..3 {
             let entry = get_entry_ptr(addr, 4 - level);
             if unsafe { !(*entry).present() } { return None; }
@@ -84,7 +81,7 @@ impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap())
     }
-    fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut x86PageTable)) {
+    fn with_temporary_map<T>(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut x86PageTable) -> T) -> T {
         // Create a temporary page
         let page = Page::of_addr(0xcafebabe);
         assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
@@ -92,9 +89,10 @@ impl ActivePageTable {
         self.map(page.start_address().as_u64() as usize, frame.start_address().as_u64() as usize);
         // Call f
         let table = unsafe { &mut *page.start_address().as_mut_ptr() };
-        f(self, table);
+        let ret = f(self, table);
         // Unmap the page
         self.unmap(0xcafebabe);
+        ret
     }
 }
 
@@ -173,7 +171,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(target))
+        let frame = alloc_frame().map(|target| Frame::of_addr(target))
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut x86PageTable| {
             table.zero();
@@ -183,7 +181,7 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { p4_frame: frame }
     }
 
-    fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
         active_table().with_temporary_map(&Cr3::read().0, |active_table, p4_table: &mut x86PageTable| {
             let backup = p4_table[0o777].clone();
 
@@ -192,12 +190,13 @@ impl InactivePageTable for InactivePageTable0 {
             tlb::flush_all();
 
             // execute f in the new context
-            f(active_table);
+            let ret = f(active_table);
 
             // restore recursive mapping to original p4 table
             p4_table[0o777] = backup;
             tlb::flush_all();
-        });
+            ret
+        })
     }
 
     unsafe fn activate(&self) {
@@ -227,14 +226,6 @@ impl InactivePageTable for InactivePageTable0 {
     fn token(&self) -> usize {
         self.p4_frame.start_address().as_u64() as usize // as CR3
     }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
-    }
 }
 
 impl InactivePageTable0 {
@@ -254,7 +245,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
     }
 }
 
