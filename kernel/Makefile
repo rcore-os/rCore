@@ -12,6 +12,7 @@
 #   d    = int | in_asm | ...	QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
+#   SFSIMG = SFS image path of user programs
 #   smp  = 1 | 2 | ...          SMP core number
 #   board = fpga				Only available on riscv32, build without bbl, run on board
 #         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
@@ -31,6 +32,14 @@ kernel := target/$(target)/$(mode)/ucore
 bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
 
+user_dir := ../user
+user_bin_path := $(user_dir)/target/$(arch)-ucore/debug
+user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
+user_obj := build/$(arch)/user.o
+
+export ARCH = $(arch)
+export SFSIMG = $(user_dir)/build/user-$(arch).img
+
 ### qemu options ###
 qemu_opts := \
 	-smp cores=$(smp) \
@@ -39,7 +48,7 @@ qemu_opts := \
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=raw,file="../user/img/ucore-i386-pic.img",media=disk,cache=writeback \
+	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
 	-serial mon:stdio \
 	-device isa-debug-exit
 
@@ -101,18 +110,19 @@ cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
 
-.PHONY: all clean run build asm doc justrun kernel
+.PHONY: all clean run build asm doc justrun debug kernel sfsimg install
 
 all: kernel
 
 clean:
 	@cargo clean
+	@cd $(user_dir) && make clean
 	@rm -rf ../riscv-pk/build
 
 doc:
 	@cargo rustdoc -- --document-private-items
 
-run: build justrun
+run: build sfsimg justrun
 
 justrun:
 	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
@@ -158,15 +168,28 @@ else ifeq ($(arch), aarch64)
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 endif
 
-kernel:
 ifeq ($(arch), x86_64)
+kernel:
 	@bootimage build $(build_args)
 else
+kernel: sfsimg
+ifeq ($(arch), riscv32)
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
+endif
 	@CC=$(cc) cargo xbuild $(build_args)
 endif
+
+
+### user programs ###
+sfsimg:
+	@cd $(user_dir) && make sfsimg
+
+# make user.o from binary files
+$(user_obj): $(user_bins)
+	@cd $(user_bin_path) && \
+		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
 
 
 ### install ###
