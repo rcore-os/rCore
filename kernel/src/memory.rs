@@ -4,7 +4,7 @@ use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, InactivePageTable, handler::*};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
 use ucore_memory::swap::*;
 use crate::process::{process};
 use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};

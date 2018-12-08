@@ -31,7 +31,6 @@ pub fn setup_page_table(frame: Frame) {
     p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 2, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
 
-    use riscv::register::satp;
     unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
     sfence_vma_all();
     info!("setup init page table end");
@@ -94,42 +93,9 @@ impl PageTable for ActivePageTable {
         let entry_addr = ((addr >> 10) & ((1 << 22) - 4)) | (RECURSIVE_INDEX << 22);
         unsafe { Some(&mut *(entry_addr as *mut PageEntry)) }
     }
-
-    /*
-    * @param:
-    *   addr:the input (virutal) address
-    * @brief:
-    *   get the addr's memory page slice
-    * @retval:
-    *   a mutable reference slice of 'addr' 's page
-    */
-    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
-        use core::slice;
-        unsafe { slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE) }
-    }
-
-    /*
-    * @param:
-    *   addr: virtual address
-    * @brief:
-    *   get the address's content
-    * @retval:
-    *   the content(u8) of 'addr'
-    */
-    fn read(&mut self, addr: usize) -> u8 {
-        unsafe { *(addr as *const u8) }
-    }
-
-    /*
-    * @param:
-    *   addr: virtual address
-    * @brief:
-    *   write the address's content
-    */
-    fn write(&mut self, addr: usize, data: u8) {
-        unsafe { *(addr as *mut u8) = data; }
-    }
 }
+
+impl PageTableExt for ActivePageTable {}
 
 // define the ROOT_PAGE_TABLE, and the virtual address of it?
 const ROOT_PAGE_TABLE: *mut RvPageTable =
@@ -138,27 +104,6 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap())
-    }
-
-    /*
-    * @param:
-    *   frame: the target physical frame which will be temporarily mapped
-    *   f: the function you would like to apply for once
-    * @brief:
-    *   do something on the target physical frame?
-    */
-    fn with_temporary_map<T>(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable) -> T) -> T {
-        // Create a temporary page
-        let page = Page::of_addr(VirtAddr::new(0xcafebabe));
-        assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
-        // Map it to table
-        self.map(page.start_address().as_usize(), frame.start_address().as_u32() as usize);
-        // Call f
-        let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
-        let ret = f(self, table);
-        // Unmap the page
-        self.unmap(0xcafebabe);
-        ret
     }
 }
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
@@ -213,114 +158,16 @@ pub struct InactivePageTable0 {
 impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
-    /*
-    * @brief:
-    *   get a new pagetable (for a new process or thread)
-    * @retbal:
-    *   the new pagetable
-    */
-    fn new() -> Self {
-        let mut pt = Self::new_bare();
-        pt.map_kernel();
-        pt
-    }
-
-    /*
-    * @brief:
-    *   allocate a new frame and then self-mapping it and regard it as the inactivepagetale
-    * retval:
-    *   the inactive page table
-    */
     fn new_bare() -> Self {
-        let frame = alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
-            .expect("failed to allocate frame");
-        active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
+        let target = alloc_frame().expect("failed to allocate frame");
+        let frame = Frame::of_addr(PhysAddr::new(target as u32));
+        active_table().with_temporary_map(target, |_, table: &mut RvPageTable| {
             table.zero();
             table.set_recursive(RECURSIVE_INDEX, frame.clone());
         });
         InactivePageTable0 { p2_frame: frame }
     }
 
-    /*
-    * @param:
-    *   f: a function to do something with the temporary modified activate page table
-    * @brief:
-    *   temporarily map the inactive pagetable as an active p2page and apply f on the temporary modified active page table
-    */
-    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
-            let backup = p2_table[RECURSIVE_INDEX].clone();
-
-            // overwrite recursive mapping
-            p2_table[RECURSIVE_INDEX].set(self.p2_frame.clone(), EF::VALID);
-            sfence_vma_all();
-
-            // execute f in the new context
-            let ret = f(active_table);
-
-            // restore recursive mapping to original p2 table
-            p2_table[RECURSIVE_INDEX] = backup;
-            sfence_vma_all();
-
-            ret
-        })
-    }
-
-    /*
-    * @brief:
-    *   active self as the current active page table
-    */
-    unsafe fn activate(&self) {
-        let old_frame = satp::read().frame();
-        let new_frame = self.p2_frame.clone();
-        debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, new_frame);
-            sfence_vma_all();
-        }
-    }
-
-    /*
-    * @param:
-    *   f: the function to run when temporarily activate self as current page table
-    * @brief:
-    *   Temporarily activate self and run the process, and return the return value of f
-    * @retval:
-    *   the return value of f
-    */
-    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        let old_frame = satp::read().frame();
-        let new_frame = self.p2_frame.clone();
-        debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, new_frame);
-            sfence_vma_all();
-        }
-        let target = f();
-        debug!("switch table {:x?} -> {:x?}", new_frame, old_frame);
-        if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, old_frame);
-            sfence_vma_all();
-        }
-        target
-    }
-
-    /*
-    * @brief:
-    *   get the token of self, the token is self's pagetable frame's starting physical address
-    * @retval:
-    *   self token
-    */
-    fn token(&self) -> usize {
-        self.p2_frame.number() | (1 << 31) // as satp
-    }
-}
-
-impl InactivePageTable0 {
-    /*
-    * @brief:
-    *   map the kernel code memory address (p2 page table) in the new inactive page table according the current active page table
-    */
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
@@ -337,6 +184,42 @@ impl InactivePageTable0 {
             table[KERNEL_P2_INDEX + 1].set(e2.frame(), EF::VALID | EF::GLOBAL);
             table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
         });
+    }
+
+    fn token(&self) -> usize {
+        self.p2_frame.number() | (1 << 31) // as satp
+    }
+
+    unsafe fn set_token(token: usize) {
+        asm!("csrw 0x180, $0" :: "r"(token) :: "volatile");
+    }
+
+    fn active_token() -> usize {
+        satp::read().bits()
+    }
+
+    fn flush_tlb() {
+        sfence_vma_all();
+    }
+
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
+        let target = satp::read().frame().start_address().as_u32() as usize;
+        active_table().with_temporary_map(target, |active_table, p2_table: &mut RvPageTable| {
+            let backup = p2_table[RECURSIVE_INDEX].clone();
+
+            // overwrite recursive mapping
+            p2_table[RECURSIVE_INDEX].set(self.p2_frame.clone(), EF::VALID);
+            sfence_vma_all();
+
+            // execute f in the new context
+            let ret = f(active_table);
+
+            // restore recursive mapping to original p2 table
+            p2_table[RECURSIVE_INDEX] = backup;
+            sfence_vma_all();
+
+            ret
+        })
     }
 }
 

@@ -66,20 +66,9 @@ impl PageTable for ActivePageTable {
         let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39);
         Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
     }
-
-    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
-        use core::slice;
-        unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, PAGE_SIZE) }
-    }
-
-    fn read(&mut self, addr: usize) -> u8 {
-        unsafe { *(addr as *const u8) }
-    }
-
-    fn write(&mut self, addr: usize, data: u8) {
-        unsafe { *(addr as *mut u8) = data; }
-    }
 }
+
+impl PageTableExt for ActivePageTable {}
 
 const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
     ((RECURSIVE_INDEX << 39) | (RECURSIVE_INDEX << 30) | (RECURSIVE_INDEX << 21) | (RECURSIVE_INDEX << 12)) as *mut Aarch64PageTable;
@@ -87,19 +76,6 @@ const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *(ROOT_PAGE_TABLE as *mut _)).unwrap())
-    }
-    fn with_temporary_map<T>(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut Aarch64PageTable) -> T) -> T {
-        // Create a temporary page
-        let page = Page::of_addr(0xcafebabe);
-        assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
-        // Map it to table
-        self.map(page.start_address().as_u64() as usize, frame.start_address().as_u64() as usize);
-        // Call f
-        let table = unsafe { &mut *page.start_address().as_mut_ptr() };
-        let ret = f(self, table);
-        // Unmap the page
-        self.unmap(0xcafebabe);
-        ret
     }
 }
 
@@ -195,9 +171,9 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn new_bare() -> Self {
-        let frame = alloc_frame().map(|target| Frame::of_addr(target))
-            .expect("failed to allocate frame");
-        active_table().with_temporary_map(&frame, |_, table: &mut Aarch64PageTable| {
+        let target = alloc_frame().expect("failed to allocate frame");
+        let frame = Frame::of_addr(target);
+        active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
             table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default(), MairNormal::attr_value());
@@ -205,8 +181,35 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { p4_frame: frame }
     }
 
+    fn map_kernel(&mut self) {
+        let table = unsafe { &mut *ROOT_PAGE_TABLE };
+        let e0 = table[KERNEL_PML4].clone();
+        assert!(!e0.is_unused());
+
+        self.edit(|_| {
+            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
+        });
+    }
+
+    fn token(&self) -> usize {
+        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
+    }
+
+    unsafe fn set_token(token: usize) {
+        ttbr_el1_write(1, Frame::containing_address(PhysAddr::new(token as u64)));
+    }
+
+    fn active_token() -> usize {
+        ttbr_el1_read(1).start_address().as_u64() as usize
+    }
+
+    fn flush_tlb() {
+        tlb_invalidate_all();
+    }
+
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        active_table().with_temporary_map(&ttbr_el1_read(0), |active_table, p4_table: &mut Aarch64PageTable| {
+        let target = ttbr_el1_read(0).start_address().as_u64() as usize;
+        active_table().with_temporary_map(target, |active_table, p4_table: &mut Aarch64PageTable| {
             let backup = p4_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
@@ -222,51 +225,9 @@ impl InactivePageTable for InactivePageTable0 {
             ret
         })
     }
-
-    unsafe fn activate(&self) {
-        let old_frame = ttbr_el1_read(1);
-        let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, new_frame);
-            tlb_invalidate_all();
-        }
-    }
-
-    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        // Just need to switch the user TTBR
-        let old_frame = ttbr_el1_read(1);
-        let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, new_frame);
-            tlb_invalidate_all();
-        }
-        let ret = f();
-        debug!("switch TTBR1 {:?} -> {:?}", new_frame, old_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, old_frame);
-            tlb_invalidate_all();
-            flush_icache_all();
-        }
-        ret
-    }
-
-    fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
-    }
 }
 
 impl InactivePageTable0 {
-    fn map_kernel(&mut self) {
-        let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e0 = table[KERNEL_PML4].clone();
-        assert!(!e0.is_unused());
-
-        self.edit(|_| {
-            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
-        });
-    }
     /// Activate as kernel page table (TTBR0).
     /// Used in `arch::memory::remap_the_kernel()`.
     pub unsafe fn activate_as_kernel(&self) {

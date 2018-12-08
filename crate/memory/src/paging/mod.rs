@@ -3,198 +3,149 @@
 //! Implemented for every architecture, used by OS.
 
 use super::*;
-use super::memory_set::InactivePageTable;
+use log::*;
 #[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
+pub use self::ext::*;
 
 #[cfg(test)]
 mod mock_page_table;
+mod ext;
 
-// trait for PageTable
+
 pub trait PageTable {
 //    type Entry: Entry;
-    /*
-    **  @brief  map a virual address to the target physics address
-    **  @param  addr: VirtAddr       the virual address to map
-    **  @param  target: VirtAddr     the target physics address
-    **  @retval Entry                the page table entry of the mapped virual address
-    */
+
+    /// Map a page of virual address `addr` to the frame of physics address `target`
+    /// Return the page table entry of the mapped virual address
     fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Entry;
-    /*
-    **  @brief  unmap a virual address from physics address
-    **  @param  addr: VirtAddr       the virual address to unmap
-    **  @retval none
-    */
+
+    /// Unmap a page of virual address `addr`
     fn unmap(&mut self, addr: VirtAddr);
-    /*
-    **  @brief  get the page table entry of a virual address
-    **  @param  addr: VirtAddr       the virual address
-    **  @retval Entry                the page table entry of the virual address
-    */
+
+    /// Get the page table entry of a page of virual address `addr`
+    /// If its page do not exist, return `None`
     fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Entry>;
-    // For testing with mock
-    /*
-    **  @brief  used for testing with mock
-    **          get a mutable reference of the content of a page from a virtual address
-    **  @param  addr: VirtAddr       the virual address of the page
-    **  @retval &'b mut [u8]         mutable reference of the content of a page as array of bytes
-    */
-    fn get_page_slice_mut<'a,'b>(&'a mut self, addr: VirtAddr) -> &'b mut [u8];
-    /*
-    **  @brief  used for testing with mock
-    **          read data from a virtual address
-    **  @param  addr: VirtAddr       the virual address of data to read
-    **  @retval u8                   the data read
-    */
-    fn read(&mut self, addr: VirtAddr) -> u8;
-    /*
-    **  @brief  used for testing with mock
-    **          write data to a virtual address
-    **  @param  addr: VirtAddr       the virual address of data to write
-    **  @param  data: u8             the data to write
-    **  @retval none
-    */
-    fn write(&mut self, addr: VirtAddr, data: u8);
+
+    /// Get a mutable reference of the content of a page of virtual address `addr`
+    /// Used for testing with mock
+    fn get_page_slice_mut<'a>(&mut self, addr: VirtAddr) -> &'a mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE) }
+    }
+    /// Read data from virtual address `addr`
+    /// Used for testing with mock
+    fn read(&mut self, addr: VirtAddr) -> u8 {
+        unsafe { (addr as *const u8).read() }
+    }
+
+    /// Write data to virtual address `addr`
+    /// Used for testing with mock
+    fn write(&mut self, addr: VirtAddr, data: u8) {
+        unsafe { (addr as *mut u8).write(data) }
+    }
 }
 
-
-// trait for Entry in PageTable
+/// Page Table Entry
 pub trait Entry {
-    /*
-    **  @brief  force update this page table entry
-    **          IMPORTANT!
-    **          This must be called after any change to ensure it become effective.
-    **          Usually this will make a flush to TLB/MMU.
-    **  @retval none
-    */
+    /// Make all changes take effect.
+    ///
+    /// IMPORTANT!
+    /// This must be called after any change to ensure it become effective.
+    /// Usually it will cause a TLB/MMU flush.
     fn update(&mut self);
-    /*
-    **  @brief  get the accessed bit of the entry
-    **          Will be set when accessed
-    **  @retval bool                 the accessed bit
-    */
+    /// A bit set by hardware when the page is accessed
     fn accessed(&self) -> bool;
-    /*
-    **  @brief  get the dirty bit of the entry
-    **          Will be set when written
-    **  @retval bool                 the dirty bit
-    */
+    /// A bit set by hardware when the page is written
     fn dirty(&self) -> bool;
-    /*
-    **  @brief  get the writable bit of the entry
-    **          Will PageFault when try to write page where writable=0
-    **  @retval bool                 the writable bit
-    */
+    /// Will PageFault when try to write page where writable=0
     fn writable(&self) -> bool;
-    /*
-    **  @brief  get the present bit of the entry
-    **          Will PageFault when try to access page where present=0
-    **  @retval bool                 the present bit
-    */
+    /// Will PageFault when try to access page where present=0
     fn present(&self) -> bool;
 
-
-    /*
-    **  @brief  clear the accessed bit
-    **  @retval none
-    */
     fn clear_accessed(&mut self);
-    /*
-    **  @brief  clear the dirty bit
-    **  @retval none
-    */
     fn clear_dirty(&mut self);
-    /*
-    **  @brief  set value of writable bit
-    **  @param  value: bool          the writable bit value
-    **  @retval none
-    */
     fn set_writable(&mut self, value: bool);
-    /*
-    **  @brief  set value of present bit
-    **  @param  value: bool          the present bit value
-    **  @retval none
-    */
     fn set_present(&mut self, value: bool);
 
-    /*
-    **  @brief  get the target physics address in the entry
-    **          can be used for other purpose if present=0
-    **  @retval target: PhysAddr     the target physics address
-    */
+    /// The target physics address in the entry
+    /// Can be used for other purpose if present=0
     fn target(&self) -> PhysAddr;
-    /*
-    **  @brief  set the target physics address in the entry
-    **  @param  target: PhysAddr     the target physics address
-    **  @retval none
-    */
     fn set_target(&mut self, target: PhysAddr);
 
-    // For Copy-on-write extension
-    /*
-    **  @brief  used for Copy-on-write extension
-    **          get the writable and shared bit
-    **  @retval value: bool          the writable and shared bit
-    */
+    // For Copy-on-write
     fn writable_shared(&self) -> bool;
-    /*
-    **  @brief  used for Copy-on-write extension
-    **          get the readonly and shared bit
-    **  @retval value: bool          the readonly and shared bit
-    */
     fn readonly_shared(&self) -> bool;
-    /*
-    **  @brief  used for Copy-on-write extension
-    **          mark the page as (writable or readonly) shared
-    **  @param  writable: bool       if it is true, set the page as writable and shared
-    **                               else set the page as readonly and shared
-    **  @retval value: none
-    */
     fn set_shared(&mut self, writable: bool);
-    /*
-    **  @brief  used for Copy-on-write extension
-    **          mark the page as not shared
-    **  @retval value: none
-    */
     fn clear_shared(&mut self);
 
-    // For Swap extension
-    /*
-    **  @brief  used for Swap extension
-    **          get the swapped bit
-    **  @retval value: bool          the swapped bit
-    */
+    // For Swap
     fn swapped(&self) -> bool;
-    /*
-    **  @brief  used for Swap extension
-    **          set the swapped bit
-    **  @param  value: bool          the swapped bit value
-    **  @retval none
-    */
     fn set_swapped(&mut self, value: bool);
 
-    /*
-    **  @brief  get the user bit of the entry
-    **  @retval bool                 the user bit
-    */
     fn user(&self) -> bool;
-    /*
-    **  @brief  set value of user bit
-    **  @param  value: bool          the user bit value
-    **  @retval none
-    */
     fn set_user(&mut self, value: bool);
-    /*
-    **  @brief  get the execute bit of the entry
-    **  @retval bool                 the execute bit
-    */
     fn execute(&self) -> bool;
-    /*
-    **  @brief  set value of user bit
-    **  @param  value: bool          the execute bit value
-    **  @retval none
-    */
     fn set_execute(&mut self, value: bool);
     fn mmio(&self) -> bool;
     fn set_mmio(&mut self, value: bool);
+}
+
+/// An inactive page table
+/// Note: InactivePageTable is not a PageTable
+///       but it can be activated and "become" a PageTable
+pub trait InactivePageTable: Sized {
+    /// the active version of page table
+    type Active: PageTable;
+
+    /// Create a new page table with kernel memory mapped
+    fn new() -> Self {
+        let mut pt = Self::new_bare();
+        pt.map_kernel();
+        pt
+    }
+
+    /// Create a new page table without kernel memory mapped
+    fn new_bare() -> Self;
+
+    /// Map kernel segments
+    fn map_kernel(&mut self);
+
+    /// CR3 on x86, SATP on RISCV, TTBR on AArch64
+    fn token(&self) -> usize;
+    unsafe fn set_token(token: usize);
+    fn active_token() -> usize;
+    fn flush_tlb();
+
+    /// Make this page table editable
+    /// Set the recursive entry of current active page table to this
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T;
+
+    /// Activate this page table
+    unsafe fn activate(&self) {
+        let old_token = Self::active_token();
+        let new_token = self.token();
+        debug!("switch table {:x?} -> {:x?}", old_token, new_token);
+        if old_token != new_token {
+            Self::set_token(new_token);
+            Self::flush_tlb();
+        }
+    }
+
+    /// Execute function `f` with this page table activated
+    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
+        let old_token = Self::active_token();
+        let new_token = self.token();
+        debug!("switch table {:x?} -> {:x?}", old_token, new_token);
+        if old_token != new_token {
+            Self::set_token(new_token);
+            Self::flush_tlb();
+        }
+        let ret = f();
+        debug!("switch table {:x?} -> {:x?}", new_token, old_token);
+        if old_token != new_token {
+            Self::set_token(old_token);
+            Self::flush_tlb();
+        }
+        ret
+    }
 }
