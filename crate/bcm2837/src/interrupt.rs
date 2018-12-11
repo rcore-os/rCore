@@ -1,4 +1,4 @@
-use IO_BASE;
+use crate::IO_BASE;
 use volatile::{ReadOnly, Volatile};
 
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;

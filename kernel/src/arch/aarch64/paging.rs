@@ -9,7 +9,7 @@ use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame
 use aarch64::paging::memory_attribute::*;
 use log::*;
 // Depends on kernel
-use crate::consts::{KERNEL_PML4, RECURSIVE_INDEX};
+use crate::consts::RECURSIVE_INDEX;
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
 // need 3 page
@@ -60,7 +60,7 @@ impl PageTable for ActivePageTable {
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
+        let (_frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
         flush.flush();
     }
 
@@ -271,15 +271,6 @@ impl InactivePageTable for InactivePageTable0 {
 }
 
 impl InactivePageTable0 {
-    fn map_kernel(&mut self) {
-        let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e0 = table[KERNEL_PML4].clone();
-        assert!(!e0.is_unused());
-
-        self.edit(|_| {
-            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
-        });
-    }
     /// Activate as kernel page table (TTBR0).
     /// Used in `arch::memory::remap_the_kernel()`.
     pub unsafe fn activate_as_kernel(&self) {

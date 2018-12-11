@@ -12,7 +12,8 @@ no_mmu = []
 # Kernel in M-mode (for riscv32)
 m_mode = ["no_mmu"]
 # (for aarch64 RaspberryPi3)
-board_raspi3 = []
+board_raspi3 = ["bcm2837"]
+raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 
 [profile.dev]
 # MUST >= 1 : Enable RVO to avoid stack overflow
@@ -53,7 +54,7 @@ bbl = { path = "../crate/bbl" }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/equation314/aarch64" }
 atags = { path = "../crate/atags" }
-bcm2837 = { path = "../crate/bcm2837", features = ["use_generic_timer"] }
+bcm2837 = { path = "../crate/bcm2837", optional = true }
 
 [package.metadata.bootimage]
 default-target = "x86_64-blog_os.json"

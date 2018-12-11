@@ -1,6 +1,6 @@
-extern crate cortex_a;
+extern crate aarch64;
 
-use self::cortex_a::regs::*;
+use aarch64::regs::*;
 use volatile::*;
 
 /// The base address for the ARM generic timer, IRQs, mailboxes

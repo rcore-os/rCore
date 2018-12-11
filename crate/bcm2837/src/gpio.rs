@@ -1,5 +1,5 @@
-use IO_BASE;
-use timer::delay;
+use crate::IO_BASE;
+use crate::timer::delay;
 use core::marker::PhantomData;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 

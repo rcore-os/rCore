@@ -78,6 +78,15 @@ features += no_bbl
 endif
 endif
 
+ifeq ($(board), raspi3)
+# qemu only has generic timer
+# TODO: configure system/generic timer automatically
+raspi3_timer ?= generic
+ifeq ($(raspi3_timer), generic)
+features += raspi3_use_generic_timer
+endif
+endif
+
 ifdef m_mode
 features += no_mmu m_mode
 bbl_m_mode := --enable-boot-machine

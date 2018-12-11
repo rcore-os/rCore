@@ -1,5 +1,5 @@
-use IO_BASE;
-use gpio::{Function, Gpio};
+use crate::IO_BASE;
+use crate::gpio::{Function, Gpio};
 use volatile::{ReadOnly, Volatile};
 
 /// The base address for the `MU` registers.
