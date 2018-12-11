@@ -8,6 +8,13 @@ const MU_REG_BASE: usize = IO_BASE + 0x215040;
 /// The `AUXENB` register from page 9 of the BCM2837 documentation.
 const AUX_ENABLES: *mut Volatile<u8> = (IO_BASE + 0x215004) as *mut Volatile<u8>;
 
+/// Enum representing bit fields of the `AUX_MU_IIR_REG` register.
+#[repr(u8)]
+pub enum MiniUartInterruptId {
+    Transmit = 0b010,
+    Recive = 0b100,
+}
+
 /// Enum representing bit fields of the `AUX_MU_LSR_REG` register.
 #[repr(u8)]
 enum LsrStatus {
@@ -15,7 +22,7 @@ enum LsrStatus {
     TxAvailable = 1 << 5,
 }
 
-/// MU registers starting from `AUX_ENABLES` (ref: peripherals 2.1, page 8)
+/// MU registers starting from `MU_REG_BASE` (ref: peripherals 2.1, page 8)
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
@@ -62,21 +69,23 @@ impl MiniUart {
             &mut *(MU_REG_BASE as *mut Registers)
         };
 
-        Gpio::new(14).into_alt(Function::Alt5).set_gpio_pd(0);
-        Gpio::new(15).into_alt(Function::Alt5).set_gpio_pd(0);
-
-        registers.AUX_MU_CNTL_REG.write(0); // Disable auto flow control and disable receiver and transmitter (for now)
-        registers.AUX_MU_IER_REG.write(0); // Disable receive and transmit interrupts
-        registers.AUX_MU_LCR_REG.write(3); // Enable 8 bit mode
-        registers.AUX_MU_MCR_REG.write(0); // Set RTS line to be always high
-        registers.AUX_MU_BAUD_REG.write(270); // Set baud rate to 115200
-
-        registers.AUX_MU_CNTL_REG.write(3); // Finally, enable transmitter and receiver
-
         MiniUart {
             registers: registers,
             timeout: None,
         }
+    }
+
+    pub fn init(&mut self) {
+        Gpio::new(14).into_alt(Function::Alt5).set_gpio_pd(0);
+        Gpio::new(15).into_alt(Function::Alt5).set_gpio_pd(0);
+
+        self.registers.AUX_MU_CNTL_REG.write(0); // Disable auto flow control and disable receiver and transmitter (for now)
+        self.registers.AUX_MU_IER_REG.write(1); // Enable receive interrupts and disable transmit interrupts
+        self.registers.AUX_MU_LCR_REG.write(3); // Enable 8 bit mode
+        self.registers.AUX_MU_MCR_REG.write(0); // Set RTS line to be always high
+        self.registers.AUX_MU_BAUD_REG.write(270); // Set baud rate to 115200
+
+        self.registers.AUX_MU_CNTL_REG.write(3); // Finally, enable transmitter and receiver
     }
 
     /// Set the read timeout to `milliseconds` milliseconds.
@@ -111,8 +120,13 @@ impl MiniUart {
     }
 
     /// Reads a byte. Blocks indefinitely until a byte is ready to be read.
-    pub fn read_byte(&mut self) -> u8 {
+    pub fn read_byte(&self) -> u8 {
         while !self.has_byte() {}
         self.registers.AUX_MU_IO_REG.read()
+    }
+
+    // Read `AUX_MU_IIR_REG` and determine if the interrupt `id` is pending.
+    pub fn interrupt_is_pending(&self, id: MiniUartInterruptId) -> bool {
+        self.registers.AUX_MU_IIR_REG.read() & 0b110 == id as u8
     }
 }

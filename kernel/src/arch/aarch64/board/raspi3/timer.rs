@@ -1,5 +1,4 @@
 use bcm2837::timer;
-use bcm2837::interrupt::{Controller, Interrupt};
 use log::*;
 
 pub fn init() {

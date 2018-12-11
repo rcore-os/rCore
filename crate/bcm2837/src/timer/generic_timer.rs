@@ -58,7 +58,7 @@ impl Timer {
     /// Reads the generic timer's counter and returns the 64-bit counter value.
     /// The returned value is the number of elapsed microseconds.
     pub fn read(&self) -> u64 {
-        let cntfrq = CNTFRQ_EL0.get();
+        let cntfrq = CNTFRQ_EL0.get(); // 62500000
         (CNTPCT_EL0.get() * 1000000 / (cntfrq as u64)) as u64
     }
 
@@ -66,7 +66,7 @@ impl Timer {
     /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
     /// interrupt will be issued in `us` microseconds.
     pub fn tick_in(&mut self, us: u32) {
-        let cntfrq = CNTFRQ_EL0.get();
+        let cntfrq = CNTFRQ_EL0.get(); // 62500000
         CNTP_TVAL_EL0.set(((cntfrq as f64) * (us as f64) / 1000000.0) as u32);
     }
 

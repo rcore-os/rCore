@@ -1,11 +1,11 @@
-use bcm2837::mini_uart::MiniUart;
+use bcm2837::mini_uart::{MiniUart, MiniUartInterruptId};
+use lazy_static::lazy_static;
 use core::fmt;
 use spin::Mutex;
-use once::*;
 
 /// Struct to get a global SerialPort interface
 pub struct SerialPort {
-    mu: Option<MiniUart>,
+    mu: MiniUart,
 }
 
 pub trait SerialRead {
@@ -14,30 +14,31 @@ pub trait SerialRead {
 
 impl SerialPort {
     /// Creates a new instance of `SerialPort`.
-    const fn new() -> SerialPort {
-        SerialPort { mu: None }
+    fn new() -> SerialPort {
+        SerialPort {
+            mu: MiniUart::new(),
+        }
     }
 
     /// Init a newly created SerialPort, can only be called once.
     pub fn init(&mut self) {
-        assert_has_not_been_called!("SerialPort::init must be called only once");
-        self.mu = Some(MiniUart::new());
+        self.mu.init();
+        super::irq::register_irq(super::irq::Interrupt::Aux, handle_serial_irq);
     }
 
     /// Writes the byte `byte` to the UART device.
-    pub fn write_byte(&mut self, byte: u8) {
-        match &mut self.mu {
-            Some(mu) => mu.write_byte(byte),
-            None => panic!("SerialPort is not initialized"),
-        }
+    fn write_byte(&mut self, byte: u8) {
+        self.mu.write_byte(byte)
     }
 
     /// Reads a byte from the UART device, blocking until a byte is available.
-    pub fn read_byte(&mut self) -> u8 {
-        match &mut self.mu {
-            Some(mu) => return mu.read_byte(),
-            None => panic!("SerialPort is not initialized"),
-        }
+    fn read_byte(&self) -> u8 {
+        self.mu.read_byte()
+    }
+
+    // Whether the interrupt `id` is pending.
+    fn interrupt_is_pending(&self, id: MiniUartInterruptId) -> bool {
+        self.mu.interrupt_is_pending(id)
     }
 }
 
@@ -70,4 +71,13 @@ impl fmt::Write for SerialPort {
     }
 }
 
-pub static SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
+fn handle_serial_irq() {
+    let serial = SERIAL_PORT.lock();
+    if serial.interrupt_is_pending(MiniUartInterruptId::Recive) {
+        crate::trap::serial(serial.read_byte() as char)
+    }
+}
+
+lazy_static!{
+    pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
+}

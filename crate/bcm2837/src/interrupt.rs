@@ -4,6 +4,7 @@ use volatile::{ReadOnly, Volatile};
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
 
 /// Allowed interrupts (ref: peripherals 7.5, page 113)
+#[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Interrupt {
     Timer1 = 1,
@@ -30,6 +31,24 @@ struct Registers {
     DisableBasicIRQ: Volatile<u32>,
 }
 
+/// Pending interrupts
+pub struct PendingInterrupts(u64);
+
+impl Iterator for PendingInterrupts {
+    type Item = usize;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let int = self.0.trailing_zeros();
+        if int < 64 {
+            self.0 &= !(1 << int);
+            Some(int as usize)
+        } else {
+            None
+        }
+    }
+}
+
 /// An interrupt controller. Used to enable and disable interrupts as well as to
 /// check if an interrupt is pending.
 pub struct Controller {
@@ -38,6 +57,7 @@ pub struct Controller {
 
 impl Controller {
     /// Returns a new handle to the interrupt controller.
+    #[inline]
     pub fn new() -> Controller {
         Controller {
             registers: unsafe { &mut *(INT_BASE as *mut Registers) },
@@ -57,5 +77,12 @@ impl Controller {
     /// Returns `true` if `int` is pending. Otherwise, returns `false`.
     pub fn is_pending(&self, int: Interrupt) -> bool {
         self.registers.IRQPending[int as usize / 32].read() & (1 << (int as usize) % 32) != 0
+    }
+
+    /// Return all pending interrupts.
+    pub fn pending_interrupts(&self) -> PendingInterrupts {
+        let irq1 = self.registers.IRQPending[0].read() as u64;
+        let irq2 = self.registers.IRQPending[1].read() as u64;
+        PendingInterrupts((irq2 << 32) | irq1)
     }
 }
