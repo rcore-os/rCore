@@ -22,4 +22,5 @@ pub fn init_early() {
 /// Initialize raspi3 drivers
 pub fn init_driver() {
     timer::init();
+    usb::init();
 }
