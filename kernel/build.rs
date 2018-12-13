@@ -12,6 +12,17 @@ fn main() {
 //			.compile("cobj");
 		gen_vector_asm().unwrap();
 	}
+	if std::env::var("TARGET").unwrap().find("aarch64").is_some() {
+		cc::Build::new()
+			.file("src/arch/aarch64/board/raspi3/usb/rpi-usb.c")
+			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency.c")
+			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency64.S")
+			.flag("-mcmodel=large \
+			-mcpu=cortex-a53+fp+simd -ffreestanding \
+			-nostartfiles -std=c11 -mstrict-align \
+			-fno-tree-loop-vectorize -fno-tree-slp-vectorize -Wno-nonnull-compare")
+			.compile("cobj");
+	}
 }
 
 fn gen_vector_asm() -> Result<()> {

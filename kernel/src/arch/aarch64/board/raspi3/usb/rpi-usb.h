@@ -32,12 +32,16 @@ extern "C"
 #endif
 
 #include <stdint.h>
-//#include "emb-stdio.h"				// Needed for printf
+#include <stdlib.h>						// Needed for __packed
+#include <string.h>
+#ifndef __packed
+#define __packed __attribute__((packed))
+#endif
 
 //#define LOG(...)
-#define LOG(...) printf(__VA_ARGS__)
+#define LOG(...) //printf(__VA_ARGS__)
 #define LOG_DEBUG(...)
-//#define 33(...) printf(__VA_ARGS__)
+//#define LOG_DEBUG(...) printf(__VA_ARGS__)
 
 typedef enum {
 	OK = 0,
@@ -294,7 +298,7 @@ struct usb_device_descriptor {
 /*--------------------------------------------------------------------------}
 {	  USB device configuration descriptor as per 9.6.3 of USB2.0 manual		}
 {--------------------------------------------------------------------------*/
-struct usb_configuration_descriptor {
+struct __attribute__((__packed__)) usb_configuration_descriptor {
 	uint8_t  bLength;												// +0x0 Length of this descriptor
 	uint8_t  bDescriptorType;										// +0x1 DEVICE descriptor type(enum DescriptorType)
 	uint16_t wTotalLength;											// +0x2 Total length of all descriptors for this configuration

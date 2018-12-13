@@ -13,7 +13,8 @@
 #include <stdint.h>				// C standard needed for uint8_t, uint32_t, uint64_t etc
 #include <string.h>				// C standard needed for memset
 #include <wchar.h>				// C standard needed for UTF for unicode descriptor support
-#include "rpi-smartstart.h"		// Provides timing routines and mailbox routines to power up/down the USB.  
+//#include "rpi-SmartStart.h"		// Provides timing routines and mailbox routines to power up/down the USB.  
+#include "usb-dependency.h"      // Provide minimal rpi-SmartStart.h
 #include "rpi-usb.h"			// This units header
 
 #define ReceiveFifoSize 20480 /* 16 to 32768 */
@@ -747,7 +748,7 @@ static_assert(sizeof(struct UsbSendControl) == 0x04, "Structure should be 32bits
 
 /* Aligned buffers for DMA which need to also be multiple of 4 bytes */
 /* Fortunately max packet size under USB2 is 1024 so that is a given */
-static uint8_t aligned_bufs[DWC_NUM_CHANNELS][USB2_MAX_PACKET_SIZE] __aligned(4);
+static uint8_t aligned_bufs[DWC_NUM_CHANNELS][USB2_MAX_PACKET_SIZE] __attribute((aligned(4)));
 
 
 bool PhyInitialised = false;
@@ -2920,6 +2921,7 @@ RESULT HCDGetDescriptor (const struct UsbPipe pipe,					// Pipe structure to sen
  24Feb17 LdB
  --------------------------------------------------------------------------*/
 RESULT UsbInitialise (void) {
+	UsbDependencyInit();
 	RESULT result;
 	chfree = (1 << DWC_NUM_CHANNELS) - 1;							// Set the channel free bit masks
 
@@ -3174,14 +3176,14 @@ const char* SpeedString[3] = { "High", "Full", "Low" };
 
 void UsbShowTree(struct UsbDevice *root, const int level, const char tee) {
 	int maxPacket;
-	for (int i = 0; i < level - 1; i++)
-		if (TreeLevelInUse[i] == 0) printf("   ");
-			else printf(" %c ", '\xB3');							// Draw level lines if in use	
+//	for (int i = 0; i < level - 1; i++)
+//		if (TreeLevelInUse[i] == 0) printf("   ");
+//			else printf(" %c ", '\xB3');							// Draw level lines if in use	
 			maxPacket = SizeToNumber(root->Pipe0.MaxSize);			// Max packet size
-	printf(" %c-%s id: %i port: %i speed: %s packetsize: %i %s\n", tee,
-		UsbGetDescription(root), root->Pipe0.Number, root->ParentHub.PortNumber,
-		SpeedString[root->Pipe0.Speed], maxPacket,
-		(IsHid(root->Pipe0.Number)) ? "- HID interface" : "");		// Print this entry
+//	printf(" %c-%s id: %i port: %i speed: %s packetsize: %i %s\n", tee,
+//		UsbGetDescription(root), root->Pipe0.Number, root->ParentHub.PortNumber,
+//		SpeedString[root->Pipe0.Speed], maxPacket,
+//		(IsHid(root->Pipe0.Number)) ? "- HID interface" : "");		// Print this entry
 	if (IsHub(root->Pipe0.Number)) {
 		int lastChild = root->HubPayload->MaxChildren;
 		for (int i = 0; i < lastChild; i++) {						// For each child of hub
