@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include "usb-dependency.h"
 
+/*
 void memset(void *d, int c, size_t n)
 {
     register char *o=(char *)d, *p=o+n;
@@ -26,6 +27,7 @@ void memcpy(void *d, const void *s, size_t n)
             *o=*oo;
     }
 }
+*/
 
 /***************************************************************************}
 {       PRIVATE INTERNAL RASPBERRY PI REGISTER STRUCTURE DEFINITIONS        }
