@@ -1,9 +1,12 @@
-// 如果board=raspi3 {
-// pub use board/raspi3/usb::
-// }
+/// ARM64 drivers
 
-pub fn initDriver() {
-	//if board=raspi3 {
-	// board/raspi3/usb::UsbInitialise()
-	//}
+use once::*;
+
+use super::board;
+
+/// Initialize ARM64 common drivers
+pub fn init() {
+    assert_has_not_been_called!();
+
+    board::init_driver();
 }
