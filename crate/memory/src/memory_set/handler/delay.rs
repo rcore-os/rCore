@@ -21,8 +21,8 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
             self.allocator.dealloc(entry.target());
+            pt.unmap(addr);
         }
-        pt.unmap(addr);
     }
 
     fn page_fault_handler(&self, pt: &mut PageTable, addr: VirtAddr) -> bool {
@@ -33,8 +33,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         }
         let frame = self.allocator.alloc().expect("failed to alloc frame");
         entry.set_target(frame);
-        entry.set_present(true);
-        entry.update();
+        self.flags.apply(entry);
         true
     }
 }
