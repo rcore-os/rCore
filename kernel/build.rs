@@ -17,10 +17,15 @@ fn main() {
 			.file("src/arch/aarch64/board/raspi3/usb/rpi-usb.c")
 			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency.c")
 			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency64.S")
-			.flag("-mcmodel=large \
-			-mcpu=cortex-a53+fp+simd -ffreestanding \
-			-nostartfiles -std=c11 -mstrict-align \
-			-fno-tree-loop-vectorize -fno-tree-slp-vectorize -Wno-nonnull-compare")
+			.flag("-mcmodel=large")
+			.flag("-mcpu=cortex-a53+fp+simd")
+			.flag("-ffreestanding")
+			.flag("-nostartfiles")
+			.flag("-std=c11")
+			.flag("-mstrict-align")
+			.flag("-fno-tree-loop-vectorize")
+			.flag("-fno-tree-slp-vectorize")
+			.flag("-Wno-nonnull-compare")
 			.compile("cobj");
 	}
 }
