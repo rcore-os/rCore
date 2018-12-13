@@ -1,6 +1,6 @@
 use super::c_structure::*;
 
 extern "C" {
-    fn UsbInitialise() -> u32;
-    fn UsbGetRootHub() -> UsbDevicePtr;
+    pub fn UsbInitialise() -> u32;
+    pub fn UsbGetRootHub() -> UsbDevicePtr;
 }
