@@ -10,8 +10,8 @@ extern "C" {									// Put extern C directive wrapper around
 #include <stddef.h>
 
 void UsbDependencyInit (void);
-//void memset(void *d, int c, size_t n);
-//void memcpy(void *d, const void *s, size_t n);
+void memset(void *d, int c, size_t n);
+void memcpy(void *d, const void *s, size_t n);
 
 /*--------------------------------------------------------------------------}
 {	                  ENUMERATED MAILBOX CHANNELS							}

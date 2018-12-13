@@ -10,7 +10,7 @@
 *******************************************************************************/
 #include <stdbool.h>			// C standard needed for bool
 #include <stdint.h>				// C standard needed for uint8_t, uint32_t, uint64_t etc
-#include "usb-dependency.h"      // Provide minimal rpi-SmartStart.h
+#include "usb-dependency.h"     // Provide minimal rpi-SmartStart
 #include "rpi-usb.h"			// This units header
 
 #define ReceiveFifoSize 20480 /* 16 to 32768 */
