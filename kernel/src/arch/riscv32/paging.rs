@@ -36,9 +36,9 @@ pub fn setup_page_table(frame: Frame) {
     info!("setup init page table end");
 }
 
-pub struct ActivePageTable(RecursivePageTable<'static>);
+pub struct ActivePageTable(RecursivePageTable<'static>, PageEntry);
 
-pub struct PageEntry(PageTableEntry);
+pub struct PageEntry(PageTableEntry, Page);
 
 impl PageTable for ActivePageTable {
     /*
@@ -84,15 +84,25 @@ impl PageTable for ActivePageTable {
     *   a mutable PageEntry reference of 'addr'
     */
     fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
-        if unsafe { !(*ROOT_PAGE_TABLE)[addr >> 22].flags().contains(EF::VALID) } {
+        let p2 = unsafe { ROOT_PAGE_TABLE.as_mut().unwrap() };
+        let page = Page::of_addr(VirtAddr::new(addr));
+        if !p2[page.p2_index()].flags().contains(EF::VALID) {
             return None;
         }
-        let page = Page::of_addr(VirtAddr::new(addr));
-        // ???
-        let _ = self.0.translate_page(page);
-        let entry_addr = ((addr >> 10) & ((1 << 22) - 4)) | (RECURSIVE_INDEX << 22);
-        unsafe { Some(&mut *(entry_addr as *mut PageEntry)) }
+        let entry = edit_entry_of(&page, |entry| *entry);
+        self.1 = PageEntry(entry, page);
+        Some(&mut self.1)
     }
+}
+
+fn edit_entry_of<T>(page: &Page, f: impl FnOnce(&mut PageTableEntry) -> T) -> T {
+    let p2_flags = unsafe { (*ROOT_PAGE_TABLE)[page.p2_index()].flags_mut() };
+    p2_flags.insert(EF::READABLE | EF::WRITABLE);
+    let entry_addr = (RECURSIVE_INDEX << 22) | (page.p2_index() << 12) | (page.p1_index() << 2);
+    let entry = unsafe { &mut *(entry_addr as *mut PageTableEntry) };
+    let ret = f(entry);
+    p2_flags.remove(EF::READABLE | EF::WRITABLE);
+    ret
 }
 
 impl PageTableExt for ActivePageTable {}
@@ -103,23 +113,26 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap())
+        ActivePageTable(
+            RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap(),
+            ::core::mem::zeroed()
+        )
     }
 }
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
-        let addr = VirtAddr::new((self as *const _ as usize) << 10);
-        sfence_vma(0, addr);
+        edit_entry_of(&self.1, |entry| *entry = self.0);
+        sfence_vma(0, self.1.start_address());
     }
     fn accessed(&self) -> bool { self.0.flags().contains(EF::ACCESSED) }
     fn dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
     fn writable(&self) -> bool { self.0.flags().contains(EF::WRITABLE) }
     fn present(&self) -> bool { self.0.flags().contains(EF::VALID | EF::READABLE) }
-    fn clear_accessed(&mut self) { self.as_flags().remove(EF::ACCESSED); }
-    fn clear_dirty(&mut self) { self.as_flags().remove(EF::DIRTY); }
-    fn set_writable(&mut self, value: bool) { self.as_flags().set(EF::WRITABLE, value); }
-    fn set_present(&mut self, value: bool) { self.as_flags().set(EF::VALID | EF::READABLE, value); }
+    fn clear_accessed(&mut self) { self.0.flags_mut().remove(EF::ACCESSED); }
+    fn clear_dirty(&mut self) { self.0.flags_mut().remove(EF::DIRTY); }
+    fn set_writable(&mut self, value: bool) { self.0.flags_mut().set(EF::WRITABLE, value); }
+    fn set_present(&mut self, value: bool) { self.0.flags_mut().set(EF::VALID | EF::READABLE, value); }
     fn target(&self) -> usize { self.0.addr().as_u32() as usize }
     fn set_target(&mut self, target: usize) {
         let flags = self.0.flags();
@@ -129,25 +142,19 @@ impl Entry for PageEntry {
     fn writable_shared(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
     fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::RESERVED2) }
     fn set_shared(&mut self, writable: bool) {
-        let flags = self.as_flags();
+        let flags = self.0.flags_mut();
         flags.set(EF::RESERVED1, writable);
         flags.set(EF::RESERVED2, !writable);
     }
-    fn clear_shared(&mut self) { self.as_flags().remove(EF::RESERVED1 | EF::RESERVED2); }
+    fn clear_shared(&mut self) { self.0.flags_mut().remove(EF::RESERVED1 | EF::RESERVED2); }
     fn swapped(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
-    fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::RESERVED1, value); }
+    fn set_swapped(&mut self, value: bool) { self.0.flags_mut().set(EF::RESERVED1, value); }
     fn user(&self) -> bool { self.0.flags().contains(EF::USER) }
-    fn set_user(&mut self, value: bool) { self.as_flags().set(EF::USER, value); }
+    fn set_user(&mut self, value: bool) { self.0.flags_mut().set(EF::USER, value); }
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
-    fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::EXECUTABLE, value); }
-    fn mmio(&self) -> bool { unimplemented!() }
-    fn set_mmio(&mut self, value: bool) { unimplemented!() }
-}
-
-impl PageEntry {
-    fn as_flags(&mut self) -> &mut EF {
-        unsafe { &mut *(self as *mut _ as *mut EF) }
-    }
+    fn set_execute(&mut self, value: bool) { self.0.flags_mut().set(EF::EXECUTABLE, value); }
+    fn mmio(&self) -> bool { false }
+    fn set_mmio(&mut self, value: bool) { }
 }
 
 #[derive(Debug)]
@@ -174,15 +181,12 @@ impl InactivePageTable for InactivePageTable0 {
         let e1 = table[KERNEL_P2_INDEX];
         let e2 = table[KERNEL_P2_INDEX + 1];
         let e3 = table[KERNEL_P2_INDEX + 2];
-        assert!(!e1.is_unused());
-        assert!(!e2.is_unused());
-        assert!(!e3.is_unused());
 
         self.edit(|_| {
             table[0x40] = e0;
-            table[KERNEL_P2_INDEX].set(e1.frame(), EF::VALID | EF::GLOBAL);
-            table[KERNEL_P2_INDEX + 1].set(e2.frame(), EF::VALID | EF::GLOBAL);
-            table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
+            table[KERNEL_P2_INDEX] = e1;
+            table[KERNEL_P2_INDEX + 1] = e2;
+            table[KERNEL_P2_INDEX + 2] = e3;
         });
     }
 
