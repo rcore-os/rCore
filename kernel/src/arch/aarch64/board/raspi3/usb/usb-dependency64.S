@@ -9,10 +9,10 @@
 .globl UsbDependencyInit;
 .type UsbDependencyInit, %function
 UsbDependencyInit:
-	ldr	x0, =0x3F000000						// No need to detect address in 64bit mode it has to be 0x3F000000 on Pi3
-	ldr x1, =RPi_IO_Base_Addr				// Address of RPi_IO_Base_Addr
-	str w0, [x1]							// Store the IO base address
-	ret										// Return
+    ldr	x0, =0x3F000000						// No need to detect address in 64bit mode it has to be 0x3F000000 on Pi3
+    ldr x1, =RPi_IO_Base_Addr				// Address of RPi_IO_Base_Addr
+    str w0, [x1]							// Store the IO base address
+    ret										// Return
 .balign	4
 .ltorg										/* Tell assembler ltorg data for code above can go here */
 .size   UsbDependencyInit, .-UsbDependencyInit
@@ -32,9 +32,9 @@ UsbDependencyInit:
 // Entry: x0 will have ARMAddress value
 //"================================================================"
 ARMaddrToGPUaddr:
-	mov x1, #0xC0000000						// ARM to VC conversion value
-	orr x0, x0, x1							// Create bus address
-	ret										// Return
+    mov x1, #0xC0000000						// ARM to VC conversion value
+    orr x0, x0, x1							// Create bus address
+    ret										// Return
 .balign	4
 .ltorg										// Tell assembler ltorg data for this code can go here
 .size	ARMaddrToGPUaddr, .-ARMaddrToGPUaddr
@@ -50,15 +50,15 @@ ARMaddrToGPUaddr:
 // Entry: x0 will have GPUAddress value
 //"================================================================"
 GPUaddrToARMaddr:
-	mov x1, ~0xC0000000						// ARM to VC conversion value	
-	and x0, x0, x1							// Create arm address
-	ret										// Return
+    mov x1, ~0xC0000000						// ARM to VC conversion value	
+    and x0, x0, x1							// Create arm address
+    ret										// Return
 .balign	4
 .ltorg										// Tell assembler ltorg data for this code can go here
 .size	GPUaddrToARMaddr, .-GPUaddrToARMaddr
 
 /****************************************************************
-       	   DATA FOR SMARTSTART64  EXPOSED TO INTERFACE 
+              DATA FOR SMARTSTART64  EXPOSED TO INTERFACE 
 ****************************************************************/
 .section ".data.usb", "aw"
 .balign 4
