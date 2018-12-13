@@ -10,3 +10,9 @@ Cargo.lock
 
 # for eclipse
 .project
+
+# shortcut
+# The changes of shortcut will be ignored by git.
+# To directly remove it from repository, you can use:
+#   `git rm --cached shortcut.sh`
+/shortcut.sh

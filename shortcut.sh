@@ -1,6 +1,10 @@
 #!/bin/bash
 
-#description: shortcut for make project
+# description: shortcut for make project
+#
+# The changes of shortcut will be ignored by git.
+# To directly remove it from repository, you can use:
+#   `git rm --cached shortcut.sh`
 
 args="arch=aarch64 board=raspi3 prefix=aarch64-linux-gnu"
 
