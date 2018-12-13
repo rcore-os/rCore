@@ -34,25 +34,23 @@ fn main() {
 		"aarch64" => {
 			if let Ok(file_path) = gen_sfsimg_asm() {
 				cc::Build::new().file(&file_path).compile("sfsimg");
+				cc::Build::new()
+					.file("src/arch/aarch64/board/raspi3/usb/rpi-usb.c")
+					.file("src/arch/aarch64/board/raspi3/usb/usb-dependency.c")
+					.file("src/arch/aarch64/board/raspi3/usb/usb-dependency64.S")
+					.flag("-ffreestanding")
+					.flag("-nostartfiles")
+					.flag("-nostdlib")
+					.flag("-std=c11")
+					.flag("-mstrict-align")
+					.flag("-mgeneral-regs-only")
+					.flag("-fno-tree-loop-vectorize")
+					.flag("-fno-tree-slp-vectorize")
+					.flag("-Wno-nonnull-compare")
+					.compile("usbdriver");
 			}
 		}
 		_ => panic!("Unknown arch {}", arch),
-	}
-	if std::env::var("TARGET").unwrap().find("aarch64").is_some() {
-		cc::Build::new()
-			.file("src/arch/aarch64/board/raspi3/usb/rpi-usb.c")
-			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency.c")
-			.file("src/arch/aarch64/board/raspi3/usb/usb-dependency64.S")
-			.flag("-mcmodel=large")
-			.flag("-mcpu=cortex-a53+fp+simd")
-			.flag("-ffreestanding")
-			.flag("-nostartfiles")
-			.flag("-std=c11")
-			.flag("-mstrict-align")
-			.flag("-fno-tree-loop-vectorize")
-			.flag("-fno-tree-slp-vectorize")
-			.flag("-Wno-nonnull-compare")
-			.compile("cobj");
 	}
 }
 
