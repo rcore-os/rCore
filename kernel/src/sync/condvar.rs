@@ -1,11 +1,10 @@
 use alloc::collections::VecDeque;
 use super::*;
-use thread;
-use thread_;
+use crate::thread;
 
 #[derive(Default)]
 pub struct Condvar {
-    wait_queue: SpinNoIrqLock<VecDeque<thread_::Thread>>,
+    wait_queue: SpinNoIrqLock<VecDeque<thread::Thread>>,
 }
 
 impl Condvar {
@@ -33,5 +32,8 @@ impl Condvar {
         while let Some(t) = self.wait_queue.lock().pop_front() {
             t.unpark();
         }
+    }
+    pub fn _clear(&self) {
+        self.wait_queue.lock().clear();
     }
 }

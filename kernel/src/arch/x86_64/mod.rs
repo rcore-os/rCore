@@ -1,6 +1,7 @@
-extern crate bootloader;
-
-use self::bootloader::bootinfo::{BootInfo, MemoryRegionType};
+use bootloader::bootinfo::{BootInfo, MemoryRegionType};
+use core::sync::atomic::*;
+use log::*;
+use crate::consts::KERNEL_OFFSET;
 
 pub mod driver;
 pub mod cpu;
@@ -8,16 +9,25 @@ pub mod interrupt;
 pub mod paging;
 pub mod gdt;
 pub mod idt;
-// TODO: Move multi-core init to bootloader
-//pub mod smp;
 pub mod memory;
 pub mod io;
+pub mod consts;
+
+static AP_CAN_INIT: AtomicBool = ATOMIC_BOOL_INIT;
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
+    let cpu_id = cpu::id();
+    println!("Hello world! from CPU {}!", cpu_id);
+
+    if cpu_id != 0 {
+        while !AP_CAN_INIT.load(Ordering::Relaxed) {}
+        other_start();
+    }
+
     // First init log mod, so that we can print log info.
-    ::logging::init();
+    crate::logging::init();
     info!("Hello world!");
     info!("{:#?}", boot_info);
 
@@ -30,20 +40,21 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     // Now heap is available
     gdt::init();
 
+    cpu::init();
+
     driver::init();
 
-    ::kmain();
+    crate::process::init();
+
+    AP_CAN_INIT.store(true, Ordering::Relaxed);
+
+    crate::kmain();
 }
 
-/// The entry point for another processors
-#[no_mangle]
-pub extern "C" fn other_main() -> ! {
+/// The entry point for other processors
+fn other_start() -> ! {
     idt::init();
     gdt::init();
-    driver::apic::other_init();
-    let cpu_id = driver::apic::lapic_id();
-//    let ms = unsafe { smp::notify_started(cpu_id) };
-    println!("Hello world! from CPU {}!", cpu_id);
-//    unsafe{ let a = *(0xdeadbeaf as *const u8); } // Page fault
-    loop {}
+    cpu::init();
+    crate::kmain();
 }

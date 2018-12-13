@@ -1,12 +1,12 @@
 use alloc::boxed::Box;
-use arch::driver::apic::lapic_id;
-use consts::MAX_CPU_NUM;
+use crate::consts::MAX_CPU_NUM;
 use core::fmt;
 use core::fmt::Debug;
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{PrivilegeLevel, VirtAddr};
 use x86_64::structures::gdt::*;
 use x86_64::structures::tss::TaskStateSegment;
+use log::*;
 
 /// Alloc TSS & GDT at kernel heap, then init and load it.
 /// The double fault stack will be allocated at kernel heap too.
@@ -50,7 +50,7 @@ pub fn init() {
         load_tss(TSS_SELECTOR);
     }
 
-    CPUS[lapic_id() as usize].call_once(||
+    CPUS[super::cpu::id() as usize].call_once(||
         Mutex::new(Cpu { gdt, tss: unsafe { &mut *tss } }));
 }
 
@@ -67,7 +67,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn current() -> MutexGuard<'static, Cpu> {
-        CPUS[lapic_id() as usize].try().unwrap().lock()
+        CPUS[super::cpu::id()].r#try().unwrap().lock()
     }
 
     /// 设置从Ring3跳到Ring0时，自动切换栈的地址

@@ -1,23 +1,22 @@
-// Rust language features implementions
+// Rust language features implementations
 
 use core::panic::PanicInfo;
 use core::alloc::Layout;
+use log::*;
 
 #[lang = "eh_personality"] 
 extern fn eh_personality() {
 }
 
 #[panic_handler]
-#[no_mangle]
-pub fn panic(info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
     let location = info.location().unwrap();
     let message = info.message().unwrap();
     error!("\n\nPANIC in {} at line {}\n    {}", location.file(), location.line(), message);
-    loop { }
+    loop { crate::arch::cpu::halt() }
 }
 
 #[lang = "oom"]
-#[no_mangle]
-pub fn oom(_: Layout) -> ! {
+fn oom(_: Layout) -> ! {
     panic!("out of memory");
 }

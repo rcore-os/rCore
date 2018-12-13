@@ -1,5 +1,10 @@
+//! Mock Swapper
+//!
+//! An mock implement of the swapper
+//! Used to test page table operation
+
 use super::Swapper;
-use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use core::mem::uninitialized;
 
 const PAGE_SIZE: usize = 4096;
@@ -37,6 +42,10 @@ impl Swapper for MockSwapper {
 }
 
 impl MockSwapper {
+    /*
+    **  @brief  allocate an unused id for location on the mock device
+    **  @retval usize                the allocated location id
+    */
     fn alloc_id(&self) -> usize {
         (0 .. 100usize).find(|i| !self.map.contains_key(i)).unwrap()
     }

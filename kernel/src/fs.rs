@@ -1,144 +1,30 @@
 use simple_filesystem::*;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
+use core::any::Any;
+use core::slice;
+use lazy_static::lazy_static;
 #[cfg(target_arch = "x86_64")]
-use arch::driver::ide;
-use spin::Mutex;
+use crate::arch::driver::ide;
+use crate::sync::Condvar;
+use crate::sync::SpinNoIrqLock as Mutex;
 
-// Hard link user program
-#[cfg(target_arch = "riscv32")]
-global_asm!(r#"
-    .section .rodata
-    .align 12
-    .global _user_img_start
-    .global _user_img_end
-_user_img_start:
-    .incbin "../user/user-riscv.img"
-_user_img_end:
-"#);
-
-// Hard link user program
-#[cfg(target_arch = "aarch64")]
-global_asm!(r#"
-    .section .rodata
-    .align 12
-    .global _user_img_start
-    .global _user_img_end
-_user_img_start:
-    .incbin "../user/user-riscv.img"
-_user_img_end:
-"#);
-
-const LOGO: &str = r#"
-    ____                __   ____  _____
-   / __ \ __  __ _____ / /_ / __ \/ ___/
-  / /_/ // / / // ___// __// / / /\__ \
- / _, _// /_/ /(__  )/ /_ / /_/ /___/ /
-/_/ |_| \__,_//____/ \__/ \____//____/
-"#;
-
-pub fn show_logo() {
-    println!("{}", LOGO);
-}
-
-#[inline(always)]
-fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
-    let ret: i32;
-    unsafe {
-        #[cfg(target_arch = "riscv32")]
-            asm!("ecall"
-            : "={x10}" (ret)
-            : "{x10}" (id), "{x11}" (arg0), "{x12}" (arg1), "{x13}" (arg2), "{x14}" (arg3), "{x15}" (arg4), "{x16}" (arg5)
-            : "memory"
-            : "volatile");
-        #[cfg(target_arch = "x86_64")]
-            asm!("int 0x40"
-            : "={rax}" (ret)
-            : "{rax}" (id), "{rdi}" (arg0), "{rsi}" (arg1), "{rdx}" (arg2), "{rcx}" (arg3), "{r8}" (arg4), "{r9}" (arg5)
-            : "memory"
-            : "intel" "volatile");
-        #[cfg(target_arch = "aarch64")]
-            asm!("svc 0"
-            : "={x0}" (ret)
-            : "{x8}" (id), "{x0}" (arg0), "{x1}" (arg1), "{x2}" (arg2), "{x3}" (arg3), "{x4}" (arg4), "{x5}" (arg5)
-            : "memory"
-            : "volatile");
-    }
-    ret
-}
-
-pub fn test_shell(prefix: &str) -> ! {
-    show_logo();
-    loop {
-        print!("{}", prefix);
-        loop {
-            let c = super::arch::io::getchar();
-            match c {
-                '\u{7f}' => {
-                    print!("\u{7f}");
-                }
-                'c' => unsafe {
-                    print!("sys_putc: ");
-                    sys_call(30, 'A' as usize, 0, 0, 0, 0, 0);
-                },
-                't' => unsafe {
-                    println!("sys_get_time: {}", sys_call(17, 0, 0, 0, 0, 0, 0));
-                },
-                ' '...'\u{7e}' => {
-                    print!("{}", c);
-                }
-                '\n' | '\r' => {
-                    print!("\n");
-                    break;
-                }
-                _ => {}
+lazy_static! {
+    pub static ref ROOT_INODE: Arc<INode> = {
+        #[cfg(any(target_arch = "riscv32", target_arch = "aarch64"))]
+        let device = {
+            extern {
+                fn _user_img_start();
+                fn _user_img_end();
             }
-        }
-    }
-}
+            // Hard link user program
+            Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
+        };
+        #[cfg(target_arch = "x86_64")]
+        let device = Box::new(ide::IDE::new(1));
 
-pub fn shell() {
-    show_logo();
-
-    #[cfg(any(target_arch = "riscv32", target_arch = "aarch64"))]
-    let device = {
-        extern {
-            fn _user_img_start();
-            fn _user_img_end();
-        }
-        Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
+        let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
+        sfs.root_inode()
     };
-
-    #[cfg(target_arch = "x86_64")]
-    let device = Box::new(&ide::DISK1);
-
-    let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
-    let root = sfs.root_inode();
-    let files = root.borrow().list().unwrap();
-    println!("Available programs: {:?}", files);
-
-    // Avoid stack overflow in release mode
-    // Equal to: `buf = Box::new([0; 64 << 12])`
-    use alloc::alloc::{alloc, dealloc, Layout};
-    const BUF_SIZE: usize = 0x40000;
-    let layout = Layout::from_size_align(BUF_SIZE, 0x1000).unwrap();
-    let buf = unsafe{ slice::from_raw_parts_mut(alloc(layout), BUF_SIZE) };
-    loop {
-        print!(">> ");
-        use console::get_line;
-        let name = get_line();
-        if name == "" {
-            continue;
-        }
-        if let Ok(file) = root.borrow().lookup(name.as_str()) {
-            use process::*;
-            let len = file.borrow().read_at(0, &mut *buf).unwrap();
-            let pid = processor().add(Context::new_user(&buf[..len]));
-            processor().current_wait_for(pid);
-        } else {
-            println!("Program not exist");
-        }
-    }
-    unsafe { dealloc(buf.as_mut_ptr(), layout) };
 }
 
 struct MemBuf(&'static [u8]);
@@ -162,19 +48,107 @@ impl Device for MemBuf {
     }
 }
 
-use core::slice;
-
 #[cfg(target_arch = "x86_64")]
-impl BlockedDevice for &'static ide::DISK1 {
+impl BlockedDevice for ide::IDE {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
-        self.0.lock().read(block_id as u64, 1, buf).is_ok()
+        self.read(block_id as u64, 1, buf).is_ok()
     }
     fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
-        self.0.lock().write(block_id as u64, 1, buf).is_ok()
+        self.write(block_id as u64, 1, buf).is_ok()
+    }
+}
+
+#[derive(Default)]
+pub struct Stdin {
+    buf: Mutex<VecDeque<char>>,
+    pushed: Condvar,
+}
+
+impl Stdin {
+    pub fn push(&self, c: char) {
+        self.buf.lock().push_back(c);
+        self.pushed.notify_one();
+    }
+    pub fn pop(&self) -> char {
+        // QEMU v3.0 don't support M-mode external interrupt (bug?)
+        // So we have to use polling.
+        #[cfg(feature = "m_mode")]
+        loop {
+            let c = crate::arch::io::getchar();
+            if c != '\0' { return c; }
+        }
+        #[cfg(not(feature = "m_mode"))]
+        loop {
+            let ret = self.buf.lock().pop_front();
+            match ret {
+                Some(c) => return c,
+                None => self.pushed._wait(),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Stdout;
+
+lazy_static! {
+    pub static ref STDIN: Arc<Stdin> = Arc::new(Stdin::default());
+    pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
+}
+
+// TODO: better way to provide default impl?
+macro_rules! impl_inode {
+    () => {
+        fn info(&self) -> Result<FileInfo> { unimplemented!() }
+        fn sync(&self) -> Result<()> { unimplemented!() }
+        fn resize(&self, len: usize) -> Result<()> { unimplemented!() }
+        fn create(&self, name: &str, type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
+        fn unlink(&self, name: &str) -> Result<()> { unimplemented!() }
+        fn link(&self, name: &str, other: &Arc<INode>) -> Result<()> { unimplemented!() }
+        fn rename(&self, old_name: &str, new_name: &str) -> Result<()> { unimplemented!() }
+        fn move_(&self, old_name: &str, target: &Arc<INode>, new_name: &str) -> Result<()> { unimplemented!() }
+        fn find(&self, name: &str) -> Result<Arc<INode>> { unimplemented!() }
+        fn get_entry(&self, id: usize) -> Result<String> { unimplemented!() }
+        fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
+        fn as_any_ref(&self) -> &Any { self }
+    };
+}
+
+impl INode for Stdin {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        buf[0] = self.pop() as u8;
+        Ok(1)
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> { unimplemented!() }
+    impl_inode!();
+}
+
+impl INode for Stdout {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        use core::str;
+        let s = str::from_utf8(buf).map_err(|_| ())?;
+        print!("{}", s);
+        Ok(buf.len())
+    }
+    impl_inode!();
+}
+
+pub trait INodeExt {
+    fn read_as_vec(&self) -> Result<Vec<u8>>;
+}
+
+impl INodeExt for INode {
+    fn read_as_vec(&self) -> Result<Vec<u8>> {
+        let size = self.info()?.size;
+        let mut buf = Vec::with_capacity(size);
+        unsafe { buf.set_len(size); }
+        self.read_at(0, buf.as_mut_slice())?;
+        Ok(buf)
     }
 }

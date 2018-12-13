@@ -1,4 +1,5 @@
 use x86_64::structures::idt::*;
+use lazy_static::lazy_static;
 
 pub fn init() {
     IDT.load();
@@ -6,8 +7,8 @@ pub fn init() {
 
 lazy_static! {
     static ref IDT: Idt = {
-        use arch::interrupt::consts::*;
-		use arch::gdt::DOUBLE_FAULT_IST_INDEX;
+        use crate::arch::interrupt::consts::*;
+		use crate::arch::gdt::DOUBLE_FAULT_IST_INDEX;
         use x86_64::PrivilegeLevel;
         use core::mem::transmute;
 

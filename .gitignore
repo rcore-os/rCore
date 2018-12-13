@@ -2,6 +2,10 @@ build
 target
 /kernel/src/arch/x86_64/interrupt/vector.asm
 
+Cargo.lock
+!kernel/Cargo.lock
+!user/Cargo.lock
+
 .DS_Store
 
 # for eclipse

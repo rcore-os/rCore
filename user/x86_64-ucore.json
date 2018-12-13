@@ -7,7 +7,13 @@
   "target-c-int-width": "32",
   "os": "none",
   "executables": true,
+  "linker": "rust-lld",
   "linker-flavor": "ld.lld",
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/x86_64/user.ld"
+    ]
+  },
   "panic-strategy": "abort",
   "disable-redzone": true,
   "features": "-mmx,-sse,+soft-float"

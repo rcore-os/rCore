@@ -36,7 +36,7 @@ pub struct TrapFrame {
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
-        use arch::gdt;
+        use crate::arch::gdt;
         let mut tf = TrapFrame::default();
         tf.rdi = arg;
         tf.cs = gdt::KCODE_SELECTOR.0 as usize;
@@ -47,7 +47,7 @@ impl TrapFrame {
         tf
     }
     fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
-        use arch::gdt;
+        use crate::arch::gdt;
         let mut tf = TrapFrame::default();
         tf.cs = if is32 { gdt::UCODE32_SELECTOR.0 } else { gdt::UCODE_SELECTOR.0 } as usize;
         tf.rip = entry_addr;
@@ -103,7 +103,6 @@ extern {
 
 /// The entry point of new thread
 extern fn forkret() {
-    debug!("forkret");
     // Will return to `trapret`
 }
 
@@ -182,5 +181,10 @@ impl Context {
                 tf
             },
         }.push_at(kstack_top)
+    }
+    /// Called at a new user context
+    /// To get the init TrapFrame in sys_exec
+    pub unsafe fn get_init_tf(&self) -> TrapFrame {
+        (*(self.0 as *const InitStack)).tf.clone()
     }
 }

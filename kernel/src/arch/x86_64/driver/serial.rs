@@ -1,10 +1,10 @@
 // Copy from Redox
-extern crate uart_16550;
 
 use core::fmt::{self, Write};
-use super::redox_syscall::io::{Io, Pio};
+use x86_64::instructions::port::Port;
 use spin::Mutex;
-use self::uart_16550::SerialPort;
+use uart_16550::SerialPort;
+use once::*;
 
 pub static COM1: Mutex<SerialPort> = Mutex::new(SerialPort::new(0x3F8));
 pub static COM2: Mutex<SerialPort> = Mutex::new(SerialPort::new(0x2F8));
@@ -14,7 +14,7 @@ pub fn init() {
 
     COM1.lock().init();
     COM2.lock().init();
-    use arch::interrupt::{enable_irq, consts::{IRQ_COM1, IRQ_COM2}};
+    use crate::arch::interrupt::{enable_irq, consts::{IRQ_COM1, IRQ_COM2}};
     enable_irq(IRQ_COM1);
     enable_irq(IRQ_COM2);
 }
@@ -26,10 +26,9 @@ pub trait SerialRead {
 impl SerialRead for SerialPort {
     fn receive(&mut self) -> u8 {
         unsafe {
-            let ports = self as *mut _ as *mut [Pio<u8>; 6];
+            let ports = self as *mut _ as *mut [Port<u8>; 6];
             let line_sts = &(*ports)[5];
             let data = &(*ports)[0];
-            while line_sts.read() & 1 != 1 {}
             data.read()
         }
     }

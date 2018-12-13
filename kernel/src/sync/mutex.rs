@@ -26,7 +26,7 @@
 //! `MutexSupport`提供了若干接口，它们会在操作锁的不同时间点被调用。
 //! 注意这个接口实际是取了几种实现的并集，并不是很通用。
 
-use arch::interrupt;
+use crate::arch::interrupt;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -174,12 +174,12 @@ impl<T: ?Sized + Default, S: MutexSupport> Default for Mutex<T, S> {
 impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S>
 {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { unsafe { &*self.mutex.data.get() } }
+    fn deref(&self) -> &T { unsafe { &*self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S>
 {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { unsafe { &mut *self.mutex.data.get() } }
+    fn deref_mut(&mut self) -> &mut T { unsafe { &mut *self.mutex.data.get() } }
 }
 
 impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>

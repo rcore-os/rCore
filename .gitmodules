@@ -1,3 +1,3 @@
-[submodule "crate/riscv"]
-	path = crate/riscv
-	url = https://github.com/riscv-and-rust-and-decaf/riscv.git
+[submodule "riscv-pk"]
+	path = riscv-pk
+	url = https://github.com/riscv-and-rust-and-decaf/riscv-pk.git

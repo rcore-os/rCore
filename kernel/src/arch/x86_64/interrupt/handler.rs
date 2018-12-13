@@ -66,13 +66,14 @@
 
 use super::consts::*;
 use super::TrapFrame;
+use log::*;
 
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
 
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    trace!("Interrupt: {:#x}", tf.trap_num);
+    trace!("Interrupt: {:#x} @ CPU{}", tf.trap_num, super::super::cpu::id());
     // Dispatch
     match tf.trap_num as u8 {
         T_BRKPT => breakpoint(),
@@ -80,19 +81,15 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_PGFLT => page_fault(tf),
         T_IRQ0...63 => {
             let irq = tf.trap_num as u8 - T_IRQ0;
+            super::ack(irq); // must ack before switching
             match irq {
-                IRQ_TIMER => ::trap::timer(),
+                IRQ_TIMER => crate::trap::timer(),
                 IRQ_KBD => keyboard(),
                 IRQ_COM1 => com1(),
                 IRQ_COM2 => com2(),
                 IRQ_IDE => ide(),
                 _ => panic!("Invalid IRQ number: {}", irq),
             }
-            #[cfg(feature = "use_apic")]
-            use arch::driver::apic::ack;
-            #[cfg(not(feature = "use_apic"))]
-            use arch::driver::pic::ack;
-            ack(irq);
         }
         T_SWITCH_TOK => to_kernel(tf),
         T_SWITCH_TOU => to_user(tf),
@@ -101,7 +98,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         T_DIVIDE | T_GPFLT | T_ILLOP => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
-    ::trap::before_return();
 }
 
 fn breakpoint() {
@@ -116,30 +112,30 @@ fn double_fault(tf: &TrapFrame) {
 fn page_fault(tf: &mut TrapFrame) {
     let addr: usize;
     unsafe { asm!("mov %cr2, $0" : "=r" (addr)); }
-    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
 
-    use memory::page_fault_handler;
-    if page_fault_handler(addr) {
+    if crate::memory::page_fault_handler(addr) {
         return;
     }
-
+    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
     error(tf);
 }
 
 fn keyboard() {
-    use arch::driver::keyboard;
-    info!("\nInterupt: Keyboard");
-    let c = keyboard::get();
-    info!("Key = '{}' {}", c as u8 as char, c);
+    use crate::arch::driver::keyboard;
+    trace!("\nInterupt: Keyboard");
+    if let Some(c) = keyboard::receive() {
+        crate::trap::serial(c);
+    }
 }
 
 fn com1() {
-    use arch::driver::serial::*;
+    use crate::arch::driver::serial::*;
     trace!("\nInterupt: COM1");
+    crate::trap::serial(COM1.lock().receive() as char);
 }
 
 fn com2() {
-    use arch::driver::serial::*;
+    use crate::arch::driver::serial::*;
     trace!("\nInterupt: COM2");
     COM2.lock().receive();
 }
@@ -149,7 +145,7 @@ fn ide() {
 }
 
 fn to_user(tf: &mut TrapFrame) {
-    use arch::gdt;
+    use crate::arch::gdt;
     info!("\nInterupt: To User");
     tf.cs = gdt::UCODE_SELECTOR.0 as usize;
     tf.ss = gdt::UDATA_SELECTOR.0 as usize;
@@ -157,7 +153,7 @@ fn to_user(tf: &mut TrapFrame) {
 }
 
 fn to_kernel(tf: &mut TrapFrame) {
-    use arch::gdt;
+    use crate::arch::gdt;
     info!("\nInterupt: To Kernel");
     tf.cs = gdt::KCODE_SELECTOR.0 as usize;
     tf.ss = gdt::KDATA_SELECTOR.0 as usize;
@@ -165,25 +161,23 @@ fn to_kernel(tf: &mut TrapFrame) {
 
 fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    use syscall::syscall;
-    let ret = syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9], tf);
+    let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9], tf);
     tf.rax = ret as usize;
 }
 
 fn syscall32(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    use syscall::syscall;
-    let ret = syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
+    let ret = crate::syscall::syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
     tf.rax = ret as usize;
 }
 
 fn error(tf: &TrapFrame) {
-    ::trap::error(tf);
+    crate::trap::error(tf);
 }
 
 #[no_mangle]
 pub extern fn set_return_rsp(tf: &TrapFrame) {
-    use arch::gdt::Cpu;
+    use crate::arch::gdt::Cpu;
     use core::mem::size_of;
     if tf.cs & 0x3 == 3 {
         Cpu::current().set_ring0_rsp(tf as *const _ as usize + size_of::<TrapFrame>());

@@ -1,32 +1,40 @@
+//! Implememnt the swap manager with the FIFO page replacement algorithm
+
 use alloc::collections::VecDeque;
 use super::*;
 
+
 #[derive(Default)]
-pub struct FifoSwapManager {
-    deque: VecDeque<VirtAddr>,
+pub struct FifoSwapManager  {
+    deque: VecDeque<Frame>,
 }
 
 impl SwapManager for FifoSwapManager {
     fn tick(&mut self) {}
 
-    fn push(&mut self, addr: usize) {
-        self.deque.push_back(addr);
+    fn push(&mut self, frame: Frame) {
+        info!("SwapManager push token: {:x?} vaddr: {:x?}", frame.get_token(), frame.get_virtaddr());
+        self.deque.push_back(frame);
     }
 
-    fn remove(&mut self, addr: usize) {
+    fn remove(&mut self, token: usize, addr: VirtAddr) {
+        info!("SwapManager remove token: {:x?} vaddr: {:x?}", token, addr);
         let id = self.deque.iter()
-            .position(|&x| x == addr)
+            .position(|ref x| x.get_virtaddr() == addr && x.get_token() == token)
             .expect("address not found");
         self.deque.remove(id);
+        //info!("SwapManager remove token finished: {:x?} vaddr: {:x?}", token, addr);
+        
     }
 
-    fn pop<T, S>(&mut self, _: &mut T, _: &mut S) -> Option<VirtAddr>
+    fn pop<T, S>(&mut self, _: &mut T, _: &mut S) -> Option<Frame>
         where T: PageTable, S: Swapper
     {
         self.deque.pop_front()
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -48,3 +56,4 @@ mod test {
         test_manager(FifoSwapManager::default(), &ops, &pgfault_count);
     }
 }
+*/

@@ -1,11 +1,19 @@
+# Constants / Macros defined in Rust code:
+#   xscratch
+#   xstatus
+#   xepc
+#   xcause
+#   xtval
+#   XRET
+
 .macro SAVE_ALL
     # If coming from userspace, preserve the user stack pointer and load
     # the kernel stack pointer. If we came from the kernel, sscratch
     # will contain 0, and we should continue on the current stack.
-    csrrw sp, 0x140, sp     # sscratch
+    csrrw sp, (xscratch), sp
     bnez sp, _save_context
 _restore_kernel_sp:
-    csrr sp, 0x140          # sscratch
+    csrr sp, (xscratch)
     # sscratch = previous-sp, sp = kernel-sp
 _save_context:
     # provide room for trap frame
@@ -13,7 +21,8 @@ _save_context:
     # save x registers except x2 (sp)
     sw x1, 1*4(sp)
     sw x3, 3*4(sp)
-    sw x4, 4*4(sp)
+    # tp(x4) = hartid. DON'T change.
+    # sw x4, 4*4(sp)
     sw x5, 5*4(sp)
     sw x6, 6*4(sp)
     sw x7, 7*4(sp)
@@ -44,11 +53,11 @@ _save_context:
 
     # get sp, sstatus, sepc, stval, scause
     # set sscratch = 0
-    csrrw s0, 0x140, x0     # sscratch
-    csrr s1, 0x100          # sstatus
-    csrr s2, 0x141          # sepc
-    csrr s3, 0x143          # stval
-    csrr s4, 0x142          # scause
+    csrrw s0, (xscratch), x0
+    csrr s1, (xstatus)
+    csrr s2, (xepc)
+    csrr s3, (xtval)
+    csrr s4, (xcause)
     # store sp, sstatus, sepc, sbadvaddr, scause
     sw s0, 2*4(sp)
     sw s1, 32*4(sp)
@@ -61,19 +70,19 @@ _save_context:
     lw s1, 32*4(sp)             # s1 = sstatus
     lw s2, 33*4(sp)             # s2 = sepc
     andi s0, s1, 1 << 8
-    bnez s0, _restore_context   # back to U-mode? (sstatus.SPP = 1)
+    bnez s0, _restore_context   # back to S-mode? (sstatus.SPP = 1)
 _save_kernel_sp:
     addi s0, sp, 36*4
-    csrw 0x140, s0              # sscratch = kernel-sp
+    csrw (xscratch), s0         # sscratch = kernel-sp
 _restore_context:
     # restore sstatus, sepc
-    csrw 0x100, s1
-    csrw 0x141, s2
+    csrw (xstatus), s1
+    csrw (xepc), s2
 
     # restore x registers except x2 (sp)
     lw x1, 1*4(sp)
     lw x3, 3*4(sp)
-    lw x4, 4*4(sp)
+    # lw x4, 4*4(sp)
     lw x5, 5*4(sp)
     lw x6, 6*4(sp)
     lw x7, 7*4(sp)
@@ -115,4 +124,4 @@ __alltraps:
 __trapret:
     RESTORE_ALL
     # return from supervisor call
-    sret
+    XRET

@@ -1,26 +1,27 @@
-use process::*;
-use arch::interrupt::TrapFrame;
+use crate::process::*;
+use crate::arch::interrupt::TrapFrame;
+use crate::arch::cpu;
+use log::*;
+
+pub static mut TICK: usize = 0;
 
 pub fn timer() {
-    let mut processor = processor();
-    processor.tick();
-}
-
-pub fn before_return() {
-    if let Some(processor) = PROCESSOR.try() {
-        processor.lock().schedule();
+    if cpu::id() == 0 {
+        unsafe { TICK += 1; }
     }
+    processor().tick();
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
-    if let Some(processor) = PROCESSOR.try() {
-        let mut processor = processor.lock();
-        let pid = processor.current_pid();
-        error!("Process {} error:\n{:#x?}", pid, tf);
-        processor.exit(pid, 0x100); // TODO: Exit code for error
-        processor.schedule();
-        unreachable!();
-    } else {
-        panic!("Exception when processor not inited\n{:#x?}", tf);
-    }
+    error!("{:#x?}", tf);
+    let pid = processor().pid();
+    error!("On CPU{} Process {}", cpu::id(), pid);
+
+    processor().manager().exit(pid, 0x100);
+    processor().yield_now();
+    unreachable!();
+}
+
+pub fn serial(c: char) {
+    crate::fs::STDIN.push(c);
 }

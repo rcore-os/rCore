@@ -20,14 +20,14 @@
 - [x] ※ Stack allocator：Naive
 - [x] MM & VMA
 - [x] Copy on write
-- [ ] Swap
+- [x] Swap
 
 #### lab4: Kernel thread
 
 - [x] idleproc
 - [x] initproc
 - [x] fork
-- [ ] Scheduler thread
+- [x] Scheduler thread
 
 #### lab5: User thread
 
@@ -51,8 +51,8 @@
 
 - [x] Simple file system
 - [x] Load user programs from .img
-- [ ] FS framework for process
-- [ ] Device IO
+- [x] FS framework for process
+- [x] Device IO
 
 
 ## uCore 32bit user programs pass status
@@ -65,11 +65,11 @@
 - [x] forktest
 - [x] forktree
 - [x] hello
-- [ ] ls
+- [x] ls
 - [x] matrix
 - [ ] pgdir
 - [x] priority
-- [ ] sh
+- [x] sh
 - [x] sleep
 - [x] sleepkill
 - [x] softint

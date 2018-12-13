@@ -1,19 +1,23 @@
 // Copy from Redox
 
-use super::redox_syscall::io::*;
+use x86_64::instructions::port::Port;
 use spin::Mutex;
+use once::*;
+use log::*;
 
 static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(0xA0));
 
 pub fn disable() {
     // Mask all interrupts (Copy from xv6 x86_64)
-    MASTER.lock().cmd.write(0xFF);
-    SLAVE.lock().cmd.write(0xFF);
+    unsafe {
+        MASTER.lock().cmd.write(0xFF);
+        SLAVE.lock().cmd.write(0xFF);
+    }
     info!("pic: disabled");
 }
 
-pub fn init() {
+pub unsafe fn init() {
     assert_has_not_been_called!("pic::init must be called only once");
     
     let mut master = MASTER.lock();
@@ -46,8 +50,7 @@ pub fn init() {
     info!("pic: init end");
 }
 
-pub fn enable_irq(irq: u8)
-{
+pub fn enable_irq(irq: u8) {
     match irq {
         _ if irq < 8 => MASTER.lock().mask_set(irq),
         _ if irq < 16 => SLAVE.lock().mask_set(irq-8),
@@ -64,35 +67,35 @@ pub fn ack(irq: u8) {
 }
 
 struct Pic {
-    cmd: Pio<u8>,
-    data: Pio<u8>,
+    cmd: Port<u8>,
+    data: Port<u8>,
 }
 
 impl Pic {
     const fn new(port: u16) -> Pic {
         Pic {
-            cmd: Pio::new(port),
-            data: Pio::new(port + 1),
+            cmd: Port::new(port),
+            data: Port::new(port + 1),
         }
     }
 
     fn ack(&mut self) {
-        self.cmd.write(0x20);
+        unsafe { self.cmd.write(0x20); }
     }
 
     fn mask_set(&mut self, irq: u8) {
         assert!(irq < 8);
-
-        let mut mask = self.data.read();
-        mask |= 1 << irq;
-        self.data.write(mask);
+        unsafe {
+            let mask = self.data.read() | 1 << irq;
+            self.data.write(mask);
+        }
     }
 
     fn mask_clear(&mut self, irq: u8) {
         assert!(irq < 8);
-
-        let mut mask = self.data.read();
-        mask &= !(1 << irq);
-        self.data.write(mask);
+        unsafe {
+            let mask = self.data.read() & !(1 << irq);
+            self.data.write(mask);
+        }
     }
 }

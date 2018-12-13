@@ -1,14 +1,10 @@
-use consts::KERNEL_OFFSET;
-use core::ptr::Unique;
 use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
+use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
-use logging::Color;
-
-pub const VGA_BUFFER: Unique<VgaBuffer> = unsafe {
-    Unique::new_unchecked((KERNEL_OFFSET + 0xb8000) as *mut _)
-};
+use crate::logging::Color;
+use crate::consts::KERNEL_OFFSET;
 
 #[derive(Debug, Clone, Copy)]
 struct ColorCode(u8);
@@ -72,8 +68,7 @@ impl VgaBuffer {
 
 lazy_static! {
 	pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
-		// It is the only user of VGA_BUFFER. So it's safe.
-		VgaWriter::new(unsafe{ &mut *VGA_BUFFER.as_ptr() })
+		VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xb8000) as *mut VgaBuffer) })
 	);
 }
 

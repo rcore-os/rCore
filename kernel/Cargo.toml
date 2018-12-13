@@ -2,17 +2,21 @@
 name = "ucore"
 version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
+edition = "2018"
 
 [features]
-use_apic = []
-link_user_program = []
+# Without BBL (for riscv32 FPGA board)
 no_bbl = []
-
-board_raspi3 = []
+# Disable paging (for riscv32)
+no_mmu = []
+# Kernel in M-mode (for riscv32)
+m_mode = ["no_mmu"]
+# (for aarch64 RaspberryPi3)
+board_raspi3 = ["bcm2837"]
+raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 
 [profile.dev]
 # MUST >= 1 : Enable RVO to avoid stack overflow
-# MUST <= 1 : Avoid double fault at -O2 T_T
 opt-level = 1
 
 [profile.release]
@@ -20,33 +24,37 @@ debug = true
 
 [dependencies]
 log = "0.4"
-spin = "0.4.9"
-once = "0.3.3"
+spin = "0.4"
+once = "0.3"
 xmas-elf = "0.6"
 bitflags = "1.0"
-bit_field = "0.9.0"
-volatile = "0.2.4"
+bit_field = "0.9"
+volatile = "0.2"
 linked_list_allocator = "0.6"
-lazy_static = { version = "1.0.0", features = ["spin_no_std"] }
+lazy_static = { version = "1.2", features = ["spin_no_std"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 ucore-memory = { path = "../crate/memory" }
 ucore-process = { path = "../crate/process" }
-simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
+simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust", branch = "multi-thread" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = "0.3"
-x86_64 = "0.2.11"
-redox_syscall = "0.1"
+bootloader = { git = "https://github.com/wangrunji0408/bootloader" }
+apic = { git = "https://github.com/wangrunji0408/APIC-Rust" }
+#bootloader = { path = "../crate/bootloader" }
+#apic = { path = "../crate/apic" }
+x86_64 = "0.3"
+raw-cpuid = "6.0"
 uart_16550 = "0.1"
+pc-keyboard = "0.3"
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv = { path = "../crate/riscv" }
+riscv = { git = "https://github.com/riscv-and-rust-and-decaf/riscv" }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-cortex-a = "2.2.1"
+aarch64 = { git = "https://github.com/equation314/aarch64" }
 atags = { path = "../crate/atags" }
-bcm2837 = { path = "../crate/bcm2837", features = ["use_generic_timer"] }
+bcm2837 = { path = "../crate/bcm2837", optional = true }
 
 [package.metadata.bootimage]
 default-target = "x86_64-blog_os.json"
@@ -56,7 +64,8 @@ minimum-image-size = 0      # The minimum output file size (in MiB)
 # (the "{}" will be replaced with the path to the bootable disk image)
 run-command = ["qemu-system-x86_64",
     "-drive", "format=raw,file={}",
-    "-drive", "format=raw,file=../user/ucore32.img,media=disk,cache=writeback",
+    # TODO: use SFSIMG environment variable
+    "-drive", "format=raw,file=../user/img/ucore-i386-pic.img,media=disk,cache=writeback",
     "-serial", "mon:stdio",
     "-device", "isa-debug-exit",
     "-smp", "4"

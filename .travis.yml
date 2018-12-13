@@ -1,29 +1,52 @@
-sudo: required
+sudo: false
 
 language: rust
 
-rust: nightly-2018-09-18
+rust: nightly
+
+os:
+  - linux
+  - osx
 
 cache:
   cargo: true
+  directories:
+    - $HOME/Library/Caches/Homebrew
 
 addons:
   apt:
+    packages:
+      - qemu
+  homebrew:
     packages:
       - qemu
 
 env:
   matrix:
     - ARCH="riscv32"
+    - ARCH="riscv32" OPTS="m_mode=1"
     - ARCH="x86_64"
+    - ARCH="aarch64"
 
 install:
   - if [ $ARCH = riscv32 ]; then
-    export FILE="riscv64-unknown-elf-gcc-2018.07.0-x86_64-linux-ubuntu14";
-    wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
-    tar xf $FILE.tar.gz;
-    export PATH=$PATH:$PWD/$FILE/bin;
+      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-linux-ubuntu14";
+      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-apple-darwin";
+      wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
+      tar xf $FILE.tar.gz;
+      export PATH=$PATH:$PWD/$FILE/bin;
     fi
+  - if [ $ARCH = aarch64 ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+      wget https://web.stanford.edu/class/cs140e/files/aarch64-none-elf-linux-x64.tar.gz;
+      tar -xzvf aarch64-none-elf-linux-x64.tar.gz;
+      export PATH=$PATH:$PWD/aarch64-none-elf/bin;
+    elif [ $TRAVIS_OS_NAME = osx ]; then
+      brew tap SergioBenitez/osxct;
+      brew install aarch64-none-elf;
+    fi;
+    fi
+
 
 before_script:
   - rustup component add rust-src
@@ -31,4 +54,5 @@ before_script:
   - (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage)
 
 script:
-  - cd kernel && make build arch=$ARCH
+  - cd kernel && make build arch=$ARCH $OPTS && cd ..
+  - cd user && make arch=$ARCH

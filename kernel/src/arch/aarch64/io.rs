@@ -1,18 +1,14 @@
 //! Serial driver for aarch64.
 
 use core::fmt::{Arguments, Write};
-use super::board::serial::{SerialRead, SERIAL_PORT};
+use super::board::serial::*;
 
 pub fn getchar() -> char {
-    // FIXME
-    unsafe {
-        SERIAL_PORT.receive() as char
-    }
+    unsafe { SERIAL_PORT.force_unlock(); }
+    SERIAL_PORT.lock().receive() as char
 }
 
 pub fn putfmt(fmt: Arguments) {
-    // FIXME
-    unsafe {
-        SERIAL_PORT.write_fmt(fmt).unwrap()
-    }
+    unsafe { SERIAL_PORT.force_unlock(); }
+    SERIAL_PORT.lock().write_fmt(fmt).unwrap()
 }

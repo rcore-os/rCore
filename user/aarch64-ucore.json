@@ -13,6 +13,11 @@
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
   "linker-is-gnu": true,
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/aarch64/user.ld"
+    ]
+  },
   "llvm-target": "aarch64-unknown-none",
   "no-compiler-rt": true,
   "features": "+a53,+strict-align,-neon",

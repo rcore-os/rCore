@@ -17,14 +17,29 @@ pub fn print(args: fmt::Arguments) {
     StdOut.write_fmt(args).unwrap();
 }
 
+pub fn print_putc(args: fmt::Arguments) {
+    SysPutc.write_fmt(args).unwrap();
+}
+
 struct StdOut;
+struct SysPutc;
 
 impl fmt::Write for StdOut {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        match sys_write(0, s.as_ptr(), s.len()) {
-            0 => Ok(()),
-            _ => Err(fmt::Error::default()),
+        if sys_write(1, s.as_ptr(), s.len()) >= 0 {
+            Ok(())
+        } else {
+            Err(fmt::Error::default())
         }
+    }
+}
+
+impl fmt::Write for SysPutc {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.bytes() {
+            sys_putc(c as char);
+        }
+        Ok(())
     }
 }
 
@@ -75,6 +90,10 @@ pub fn sys_open(path: &str, flags: usize) -> i32 {
 
 pub fn sys_close(fd: usize) -> i32 {
     sys_call(SYS_CLOSE, fd, 0, 0, 0, 0, 0)
+}
+
+pub fn sys_dup(fd1: usize, fd2: usize) -> i32 {
+    sys_call(SYS_DUP, fd1, fd2, 0, 0, 0, 0)
 }
 
 /// Fork the current process. Return the child's PID.
@@ -144,3 +163,15 @@ const SYS_GETCWD: usize = 121;
 const SYS_GETDIRENTRY: usize = 128;
 const SYS_DUP: usize = 130;
 const SYS_LAB6_SET_PRIORITY: usize = 255;
+
+/* VFS flags */
+// TODO: use bitflags
+// flags for open: choose one of these
+pub const O_RDONLY: usize = 0; // open for reading only
+pub const O_WRONLY: usize = 1; // open for writing only
+pub const O_RDWR: usize = 2; // open for reading and writing
+// then or in any of these:
+pub const O_CREAT: usize = 0x00000004; // create file if it does not exist
+pub const O_EXCL: usize = 0x00000008; // error if O_CREAT and the file exists
+pub const O_TRUNC: usize = 0x00000010; // truncate file upon open
+pub const O_APPEND: usize = 0x00000020; // append on each write
