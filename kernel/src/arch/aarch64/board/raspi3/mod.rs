@@ -5,6 +5,7 @@ use once::*;
 pub mod irq;
 pub mod timer;
 pub mod serial;
+pub mod mailbox;
 
 pub const IO_REMAP_BASE: usize = bcm2837::IO_BASE;
 pub const IO_REMAP_END: usize = 0x40001000;

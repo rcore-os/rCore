@@ -18,10 +18,12 @@ global_asm!(include_str!("boot/boot.S"));
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main() -> ! {
     memory::init_mmu_early(); // Enable mmu and paging
+
+    crate::logging::init();
+
     board::init_early();
     println!("{}", LOGO);
 
-    crate::logging::init();
     interrupt::init();
     memory::init();
     driver::init();

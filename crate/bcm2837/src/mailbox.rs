@@ -61,7 +61,7 @@ impl Mailbox {
         }
     }
 
-    // Read from the requested channel of mailbox 0.
+    /// Read from the requested channel of mailbox 0.
     pub fn read(&self, channel: MailboxChannel) -> u32 {
         loop {
             while self.registers.MAIL0_STA.read() & (MailboxStatus::MailboxEmpty as u32) != 0 {}
@@ -72,7 +72,7 @@ impl Mailbox {
         }
     }
 
-    // Write to the requested channel of mailbox 1.
+    /// Write to the requested channel of mailbox 1.
     pub fn write(&mut self, channel: MailboxChannel, data: u32) {
         while self.registers.MAIL1_STA.read() & (MailboxStatus::MailboxFull as u32) != 0 {}
         self.registers.MAIL1_WRT.write((data & !0xF) | (channel as u32));
