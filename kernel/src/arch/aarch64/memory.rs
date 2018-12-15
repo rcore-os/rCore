@@ -99,7 +99,7 @@ fn init_frame_allocator() {
 
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
-    let mut ms = unsafe { MemorySet::new_bare() };
+    let mut ms = MemorySet::new_bare();
     ms.push(0, bootstacktop as usize, Linear::new(0, MemoryAttr::default()), "kstack");
     ms.push(stext as usize, etext as usize, Linear::new(0, MemoryAttr::default().execute().readonly()), "text");
     ms.push(sdata as usize, edata as usize, Linear::new(0, MemoryAttr::default()), "data");

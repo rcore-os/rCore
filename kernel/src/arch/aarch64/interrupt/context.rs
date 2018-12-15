@@ -99,7 +99,7 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    unsafe extern fn __switch(self_stack: &mut usize, target_stack: &mut usize) {
+    unsafe extern fn __switch(_self_stack: &mut usize, _target_stack: &mut usize) {
         asm!(
         "
         mov x10, #-(12 * 8)
@@ -149,7 +149,7 @@ impl Context {
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top, ttbr)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, ttbr: usize) -> Self {
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, ttbr: usize) -> Self {
         InitStack {
             context: ContextData::new(),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),

@@ -6,7 +6,6 @@
 #![feature(vec_resize_default)]
 #![feature(asm)]
 #![feature(exact_size_is_empty)]
-#![feature(extern_crate_item_prelude)]
 
 extern crate alloc;
 

@@ -1,12 +1,10 @@
 [[package]]
 name = "aarch64"
 version = "2.2.2"
-source = "git+https://github.com/equation314/aarch64#47bf5439f5a1379f0fef6272853cf684207a4e45"
+source = "git+https://github.com/equation314/aarch64#e3b60adb233ad34d05443e0b5ec34cac29253296"
 dependencies = [
- "bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "os_bootinfo 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "usize_conversions 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ux 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -50,7 +48,7 @@ version = "0.1.0"
 name = "bcm2837"
 version = "0.1.0"
 dependencies = [
- "cortex-a 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -97,14 +95,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "cfg-if"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "cortex-a"
-version = "2.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "fixedvec"
@@ -455,7 +445,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bootloader 0.3.4 (git+https://github.com/wangrunji0408/bootloader)" = "<none>"
 "checksum cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)" = "f159dfd43363c4d08055a07703eb7a3406b0dac4d0584d96965a3262db3c9d16"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
-"checksum cortex-a 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2b187d0d728b4a99ba1d79f9671b976bcdd71a8a2c719585218fd2dc14a4d08c"
 "checksum fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "7c6c16d316ccdac21a4dd648e314e76facbbaf316e83ca137d0857a9c07419d0"
 "checksum fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2e9763c69ebaae630ba35f74888db465e49e259ba1bc0eda7d06f4a067615d82"
 "checksum fuchsia-zircon-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"

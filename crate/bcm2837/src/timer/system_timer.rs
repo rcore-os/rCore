@@ -1,6 +1,6 @@
-use ::IO_BASE;
+use crate::IO_BASE;
+use crate::interrupt::{Controller, Interrupt};
 use volatile::{ReadOnly, Volatile};
-use interrupt::{Controller, Interrupt};
 
 /// The base address for the ARM system timer registers.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;

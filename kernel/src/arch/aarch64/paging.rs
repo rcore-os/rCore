@@ -58,12 +58,14 @@ impl PageTable for ActivePageTable {
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
+        let (_frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
         flush.flush();
     }
 
-    fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
-        let entry_addr = ((addr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39);
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
+        // get p1 entry
+        let entry_addr = ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39)
+            | (vaddr & 0xffff_0000_0000_0000);
         Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
     }
 }
@@ -211,9 +213,11 @@ impl InactivePageTable for InactivePageTable0 {
         let target = ttbr_el1_read(0).start_address().as_u64() as usize;
         active_table().with_temporary_map(target, |active_table, p4_table: &mut Aarch64PageTable| {
             let backup = p4_table[RECURSIVE_INDEX].clone();
+            let old_frame = ttbr_el1_read(1);
 
             // overwrite recursive mapping
             p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::default(), MairNormal::attr_value());
+            ttbr_el1_write(1, self.p4_frame.clone());
             tlb_invalidate_all();
 
             // execute f in the new context
@@ -221,6 +225,7 @@ impl InactivePageTable for InactivePageTable0 {
 
             // restore recursive mapping to original p4 table
             p4_table[RECURSIVE_INDEX] = backup;
+            ttbr_el1_write(1, old_frame);
             tlb_invalidate_all();
             ret
         })

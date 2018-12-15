@@ -93,8 +93,9 @@ fn handle_syscall(num: u16, tf: &mut TrapFrame) {
 }
 
 fn handle_page_fault(tf: &mut TrapFrame) {
-    let addr = FAR_EL1.get();
-    error!("\nEXCEPTION: Page Fault @ {:#x}", addr);
-
-    crate::trap::error(tf);
+    let addr = FAR_EL1.get() as usize;
+    if !crate::memory::page_fault_handler(addr) {
+        error!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+        crate::trap::error(tf);
+    }
 }
