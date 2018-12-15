@@ -7,6 +7,8 @@ use crate::process::*;
 
 pub fn run_user_shell() {
     if let Ok(inode) = ROOT_INODE.lookup("sh") {
+        println!("Going to user mode shell.");
+        println!("Use 'ls' to list available programs.");
         let data = inode.read_as_vec().unwrap();
         processor().manager().add(Process::new_user(data.as_slice(), "sh".split(' ')), 0);
     } else {

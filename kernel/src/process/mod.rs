@@ -21,10 +21,13 @@ pub fn init() {
         }
     }
 
+    // Add idle threads
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }
     }
-    for i in 0..4 {
+    use core::str::FromStr;
+    let cores = usize::from_str(env!("SMP")).unwrap();
+    for i in 0..cores {
         manager.add(Process::new_kernel(idle, i), 0);
     }
     crate::shell::run_user_shell();

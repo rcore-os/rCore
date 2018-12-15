@@ -34,6 +34,7 @@ bootimage := target/$(target)/bootimage.bin
 user_dir := ../user
 
 export ARCH = $(arch)
+export SMP = $(smp)
 #export SFSIMG = $(user_dir)/build/user-$(arch).img
 ifeq ($(arch), x86_64)
 export SFSIMG = $(user_dir)/img/ucore-i386.img
