@@ -8,9 +8,11 @@ Going to be the next generation teaching operating system.
 
 Supported architectures: x86_64, RISCV32IMA(S/M), AArch64
 
-Tested boards: QEMU, Raspberry Pi 3B+
+Tested boards: QEMU, labeled-RISCV, Raspberry Pi 3B+
 
 [Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
+
+![demo](./docs/2_OSLab/os2atc/demo.png)
 
 ## Summary
 
