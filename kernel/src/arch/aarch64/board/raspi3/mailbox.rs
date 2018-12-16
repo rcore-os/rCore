@@ -2,8 +2,10 @@
 //!
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
+use super::fb::FramebufferInfo;
 use bcm2837::mailbox::{Mailbox, MailboxChannel};
 use lazy_static::lazy_static;
+use alloc::string::String;
 use core::mem;
 use spin::Mutex;
 use aarch64::barrier;
@@ -15,6 +17,12 @@ lazy_static! {
 #[derive(Debug)]
 pub struct PropertyMailboxError(u32);
 pub type PropertyMailboxResult<T> = Result<T, PropertyMailboxError>;
+
+impl From<PropertyMailboxError> for String {
+    fn from(error: PropertyMailboxError) -> Self {
+        format!("{:x?}", error)
+    }
+}
 
 /// Buffer request/response code.
 /// Copied from `linux/include/soc/bcm2835/raspberrypi-firmware.h`
@@ -167,11 +175,11 @@ struct Align16<T: Sized>(PropertyMailboxRequest<T>);
 
 /// Pack a sequence of concatenated tags into a request, and send the address
 /// to the mailbox.
-/// Returns PropertyMailboxResult<typeof($tags)>.
+/// Returns `PropertyMailboxResult<typeof($tags)>`.
 macro_rules! send_request {
     ($tags: ident) => {{
         let req = Align16(PropertyMailboxRequest {
-            buf_size: mem::size_of_val(&$tags) as u32,
+            buf_size: mem::size_of_val(&$tags) as u32 + 12,
             req_resp_code: RPI_FIRMWARE_STATUS_REQUEST,
             buf: $tags,
             end_tag: RPI_FIRMWARE_PROPERTY_END,
@@ -179,8 +187,9 @@ macro_rules! send_request {
 
         unsafe { barrier::wmb() }
         {
+            let addr = &req as *const _ as u32;
             let mut mbox = MAILBOX.lock();
-            mbox.write(MailboxChannel::Property, &req as *const _ as u32);
+            mbox.write(MailboxChannel::Property, addr);
             mbox.read(MailboxChannel::Property);
         }
         unsafe { barrier::rmb() }
@@ -193,7 +202,7 @@ macro_rules! send_request {
 }
 
 /// Send a tag to mailbox. Will call `send_request!`.
-/// Returns PropertyMailboxResult<typeof(buf)>.
+/// Returns `PropertyMailboxResult<typeof(buf)>`.
 macro_rules! send_one_tag {
     ($id: expr, [$($arg: expr),*]) => {{
         let buf = [$($arg),*];
@@ -263,4 +272,80 @@ pub fn framebuffer_set_virtual_offset(xoffset: u32, yoffset: u32) -> PropertyMai
         [xoffset, yoffset]
     )?;
     Ok((ret[0], ret[1]))
+}
+
+/// Allocate framebuffer on GPU and try to set width/height/depth.
+/// Returns `FramebufferInfo`.
+pub fn framebuffer_alloc(width: u32, height: u32, depth: u32) -> PropertyMailboxResult<FramebufferInfo> {
+    #[repr(C, packed)]
+    #[derive(Debug)]
+    struct FramebufferAllocTag {
+        set_physical_size: PropertyMailboxTag<[u32; 2]>,
+        set_virtual_size: PropertyMailboxTag<[u32; 2]>,
+        set_depth: PropertyMailboxTag<[u32; 1]>,
+        set_virtual_offset: PropertyMailboxTag<[u32; 2]>,
+        allocate: PropertyMailboxTag<[u32; 2]>,
+        get_pitch: PropertyMailboxTag<[u32; 1]>,
+    }
+
+    let tags = FramebufferAllocTag {
+        // Set physical (buffer) width/height. Returns `(width, height)` in pixel.
+        set_physical_size: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_SET_PHYSICAL_WIDTH_HEIGHT,
+            buf_size: 8,
+            req_resp_size: 0,
+            buf: [width, height],
+        },
+        // Set virtual (buffer) width/height. Returns `(width, height)` in pixel.
+        set_virtual_size: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_WIDTH_HEIGHT,
+            buf_size: 8,
+            req_resp_size: 0,
+            buf: [width, height],
+        },
+        // Set depth; Returns bits per pixel.
+        set_depth: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_SET_DEPTH,
+            buf_size: 4,
+            req_resp_size: 0,
+            buf: [depth],
+        },
+        // Set virtual offset. Returns `(X, Y)` in pixel.
+        set_virtual_offset: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_OFFSET,
+            buf_size: 8,
+            req_resp_size: 0,
+            buf: [0, 0],
+        },
+        // Allocate buffer. Returns `(base_address, size)` in bytes.
+        allocate: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_ALLOCATE,
+            buf_size: 8,
+            req_resp_size: 0,
+            buf: [0x1000, 0],
+        },
+        // Get pitch. Return bytes per line.
+        get_pitch: PropertyMailboxTag {
+            id: RPI_FIRMWARE_FRAMEBUFFER_GET_PITCH,
+            buf_size: 4,
+            req_resp_size: 0,
+            buf: [0],
+        },
+    };
+
+    let ret = send_request!(tags)?;
+    Ok(FramebufferInfo {
+        xres: ret.set_physical_size.buf[0],
+        yres: ret.set_physical_size.buf[1],
+        xres_virtual: ret.set_virtual_size.buf[0],
+        yres_virtual: ret.set_virtual_size.buf[1],
+        xoffset: ret.set_virtual_offset.buf[0],
+        yoffset: ret.set_virtual_offset.buf[1],
+
+        depth: ret.set_depth.buf[0],
+        pitch: ret.get_pitch.buf[0],
+
+        bus_addr: ret.allocate.buf[0],
+        screen_size: ret.allocate.buf[1],
+    })
 }
