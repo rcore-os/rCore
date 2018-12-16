@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use core::mem;
 use spin::Mutex;
-use aarch64::barrier;
+use aarch64::{asm, barrier};
 
 lazy_static! {
     static ref MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());
@@ -185,14 +185,16 @@ macro_rules! send_request {
             end_tag: RPI_FIRMWARE_PROPERTY_END,
         });
 
-        unsafe { barrier::wmb() }
+        let start = &req as *const _ as u32;
+        let end = start + req.0.buf_size;
         {
-            let addr = &req as *const _ as u32;
+            // flush data cache around mailbox accesses
             let mut mbox = MAILBOX.lock();
-            mbox.write(MailboxChannel::Property, addr);
+            asm::flush_dcache_range(start as usize, end as usize);
+            mbox.write(MailboxChannel::Property, start);
             mbox.read(MailboxChannel::Property);
+            asm::flush_dcache_range(start as usize, end as usize);
         }
-        unsafe { barrier::rmb() }
 
         match req.0.req_resp_code {
             RPI_FIRMWARE_STATUS_SUCCESS => Ok(req.0.buf),
