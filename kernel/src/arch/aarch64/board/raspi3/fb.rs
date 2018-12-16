@@ -143,9 +143,11 @@ impl Framebuffer {
             ))?;
         }
 
+        use crate::arch::memory;
         let paddr = info.bus_addr & !0xC0000000;
+        let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb") as u32;
         Ok(Framebuffer {
-            buf: ColorBuffer::new(color_format, paddr, info.screen_size),
+            buf: ColorBuffer::new(color_format, vaddr, info.screen_size),
             color_format,
             fb_info: info,
         })

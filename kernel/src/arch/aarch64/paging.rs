@@ -162,15 +162,10 @@ impl Entry for PageEntry {
             self.as_flags().set(EF::PXN, !value)
         }
     }
-    fn mmio(&self) -> bool {
-        self.0.attr().value == MairDevice::attr_value().value
-    }
-    fn set_mmio(&mut self, value: bool) {
-        if value {
-            self.0.modify_attr(MairDevice::attr_value())
-        } else {
-            self.0.modify_attr(MairNormal::attr_value())
-        }
+    fn mmio(&self) -> usize { self.0.attr().value as usize }
+    fn set_mmio(&mut self, value: usize) {
+        use aarch64::paging::{PageTableAttribute, MEMORY_ATTR_MASK};
+        self.0.modify_attr(PageTableAttribute::new(MEMORY_ATTR_MASK, 0, value as u64))
     }
 }
 
