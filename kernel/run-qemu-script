@@ -185,7 +185,6 @@ rustc --crate-name bbl /home/dzy/rust/RustOS/crate/bbl/src/lib.rs \
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     -L $PWD/outdir
 
 
@@ -250,7 +249,6 @@ rustc --crate-name bit_allocator /home/dzy/rust/RustOS/crate/bit-allocator/src/l
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     -L $PWD/outdir \
 
 
@@ -277,7 +275,6 @@ rustc --edition=2018 --crate-name ucore_process /home/dzy/rust/RustOS/crate/proc
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     --extern log=$PWD/outdir/liblog.rlib \
     --extern spin=$PWD/outdir/libspin.rlib \
     -L $PWD/outdir 
@@ -292,7 +289,6 @@ rustc --edition=2018 --crate-name ucore_memory /home/dzy/rust/RustOS/crate/memor
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     --extern log=$PWD/outdir/liblog.rlib \
     -L $PWD/outdir 
 
@@ -358,7 +354,6 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     -L $PWD/outdir \
     --extern bbl=$PWD/outdir/libbbl.rlib \
     --extern bit_allocator=$PWD/outdir/libbit_allocator.rlib \
@@ -376,7 +371,7 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     --extern volatile=$PWD/outdir/libvolatile.rlib \
     --extern xmas_elf=$PWD/outdir/libxmas_elf.rlib \
     -L native=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/build/ucore-6787973a04115b52/out \
-    -L native=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/build/ucore-6787973a04115b52/out -l static=atomic_rt -l static=sfsimg
+    -l static=atomic_rt -l static=sfsimg
 
 
 
@@ -387,7 +382,6 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target /home/dzy/rust/RustOS/kernel/riscv32-blog_os.json \
-    -C incremental=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/incremental \
     -L $PWD/outdir \
     --extern bbl=$PWD/outdir/libbbl.rlib \
     --extern bit_allocator=$PWD/outdir/libbit_allocator.rlib \
@@ -405,7 +399,6 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     --extern ucore_process=$PWD/outdir/libucore_process.rlib \
     --extern volatile=$PWD/outdir/libvolatile.rlib \
     --extern xmas_elf=$PWD/outdir/libxmas_elf.rlib \
-    -L native=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/build/ucore-6787973a04115b52/out \
     -L native=/home/dzy/rust/RustOS/kernel/target/riscv32-blog_os/debug/build/ucore-6787973a04115b52/out
 
 
@@ -419,7 +412,7 @@ cd ../riscv-pk && mkdir -p build && cd build
         --host=riscv32-unknown-elf \
         --with-payload=../../kernel/outdir/ucore
 
-make 
+make -j8
 
 cp bbl ../../kernel/outdir/kernel.bin
 
