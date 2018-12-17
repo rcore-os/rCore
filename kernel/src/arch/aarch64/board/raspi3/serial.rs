@@ -22,7 +22,7 @@ impl SerialPort {
     }
 
     /// Init a newly created SerialPort, can only be called once.
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         assert_has_not_been_called!("SerialPort::init must be called only once");
 
         self.mu.init();

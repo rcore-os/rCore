@@ -175,6 +175,16 @@ impl Framebuffer {
             RGBA8888 => self.buf.write32(y * self.fb_info.xres + x, pixel),
         }
     }
+
+    /// Clean screen
+    pub fn clear(&mut self) {
+        let mut start = self.base_addr();
+        let end = start + self.fb_info.screen_size as usize;
+        while start < end {
+            unsafe { *(start as *mut usize) = 0 }
+            start += core::mem::size_of::<usize>();
+        }
+    }
 }
 
 lazy_static! {
@@ -185,7 +195,6 @@ lazy_static! {
 pub fn init() {
     match Framebuffer::new(0, 0, 0) {
         Ok(fb) => {
-            let info = fb.fb_info;
             info!("framebuffer: init end\n{:#x?}", fb);
             *FRAME_BUFFER.lock() = Some(fb);
         }
