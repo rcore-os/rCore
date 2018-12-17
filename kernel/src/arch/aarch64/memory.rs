@@ -1,6 +1,7 @@
 //! Memory initialization for aarch64.
 
 use crate::memory::{init_heap, MemoryArea, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use super::paging::MMIOType;
 use aarch64::paging::{memory_attribute::*, PhysFrame as Frame};
 use aarch64::{addr::*, barrier, regs::*};
 use atags::atags::Atags;
@@ -32,8 +33,8 @@ pub fn init_mmu_early() {
 
     // device.
     MAIR_EL1.write(
-        MAIR_EL1::Attr0.val(MairDevice::config_value()) +
-        MAIR_EL1::Attr1.val(MairNormal::config_value()) +
+        MAIR_EL1::Attr0.val(MairNormal::config_value()) +
+        MAIR_EL1::Attr1.val(MairDevice::config_value()) +
         MAIR_EL1::Attr2.val(MairNormalNonCacheable::config_value()),
     );
 
@@ -116,7 +117,7 @@ fn remap_the_kernel() {
     ms.push(MemoryArea::new_identity(
         IO_REMAP_BASE,
         IO_REMAP_END,
-        MemoryAttr::default().mmio(MairDevice::attr_value().value as usize),
+        MemoryAttr::default().mmio(MMIOType::Device as u8),
         "io_remap",
     ));
 
@@ -129,7 +130,7 @@ pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
     let area = MemoryArea::new_identity(
         start,
         start + len,
-        MemoryAttr::default().mmio(MairNormalNonCacheable::attr_value().value as usize),
+        MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8),
         name,
     );
     ms.push(area);

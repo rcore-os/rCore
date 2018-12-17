@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use core::mem;
 use spin::Mutex;
-use aarch64::{asm, barrier};
+use aarch64::asm;
 
 lazy_static! {
     static ref MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());

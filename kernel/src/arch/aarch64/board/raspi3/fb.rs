@@ -48,7 +48,7 @@ use self::ColorFormat::*;
 
 #[repr(C)]
 union ColorBuffer {
-    base_addr: u32,
+    base_addr: usize,
     buf16: &'static mut [u16],
     buf32: &'static mut [u32],
 }
@@ -154,10 +154,11 @@ impl Framebuffer {
     }
 
     #[inline]
-    pub fn base_addr(&self) -> u32 {
+    pub fn base_addr(&self) -> usize {
         unsafe { self.buf.base_addr }
     }
 
+    /// Read pixel at `(x, y)`.
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {
         match self.color_format {
@@ -166,6 +167,7 @@ impl Framebuffer {
         }
     }
 
+    /// Write pixel at `(x, y)`.
     #[inline]
     pub fn write(&mut self, x: u32, y: u32, pixel: u32) {
         match self.color_format {

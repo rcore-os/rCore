@@ -142,8 +142,8 @@ impl Entry for PageEntry {
     }
     fn execute(&self) -> bool { !self.0.flags().contains(EF::NO_EXECUTE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::NO_EXECUTE, !value); }
-    fn mmio(&self) -> bool { unimplemented!() }
-    fn set_mmio(&mut self, value: bool) { unimplemented!() }
+    fn mmio(&self) -> u8 { 0 }
+    fn set_mmio(&mut self, _value: u8) { }
 }
 
 fn get_entry_ptr(addr: usize, level: u8) -> *mut PageEntry {
