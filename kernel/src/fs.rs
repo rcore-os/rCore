@@ -1,7 +1,6 @@
 use simple_filesystem::*;
 use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
 use core::any::Any;
-use core::slice;
 use lazy_static::lazy_static;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;

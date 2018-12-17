@@ -141,7 +141,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> SysResult {
-    let mut context = process().fork(tf);
+    let context = process().fork(tf);
     //memory_set_map_swappable(context.get_memory_set_mut());
     let pid = processor().manager().add(context, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
@@ -374,6 +374,7 @@ impl From<FileInfo> for Stat {
             mode: match info.type_ {
                 FileType::File => StatMode::FILE,
                 FileType::Dir => StatMode::DIR,
+                #[allow(unreachable_patterns)]
                 _ => StatMode::NULL,
             },
             nlinks: info.nlinks as u32,

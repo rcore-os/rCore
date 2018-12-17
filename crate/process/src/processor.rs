@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use spin::Mutex;
 use log::*;
 use core::cell::UnsafeCell;
 use crate::process_manager::*;
@@ -30,14 +29,12 @@ impl Processor {
     }
 
     pub unsafe fn init(&self, id: usize, context: Box<Context>, manager: Arc<ProcessManager>) {
-        unsafe {
-            *self.inner.get() = Some(ProcessorInner {
-                id,
-                proc: None,
-                loop_context: context,
-                manager,
-            });
-        }
+        *self.inner.get() = Some(ProcessorInner {
+            id,
+            proc: None,
+            loop_context: context,
+            manager,
+        });
     }
 
     fn inner(&self) -> &mut ProcessorInner {

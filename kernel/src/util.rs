@@ -1,5 +1,3 @@
-use core::fmt::Debug;
-
 /// Convert C string to Rust string
 pub unsafe fn from_cstr(s: *const u8) -> &'static str {
     use core::{str, slice};

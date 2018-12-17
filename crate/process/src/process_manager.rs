@@ -1,9 +1,7 @@
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::Mutex;
 use log::*;
-use core::cell::UnsafeCell;
 use crate::scheduler::Scheduler;
 use crate::event_hub::EventHub;
 

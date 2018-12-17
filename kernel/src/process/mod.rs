@@ -1,11 +1,8 @@
-use spin::Mutex;
 pub use self::context::Process;
 pub use ucore_process::*;
 use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use crate::arch::cpu;
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
-use crate::sync::Condvar;
-use core::sync::atomic::*;
+use alloc::{boxed::Box, sync::Arc};
 use log::*;
 
 pub mod context;

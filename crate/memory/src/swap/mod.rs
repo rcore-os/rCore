@@ -296,7 +296,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
                     entry.set_present(true);
                     entry.update();
                 }
-                if(swapin){
+                if swapin {
                     unsafe {
                         self.set_swappable(pt, addr & 0xfffff000);
                     }
