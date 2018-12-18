@@ -44,22 +44,21 @@ macro_rules! with_color {
 
 fn print_in_color(args: fmt::Arguments, color: Color) {
     use crate::arch::io;
-    let mutex = log_mutex.lock();
+    let _guard = log_mutex.lock();
     io::putfmt(with_color!(args, color));
 }
 
 pub fn print(args: fmt::Arguments) {
     use crate::arch::io;
-    let mutex = log_mutex.lock();
+    let _guard = log_mutex.lock();
     io::putfmt(args);
 }
 
 struct SimpleLogger;
 
 impl Log for SimpleLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        true
-//        metadata.level() <= Level::Info
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+       true
     }
     fn log(&self, record: &Record) {
         static DISABLED_TARGET: &[&str] = &[

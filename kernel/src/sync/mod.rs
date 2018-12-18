@@ -48,6 +48,7 @@
 //!	    Dining_Philosophers --> Monitor
 //!	end
 //! ```
+#![allow(dead_code)]
 
 pub use self::condvar::*;
 pub use self::mutex::*;

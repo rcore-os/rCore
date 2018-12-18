@@ -42,7 +42,7 @@ impl Device for MemBuf {
         buf[..len].copy_from_slice(&slice[offset..offset + len]);
         Some(len)
     }
-    fn write_at(&mut self, offset: usize, buf: &[u8]) -> Option<usize> {
+    fn write_at(&mut self, _offset: usize, _buf: &[u8]) -> Option<usize> {
         None
     }
 }
@@ -105,31 +105,31 @@ macro_rules! impl_inode {
     () => {
         fn info(&self) -> Result<FileInfo> { unimplemented!() }
         fn sync(&self) -> Result<()> { unimplemented!() }
-        fn resize(&self, len: usize) -> Result<()> { unimplemented!() }
-        fn create(&self, name: &str, type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
-        fn unlink(&self, name: &str) -> Result<()> { unimplemented!() }
-        fn link(&self, name: &str, other: &Arc<INode>) -> Result<()> { unimplemented!() }
-        fn rename(&self, old_name: &str, new_name: &str) -> Result<()> { unimplemented!() }
-        fn move_(&self, old_name: &str, target: &Arc<INode>, new_name: &str) -> Result<()> { unimplemented!() }
-        fn find(&self, name: &str) -> Result<Arc<INode>> { unimplemented!() }
-        fn get_entry(&self, id: usize) -> Result<String> { unimplemented!() }
+        fn resize(&self, _len: usize) -> Result<()> { unimplemented!() }
+        fn create(&self, _name: &str, _type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
+        fn unlink(&self, _name: &str) -> Result<()> { unimplemented!() }
+        fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { unimplemented!() }
+        fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { unimplemented!() }
+        fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { unimplemented!() }
+        fn find(&self, _name: &str) -> Result<Arc<INode>> { unimplemented!() }
+        fn get_entry(&self, _id: usize) -> Result<String> { unimplemented!() }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };
 }
 
 impl INode for Stdin {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         buf[0] = self.pop() as u8;
         Ok(1)
     }
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> { unimplemented!() }
     impl_inode!();
 }
 
 impl INode for Stdout {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> { unimplemented!() }
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         use core::str;
         let s = str::from_utf8(buf).map_err(|_| ())?;
         print!("{}", s);
