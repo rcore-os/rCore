@@ -9,10 +9,10 @@ use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct Color(u8);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct ConsoleChar {
     ascii_char: u8,
@@ -68,16 +68,23 @@ impl<F: Font> ConsoleBuffer<F> {
         self.write(row, col, ConsoleChar::default());
     }
 
-    /// Insert one blank line at the bottom and remove the top line.
-    /// TODO: improve performance
-    fn new_line(&mut self) {
+    /// Insert one blank line at the bottom, and scroll up one line.
+    /// XXX: read framebuffer is toooo slow, do not use `fb.copy()`.
+    pub fn new_line(&mut self) {
         for i in 1..self.num_row {
             for j in 0..self.num_col {
-                self.write(i - 1, j, self.buf[i][j]);
+                if self.buf[i - 1][j] != self.buf[i][j] {
+                    self.write(i - 1, j, self.buf[i][j]);
+                }
             }
         }
         for j in 0..self.num_col {
-            self.write(self.num_row - 1, j, ConsoleChar::default());
+            self.buf[self.num_row - 1][j] = ConsoleChar::default();
+        }
+
+        if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
+            let rowbytes = F::HEIGHT * fb.fb_info.pitch as usize;
+            fb.fill(rowbytes * (self.num_row - 1), rowbytes, 0);
         }
     }
 

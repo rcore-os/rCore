@@ -176,14 +176,43 @@ impl Framebuffer {
         }
     }
 
-    /// Clean screen
-    pub fn clear(&mut self) {
-        let mut start = self.base_addr();
-        let end = start + self.fb_info.screen_size as usize;
-        while start < end {
-            unsafe { *(start as *mut usize) = 0 }
-            start += core::mem::size_of::<usize>();
+    /// Copy buffer `[src_off .. src_off + size]` to `[dst_off .. dst_off + size]`.
+    /// `dst_off`, `src_off` and `size` must be aligned with `usize`.
+    pub fn copy(&mut self, dst_off: usize, src_off: usize, size: usize) {
+        const USIZE: usize = core::mem::size_of::<usize>();
+        let mut dst = self.base_addr() + dst_off;
+        let mut src = self.base_addr() + src_off;
+        let src_end = src + size;
+        while src < src_end {
+            unsafe { *(dst as *mut usize) = *(src as *mut usize) }
+            dst += USIZE;
+            src += USIZE;
         }
+    }
+
+    /// Fill buffer `[offset .. offset + size]` with `pixel`.
+    /// `offset` and `size` must be aligned with `usize`.
+    pub fn fill(&mut self, offset: usize, size: usize, pixel: u32) {
+        const USIZE: usize = core::mem::size_of::<usize>();
+        let mut value: usize = 0;
+        let repeat = USIZE * 8 / self.fb_info.depth as usize;
+        let mask = ((1u64 << self.fb_info.depth) - 1) as usize;
+        for i in 0..repeat {
+            value <<= self.fb_info.depth;
+            value += pixel as usize & mask;
+        }
+
+        let mut start = self.base_addr() + offset;
+        let end = start + size;
+        while start < end {
+            unsafe { *(start as *mut usize) = value }
+            start += USIZE;
+        }
+    }
+
+    /// Fill the entire buffer with `0`.
+    pub fn clear(&mut self) {
+        self.fill(0, self.fb_info.screen_size as usize, 0);
     }
 }
 
