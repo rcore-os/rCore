@@ -3,6 +3,10 @@
 use super::board;
 use once::*;
 
+pub use self::board::fb;
+pub use self::board::serial;
+
+pub mod fonts;
 pub mod console;
 
 /// Initialize ARM64 common drivers

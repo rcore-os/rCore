@@ -1,6 +1,6 @@
 //! Serial driver for aarch64.
 
-use super::board::serial::*;
+use super::driver::serial::*;
 use super::driver::console::CONSOLE;
 use core::fmt::{Arguments, Write};
 

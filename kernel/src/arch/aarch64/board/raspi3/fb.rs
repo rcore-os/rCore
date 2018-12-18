@@ -198,6 +198,6 @@ pub fn init() {
             info!("framebuffer: init end\n{:#x?}", fb);
             *FRAME_BUFFER.lock() = Some(fb);
         }
-        Err(err) => error!("framebuffer init failed: {}", err),
+        Err(err) => warn!("framebuffer init failed: {}", err),
     }
 }
