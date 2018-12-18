@@ -69,6 +69,7 @@ impl<T: PartialEq> EventHub<T> {
         }
         self.timers.insert(i, timer);
     }
+    #[allow(dead_code)]
     pub fn get_time(&self) -> Time {
         self.tick
     }

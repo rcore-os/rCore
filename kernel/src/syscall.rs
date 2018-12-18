@@ -374,8 +374,10 @@ impl From<FileInfo> for Stat {
             mode: match info.type_ {
                 FileType::File => StatMode::FILE,
                 FileType::Dir => StatMode::DIR,
-                #[allow(unreachable_patterns)]
-                _ => StatMode::NULL,
+                // _ => StatMode::NULL,
+                //Note: we should mark FileType as #[non_exhaustive]
+                //      but it is currently not implemented for enum
+                //      see rust-lang/rust#44109
             },
             nlinks: info.nlinks as u32,
             blocks: info.blocks as u32,

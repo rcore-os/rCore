@@ -108,7 +108,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **  @param addr: VirtAddr        the target page's virtual address
     */
     pub unsafe fn set_swappable<T2: InactivePageTable>(&mut self, pt: *mut T2, addr: VirtAddr){
-        let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
+        let Self {ref mut page_table, ref mut swap_manager, ..} = self;
         let targetpt = &mut *(pt);
         let pttoken = {
             info!("SET_SWAPPABLE: the target page table token is {:x?}, addr is {:x?}", targetpt.token(), addr);
@@ -209,7 +209,7 @@ impl<T: PageTable, M: SwapManager, S: Swapper> SwapExt<T, M, S> {
     **                               the error if failed
     */
     fn swap_out<T2: InactivePageTable>(&mut self, frame: &Frame) -> Result<PhysAddr, SwapError> {
-        let Self {ref mut page_table, ref mut swap_manager, ref mut swapper} = self;
+        let Self {ref mut page_table, ref mut swapper, ..} = self;
         let ret = unsafe{
             let pt = &mut *(frame.get_page_table() as *mut T2);
             pt.with(|| {

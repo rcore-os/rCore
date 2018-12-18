@@ -6,6 +6,7 @@ use crate::scheduler::Scheduler;
 use crate::event_hub::EventHub;
 
 struct Process {
+    #[allow(dead_code)]
     id: Pid,
     status: Status,
     status_after_stop: Status,
