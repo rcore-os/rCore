@@ -56,5 +56,6 @@ pub fn putfmt(fmt: Arguments) {
 
 const DATA: *mut u8 = 0x10000000 as *mut u8;
 const STATUS: *const u8 = 0x10000005 as *const u8;
+#[allow(dead_code)]
 const CAN_READ: u8 = 1 << 0;
 const CAN_WRITE: u8 = 1 << 5;

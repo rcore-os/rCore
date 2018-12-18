@@ -1,6 +1,8 @@
 // Physical address available on THINPAD:
 // [0x80000000, 0x80800000]
+#[allow(dead_code)]
 const P2_SIZE: usize = 1 << 22;
+#[allow(dead_code)]
 const P2_MASK: usize = 0x3ff << 22;
 pub const RECURSIVE_INDEX: usize = 0x3fe;
 pub const KERNEL_OFFSET: usize = 0;

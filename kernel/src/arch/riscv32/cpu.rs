@@ -1,6 +1,5 @@
 use crate::consts::MAX_CPU_NUM;
 use core::ptr::{read_volatile, write_volatile};
-use crate::memory::*;
 
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 

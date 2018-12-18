@@ -22,6 +22,7 @@ fn main() {
 				.file("src/arch/riscv32/compiler_rt.c")
 				.flag("-march=rv32ia")
 				.flag("-mabi=ilp32")
+    			.flag("-Wno-builtin-declaration-mismatch")
 				.compile("atomic_rt");
 			if let Ok(file_path) = gen_sfsimg_asm() {
 				cc::Build::new()

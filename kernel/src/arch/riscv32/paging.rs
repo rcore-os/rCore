@@ -6,8 +6,6 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::register::satp;
-use ucore_memory::memory_set::*;
-use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use log::*;
 
@@ -26,7 +24,7 @@ pub fn setup_page_table(frame: Frame) {
     // Set kernel identity map
     // 0x10000000 ~ 1K area
     p2.map_identity(0x40, EF::VALID | EF::READABLE | EF::WRITABLE);
-    // 0x80000000 ~ 12M area 
+    // 0x80000000 ~ 12M area
     p2.map_identity(KERNEL_P2_INDEX, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
     p2.map_identity(KERNEL_P2_INDEX + 2, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
@@ -71,7 +69,7 @@ impl PageTable for ActivePageTable {
     */
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
-        let (frame, flush) = self.0.unmap(page).unwrap();
+        let (_, flush) = self.0.unmap(page).unwrap();
         flush.flush();
     }
 
@@ -154,7 +152,7 @@ impl Entry for PageEntry {
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
     fn set_execute(&mut self, value: bool) { self.0.flags_mut().set(EF::EXECUTABLE, value); }
     fn mmio(&self) -> bool { false }
-    fn set_mmio(&mut self, value: bool) { }
+    fn set_mmio(&mut self, _value: bool) { }
 }
 
 #[derive(Debug)]

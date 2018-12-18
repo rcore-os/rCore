@@ -6,7 +6,7 @@ int __atomic_load_4(int *src) {
     return res;
 }
 
-int __atomic_store_4(int *dst, int val) {
+void __atomic_store_4(int *dst, int val) {
     __asm__ __volatile__("amoswap.w.aq zero, %0, (%1)" :: "r"(val), "r"(dst) : "memory");
 }
 

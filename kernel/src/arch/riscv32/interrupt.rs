@@ -12,7 +12,6 @@ use riscv::register::{
 };
 use riscv::register::{mcause, mepc, sie};
 pub use self::context::*;
-use crate::memory::{MemorySet, InactivePageTable0};
 use log::*;
 
 #[path = "context.rs"]

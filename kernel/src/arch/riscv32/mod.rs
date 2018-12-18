@@ -16,7 +16,7 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
     if hartid != 0 {
         while unsafe { !cpu::has_started(hartid) }  { }
         others_main();
-        unreachable!();
+        //other_main -> !
     }
 
     crate::logging::init();
