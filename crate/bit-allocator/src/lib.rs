@@ -134,11 +134,7 @@ fn log2(x: u16) -> usize {
 #[inline(always)]
 #[cfg(not(target_arch = "x86_64"))]
 fn log2(x: u16) -> usize {
-    log2_naive(x)
-}
-
-#[inline(always)]
-fn log2_naive(mut x: u16) -> usize {
+    //a naive implement
     assert_ne!(x, 0);
     let mut pos = -1;
     while x != 0 {

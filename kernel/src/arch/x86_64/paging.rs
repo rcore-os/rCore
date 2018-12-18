@@ -1,16 +1,11 @@
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
-use spin::{Mutex, MutexGuard};
-use ucore_memory::cow::CowExt;
-use ucore_memory::memory_set::*;
-use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use x86_64::instructions::tlb;
 use x86_64::PhysAddr;
 use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::{Mapper, PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
-use x86_64::ux::u9;
 use log::*;
 
 pub trait PageExt {
@@ -51,7 +46,7 @@ impl PageTable for ActivePageTable {
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
+        let (_, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
         flush.flush();
     }
 
@@ -117,7 +112,7 @@ impl Entry for PageEntry {
     fn execute(&self) -> bool { !self.0.flags().contains(EF::NO_EXECUTE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::NO_EXECUTE, !value); }
     fn mmio(&self) -> bool { false }
-    fn set_mmio(&mut self, value: bool) { }
+    fn set_mmio(&mut self, _value: bool) { }
 }
 
 fn get_entry_ptr(addr: usize, level: u8) -> *mut PageEntry {
@@ -152,7 +147,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn map_kernel(&mut self) {
-        let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut x86PageTable) };
+        let table = unsafe { &mut *(0xffffffff_fffff000 as *mut x86PageTable) };
         // Kernel at 0xffff_ff00_0000_0000
         // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
         let e510 = table[510].clone();

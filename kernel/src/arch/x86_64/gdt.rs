@@ -1,7 +1,5 @@
 use alloc::boxed::Box;
 use crate::consts::MAX_CPU_NUM;
-use core::fmt;
-use core::fmt::Debug;
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{PrivilegeLevel, VirtAddr};
 use x86_64::structures::gdt::*;

@@ -25,7 +25,7 @@ pub fn receive() -> Option<char> {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => return Some(character),
-                DecodedKey::RawKey(key) => {}, // TODO: handle RawKey from keyboard
+                DecodedKey::RawKey(_key) => {}, // TODO: handle RawKey from keyboard
             }
         }
     }

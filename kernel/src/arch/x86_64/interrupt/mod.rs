@@ -43,7 +43,7 @@ pub fn enable_irq(irq: u8) {
 }
 
 #[inline(always)]
-pub fn ack(irq: u8) {
+pub fn ack(_irq: u8) {
     let mut lapic = unsafe { XApic::new(KERNEL_OFFSET + LAPIC_ADDR) };
     lapic.eoi();
 }

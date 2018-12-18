@@ -6,7 +6,7 @@ pub fn init() {
 }
 
 lazy_static! {
-    static ref IDT: Idt = {
+    static ref IDT: InterruptDescriptorTable = {
         use crate::arch::interrupt::consts::*;
 		use crate::arch::gdt::DOUBLE_FAULT_IST_INDEX;
         use x86_64::PrivilegeLevel;
@@ -21,10 +21,10 @@ lazy_static! {
 
         let ring3 = [T_SWITCH_TOK, T_SYSCALL, T_SYSCALL32];
 
-        let mut idt = Idt::new();
-        let entries = unsafe{ &mut *(&mut idt as *mut _ as *mut [IdtEntry<HandlerFunc>; 256]) };
+        let mut idt = InterruptDescriptorTable::new();
+        let entries = unsafe{ &mut *(&mut idt as *mut _ as *mut [Entry<HandlerFunc>; 256]) };
         for i in 0..256 {
-            let mut opt = entries[i].set_handler_fn(unsafe { transmute(__vectors[i]) });
+            let opt = entries[i].set_handler_fn(unsafe { transmute(__vectors[i]) });
             if ring3.contains(&(i as u8)) {
                 opt.set_privilege_level(PrivilegeLevel::Ring3);
                 opt.disable_interrupts(false);

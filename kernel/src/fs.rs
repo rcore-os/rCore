@@ -26,8 +26,10 @@ lazy_static! {
     };
 }
 
+#[cfg(not(target_arch = "x86_64"))]
 struct MemBuf(&'static [u8]);
 
+#[cfg(not(target_arch = "x86_64"))]
 impl MemBuf {
     unsafe fn new(begin: unsafe extern fn(), end: unsafe extern fn()) -> Self {
         use core::slice;
@@ -35,6 +37,7 @@ impl MemBuf {
     }
 }
 
+#[cfg(not(target_arch = "x86_64"))]
 impl Device for MemBuf {
     fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Option<usize> {
         let slice = self.0;
@@ -51,11 +54,13 @@ impl Device for MemBuf {
 impl BlockedDevice for ide::IDE {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
+        use core::slice;
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.read(block_id as u64, 1, buf).is_ok()
     }
     fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
+        use core::slice;
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.write(block_id as u64, 1, buf).is_ok()
