@@ -134,6 +134,12 @@ fn log2(x: u16) -> usize {
 #[inline(always)]
 #[cfg(not(target_arch = "x86_64"))]
 fn log2(x: u16) -> usize {
+    log2_naive(x)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+#[inline(always)]
+fn log2_naive(mut x: u16) -> usize {
     //a naive implement
     assert_ne!(x, 0);
     let mut pos = -1;
@@ -148,6 +154,7 @@ fn log2(x: u16) -> usize {
 mod tests {
     use super::*;
 
+    #[cfg(not(target_arch = "x86_64"))]
     #[test]
     fn log2_() {
         for x in 1..=0xffff {
