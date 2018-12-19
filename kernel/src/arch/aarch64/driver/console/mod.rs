@@ -1,7 +1,12 @@
 //! Framebuffer console display driver for ARM64
 
-use super::fb::{FramebufferInfo, FRAME_BUFFER};
-use super::fonts::{Font, Font8x16};
+mod color;
+mod fonts;
+
+use self::color::{ConsoleColor, ConsoleColor::*, FramebufferColor};
+use self::fonts::{Font, Font8x16};
+
+use super::fb::{ColorDepth::*, FramebufferInfo, FRAME_BUFFER};
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
@@ -9,21 +14,28 @@ use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Color(u8);
-
-#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ColorPair<C: FramebufferColor> {
+    foreground: C,
+    background: C,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConsoleChar {
     ascii_char: u8,
-    color: Color,
+    color: ColorPair<ConsoleColor>,
 }
 
 impl Default for ConsoleChar {
     fn default() -> Self {
         ConsoleChar {
             ascii_char: b' ',
-            color: Color(0),
+            color: ColorPair {
+                foreground: Black,
+                background: Black,
+            },
         }
     }
 }
@@ -47,16 +59,29 @@ impl<F: Font> ConsoleBuffer<F> {
     }
 
     /// Write one character at `(row, col)`.
-    /// TODO: color
     fn write(&mut self, row: usize, col: usize, ch: ConsoleChar) {
         self.buf[row][col] = ch;
 
         let off_x = col * F::WIDTH;
         let off_y = row * F::HEIGHT;
         if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
+            let (foreground, background) = match fb.color_depth {
+                ColorDepth16 => (
+                    ch.color.foreground.pack16() as u32,
+                    ch.color.background.pack16() as u32,
+                ),
+                ColorDepth32 => (
+                    ch.color.foreground.pack32(),
+                    ch.color.background.pack32(),
+                ),
+            };
             for y in 0..F::HEIGHT {
                 for x in 0..F::WIDTH {
-                    let pixel = if ch.color.0 != 0 && F::get(ch.ascii_char, x, y) { !0 } else { 0 };
+                    let pixel = if F::get(ch.ascii_char, x, y) {
+                        foreground
+                    } else {
+                        background
+                    };
                     fb.write((off_x + x) as u32, (off_y + y) as u32, pixel);
                 }
             }
@@ -70,7 +95,7 @@ impl<F: Font> ConsoleBuffer<F> {
 
     /// Insert one blank line at the bottom, and scroll up one line.
     /// XXX: read framebuffer is toooo slow, do not use `fb.copy()`.
-    pub fn new_line(&mut self) {
+    fn new_line(&mut self) {
         for i in 1..self.num_row {
             for j in 0..self.num_col {
                 if self.buf[i - 1][j] != self.buf[i][j] {
@@ -104,7 +129,7 @@ impl<F: Font> ConsoleBuffer<F> {
 /// Console structure
 pub struct Console<F: Font> {
     /// current color
-    color: Color,
+    color: ColorPair<ConsoleColor>,
     /// cursor row
     row: usize,
     /// cursor column
@@ -118,7 +143,10 @@ impl<F: Font> Console<F> {
         let num_row = fb.yres as usize / F::HEIGHT;
         let num_col = fb.xres as usize / F::WIDTH;
         Console {
-            color: Color(1),
+            color: ColorPair {
+                foreground: BrightWhite,
+                background: Black,
+            },
             row: 0,
             col: 0,
             buf: ConsoleBuffer::new(num_row, num_col),
@@ -134,6 +162,7 @@ impl<F: Font> Console<F> {
         }
     }
 
+    // TODO: pasre color with ANSI escape sequences
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\x7f' => {
@@ -164,7 +193,10 @@ impl<F: Font> Console<F> {
     }
 
     pub fn clear(&mut self) {
-        self.color = Color(1);
+        self.color = ColorPair {
+            foreground: BrightWhite,
+            background: Black,
+        };
         self.row = 0;
         self.col = 0;
         self.buf.clear();

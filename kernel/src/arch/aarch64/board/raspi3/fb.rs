@@ -39,12 +39,11 @@ pub struct FramebufferInfo {
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
-#[allow(non_camel_case_types)]
-pub enum ColorFormat {
-    BGR565 = 16,
-    RGBA8888 = 32,
+pub enum ColorDepth {
+    ColorDepth16 = 16,
+    ColorDepth32 = 32,
 }
-use self::ColorFormat::*;
+use self::ColorDepth::*;
 
 #[repr(C)]
 union ColorBuffer {
@@ -54,16 +53,16 @@ union ColorBuffer {
 }
 
 impl ColorBuffer {
-    fn new(color_format: ColorFormat, bus_addr: u32, size: u32) -> ColorBuffer {
+    fn new(color_depth: ColorDepth, bus_addr: u32, size: u32) -> ColorBuffer {
         unsafe {
-            match color_format {
-                BGR565 => ColorBuffer {
+            match color_depth {
+                ColorDepth16 => ColorBuffer {
                     buf16: core::slice::from_raw_parts_mut(
                         bus_addr as *mut u16,
                         (size / 2) as usize,
                     ),
                 },
-                RGBA8888 => ColorBuffer {
+                ColorDepth32 => ColorBuffer {
                     buf32: core::slice::from_raw_parts_mut(
                         bus_addr as *mut u32,
                         (size / 4) as usize,
@@ -97,7 +96,7 @@ impl ColorBuffer {
 /// Frambuffer structure
 pub struct Framebuffer {
     pub fb_info: FramebufferInfo,
-    pub color_format: ColorFormat,
+    pub color_depth: ColorDepth,
     buf: ColorBuffer,
 }
 
@@ -105,7 +104,7 @@ impl fmt::Debug for Framebuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut f = f.debug_struct("Framebuffer");
         f.field("fb_info", &self.fb_info);
-        f.field("color_format", &self.color_format);
+        f.field("color_depth", &self.color_depth);
         f.field("base_addr", unsafe { &self.buf.base_addr });
         f.finish()
     }
@@ -127,9 +126,9 @@ impl Framebuffer {
         };
 
         let info = mailbox::framebuffer_alloc(width, height, depth)?;
-        let color_format = match info.depth {
-            16 => BGR565,
-            32 => RGBA8888,
+        let color_depth = match info.depth {
+            16 => ColorDepth16,
+            32 => ColorDepth32,
             _ => Err(format!("unsupported color depth {}", info.depth))?,
         };
 
@@ -147,8 +146,8 @@ impl Framebuffer {
         let paddr = info.bus_addr & !0xC0000000;
         let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb") as u32;
         Ok(Framebuffer {
-            buf: ColorBuffer::new(color_format, vaddr, info.screen_size),
-            color_format,
+            buf: ColorBuffer::new(color_depth, vaddr, info.screen_size),
+            color_depth,
             fb_info: info,
         })
     }
@@ -161,18 +160,18 @@ impl Framebuffer {
     /// Read pixel at `(x, y)`.
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {
-        match self.color_format {
-            BGR565 => self.buf.read16(y * self.fb_info.xres + x) as u32,
-            RGBA8888 => self.buf.read32(y * self.fb_info.xres + x),
+        match self.color_depth {
+            ColorDepth16 => self.buf.read16(y * self.fb_info.xres + x) as u32,
+            ColorDepth32 => self.buf.read32(y * self.fb_info.xres + x),
         }
     }
 
     /// Write pixel at `(x, y)`.
     #[inline]
     pub fn write(&mut self, x: u32, y: u32, pixel: u32) {
-        match self.color_format {
-            BGR565 => self.buf.write16(y * self.fb_info.xres + x, pixel as u16),
-            RGBA8888 => self.buf.write32(y * self.fb_info.xres + x, pixel),
+        match self.color_depth {
+            ColorDepth16 => self.buf.write16(y * self.fb_info.xres + x, pixel as u16),
+            ColorDepth32 => self.buf.write32(y * self.fb_info.xres + x, pixel),
         }
     }
 

@@ -1,4 +1,4 @@
-//! Serial driver for aarch64.
+//! Input/output for aarch64.
 
 use super::driver::serial::*;
 use super::driver::console::CONSOLE;
