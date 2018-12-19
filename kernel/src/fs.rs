@@ -10,7 +10,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 
 lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
-        #[cfg(any(target_arch = "riscv32", target_arch = "aarch64"))]
+        #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "aarch64"))]
         let device = {
             extern {
                 fn _user_img_start();

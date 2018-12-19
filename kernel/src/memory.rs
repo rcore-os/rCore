@@ -24,7 +24,7 @@ pub type MemorySet = ucore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 pub type FrameAlloc = BitAlloc64K;
 
 // RISCV only have 8M memory
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub type FrameAlloc = BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory

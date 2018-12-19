@@ -6,7 +6,7 @@
 #   $ ./run-qemu-script-custom-llc
 set -e
 
-if ! [ -d outdir ]
+if ! [[ -d outdir ]]
 then
   echo "You have to \`mkdir outdir\` first."
   echo "If you know what you're doing, do this yourself, otherwise quit."
@@ -14,11 +14,13 @@ then
 fi
 
 # CONFIGURATIONS
-export LLC=~dzy/llvm/rust-llvm-build/bin/llc
-export LLC_ARCH=riscv32
-export RUSTUP_SRCDIR=/home/dzy/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src
-export TARGET_JSON=$PWD/riscv32-blog_os.json
-export CARGO_PATH=/home/dzy/.cargo
+export LLC=$PWD/../../llvm/build/bin/llc
+export LLC_ARCH=riscv64
+export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
+export TARGET_JSON=$PWD/riscv64-blog_os.json
+export CARGO_PATH=~/.cargo
+export CC=riscv64-unknown-elf-gcc
+export AR=riscv64-unknown-elf-ar
 
 
 #============================================================================
@@ -35,7 +37,7 @@ gen_full_rlib() {
   done
   for X in ${CNAME}.*o
   do
-    ar r lib${CNAME}.rlib ${X}
+    ${AR} r lib${CNAME}.rlib ${X}
   done
   cd ..
 }
@@ -43,19 +45,24 @@ gen_full_rlib() {
 #
 # Basic dependencies
 CNAME=core
-rustc --crate-name ${CNAME} $RUSTUP_SRCDIR/libcore/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --crate-name ${CNAME} $RUST_SRC_PATH/libcore/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=3 \
     -C debuginfo=2 \
     -Z force-unstable-if-unmarked \
     --out-dir $PWD/outdir \
     --target $TARGET_JSON
 gen_full_rlib
+fi
 
+# Note: In recent nightly, compiler_builtins has been removed from rust_src.
 CNAME=compiler_builtins
-# omit build_script_build
-rustc --crate-name compiler_builtins $RUSTUP_SRCDIR/libcompiler_builtins/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.2/src/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=3 \
     -C debuginfo=2 \
     -Z force-unstable-if-unmarked \
@@ -65,10 +72,13 @@ rustc --crate-name compiler_builtins $RUSTUP_SRCDIR/libcompiler_builtins/src/lib
     --target $TARGET_JSON \
     -L $PWD/outdir
 gen_full_rlib
+fi
 
 CNAME=alloc
-rustc --crate-name alloc $RUSTUP_SRCDIR/liballoc/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --crate-name alloc $RUST_SRC_PATH/liballoc/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=3 \
     -C debuginfo=2 \
     -Z force-unstable-if-unmarked \
@@ -76,11 +86,14 @@ rustc --crate-name alloc $RUSTUP_SRCDIR/liballoc/lib.rs \
     --target $TARGET_JSON \
     -L $PWD/outdir
 gen_full_rlib
+fi
 
 
 CNAME=semver_parser
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name semver_parser $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/semver-parser-0.7.0/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -88,10 +101,13 @@ rustc --crate-name semver_parser $CARGO_PATH/registry/src/github.com-1ecc6299db9
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=cfg_if
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name cfg_if $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/cfg-if-0.1.6/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -100,10 +116,13 @@ rustc --crate-name cfg_if $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/c
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=spin
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name spin $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/spin-0.4.10/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -116,21 +135,13 @@ rustc --crate-name spin $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/spi
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
-
-CNAME=cc
-rustc --crate-name cc $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/cc-1.0.25/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
-    -C opt-level=1 \
-    -C debuginfo=2 \
-    -C debug-assertions=on \
-    --out-dir $PWD/outdir \
-    -L $PWD/outdir \
-    --cap-lints allow
-gen_full_rlib
+fi
 
 CNAME=static_assertions
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name static_assertions $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/static_assertions-0.3.1/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -139,10 +150,13 @@ rustc --crate-name static_assertions $CARGO_PATH/registry/src/github.com-1ecc629
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bit_field
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name bit_field $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bit_field-0.9.0/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -151,10 +165,13 @@ rustc --crate-name bit_field $CARGO_PATH/registry/src/github.com-1ecc6299db9ec82
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=zero
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name zero $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/zero-0.1.2/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -163,10 +180,13 @@ rustc --crate-name zero $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/zer
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bit_vec
-rustc --crate-name bit_vec $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58d6e76/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --crate-name bit_vec $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58*/src/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -175,10 +195,13 @@ rustc --crate-name bit_vec $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/98
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bitflags
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name bitflags $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bitflags-1.0.4/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -188,10 +211,13 @@ rustc --crate-name bitflags $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=volatile
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name volatile $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/volatile-0.2.5/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -200,10 +226,13 @@ rustc --crate-name volatile $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=once
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name once $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/once-0.3.3/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -212,10 +241,13 @@ rustc --crate-name once $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/onc
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bbl
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name bbl $PWD/../crate/bbl/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -223,10 +255,13 @@ rustc --crate-name bbl $PWD/../crate/bbl/src/lib.rs \
     --target $TARGET_JSON \
     -L $PWD/outdir
 gen_full_rlib
+fi
 
 CNAME=log
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name log $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/log-0.4.6/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -235,10 +270,13 @@ rustc --crate-name log $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/log-
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=linked_list_allocator
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name linked_list_allocator $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/linked_list_allocator-0.6.3/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -250,10 +288,13 @@ rustc --crate-name linked_list_allocator $CARGO_PATH/registry/src/github.com-1ec
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=lazy_static
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name lazy_static $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/lazy_static-1.2.0/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -264,11 +305,14 @@ rustc --crate-name lazy_static $CARGO_PATH/registry/src/github.com-1ecc6299db9ec
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 #
 
 CNAME=xmas_elf
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name xmas_elf $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/xmas-elf-0.6.2/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -277,10 +321,13 @@ rustc --crate-name xmas_elf $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bit_allocator
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name bit_allocator $PWD/../crate/bit-allocator/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -288,11 +335,14 @@ rustc --crate-name bit_allocator $PWD/../crate/bit-allocator/src/lib.rs \
     --target $TARGET_JSON \
     -L $PWD/outdir 
 gen_full_rlib
+fi
 
 
 CNAME=simple_filesystem
-rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/simplefilesystem-rust-868ccb44dbeefdea/249383f7e3f1/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/simplefilesystem-rust-868ccb44dbeefdea/249383f*/src/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -304,10 +354,13 @@ rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/si
     --extern static_assertions=$PWD/outdir/libstatic_assertions.rlib \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=ucore_process
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --edition=2018 --crate-name ucore_process $PWD/../crate/process/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -317,10 +370,13 @@ rustc --edition=2018 --crate-name ucore_process $PWD/../crate/process/src/lib.rs
     --extern spin=$PWD/outdir/libspin.rlib \
     -L $PWD/outdir 
 gen_full_rlib
+fi
 
 CNAME=ucore_memory
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --edition=2018 --crate-name ucore_memory $PWD/../crate/memory/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -329,10 +385,13 @@ rustc --edition=2018 --crate-name ucore_memory $PWD/../crate/memory/src/lib.rs \
     --extern log=$PWD/outdir/liblog.rlib \
     -L $PWD/outdir 
 gen_full_rlib
+fi
 
 CNAME=semver
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name semver $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/semver-0.9.0/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -342,11 +401,14 @@ rustc --crate-name semver $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/s
     --extern semver_parser=$PWD/outdir/libsemver_parser.rlib \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=rustc_version
 # omit build_script_build
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name rustc_version $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/rustc_version-0.2.3/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -355,11 +417,14 @@ rustc --crate-name rustc_version $CARGO_PATH/registry/src/github.com-1ecc6299db9
     --extern semver=$PWD/outdir/libsemver.rlib \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=bare_metal
 # omit build_script_build
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --crate-name bare_metal $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bare-metal-0.2.4/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -368,10 +433,13 @@ rustc --crate-name bare_metal $CARGO_PATH/registry/src/github.com-1ecc6299db9ec8
     -L $PWD/outdir \
     --cap-lints allow
 gen_full_rlib
+fi
 
 CNAME=riscv
-rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/966eb26d5e8d/src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+if ! [[ -f outdir/${CNAME}.o ]]
+then
+rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/1f59ef7*/src/lib.rs \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -383,11 +451,12 @@ rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/966eb2
     --extern bitflags=$PWD/outdir/libbitflags.rlib \
     --cap-lints allow
 gen_full_rlib
+fi
 
 
 # Hand generate build.rs
-riscv32-unknown-elf-gcc src/arch/riscv32/compiler_rt.c -march=rv32ia -mabi=ilp32 -c -o outdir/compiler_rt.o
-ar r outdir/libatomic_rt.a outdir/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c -march=rv64ia -mabi=lp64 -c -o outdir/compiler_rt.o
+${AR} r outdir/libatomic_rt.a outdir/compiler_rt.o
 
 cat >outdir/sfsimg.S <<EOF
 		.section .rodata
@@ -398,15 +467,17 @@ _user_img_start:
 		.incbin "../user/build/user-riscv32.img"
 _user_img_end:
 EOF
-riscv32-unknown-elf-gcc outdir/sfsimg.S -march=rv32ia -mabi=ilp32 -c -o outdir/sfsimg.o
-ar r outdir/libsfsimg.a outdir/sfsimg.o
+${CC} outdir/sfsimg.S -march=rv64ia -mabi=lp64 -c -o outdir/sfsimg.o
+${AR} r outdir/libsfsimg.a outdir/sfsimg.o
 
 make sfsimg
 
 
 CNAME=ucore
+if ! [[ -f outdir/${CNAME}.o ]]
+then
 rustc --edition=2018 --crate-name ucore src/lib.rs \
-    --color never --crate-type lib --emit=metadata,llvm-ir \
+    --color always --crate-type lib --emit=metadata,llvm-ir \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -431,9 +502,10 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     -L native=outdir -l static=sfsimg -l static=atomic_rt
 
 gen_full_rlib
+fi
 
 rustc --edition=2018 --crate-name ucore src/main.rs \
-    --color never --crate-type bin --emit=link \
+    --color always --crate-type bin --emit=link \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
@@ -461,10 +533,10 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
 cd ../riscv-pk && mkdir -p build && cd build
 
 ../configure \
-        --with-arch=rv32imac \
-        --disable-fp-emulation \
-        --host=riscv32-unknown-elf \
-        --with-payload=../../kernel/outdir/ucore
+    --with-arch=rv64imac \
+    --disable-fp-emulation \
+    --host=riscv64-unknown-elf \
+    --with-payload=../../kernel/outdir/ucore
 
 make 
 
@@ -472,6 +544,4 @@ cp bbl ../../kernel/outdir/kernel.bin
 
 cd ../../kernel
 
-qemu-system-riscv32 -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin || [ $? -eq 11 ] # run qemu and assert it exit 11
-
-
+qemu-system-riscv64 -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin

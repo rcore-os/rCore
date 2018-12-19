@@ -18,6 +18,7 @@ use log::*;
 *   setup page table in the frame
 */
 // need 1 page
+#[cfg(target_arch = "riscv32")]
 pub fn setup_page_table(frame: Frame) {
     let p2 = unsafe { &mut *(frame.start_address().as_u32() as *mut RvPageTable) };
     p2.zero();
@@ -35,6 +36,11 @@ pub fn setup_page_table(frame: Frame) {
     unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
     sfence_vma_all();
     info!("setup init page table end");
+}
+
+#[cfg(target_arch = "riscv64")]
+pub fn setup_page_table(_frame: Frame) {
+    unimplemented!();
 }
 
 pub struct ActivePageTable(RecursivePageTable<'static>);
@@ -274,7 +280,7 @@ impl InactivePageTable for InactivePageTable0 {
         let new_frame = self.p2_frame.clone();
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, new_frame);
+            satp::set(SATP_MODE, 0, new_frame);
             sfence_vma_all();
         }
     }
@@ -292,13 +298,13 @@ impl InactivePageTable for InactivePageTable0 {
         let new_frame = self.p2_frame.clone();
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, new_frame);
+            satp::set(SATP_MODE, 0, new_frame);
             sfence_vma_all();
         }
         let target = f();
         debug!("switch table {:x?} -> {:x?}", new_frame, old_frame);
         if old_frame != new_frame {
-            satp::set(satp::Mode::Sv32, 0, old_frame);
+            satp::set(SATP_MODE, 0, old_frame);
             sfence_vma_all();
         }
         target
@@ -322,6 +328,11 @@ impl InactivePageTable for InactivePageTable0 {
         dealloc_frame(target)
     }
 }
+
+#[cfg(target_arch = "riscv32")]
+const SATP_MODE: satp::Mode = satp::Mode::Sv32;
+#[cfg(target_arch = "riscv64")]
+const SATP_MODE: satp::Mode = satp::Mode::Sv39;
 
 impl InactivePageTable0 {
     /*
