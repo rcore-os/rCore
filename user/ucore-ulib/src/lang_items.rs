@@ -1,12 +1,12 @@
 use crate::syscall::{sys_close, sys_dup, sys_exit, sys_open};
-use crate::syscall::{O_RDONLY, O_WRONLY};
+use crate::io::{O_RDONLY, O_WRONLY, STDIN, STDOUT};
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 
 // used for panic
 macro_rules! print {
     ($($arg:tt)*) => ({
-        $crate::syscall::print_putc(format_args!($($arg)*));
+        $crate::io::print_putc(format_args!($($arg)*));
     });
 }
 
@@ -33,11 +33,11 @@ fn initfd(fd2: usize, path: &str, open_flags: usize) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> ! {
-    let fd = initfd(0, "stdin:", O_RDONLY);
+    let fd = initfd(STDIN, "stdin:", O_RDONLY);
     if fd < 0 {
         panic!("open <stdin> failed: {}.", fd);
     }
-    let fd = initfd(1, "stdout:", O_WRONLY);
+    let fd = initfd(STDOUT, "stdout:", O_WRONLY);
     if fd < 0 {
         panic!("open <stdout> failed: {}.", fd);
     }

@@ -6,5 +6,6 @@
 #![feature(compiler_builtins_lib)]
 
 #[macro_use]
+pub mod io;
 pub mod syscall;
 pub mod lang_items;

@@ -1,48 +1,3 @@
-use core::fmt::{self, Write};
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ({
-        $crate::syscall::print(format_args!($($arg)*));
-    });
-}
-
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
-
-pub fn print(args: fmt::Arguments) {
-    StdOut.write_fmt(args).unwrap();
-}
-
-pub fn print_putc(args: fmt::Arguments) {
-    SysPutc.write_fmt(args).unwrap();
-}
-
-struct StdOut;
-struct SysPutc;
-
-impl fmt::Write for StdOut {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        if sys_write(1, s.as_ptr(), s.len()) >= 0 {
-            Ok(())
-        } else {
-            Err(fmt::Error::default())
-        }
-    }
-}
-
-impl fmt::Write for SysPutc {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.bytes() {
-            sys_putc(c as char);
-        }
-        Ok(())
-    }
-}
-
 #[inline(always)]
 fn sys_call(syscall_id: SyscallId, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
     let id = syscall_id as usize;
@@ -77,6 +32,10 @@ pub fn sys_exit(code: usize) -> ! {
 
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
     sys_call(SyscallId::Write, fd, base as usize, len, 0, 0, 0)
+}
+
+pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> i32 {
+    sys_call(SyscallId::Read, fd, base as usize, len, 0, 0, 0)
 }
 
 pub fn sys_open(path: &str, flags: usize) -> i32 {
@@ -134,7 +93,7 @@ pub fn sys_lab6_set_priority(priority: usize) -> i32 {
     sys_call(SyscallId::Lab6SetPriority, priority, 0, 0, 0, 0, 0)
 }
 
-pub fn sys_putc(c: char) -> i32 {
+pub fn sys_putc(c: u8) -> i32 {
     sys_call(SyscallId::Putc, c as usize, 0, 0, 0, 0, 0)
 }
 
@@ -167,15 +126,3 @@ enum SyscallId{
     Dup = 130,
     Lab6SetPriority = 255,
 }
-
-/* VFS flags */
-// TODO: use bitflags
-// flags for open: choose one of these
-pub const O_RDONLY: usize = 0; // open for reading only
-pub const O_WRONLY: usize = 1; // open for writing only
-pub const O_RDWR: usize = 2; // open for reading and writing
-// then or in any of these:
-pub const O_CREAT: usize = 0x00000004; // create file if it does not exist
-pub const O_EXCL: usize = 0x00000008; // error if O_CREAT and the file exists
-pub const O_TRUNC: usize = 0x00000010; // truncate file upon open
-pub const O_APPEND: usize = 0x00000020; // append on each write
