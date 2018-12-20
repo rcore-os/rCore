@@ -195,6 +195,16 @@ pub trait Entry {
     **  @retval none
     */
     fn set_execute(&mut self, value: bool);
-    fn mmio(&self) -> bool;
-    fn set_mmio(&mut self, value: bool);
+    /*
+    **  @brief  get MMIO type
+    **          (e.g. aarch64 can have normal/device/normal_non_cacheable memory)
+    **  @retval u8                  the MMIO type
+    */
+    fn mmio(&self) -> u8;
+    /*
+    **  @brief  set MMIO type
+    **  @param  value: u8            the MMIO type
+    **  @retval none
+    */
+    fn set_mmio(&mut self, value: u8);
 }

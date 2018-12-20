@@ -1,6 +1,7 @@
 #![feature(lang_items)]
 #![feature(alloc)]
 #![feature(naked_functions)]
+#![feature(untagged_unions)]
 #![feature(asm)]
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
@@ -8,6 +9,7 @@
 #![no_std]
 
 // just keep it ...
+#[macro_use]
 extern crate alloc;
 
 pub use crate::process::{processor, new_kernel_context};

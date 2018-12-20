@@ -22,7 +22,7 @@ pub fn setup_temp_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: F
     p2.zero();
 
     let (start_addr, end_addr) = (0, 0x40000000);
-    let block_flags = EF::VALID | EF::AF | EF::WRITE | EF::XN;
+    let block_flags = EF::VALID | EF::AF | EF::WRITE | EF::UXN;
     for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
         let paddr = PhysAddr::new(page.start_address().as_u64());
 
@@ -106,6 +106,14 @@ impl ActivePageTable {
     }
 }
 
+#[repr(u8)]
+pub enum MMIOType {
+    Normal = 0,
+    Device = 1,
+    NormalNonCacheable = 2,
+    Unsupported = 3,
+}
+
 impl Entry for PageEntry {
     fn update(&mut self) {
         let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
@@ -150,27 +158,38 @@ impl Entry for PageEntry {
     }
     fn execute(&self) -> bool {
         if self.user() {
-            !self.0.flags().contains(EF::XN)
+            !self.0.flags().contains(EF::UXN)
         } else {
             !self.0.flags().contains(EF::PXN)
         }
     }
     fn set_execute(&mut self, value: bool) {
         if self.user() {
-            self.as_flags().set(EF::XN, !value)
+            self.as_flags().set(EF::UXN, !value)
         } else {
             self.as_flags().set(EF::PXN, !value)
         }
     }
-    fn mmio(&self) -> bool {
-        self.0.attr().value == MairDevice::attr_value().value
-    }
-    fn set_mmio(&mut self, value: bool) {
-        if value {
-            self.0.modify_attr(MairDevice::attr_value())
+    fn mmio(&self) -> u8 {
+        let value = self.0.attr().value;
+        if value == MairNormal::attr_value().value {
+            0
+        } else if value == MairDevice::attr_value().value {
+            1
+        } else if value == MairNormalNonCacheable::attr_value().value {
+            2
         } else {
-            self.0.modify_attr(MairNormal::attr_value())
+            3
         }
+    }
+    fn set_mmio(&mut self, value: u8) {
+        let attr = match value {
+            0 => MairNormal::attr_value(),
+            1 => MairDevice::attr_value(),
+            2 => MairNormalNonCacheable::attr_value(),
+            _ => return,
+        };
+        self.0.modify_attr(attr);
     }
 }
 

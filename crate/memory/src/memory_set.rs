@@ -222,8 +222,8 @@ pub struct MemoryAttr {
     user: bool,
     readonly: bool,
     execute: bool,
-    mmio: bool,
     hide: bool,
+    mmio: u8,
 }
 
 impl MemoryAttr {
@@ -251,8 +251,12 @@ impl MemoryAttr {
         self.execute = true;
         self
     }
-    pub fn mmio(mut self) -> Self {
-        self.mmio = true;
+    /*
+    **  @brief  set the MMIO type
+    **  @retval MemoryAttr           the memory attribute itself
+    */
+    pub fn mmio(mut self, value: u8) -> Self {
+        self.mmio = value;
         self
     }
     /*
@@ -273,9 +277,9 @@ impl MemoryAttr {
         if self.user { entry.set_user(true); }
         if self.readonly { entry.set_writable(false); }
         if self.execute { entry.set_execute(true); }
-        if self.mmio { entry.set_mmio(true); }
+        if self.mmio != 0 { entry.set_mmio(self.mmio); }
         if self.hide { entry.set_present(false); }
-        if self.user || self.readonly || self.execute || self.mmio || self.hide { entry.update(); }
+        if self.user || self.readonly || self.execute || self.mmio != 0 || self.hide { entry.update(); }
     }
 }
 

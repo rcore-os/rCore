@@ -1,7 +1,7 @@
 [[package]]
 name = "aarch64"
 version = "2.2.2"
-source = "git+https://github.com/equation314/aarch64#e3b60adb233ad34d05443e0b5ec34cac29253296"
+source = "git+https://github.com/equation314/aarch64#b6a0f4a3be6f74927c88305a6af5ad2be079bccd"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
