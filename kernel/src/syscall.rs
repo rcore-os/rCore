@@ -53,7 +53,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
     };
     match ret {
         Ok(code) => code,
-        Err(err) => -(err as i32),
+        Err(err) => (err as i32),
     }
 }
 
@@ -286,7 +286,8 @@ pub type SysResult = Result<i32, SysError>;
 #[repr(i32)]
 #[derive(Debug)]
 pub enum SysError {
-    // ucore compatible error code, which is a modified version of the ones used in linux
+    // ucore_plus compatible error code, which is a modified version of the ones used in linux
+    // note that ucore_os_lab use another error code table
     // name conversion E_XXXXX -> SysError::Xxxxx
     // see https://github.com/oscourse-tsinghua/ucore_plus/blob/master/ucore/src/libs-user-ucore/common/error.h
     // we only add current used errors here

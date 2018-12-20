@@ -108,16 +108,16 @@ lazy_static! {
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
-        fn info(&self) -> Result<FileInfo> { unimplemented!() }
-        fn sync(&self) -> Result<()> { unimplemented!() }
-        fn resize(&self, _len: usize) -> Result<()> { unimplemented!() }
-        fn create(&self, _name: &str, _type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
-        fn unlink(&self, _name: &str) -> Result<()> { unimplemented!() }
-        fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { unimplemented!() }
-        fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { unimplemented!() }
-        fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { unimplemented!() }
-        fn find(&self, _name: &str) -> Result<Arc<INode>> { unimplemented!() }
-        fn get_entry(&self, _id: usize) -> Result<String> { unimplemented!() }
+        fn info(&self) -> Result<FileInfo> { Err(FsError::NotSupported) }
+        fn sync(&self) -> Result<()> { Ok(()) }
+        fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
+        fn create(&self, _name: &str, _type_: FileType) -> Result<Arc<INode>> { Err(FsError::NotDir) }
+        fn unlink(&self, _name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { Err(FsError::NotDir) }
+        fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
+        fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };
