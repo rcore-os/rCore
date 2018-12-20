@@ -22,6 +22,7 @@ pub fn init_serial_early() {
 
 /// Initialize raspi3 drivers
 pub fn init_driver() {
+    #[cfg(not(feature = "nographic"))]
     fb::init();
     timer::init();
 }

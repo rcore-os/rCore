@@ -1,22 +1,23 @@
 # Commands:
-#   make build					Build
-# 	make run					Build and run in QEMU
-# 	make justrun				Run the last build
-# 	make doc					Generate docs
-# 	make asm					Open the deassemble file of the last build
-# 	make header					Open 'objdump -h' of the last build
-# 	make clean					Clean
+#   make build                      Build
+#   make run                        Build and run in QEMU
+#   make justrun                    Run the last build
+#   make doc                        Generate docs
+#   make asm                        Open the deassemble file of the last build
+#   make header                     Open 'objdump -h' of the last build
+#   make clean                      Clean
 #
 # Options:
-#   arch = x86_64 | riscv32 | aarch64
-#   d    = int | in_asm | ...	QEMU debug info
-#   mode = debug | release
-#   LOG  = off | error | warn | info | debug | trace
-#   SFSIMG = SFS image path of user programs
-#   smp  = 1 | 2 | ...          SMP core number
-#   board = fpga				Only available on riscv32, build without bbl, run on board
-#         | raspi3				Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   m_mode						Only available on riscv32, build for M-Mode, without MMU
+#   arch    = x86_64 | riscv32 | aarch64
+#   d       = int | in_asm | ...    QEMU debug info
+#   mode    = debug | release
+#   LOG     = off | error | warn | info | debug | trace
+#   SFSIMG  = <sfsimg>              SFS image path of user programs
+#   smp     = 1 | 2 | ...           SMP core number
+#   graphic = on | off              enable/disable qemu graphical output
+#   board   = fpga                  Only available on riscv32, build without bbl, run on board
+#           | raspi3                Only available on aarch64, run on Raspberry Pi 3 Model B/B+
+#   m_mode                          Only available on riscv32, build for M-Mode, without MMU
 
 arch ?= riscv32
 board ?= raspi3
@@ -24,7 +25,7 @@ mode ?= debug
 LOG  ?= debug
 smp  ?= 4
 # NOTE: crate 'process' use this name 'm_mode' as an environment
-#		to set interrupt (MIE or SIE)
+#       to set interrupt (MIE or SIE)
 m_mode ?=
 
 target := $(arch)-blog_os
@@ -40,10 +41,15 @@ user_obj := build/$(arch)/user.o
 export ARCH = $(arch)
 export SFSIMG = $(user_dir)/build/user-$(arch).img
 
+ifeq ($(arch), aarch64)
+graphic ?= on
+else
+graphic ?= off
+endif
+
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(smp) \
-	-nographic
+	-smp cores=$(smp)
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -67,6 +73,10 @@ qemu_opts += \
 	-kernel $(bin)
 endif
 
+ifneq ($(graphic), on)
+qemu_opts += -nographic
+endif
+
 ifdef d
 qemu_opts += -d $(d)
 endif
@@ -76,6 +86,10 @@ ifeq ($(arch), riscv32)
 ifeq ($(board), fpga)
 features += no_bbl
 endif
+endif
+
+ifneq ($(graphic), on)
+features += nographic
 endif
 
 ifeq ($(board), raspi3)
