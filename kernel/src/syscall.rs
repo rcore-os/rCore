@@ -53,7 +53,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
     };
     match ret {
         Ok(code) => code,
-        Err(_) => -1,
+        Err(err) => -(err as i32),
     }
 }
 
@@ -96,7 +96,7 @@ fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     match process().files.remove(&fd) {
         Some(_) => Ok(0),
-        None => Err(SysError::InvalidFile),
+        None => Err(SysError::Badf),
     }
 }
 
@@ -118,11 +118,11 @@ fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     let file = get_file(fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
-        return Err(SysError::InvalidArgument);
+        return Err(SysError::Inval);
     }
     let info = file.lock().info()?;
     if info.type_ != FileType::Dir || info.size <= dentry.entry_id() {
-        return Err(SysError::InvalidArgument);
+        return Err(SysError::Inval);
     }
     let name = file.lock().get_entry(dentry.entry_id())?;
     dentry.set_name(name.as_str());
@@ -133,7 +133,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
     info!("dup: {} {}", fd1, fd2);
     let file = get_file(fd1)?;
     if process().files.contains_key(&fd2) {
-        return Err(SysError::InvalidFile);
+        return Err(SysError::Badf);
     }
     process().files.insert(fd2, file.clone());
     Ok(0)
@@ -278,7 +278,7 @@ fn sys_putc(c: char) -> SysResult {
 }
 
 fn get_file(fd: usize) -> Result<&'static Arc<Mutex<File>>, SysError> {
-    process().files.get(&fd).ok_or(SysError::InvalidFile)
+    process().files.get(&fd).ok_or(SysError::Badf)
 }
 
 pub type SysResult = Result<i32, SysError>;
@@ -286,14 +286,21 @@ pub type SysResult = Result<i32, SysError>;
 #[repr(i32)]
 #[derive(Debug)]
 pub enum SysError {
-    VfsError,
-    InvalidFile,
-    InvalidArgument,
+    // ucore compatible error code, which is a modified version of the ones used in linux
+    // name conversion E_XXXXX -> SysError::Xxxxx
+    // see https://github.com/oscourse-tsinghua/ucore_plus/blob/master/ucore/src/libs-user-ucore/common/error.h
+    // we only add current used errors here
+    Badf = 9,// Invaild fd number
+    Inval = 22,// Invalid argument.
+
+    Unknown = 65535,// A really really unknown error.
 }
 
 impl From<FsError> for SysError {
-    fn from(_: FsError) -> Self {
-        SysError::VfsError
+    fn from(error: FsError) -> Self {
+        match error {
+            _ => SysError::Unknown
+        }
     }
 }
 
