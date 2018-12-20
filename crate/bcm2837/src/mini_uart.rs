@@ -2,11 +2,11 @@ use crate::IO_BASE;
 use crate::gpio::{Function, Gpio};
 use volatile::{ReadOnly, Volatile};
 
-/// The base address for the `MU` registers.
-const MU_REG_BASE: usize = IO_BASE + 0x215040;
-
 /// The `AUXENB` register from page 9 of the BCM2837 documentation.
 const AUX_ENABLES: *mut Volatile<u8> = (IO_BASE + 0x215004) as *mut Volatile<u8>;
+
+/// The base address for the `MU` registers.
+const MU_REG_BASE: usize = IO_BASE + 0x215040;
 
 /// Enum representing bit fields of the `AUX_MU_IIR_REG` register.
 #[repr(u8)]
@@ -55,19 +55,10 @@ pub struct MiniUart {
 }
 
 impl MiniUart {
-    /// Initializes the mini UART by enabling it as an auxiliary peripheral,
-    /// setting the data size to 8 bits, setting the BAUD rate to ~115200 (baud
-    /// divider of 270), setting GPIO pins 14 and 15 to alternative function 5
-    /// (TXD1/RDXD1), and finally enabling the UART transmitter and receiver.
-    ///
-    /// By default, reads will never time out. To set a read timeout, use
-    /// `set_read_timeout()`.
+    /// Returns a new instance of `MiniUart`.
+    #[inline]
     pub fn new() -> MiniUart {
-        let registers = unsafe {
-            // Enable the mini UART as an auxiliary device.
-            (*AUX_ENABLES).write(1);
-            &mut *(MU_REG_BASE as *mut Registers)
-        };
+        let registers = unsafe { &mut *(MU_REG_BASE as *mut Registers) };
 
         MiniUart {
             registers: registers,
@@ -75,7 +66,17 @@ impl MiniUart {
         }
     }
 
+    /// Initializes the mini UART by enabling it as an auxiliary peripheral,
+    /// setting the data size to 8 bits, setting the BAUD rate to ~115200 (baud
+    /// divider of 270), setting GPIO pins 14 and 15 to alternative function 5
+    /// (TXD1/RDXD1), and finally enabling the UART transmitter and receiver.
+    ///
+    /// By default, reads will never time out. To set a read timeout, use
+    /// `set_read_timeout()`.
     pub fn init(&mut self) {
+        // Enable the mini UART as an auxiliary device.
+        unsafe { (*AUX_ENABLES).write(1) }
+
         Gpio::new(14).into_alt(Function::Alt5).set_gpio_pd(0);
         Gpio::new(15).into_alt(Function::Alt5).set_gpio_pd(0);
 

@@ -2,6 +2,7 @@ use bcm2837::mini_uart::{MiniUart, MiniUartInterruptId};
 use lazy_static::lazy_static;
 use core::fmt;
 use spin::Mutex;
+use once::*;
 
 /// Struct to get a global SerialPort interface
 pub struct SerialPort {
@@ -21,7 +22,9 @@ impl SerialPort {
     }
 
     /// Init a newly created SerialPort, can only be called once.
-    pub fn init(&mut self) {
+    fn init(&mut self) {
+        assert_has_not_been_called!("SerialPort::init must be called only once");
+
         self.mu.init();
         super::irq::register_irq(super::irq::Interrupt::Aux, handle_serial_irq);
     }
@@ -78,6 +81,11 @@ fn handle_serial_irq() {
     }
 }
 
-lazy_static!{
+lazy_static! {
     pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
+}
+
+
+pub fn init() {
+    SERIAL_PORT.lock().init();
 }
