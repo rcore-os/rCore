@@ -290,16 +290,35 @@ pub enum SysError {
     // name conversion E_XXXXX -> SysError::Xxxxx
     // see https://github.com/oscourse-tsinghua/ucore_plus/blob/master/ucore/src/libs-user-ucore/common/error.h
     // we only add current used errors here
+    Noent = 2,// No such file or directory
     Badf = 9,// Invaild fd number
+    Nomem = 12,// Out of memory, also used as no device space in ucore
+    Exist = 17,// File exists
+    Xdev = 18,// Cross-device link
+    Notdir = 20,// Fd is not a directory
+    Isdir = 21,// Fd is a directory
     Inval = 22,// Invalid argument.
+    Unimp = 35,// Not implemented operation
 
+    #[allow(dead_code)]
     Unknown = 65535,// A really really unknown error.
 }
 
 impl From<FsError> for SysError {
     fn from(error: FsError) -> Self {
         match error {
-            _ => SysError::Unknown
+            FsError::NotSupported => SysError::Unimp,
+            FsError::NotFile => SysError::Isdir,
+            FsError::IsDir => SysError::Isdir,
+            FsError::NotDir => SysError::Notdir,
+            FsError::EntryNotFound => SysError::Noent,
+            FsError::EntryExist => SysError::Exist,
+            FsError::NotSameFs => SysError::Xdev,
+            FsError::InvalidParam => SysError::Inval,
+            FsError::NoDeviceSpace => SysError::Nomem,
+            FsError::DirRemoved => SysError::Noent,
+            FsError::DirNotEmpty => SysError::Isdir,// It should be E_NOTEMPTY in linux, but in ucore it is equal to E_Isdir
+            FsError::WrongFs => SysError::Inval,
         }
     }
 }
