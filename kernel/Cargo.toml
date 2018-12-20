@@ -47,7 +47,7 @@ uart_16550 = "0.1"
 pc-keyboard = "0.3"
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv = { git = "https://github.com/riscv-and-rust-and-decaf/riscv" }
+riscv = { path = "../crate/riscv" }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
