@@ -136,7 +136,8 @@ impl INode for Stdout {
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> { unimplemented!() }
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         use core::str;
-        let s = str::from_utf8(buf).map_err(|_| ())?;
+        //we do not care the utf-8 things, we just want to print it!
+        let s = unsafe{ str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
     }

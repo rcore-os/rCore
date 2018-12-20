@@ -1,6 +1,6 @@
 //! System call
 
-use simple_filesystem::{INode, file::File, FileInfo, FileType};
+use simple_filesystem::{INode, file::File, FileInfo, FileType, FsError};
 use core::{slice, str};
 use alloc::{sync::Arc, vec::Vec, string::String};
 use spin::Mutex;
@@ -291,8 +291,8 @@ pub enum SysError {
     InvalidArgument,
 }
 
-impl From<()> for SysError {
-    fn from(_: ()) -> Self {
+impl From<FsError> for SysError {
+    fn from(_: FsError) -> Self {
         SysError::VfsError
     }
 }

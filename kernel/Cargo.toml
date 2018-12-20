@@ -56,6 +56,9 @@ aarch64 = { git = "https://github.com/equation314/aarch64" }
 atags = { path = "../crate/atags" }
 bcm2837 = { path = "../crate/bcm2837", optional = true }
 
+[patch.'https://github.com/wangrunji0408/SimpleFileSystem-Rust']
+simple-filesystem = { git = "https://github.com/benpigchu/SimpleFileSystem-Rust", branch = "ucore-fs-enhance" }
+
 [package.metadata.bootimage]
 default-target = "x86_64-blog_os.json"
 output = "target/x86_64-blog_os/bootimage.bin"
