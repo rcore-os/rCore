@@ -145,6 +145,13 @@ impl Framebuffer {
         use crate::arch::memory;
         let paddr = info.bus_addr & !0xC0000000;
         let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb") as u32;
+        if vaddr == 0 {
+            Err(format!(
+                "cannot remap memory range [{:#x?}..{:#x?}]",
+                paddr,
+                paddr + info.screen_size
+            ))?;
+        }
         Ok(Framebuffer {
             buf: ColorBuffer::new(color_depth, vaddr, info.screen_size),
             color_depth,

@@ -1,6 +1,4 @@
 //! Page table implementations for aarch64.
-use ucore_memory::memory_set::*;
-use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, flush_icache_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
@@ -9,7 +7,7 @@ use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame
 use aarch64::paging::memory_attribute::*;
 use log::*;
 // Depends on kernel
-use crate::consts::RECURSIVE_INDEX;
+use crate::consts::{KERNEL_PML4, RECURSIVE_INDEX};
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
 // need 3 page
@@ -49,9 +47,7 @@ pub struct ActivePageTable(RecursivePageTable<'static>);
 pub struct PageEntry(PageTableEntry);
 
 impl PageTable for ActivePageTable {
-    type Entry = PageEntry;
-
-    fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, attr, &mut FrameAllocatorForAarch64)
@@ -64,26 +60,15 @@ impl PageTable for ActivePageTable {
         flush.flush();
     }
 
-    fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         // get p1 entry
         let entry_addr = ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39)
             | (vaddr & 0xffff_0000_0000_0000);
         Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
     }
-
-    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
-        use core::slice;
-        unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, PAGE_SIZE) }
-    }
-
-    fn read(&mut self, addr: usize) -> u8 {
-        unsafe { *(addr as *const u8) }
-    }
-
-    fn write(&mut self, addr: usize, data: u8) {
-        unsafe { *(addr as *mut u8) = data; }
-    }
 }
+
+impl PageTableExt for ActivePageTable {}
 
 const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
     ((RECURSIVE_INDEX << 39) | (RECURSIVE_INDEX << 30) | (RECURSIVE_INDEX << 21) | (RECURSIVE_INDEX << 12)) as *mut Aarch64PageTable;
@@ -91,18 +76,6 @@ const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *(ROOT_PAGE_TABLE as *mut _)).unwrap())
-    }
-    fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut Aarch64PageTable)) {
-        // Create a temporary page
-        let page = Page::of_addr(0xcafebabe);
-        assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
-        // Map it to table
-        self.map(page.start_address().as_u64() as usize, frame.start_address().as_u64() as usize);
-        // Call f
-        let table = unsafe { &mut *page.start_address().as_mut_ptr() };
-        f(self, table);
-        // Unmap the page
-        self.unmap(0xcafebabe);
     }
 }
 
@@ -217,9 +190,9 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(target))
-            .expect("failed to allocate frame");
-        active_table().with_temporary_map(&frame, |_, table: &mut Aarch64PageTable| {
+        let target = alloc_frame().expect("failed to allocate frame");
+        let frame = Frame::of_addr(target);
+        active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
             table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default(), MairNormal::attr_value());
@@ -227,8 +200,35 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { p4_frame: frame }
     }
 
-    fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
-        active_table().with_temporary_map(&ttbr_el1_read(0), |active_table, p4_table: &mut Aarch64PageTable| {
+    fn map_kernel(&mut self) {
+        let table = unsafe { &mut *ROOT_PAGE_TABLE };
+        let e0 = table[KERNEL_PML4].clone();
+        assert!(!e0.is_unused());
+
+        self.edit(|_| {
+            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
+        });
+    }
+
+    fn token(&self) -> usize {
+        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
+    }
+
+    unsafe fn set_token(token: usize) {
+        ttbr_el1_write(1, Frame::containing_address(PhysAddr::new(token as u64)));
+    }
+
+    fn active_token() -> usize {
+        ttbr_el1_read(1).start_address().as_u64() as usize
+    }
+
+    fn flush_tlb() {
+        tlb_invalidate_all();
+    }
+
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
+        let target = ttbr_el1_read(0).start_address().as_u64() as usize;
+        active_table().with_temporary_map(target, |active_table, p4_table: &mut Aarch64PageTable| {
             let backup = p4_table[RECURSIVE_INDEX].clone();
             let old_frame = ttbr_el1_read(1);
 
@@ -238,54 +238,14 @@ impl InactivePageTable for InactivePageTable0 {
             tlb_invalidate_all();
 
             // execute f in the new context
-            f(active_table);
+            let ret = f(active_table);
 
             // restore recursive mapping to original p4 table
             p4_table[RECURSIVE_INDEX] = backup;
             ttbr_el1_write(1, old_frame);
             tlb_invalidate_all();
-        });
-    }
-
-    unsafe fn activate(&self) {
-        let old_frame = ttbr_el1_read(1);
-        let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, new_frame);
-            tlb_invalidate_all();
-        }
-    }
-
-    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        // Just need to switch the user TTBR
-        let old_frame = ttbr_el1_read(1);
-        let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, new_frame);
-            tlb_invalidate_all();
-        }
-        let ret = f();
-        debug!("switch TTBR1 {:?} -> {:?}", new_frame, old_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(1, old_frame);
-            tlb_invalidate_all();
-            flush_icache_all();
-        }
-        ret
-    }
-
-    fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
-    }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
+            ret
+        })
     }
 }
 
@@ -306,7 +266,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
     }
 }
 

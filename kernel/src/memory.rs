@@ -4,7 +4,7 @@ use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, InactivePageTable};
+pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
 use ucore_memory::swap::*;
 use crate::process::{process};
 use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
@@ -46,33 +46,29 @@ pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>, SpinNoIrq>
     ACTIVE_TABLE.lock()
 }
 
-// Page table for swap in and out
-lazy_static!{
-    static ref ACTIVE_TABLE_SWAP: SpinNoIrqLock<SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>> =
-        SpinNoIrqLock::new(unsafe{SwapExt::new(ActivePageTable::new(), fifo::FifoSwapManager::default(), mock_swapper::MockSwapper::default())});
+
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalFrameAlloc;
+
+impl FrameAllocator for GlobalFrameAlloc {
+    fn alloc(&self) -> Option<usize> {
+        // get the real address of the alloc frame
+        let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+        trace!("Allocate frame: {:x?}", ret);
+        ret
+        // TODO: try to swap out when alloc failed
+    }
+    fn dealloc(&self, target: usize) {
+        trace!("Deallocate frame: {:x}", target);
+        FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
+    }
 }
 
-pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo::FifoSwapManager, mock_swapper::MockSwapper>, SpinNoIrq>{
-    ACTIVE_TABLE_SWAP.lock()
-}
-
-/*
-* @brief:
-*   allocate a free physical frame, if no free frame, then swap out one page and reture mapped frame as the free one
-* @retval:
-*   the physical address for the allocated frame
-*/
 pub fn alloc_frame() -> Option<usize> {
-    // get the real address of the alloc frame
-    let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
-    trace!("Allocate frame: {:x?}", ret);
-    //do we need : unsafe { ACTIVE_TABLE_SWAP.force_unlock(); } ???
-    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().expect("fail to swap out page")))
+    GlobalFrameAlloc.alloc()
 }
-
 pub fn dealloc_frame(target: usize) {
-    trace!("Deallocate frame: {:x}", target);
-    FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
+    GlobalFrameAlloc.dealloc(target);
 }
 
 pub struct KernelStack(usize);
@@ -97,44 +93,12 @@ impl Drop for KernelStack {
 }
 
 
-/*
-* @param:
-*   addr: the virtual address of the page fault
-* @brief:
-*   handle page fault
-* @retval:
-*   Return true to continue, false to halt
-*/
+/// Handle page fault at `addr`.
+/// Return true to continue, false to halt.
 #[cfg(not(feature = "no_mmu"))]
 pub fn page_fault_handler(addr: usize) -> bool {
     info!("start handling swap in/out page fault");
-    //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
-
-    /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER
-    * handle the frame deallocated
-    */
-
-    info!("get pt from processor()");
-    if process().memory_set.find_area(addr).is_none(){
-        return false;
-    }
-
-    let pt = process().memory_set.get_page_table_mut();
-    info!("pt got");
-    if active_table_swap().page_fault_handler(pt as *mut InactivePageTable0, addr, true, || alloc_frame().expect("fail to alloc frame")){
-        return true;
-    }
-    //////////////////////////////////////////////////////////////////////////////
-
-
-    // Handle copy on write (not being used now)
-    /*
-    unsafe { ACTIVE_TABLE.force_unlock(); }
-    if active_table().page_fault_handler(addr, || alloc_frame().expect("fail to alloc frame")){
-        return true;
-    }
-    */
-    false
+    process().memory_set.page_fault_handler(addr)
 }
 
 pub fn init_heap() {

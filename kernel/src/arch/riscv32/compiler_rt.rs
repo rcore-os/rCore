@@ -10,7 +10,7 @@ pub extern fn __mulsi3(mut a: u32, mut b: u32) -> u32 {
 
     while a > 0 {
         if a & 1 > 0 {
-            r += b;
+            r = r.overflowing_add(b).0;
         }
         a >>= 1;
         b <<= 1;
