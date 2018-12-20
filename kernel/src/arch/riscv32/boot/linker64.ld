@@ -6,30 +6,25 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-BASE_ADDRESS = 0x40020000;
+BASE_ADDRESS = 0x40000000;
 
 SECTIONS
 {
-    . = 0x40000000;
-    .boot : {
-        KEEP(*(.text.boot))
-    }
-
     /* Load the kernel at this address: "." means the current address */
     . = BASE_ADDRESS;
     start = .;
 
     .text : {
         stext = .;
-        *(.text.entry)
-        *(.text .stub .text.* .gnu.linkonce.t.*)
+        KEEP(*(.text.boot))
+        *(.text .text.*)
         . = ALIGN(4K);
         etext = .;
     }
 
     .rodata : {
         srodata = .;
-        *(.rodata .rodata.* .gnu.linkonce.r.*)
+        *(.rodata .rodata.*)
         . = ALIGN(4K);
         erodata = .;
     }
@@ -43,14 +38,9 @@ SECTIONS
 
     .bss : {
         sbss = .;
-        *(.bss .bss.* .sbss*)
+        *(.bss .bss.*)
         . = ALIGN(4K);
         ebss = .;
-    }
-
-    .got : {
-        *(.got .got.*)
-        . = ALIGN(4K);
     }
 
     PROVIDE(end = .);

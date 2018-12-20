@@ -1,5 +1,4 @@
 use core::fmt::{Write, Result, Arguments};
-use core::ptr::{read_volatile, write_volatile};
 use bbl::sbi;
 
 struct SerialPort;
@@ -20,10 +19,10 @@ impl Write for SerialPort {
 }
 
 fn putchar(c: u8) {
-    if cfg!(feature = "no_bbl") {
+    if cfg!(feature = "board_k210") {
         unsafe {
-            while read_volatile(STATUS) & CAN_WRITE == 0 {}
-            write_volatile(DATA, c as u8);
+            while TXDATA.read_volatile() & (1 << 31) != 0 {}
+            (TXDATA as *mut u8).write_volatile(c as u8);
         }
     } else if cfg!(feature = "m_mode") {
         (super::BBL.mcall_console_putchar)(c);
@@ -33,10 +32,10 @@ fn putchar(c: u8) {
 }
 
 pub fn getchar() -> char {
-    let c = if cfg!(feature = "no_bbl") {
+    let c = if cfg!(feature = "board_k210") {
         unsafe {
-            // while read_volatile(STATUS) & CAN_READ == 0 {}
-            read_volatile(DATA)
+            while RXDATA.read_volatile() & (1 << 31) == 0 {}
+            (RXDATA as *const u8).read_volatile()
         }
     } else if cfg!(feature = "m_mode") {
         (super::BBL.mcall_console_getchar)() as u8
@@ -54,7 +53,5 @@ pub fn putfmt(fmt: Arguments) {
     SerialPort.write_fmt(fmt).unwrap();
 }
 
-const DATA: *mut u8 = 0x10000000 as *mut u8;
-const STATUS: *const u8 = 0x10000005 as *const u8;
-const CAN_READ: u8 = 1 << 0;
-const CAN_WRITE: u8 = 1 << 5;
+const TXDATA: *mut u32 = 0x38000000 as *mut u32;
+const RXDATA: *mut u32 = 0x38000004 as *mut u32;

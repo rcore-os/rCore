@@ -57,8 +57,8 @@ global_asm!("
     .macro XRET\n sret\n .endm
 ");
 
-#[cfg(feature = "no_bbl")]
-global_asm!(include_str!("boot/boot.asm"));
+#[cfg(feature = "board_k210")]
+global_asm!(include_str!("boot/boot_k210.asm"));
 global_asm!(include_str!("boot/entry.asm"));
 global_asm!(include_str!("boot/trap.asm"));
 
