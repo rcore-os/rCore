@@ -37,7 +37,7 @@ extern "C"
 #endif
 
 //#define LOG(...)
-#define LOG(...) //printf(__VA_ARGS__)
+#define LOG(...) 0 //printf(__VA_ARGS__)
 #define LOG_DEBUG(...)
 //#define LOG_DEBUG(...) printf(__VA_ARGS__)
 
@@ -144,7 +144,7 @@ typedef enum {
     USB_SPEED_FULL = 1,												// USB full speed
     USB_SPEED_LOW = 2,												// USB low speed
 } UsbSpeed;
-extern const char* SpeedString[3];	// Speed strings High, Low, Full provided as constants 
+extern const char* SpeedString[3];	// rpi-usb.c Speed strings High, Low, Full provided as constants
 
 /*--------------------------------------------------------------------------}
 {			 Transfer types as layed out in USB 2.0 standard			    }
@@ -620,7 +620,7 @@ struct __attribute__((__packed__)) HidDescriptor {
 #define USB_SETUP_RECIPIENT_DEVICE              0x00    // Device Request bmRequestType recipient - device
 #define USB_SETUP_RECIPIENT_INTERFACE           0x01    // Device Request bmRequestType recipient - interface
 #define USB_SETUP_RECIPIENT_ENDPOINT            0x02    // Device Request bmRequestType recipient - endpoint
-#define USB_SETUP_RECIPIENT_OTHER				0x03	// Device Request bmRequestType recipient - other
+#define USB_SETUP_RECIPIENT_OTHER               0x03    // Device Request bmRequestType recipient - other
 
 /*--------------------------------------------------------------------------}
 { 		  USB struct UsbDeviceRequest .Type Bit masks for a HUB			    }
