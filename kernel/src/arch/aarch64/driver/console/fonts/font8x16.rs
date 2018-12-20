@@ -4622,6 +4622,9 @@ impl Font for Font8x16 {
     const HEIGHT: usize = 16;
     const WIDTH: usize = 8;
 
+    const UNDERLINE: usize = 13;
+    const STRIKETHROUGH: usize = 8;
+
     #[inline]
     fn get(byte: u8, x: usize, y: usize) -> bool {
         Self::DATA[byte as usize * 16 + y] & (1 << (7 - x)) != 0

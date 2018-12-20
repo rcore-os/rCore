@@ -1,9 +1,11 @@
 //! Framebuffer console display driver for ARM64
 
 mod color;
+mod escape_parser;
 mod fonts;
 
-use self::color::{ConsoleColor, ConsoleColor::*, FramebufferColor};
+use self::color::FramebufferColor;
+use self::escape_parser::{CharacterAttribute, EscapeParser};
 use self::fonts::{Font, Font8x16};
 
 use super::fb::{ColorDepth::*, FramebufferInfo, FRAME_BUFFER};
@@ -16,26 +18,16 @@ use spin::Mutex;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct ColorPair<C: FramebufferColor> {
-    foreground: C,
-    background: C,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConsoleChar {
     ascii_char: u8,
-    color: ColorPair<ConsoleColor>,
+    attr: CharacterAttribute,
 }
 
 impl Default for ConsoleChar {
     fn default() -> Self {
         ConsoleChar {
-            ascii_char: b' ',
-            color: ColorPair {
-                foreground: Black,
-                background: Black,
-            },
+            ascii_char: 0,
+            attr: CharacterAttribute::default(),
         }
     }
 }
@@ -60,24 +52,40 @@ impl<F: Font> ConsoleBuffer<F> {
 
     /// Write one character at `(row, col)`.
     fn write(&mut self, row: usize, col: usize, ch: ConsoleChar) {
+        if self.buf[row][col] == ch {
+            return;
+        }
         self.buf[row][col] = ch;
 
         let off_x = col * F::WIDTH;
         let off_y = row * F::HEIGHT;
         if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
-            let (foreground, background) = match fb.color_depth {
+            let (mut foreground, mut background) = match fb.color_depth {
                 ColorDepth16 => (
-                    ch.color.foreground.pack16() as u32,
-                    ch.color.background.pack16() as u32,
+                    ch.attr.foreground.pack16() as u32,
+                    ch.attr.background.pack16() as u32,
                 ),
                 ColorDepth32 => (
-                    ch.color.foreground.pack32(),
-                    ch.color.background.pack32(),
+                    ch.attr.foreground.pack32(),
+                    ch.attr.background.pack32(),
                 ),
+            };
+            if ch.attr.reverse {
+                core::mem::swap(&mut foreground, &mut background);
+            }
+            let underline_y = if ch.attr.underline {
+                F::UNDERLINE
+            } else {
+                F::HEIGHT
+            };
+            let strikethrough_y = if ch.attr.strikethrough {
+                F::STRIKETHROUGH
+            } else {
+                F::HEIGHT
             };
             for y in 0..F::HEIGHT {
                 for x in 0..F::WIDTH {
-                    let pixel = if F::get(ch.ascii_char, x, y) {
+                    let pixel = if y == underline_y || y == strikethrough_y || F::get(ch.ascii_char, x, y) {
                         foreground
                     } else {
                         background
@@ -98,18 +106,11 @@ impl<F: Font> ConsoleBuffer<F> {
     fn new_line(&mut self) {
         for i in 1..self.num_row {
             for j in 0..self.num_col {
-                if self.buf[i - 1][j] != self.buf[i][j] {
-                    self.write(i - 1, j, self.buf[i][j]);
-                }
+                self.write(i - 1, j, self.buf[i][j]);
             }
         }
         for j in 0..self.num_col {
-            self.buf[self.num_row - 1][j] = ConsoleChar::default();
-        }
-
-        if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
-            let rowbytes = F::HEIGHT * fb.fb_info.pitch as usize;
-            fb.fill(rowbytes * (self.num_row - 1), rowbytes, 0);
+            self.write(self.num_row - 1, j, ConsoleChar::default());
         }
     }
 
@@ -128,12 +129,12 @@ impl<F: Font> ConsoleBuffer<F> {
 
 /// Console structure
 pub struct Console<F: Font> {
-    /// current color
-    color: ColorPair<ConsoleColor>,
     /// cursor row
     row: usize,
     /// cursor column
     col: usize,
+    /// escape sequence parser
+    parser: EscapeParser,
     /// character buffer
     buf: ConsoleBuffer<F>,
 }
@@ -143,17 +144,21 @@ impl<F: Font> Console<F> {
         let num_row = fb.yres as usize / F::HEIGHT;
         let num_col = fb.xres as usize / F::WIDTH;
         Console {
-            color: ColorPair {
-                foreground: BrightWhite,
-                background: Black,
-            },
             row: 0,
             col: 0,
+            parser: EscapeParser::new(),
             buf: ConsoleBuffer::new(num_row, num_col),
         }
     }
 
     fn new_line(&mut self) {
+        let attr_blank = ConsoleChar {
+            ascii_char: 0,
+            attr: self.parser.char_attribute(),
+        };
+        for j in self.col..self.buf.num_col {
+            self.buf.write(self.row, j, attr_blank);
+        }
         self.col = 0;
         if self.row < self.buf.num_row - 1 {
             self.row += 1;
@@ -162,8 +167,12 @@ impl<F: Font> Console<F> {
         }
     }
 
-    // TODO: pasre color with ANSI escape sequences
     fn write_byte(&mut self, byte: u8) {
+        if self.parser.is_parsing() {
+            if self.parser.parse(byte) {
+                return;
+            }
+        }
         match byte {
             b'\x7f' => {
                 if self.col > 0 {
@@ -177,6 +186,7 @@ impl<F: Font> Console<F> {
             }
             b'\n' => self.new_line(),
             b'\r' => self.col = 0,
+            b'\x1b' => self.parser.start_parse(),
             byte => {
                 if self.col >= self.buf.num_col {
                     self.new_line();
@@ -184,7 +194,7 @@ impl<F: Font> Console<F> {
 
                 let ch = ConsoleChar {
                     ascii_char: byte,
-                    color: self.color,
+                    attr: self.parser.char_attribute(),
                 };
                 self.buf.write(self.row, self.col, ch);
                 self.col += 1;
@@ -193,12 +203,9 @@ impl<F: Font> Console<F> {
     }
 
     pub fn clear(&mut self) {
-        self.color = ColorPair {
-            foreground: BrightWhite,
-            background: Black,
-        };
         self.row = 0;
         self.col = 0;
+        self.parser = EscapeParser::new();
         self.buf.clear();
     }
 }
