@@ -2,7 +2,7 @@ use core::{slice, mem};
 use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 use log::*;
-use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR};
+use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END};
 
 #[cfg(feature = "no_mmu")]
@@ -78,11 +78,11 @@ fn init_frame_allocator() {
 fn remap_the_kernel() {
     let mut ms = MemorySet::new_bare();
     #[cfg(feature = "no_bbl")]
-    ms.push(MemoryArea::new_identity(0x10000000, 0x10000008, MemoryAttr::default(), "serial"));
-    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
-    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
-    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
-    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
+    ms.push(0x10000000, 0x10000008,  Linear::new(0, MemoryAttr::default()), "serial");
+    ms.push(stext as usize, etext as usize, Linear::new(0, MemoryAttr::default().execute().readonly()), "text");
+    ms.push(sdata as usize, edata as usize, Linear::new(0, MemoryAttr::default()), "data");
+    ms.push(srodata as usize, erodata as usize, Linear::new(0, MemoryAttr::default().readonly()), "rodata");
+    ms.push(sbss as usize, ebss as usize, Linear::new(0, MemoryAttr::default()), "bss");
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);

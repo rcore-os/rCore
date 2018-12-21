@@ -1,13 +1,11 @@
 //! Memory initialization for aarch64.
 
-use crate::memory::{init_heap, MemoryArea, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use super::paging::MMIOType;
 use aarch64::paging::{memory_attribute::*, PhysFrame as Frame};
 use aarch64::{addr::*, barrier, regs::*};
 use atags::atags::Atags;
-use lazy_static::lazy_static;
 use log::*;
-use spin::Mutex;
 use ucore_memory::PAGE_SIZE;
 
 /// Memory initialization.
@@ -100,41 +98,31 @@ fn init_frame_allocator() {
     }
 }
 
-lazy_static! {
-    pub static ref KERNEL_MEMORY_SET: Mutex<MemorySet> = Mutex::new(MemorySet::new_bare());
-}
+static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
-    let mut ms = KERNEL_MEMORY_SET.lock();
-    ms.push(MemoryArea::new_identity(0, bootstacktop as usize, MemoryAttr::default(), "kstack"));
-    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
-    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
-    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
-    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
+    let mut ms = MemorySet::new_bare();
+    ms.push(0, bootstacktop as usize, Linear::new(0, MemoryAttr::default()), "kstack");
+    ms.push(stext as usize, etext as usize, Linear::new(0, MemoryAttr::default().execute().readonly()), "text");
+    ms.push(sdata as usize, edata as usize, Linear::new(0, MemoryAttr::default()), "data");
+    ms.push(srodata as usize, erodata as usize, Linear::new(0, MemoryAttr::default().readonly()), "rodata");
+    ms.push(sbss as usize, ebss as usize, Linear::new(0, MemoryAttr::default()), "bss");
 
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
-    ms.push(MemoryArea::new_identity(
-        IO_REMAP_BASE,
-        IO_REMAP_END,
-        MemoryAttr::default().mmio(MMIOType::Device as u8),
-        "io_remap",
-    ));
+    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
 
     unsafe { ms.get_page_table_mut().activate_as_kernel() }
+    unsafe { KERNEL_MEMORY_SET = Some(ms) }
     info!("kernel remap end");
 }
 
 pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
-    let mut ms = KERNEL_MEMORY_SET.lock();
-    let area = MemoryArea::new_identity(
-        start,
-        start + len,
-        MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8),
-        name,
-    );
-    ms.push(area);
-    start
+    if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
+        ms.push(start, start + len, Linear::new(0, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8)), name);
+        return start;
+    }
+    0
 }
 
 /// Returns the (start address, end address) of the available memory on this

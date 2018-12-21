@@ -8,7 +8,6 @@
 
 use super::*;
 use super::paging::*;
-use super::memory_set::InactivePageTable;
 use super::addr::Frame;
 use core::ops::{Deref, DerefMut};
 

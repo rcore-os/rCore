@@ -1,18 +1,16 @@
-use crate::arch::interrupt::{TrapFrame, Context as ArchContext};
-use crate::memory::{MemoryArea, MemoryAttr, MemorySet, KernelStack, active_table_swap, alloc_frame, InactivePageTable0};
-use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, Type, SegmentData}};
-use core::fmt::{Debug, Error, Formatter};
-use alloc::{boxed::Box, collections::BTreeMap, vec::Vec, sync::Arc, string::String};
-use ucore_memory::{Page};
-use ucore_memory::memory_set::*;
-use ucore_process::Context;
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+
+use log::*;
 use simple_filesystem::file::File;
 use spin::Mutex;
-use log::*;
+use ucore_process::Context;
+use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, SegmentData, Type}};
 
+use crate::arch::interrupt::{Context as ArchContext, TrapFrame};
+use crate::memory::{ByFrame, Delay, FrameAllocator, GlobalFrameAlloc, KernelStack, MemoryArea, MemoryAttr, MemorySet};
 
 // TODO: avoid pub
-pub struct ContextImpl {
+pub struct Process {
     pub arch: ArchContext,
     pub memory_set: MemorySet,
     pub kstack: KernelStack,
@@ -20,17 +18,17 @@ pub struct ContextImpl {
     pub cwd: String,
 }
 
-impl Context for ContextImpl {
+impl Context for Process {
     unsafe fn switch_to(&mut self, target: &mut Context) {
         use core::mem::transmute;
-        let (target, _): (&mut ContextImpl, *const ()) = transmute(target);
+        let (target, _): (&mut Process, *const ()) = transmute(target);
         self.arch.switch(&mut target.arch);
     }
 }
 
-impl ContextImpl {
+impl Process {
     pub unsafe fn new_init() -> Box<Context> {
-        Box::new(ContextImpl {
+        Box::new(Process {
             arch: ArchContext::null(),
             memory_set: MemorySet::new(),
             kstack: KernelStack::new(),
@@ -42,7 +40,7 @@ impl ContextImpl {
     pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
         let memory_set = MemorySet::new();
         let kstack = KernelStack::new();
-        Box::new(ContextImpl {
+        Box::new(Process {
             arch: unsafe { ArchContext::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
@@ -52,7 +50,7 @@ impl ContextImpl {
     }
 
     /// Make a new user thread from ELF data
-    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<ContextImpl>
+    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Process>
         where Iter: Iterator<Item=&'a str>
     {
         // Parse elf
@@ -82,7 +80,7 @@ impl ContextImpl {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
                 false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
             };
-            memory_set.push(MemoryArea::new(ustack_buttom, ustack_top, MemoryAttr::default().user(), "user_stack"));
+            memory_set.push(ustack_buttom, ustack_top,  ByFrame::new(MemoryAttr::default().user(), GlobalFrameAlloc), "user_stack");
             ustack_top
         };
         #[cfg(feature = "no_mmu")]
@@ -96,10 +94,7 @@ impl ContextImpl {
 
         let kstack = KernelStack::new();
 
-        //set the user Memory pages in the memory set swappable
-        memory_set_map_swappable(&mut memory_set);
-
-        Box::new(ContextImpl {
+        Box::new(Process {
             arch: unsafe {
                 ArchContext::new_user_thread(
                     entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
@@ -131,43 +126,13 @@ impl ContextImpl {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        memory_set_map_swappable(&mut memory_set);
-        info!("FORK() finsihed!");
-
-        Box::new(ContextImpl {
+        Box::new(Process {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
             files: BTreeMap::default(),
             cwd: String::new(),
         })
-    }
-}
-
-#[cfg(not(feature = "no_mmu"))]
-impl Drop for ContextImpl {
-    fn drop(&mut self){
-        info!("come in to drop for ContextImpl");
-        //set the user Memory pages in the memory set unswappable
-        let Self {ref mut arch, ref mut memory_set, ref mut kstack, ..} = self;
-        let pt = {
-            memory_set.get_page_table_mut() as *mut InactivePageTable0
-        };
-        for area in memory_set.iter(){
-            for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
-                let addr = page.start_address();
-                unsafe {
-                    active_table_swap().remove_from_swappable(pt, addr, || alloc_frame().expect("alloc frame failed"));
-                }
-            }
-        }
-        debug!("Finishing setting pages unswappable");
-    }
-}
-
-impl Debug for ContextImpl {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{:x?}", self.arch)
     }
 }
 
@@ -200,7 +165,7 @@ unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
 
 /// Generate a MemorySet according to the ELF file.
 /// Also return the real entry point address.
-fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
+fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
     debug!("come in to memory_set_from");
     let mut ms = MemorySet::new();
     let mut entry = None;
@@ -221,7 +186,7 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
         let target = ms.push(mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
-            ms.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(ph.flags()), ""));
+            ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()), GlobalFrameAlloc), "");
             unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
         };
         // Copy data
@@ -247,30 +212,4 @@ fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
     // TODO: handle readonly
     if elf_flags.is_execute() { flags = flags.execute(); }
     flags
-}
-
-/*
-* @param:
-*   memory_set: the target MemorySet to set swappable
-* @brief:
-*   map the memory area in the memory_set swappalbe, specially for the user process
-*/
-#[cfg(not(feature = "no_mmu"))]
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
-    info!("COME INTO memory set map swappable!");
-    let pt = unsafe {
-        memory_set.get_page_table_mut() as *mut InactivePageTable0
-    };
-    for area in memory_set.iter(){
-        for page in Page::range_of(area.get_start_addr(), area.get_end_addr()) {
-            let addr = page.start_address();
-            unsafe { active_table_swap().set_swappable(pt, addr); }
-        }
-    }
-    info!("Finishing setting pages swappable");
-}
-
-#[cfg(feature = "no_mmu")]
-pub fn memory_set_map_swappable(memory_set: &mut MemorySet) {
-    // NOTE:  This function may disappear after refactor memory crate
 }
