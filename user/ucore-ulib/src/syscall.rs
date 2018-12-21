@@ -30,6 +30,11 @@ pub fn sys_exit(code: usize) -> ! {
     unreachable!()
 }
 
+
+pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8) -> i32 {
+    sys_call(SyscallId::Exec, name as usize, argc, argv as usize, 0, 0, 0)
+}
+
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> i32 {
     sys_call(SyscallId::Write, fd, base as usize, len, 0, 0, 0)
 }

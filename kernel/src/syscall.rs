@@ -198,6 +198,9 @@ fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapF
             .collect()
     };
 
+    if args.len() <= 0 {
+        return Err(SysError::Inval);
+    }
     // Read program file
     let path = args[0].as_str();
     let inode = crate::fs::ROOT_INODE.lookup(path)?;
