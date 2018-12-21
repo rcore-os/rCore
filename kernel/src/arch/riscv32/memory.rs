@@ -82,6 +82,7 @@ fn remap_the_kernel() {
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
+    ms.push(MemoryArea::new_identity(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), "stack"));
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
@@ -92,6 +93,14 @@ fn remap_the_kernel() {
 // First core stores its SATP here.
 // Other cores load it later.
 static mut SATP: usize = 0;
+
+pub unsafe fn clear_bss() {
+    let bss_start = sbss as usize;
+    let bss_end = ebss as usize;
+    for i in bss_start..bss_end {
+        (i as *mut u8).write(0);
+    }
+}
 
 // Symbols provided by linker script
 extern {

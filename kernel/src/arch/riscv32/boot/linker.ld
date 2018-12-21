@@ -22,14 +22,14 @@ SECTIONS
     .text : {
         stext = .;
         *(.text.entry)
-        *(.text .stub .text.* .gnu.linkonce.t.*)
+        *(.text .text.*)
         . = ALIGN(4K);
         etext = .;
     }
 
     .rodata : {
         srodata = .;
-        *(.rodata .rodata.* .gnu.linkonce.r.*)
+        *(.rodata .rodata.*)
         . = ALIGN(4K);
         erodata = .;
     }
@@ -37,20 +37,17 @@ SECTIONS
     .data : {
         sdata = .;
         *(.data .data.*)
-        . = ALIGN(4K);
         edata = .;
+    }
+
+    .stack : {
+        *(.bss.stack)
     }
 
     .bss : {
         sbss = .;
-        *(.bss .bss.* .sbss*)
-        . = ALIGN(4K);
+        *(.bss .bss.*)
         ebss = .;
-    }
-
-    .got : {
-        *(.got .got.*)
-        . = ALIGN(4K);
     }
 
     PROVIDE(end = .);

@@ -10,7 +10,7 @@ _start:
 
     call rust_main
 
-    .section .bss
+    .section .bss.stack
     .align 12  #PGSHIFT
     .global bootstack
 bootstack:

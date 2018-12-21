@@ -10,14 +10,18 @@ pub mod cpu;
 #[no_mangle]
 pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: usize) -> ! {
     unsafe { cpu::set_cpu_id(hartid); }
-    unsafe { BBL_FUNCTIONS_PTR = functions as *const _; }
-    println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
 
     if hartid != 0 {
         while unsafe { !cpu::has_started(hartid) }  { }
+        println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
         others_main();
         unreachable!();
     }
+
+    unsafe { memory::clear_bss(); }
+    unsafe { BBL_FUNCTIONS_PTR = functions as *const _; }
+
+    println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
 
     crate::logging::init();
     interrupt::init();
