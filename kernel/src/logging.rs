@@ -30,15 +30,15 @@ macro_rules! print {
 
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!($fmt, "\r\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\r\n"), $($arg)*));
 }
 
 /// Add escape sequence to print with color in Linux console
 macro_rules! with_color {
     ($args: ident, $color: ident) => {{
         let (show, code) = color_to_console_code($color);
-        format_args!("{}[{};{}m{}{}[0m", 27 as char, show.clone(), code + 30, $args, 27 as char)
+        format_args!("\u{1B}[{};{}m{}\u{1B}[0m", show.clone(), code + 30, $args)
     }};
 }
 
@@ -67,7 +67,7 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
 //            let target = record.target();
 //            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
-            print_in_color(format_args!("[{:>5}] {}\n", record.level(), record.args()), Color::from(record.level()));
+            print_in_color(format_args!("[{:>5}] {}\r\n", record.level(), record.args()), Color::from(record.level()));
         }
     }
     fn flush(&self) {}
