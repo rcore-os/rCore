@@ -8,16 +8,16 @@ extern "C" {
 }
 
 #[inline]
-fn SizeToNumber(size: UsbPacketSize) -> u32 {
+pub fn SizeToNumber(size: UsbPacketSize) -> u32 {
     return if size == UsbPacketSize::Bits8 {8}
         else if size == UsbPacketSize::Bits16 {16}
         else if size == UsbPacketSize::Bits32 {32}
         else {64};
 }
 macro_rules! AssertSize {
-    ($type:ty,$size:expr,$msg:expr) => {if core::mem::size_of::<$type>()!=($size) {print!($msg)}};
+    ($type:ty,$size:expr,$msg:expr) => {if core::mem::size_of::<$type>()!=($size) {println!($msg)}};
 }
-fn check_size() {
+pub fn check_size() {
     println!("check struct size");
 /* DESIGNWARE 2.0 REGISTERS */
 //    AssertSize!(CoreOtgControl, 0x04, "Register/Structure should be 32bits (4 bytes)");
