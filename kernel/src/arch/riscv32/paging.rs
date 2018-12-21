@@ -20,7 +20,7 @@ use log::*;
 // need 1 page
 #[cfg(target_arch = "riscv32")]
 pub fn setup_page_table(frame: Frame) {
-    let p2 = unsafe { &mut *(frame.start_address().as_u32() as *mut RvPageTable) };
+    let p2 = unsafe { &mut *(frame.start_address().as_usize() as *mut RvPageTable) };
     p2.zero();
     p2.set_recursive(RECURSIVE_INDEX, frame.clone());
 
@@ -64,7 +64,7 @@ impl PageTable for ActivePageTable {
         let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
         // here page is for the virtual address while frame is for the physical, both of them is 4096 bytes align
         let page = Page::of_addr(VirtAddr::new(addr));
-        let frame = Frame::of_addr(PhysAddr::new(target as u32));
+        let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
@@ -160,7 +160,7 @@ impl ActivePageTable {
         let page = Page::of_addr(VirtAddr::new(0xcafebabe));
         assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
         // Map it to table
-        self.map(page.start_address().as_usize(), frame.start_address().as_u32() as usize);
+        self.map(page.start_address().as_usize(), frame.start_address().as_usize());
         // Call f
         let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
         f(self, table);
@@ -182,10 +182,10 @@ impl Entry for PageEntry {
     fn clear_dirty(&mut self) { self.as_flags().remove(EF::DIRTY); }
     fn set_writable(&mut self, value: bool) { self.as_flags().set(EF::WRITABLE, value); }
     fn set_present(&mut self, value: bool) { self.as_flags().set(EF::VALID | EF::READABLE, value); }
-    fn target(&self) -> usize { self.0.addr().as_u32() as usize }
+    fn target(&self) -> usize { self.0.addr().as_usize() }
     fn set_target(&mut self, target: usize) {
         let flags = self.0.flags();
-        let frame = Frame::of_addr(PhysAddr::new(target as u32));
+        let frame = Frame::of_addr(PhysAddr::new(target));
         self.0.set(frame, flags);
     }
     fn writable_shared(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
@@ -239,7 +239,7 @@ impl InactivePageTable for InactivePageTable0 {
     *   the inactive page table
     */
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
+        let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target)))
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
             table.zero();
@@ -363,7 +363,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p2_frame.start_address().as_u32() as usize);
+        Self::dealloc_frame(self.p2_frame.start_address().as_usize());
     }
 }
 
@@ -371,12 +371,12 @@ struct FrameAllocatorForRiscv;
 
 impl FrameAllocator for FrameAllocatorForRiscv {
     fn alloc(&mut self) -> Option<Frame> {
-        alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new(addr as u32)))
+        alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new(addr)))
     }
 }
 
 impl FrameDeallocator for FrameAllocatorForRiscv {
     fn dealloc(&mut self, frame: Frame) {
-        dealloc_frame(frame.start_address().as_u32() as usize);
+        dealloc_frame(frame.start_address().as_usize());
     }
 }

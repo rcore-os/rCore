@@ -26,7 +26,7 @@ pub fn init() {
     static PAGE_TABLE_ROOT: PageData = PageData([0; PAGE_SIZE]);
 
     unsafe { sstatus::set_sum(); }  // Allow user memory access
-    let frame = Frame::of_addr(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as u32));
+    let frame = Frame::of_addr(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as usize));
     super::paging::setup_page_table(frame); // set up page table
     // initialize heap and Frame allocator
     init_frame_allocator();
