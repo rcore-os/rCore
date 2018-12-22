@@ -86,10 +86,11 @@ fn remap_the_kernel() {
 static mut SATP: usize = 0;
 
 pub unsafe fn clear_bss() {
-    let bss_start = sbss as usize;
-    let bss_end = ebss as usize;
-    for i in bss_start..bss_end {
-        (i as *mut u8).write(0);
+    let start = sbss as usize;
+    let end = ebss as usize;
+    let step = core::mem::size_of::<usize>();
+    for i in (start..end).step_by(step) {
+        (i as *mut usize).write(0);
     }
 }
 
