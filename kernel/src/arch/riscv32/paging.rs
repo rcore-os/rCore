@@ -11,38 +11,6 @@ use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use log::*;
 
-/*
-* @param:
-*   Frame: page table root frame
-* @brief:
-*   setup page table in the frame
-*/
-// need 1 page
-#[cfg(target_arch = "riscv32")]
-pub fn setup_page_table(frame: Frame) {
-    let p2 = unsafe { &mut *(frame.start_address().as_usize() as *mut RvPageTable) };
-    p2.zero();
-    p2.set_recursive(RECURSIVE_INDEX, frame.clone());
-
-    // Set kernel identity map
-    // 0x10000000 ~ 1K area
-    p2.map_identity(0x40, EF::VALID | EF::READABLE | EF::WRITABLE);
-    // 0x80000000 ~ 12M area 
-    p2.map_identity(KERNEL_P2_INDEX, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
-    p2.map_identity(KERNEL_P2_INDEX + 1, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
-    p2.map_identity(KERNEL_P2_INDEX + 2, EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE);
-
-    use riscv::register::satp;
-    unsafe { satp::set(satp::Mode::Sv32, 0, frame); }
-    sfence_vma_all();
-    info!("setup init page table end");
-}
-
-#[cfg(target_arch = "riscv64")]
-pub fn setup_page_table(_frame: Frame) {
-    unimplemented!();
-}
-
 pub struct ActivePageTable(RecursivePageTable<'static>);
 
 pub struct PageEntry(PageTableEntry);

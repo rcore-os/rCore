@@ -21,13 +21,7 @@ pub fn init() {
 */
 #[cfg(not(feature = "no_mmu"))]
 pub fn init() {
-    #[repr(align(4096))]  // align the PageData struct to 4096 bytes
-    struct PageData([u8; PAGE_SIZE]);
-    static PAGE_TABLE_ROOT: PageData = PageData([0; PAGE_SIZE]);
-
     unsafe { sstatus::set_sum(); }  // Allow user memory access
-    let frame = Frame::of_addr(PhysAddr::new(&PAGE_TABLE_ROOT as *const _ as usize));
-    super::paging::setup_page_table(frame); // set up page table
     // initialize heap and Frame allocator
     init_frame_allocator();
     init_heap();
@@ -70,10 +64,7 @@ fn init_frame_allocator() {
     }
 }
 
-/*
-* @brief:
-*   remmap the kernel memory address with 4K page recorded in p1 page table
-*/
+/// Remap the kernel memory address with 4K page recorded in p1 page table
 #[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel() {
     let mut ms = MemorySet::new_bare();

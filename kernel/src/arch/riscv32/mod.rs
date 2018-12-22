@@ -9,6 +9,8 @@ pub mod cpu;
 
 #[no_mangle]
 pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: usize) -> ! {
+    // An initial recursive page table has been set by BBL (shared by all cores)
+
     unsafe { cpu::set_cpu_id(hartid); }
 
     if hartid != 0 {
