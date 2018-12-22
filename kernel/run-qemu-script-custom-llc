@@ -1,9 +1,13 @@
 #!/bin/bash
 # The contents are adopted from xbuild verbose output.
 # Output files are in $PWD/outdir
+#
 # Usage:
 #   Just run
 #   $ ./run-qemu-script-custom-llc
+#
+# By default riscv32 is built. To build for riscv64,
+#		set the environment variable `RV64` to "1"
 set -e
 
 if ! [[ -d outdir ]]
@@ -13,17 +17,31 @@ then
   exit 1
 fi
 
-# CONFIGURATIONS
-export LOG=info
-export LLC=$PWD/../tools/llc
-export LLC_ARCH=riscv64
-export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
-export TARGET_JSON=$PWD/riscv64-blog_os.json
-export CARGO_PATH=~/.cargo
-export CC=riscv64-unknown-elf-gcc
-export AR=riscv64-unknown-elf-ar
-export OBJCOPY=riscv64-unknown-elf-objcopy
-export QEMU=$PWD/../../@github/qemu/build/riscv64-softmmu/qemu-system-riscv64
+if [[ ${RV64} = 1 ]]; then
+	TARGET_ARCH=riscv64
+	LOG=info
+	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -DTARGET_IS_64BITS -O3"
+	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
+	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
+	UCORE_USER_IMAGE="../user/img/ucore-riscv64.img"
+else
+	exit 1
+	TARGET_ARCH=riscv32
+	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
+	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
+	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv32imac --disable-fp-emulation --host=riscv32-unknown-elf"
+	UCORE_USER_IMAGE="../user/img/ucore-rv32.img"
+fi
+LLC=llc
+RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
+CARGO_PATH=~/.cargo
+LLC_ARCH=${TARGET_ARCH}
+TARGET_JSON=$PWD/${TARGET_ARCH}-blog_os.json
+CC=${TARGET_ARCH}-unknown-elf-gcc
+AR=${TARGET_ARCH}-unknown-elf-ar
+OBJCOPY=${TARGET_ARCH}-unknown-elf-objcopy
+QEMU=qemu-system-${TARGET_ARCH}
+
 
 
 #============================================================================
@@ -206,21 +224,6 @@ rustc --crate-name bitflags $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823
     -C debuginfo=2 \
     -C debug-assertions=on \
     --cfg 'feature="default"' \
-    --out-dir $PWD/outdir \
-    --target $TARGET_JSON \
-    -L $PWD/outdir \
-    --cap-lints allow
-gen_full_rlib
-fi
-
-CNAME=tock_registers
-if ! [[ -f outdir/${CNAME}.o ]]
-then
-rustc --edition=2018 --crate-name tock_registers $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/tock-registers-0.3.0/src/lib.rs \
-    --color always --crate-type lib --emit=metadata,llvm-bc \
-    -C opt-level=1 \
-    -C debuginfo=2 \
-    -C debug-assertions=on \
     --out-dir $PWD/outdir \
     --target $TARGET_JSON \
     -L $PWD/outdir \
@@ -472,7 +475,7 @@ fi
 # Hand generate build.rs
 if ! [[ -f outdir/libatomic_rt.a ]]
 then
-${CC} src/arch/riscv32/compiler_rt.c -march=rv64ia -mabi=lp64 -O3 -c -o outdir/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -c -o outdir/compiler_rt.o
 ${AR} r outdir/libatomic_rt.a outdir/compiler_rt.o
 fi
 
@@ -484,10 +487,10 @@ cat >outdir/sfsimg.S <<EOF
 		.global _user_img_start
 		.global _user_img_end
 _user_img_start:
-		.incbin "../user/img/ucore-riscv64.img"
+		.incbin "${UCORE_USER_IMAGE}"
 _user_img_end:
 EOF
-${CC} outdir/sfsimg.S -march=rv64ia -mabi=lp64 -c -o outdir/sfsimg.o
+${CC} outdir/sfsimg.S ${SFSIMG_CFLAGS} -c -o outdir/sfsimg.o
 ${AR} r outdir/libsfsimg.a outdir/sfsimg.o
 fi
 
@@ -520,7 +523,6 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     --extern riscv=$PWD/outdir/libriscv.rlib \
     --extern simple_filesystem=$PWD/outdir/libsimple_filesystem.rlib \
     --extern spin=$PWD/outdir/libspin.rlib \
-    --extern tock_registers=$PWD/outdir/libtock_registers.rlib \
     --extern ucore_memory=$PWD/outdir/libucore_memory.rlib \
     --extern ucore_process=$PWD/outdir/libucore_process.rlib \
     --extern volatile=$PWD/outdir/libvolatile.rlib \
@@ -551,7 +553,6 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     --extern riscv=$PWD/outdir/libriscv.rlib \
     --extern simple_filesystem=$PWD/outdir/libsimple_filesystem.rlib \
     --extern spin=$PWD/outdir/libspin.rlib \
-    --extern tock_registers=$PWD/outdir/libtock_registers.rlib \
     --extern ucore=$PWD/outdir/libucore.rlib \
     --extern ucore_memory=$PWD/outdir/libucore_memory.rlib \
     --extern ucore_process=$PWD/outdir/libucore_process.rlib \
@@ -564,14 +565,14 @@ if [[ ${K210} = 1 ]]; then
     ${OBJCOPY} outdir/ucore --strip-all -O binary outdir/ucore.bin
     ${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore -d in_asm 2> dump
 else
-    cd ../riscv-pk && mkdir -p build && cd build
+    cd ../riscv-pk
+		rm build -r || true
+		mkdir -p build && cd build
     ../configure \
-        --with-arch=rv64imac \
-        --disable-fp-emulation \
-        --host=riscv64-unknown-elf \
+				${RISCV_PK_CONFIGURE_FLAGS} \
         --with-payload=../../kernel/outdir/ucore
     make
     cp bbl ../../kernel/outdir/kernel.bin
     cd ../../kernel
-    qemu-system-riscv64 -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin
+    ${QEMU} -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin
 fi
