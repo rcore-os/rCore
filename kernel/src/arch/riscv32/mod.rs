@@ -63,6 +63,18 @@ global_asm!("
     .macro XRET\n sret\n .endm
 ");
 
+#[cfg(target_pointer_width = "32")]
+global_asm!("
+    .equ XLENB,     4
+    .equ XLENb,     32
+");
+#[cfg(target_pointer_width = "64")]
+global_asm!("
+    .equ XLENB,     8
+    .equ XLENb,     64
+");
+
+
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/boot_k210.asm"));
 global_asm!(include_str!("boot/entry.asm"));

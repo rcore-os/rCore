@@ -49,6 +49,7 @@ int __atomic_fetch_sub_4(int* ptr, int val) {
     return res;
 }
 
+#ifdef TARGET_IS_64BITS
 typedef unsigned long long u64;
 
 u64 __atomic_load_8(u64 *src) {
@@ -87,3 +88,4 @@ u64 __atomic_fetch_sub_8(u64* ptr, u64 val) {
     __asm__ __volatile__("amoadd.d.rl %0, %1, (%2)" : "=r"(res) : "r"(-val), "r"(ptr) : "memory");
     return res;
 }
+#endif
