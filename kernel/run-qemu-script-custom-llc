@@ -14,6 +14,7 @@ then
 fi
 
 # CONFIGURATIONS
+export LOG=info
 export LLC=$PWD/../tools/llc
 export LLC_ARCH=riscv64
 export RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
@@ -452,7 +453,7 @@ fi
 CNAME=riscv
 if ! [[ -f outdir/${CNAME}.o ]]
 then
-rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/1f59ef7*/src/lib.rs \
+rustc --crate-name riscv ../crate/riscv/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -471,7 +472,7 @@ fi
 # Hand generate build.rs
 if ! [[ -f outdir/libatomic_rt.a ]]
 then
-${CC} src/arch/riscv32/compiler_rt.c -march=rv64ia -mabi=lp64 -c -o outdir/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c -march=rv64ia -mabi=lp64 -O3 -c -o outdir/compiler_rt.o
 ${AR} r outdir/libatomic_rt.a outdir/compiler_rt.o
 fi
 
@@ -496,13 +497,15 @@ fi
 CNAME=ucore
 #if ! [[ -f outdir/${CNAME}.o ]]
 #then
+if [[ ${K210} = 1 ]]; then
+    export UCORE_FEATURE_ARGS='--cfg feature="m_mode" --cfg feature="board_k210"'
+fi
 rustc --edition=2018 --crate-name ucore src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --cfg 'feature="m_mode"' \
-    --cfg 'feature="board_k210"' \
+    ${UCORE_FEATURE_ARGS} \
     --out-dir $PWD/outdir \
     --target $TARGET_JSON \
     -L $PWD/outdir \
@@ -557,22 +560,18 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     -L native=outdir
 #fi
 
-${OBJCOPY} outdir/ucore --strip-all -O binary outdir/ucore.bin
-
-#cd ../riscv-pk && mkdir -p build && cd build
-#
-#../configure \
-#    --with-arch=rv64imac \
-#    --disable-fp-emulation \
-#    --host=riscv64-unknown-elf \
-#    --with-payload=../../kernel/outdir/ucore
-#
-#make
-
-#cp bbl ../../kernel/outdir/kernel.bin
-
-#cd ../../kernel
-
-#qemu-system-riscv64 -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin
-
-${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore -d in_asm 2> dump
+if [[ ${K210} = 1 ]]; then
+    ${OBJCOPY} outdir/ucore --strip-all -O binary outdir/ucore.bin
+    ${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore -d in_asm 2> dump
+else
+    cd ../riscv-pk && mkdir -p build && cd build
+    ../configure \
+        --with-arch=rv64imac \
+        --disable-fp-emulation \
+        --host=riscv64-unknown-elf \
+        --with-payload=../../kernel/outdir/ucore
+    make
+    cp bbl ../../kernel/outdir/kernel.bin
+    cd ../../kernel
+    qemu-system-riscv64 -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin
+fi

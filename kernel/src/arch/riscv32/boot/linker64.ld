@@ -6,7 +6,7 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-BASE_ADDRESS = 0x40000000;
+BASE_ADDRESS = 0xffffffff80020000;
 
 SECTIONS
 {
@@ -16,7 +16,7 @@ SECTIONS
 
     .text : {
         stext = .;
-        KEEP(*(.text.boot))
+        *(.text.entry)
         *(.text .text.*)
         . = ALIGN(4K);
         etext = .;
