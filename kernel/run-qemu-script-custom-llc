@@ -6,8 +6,8 @@
 #   Just run
 #   $ ./run-qemu-script-custom-llc
 #
-# By default riscv32 is built. To build for riscv64,
-#		set the environment variable `RV64` to "1"
+# By default riscv64 is built. To build for riscv32,
+#		set the environment variable `RV32` to "1"
 set -e
 
 if ! [[ -d outdir ]]
@@ -17,10 +17,10 @@ then
   exit 1
 fi
 
-if [[ ${RV64} = 1 ]]; then
+if ! [[ ${RV32} = 1 ]]; then
 	TARGET_ARCH=riscv64
-	LOG=info
-	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -DTARGET_IS_64BITS -O3"
+	export LOG=info
+	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
 	UCORE_USER_IMAGE="../user/img/ucore-riscv64.img"
@@ -475,7 +475,7 @@ fi
 # Hand generate build.rs
 if ! [[ -f outdir/libatomic_rt.a ]]
 then
-${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -c -o outdir/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -O3 -c -o outdir/compiler_rt.o
 ${AR} r outdir/libatomic_rt.a outdir/compiler_rt.o
 fi
 
@@ -501,7 +501,10 @@ CNAME=ucore
 #if ! [[ -f outdir/${CNAME}.o ]]
 #then
 if [[ ${K210} = 1 ]]; then
-    export UCORE_FEATURE_ARGS='--cfg feature="m_mode" --cfg feature="board_k210"'
+    export UCORE_FEATURE_ARGS='--cfg feature="m_mode" --cfg feature="no_mmu" --cfg feature="board_k210"'
+    cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+else
+    cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
 fi
 rustc --edition=2018 --crate-name ucore src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -563,13 +566,12 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
 
 if [[ ${K210} = 1 ]]; then
     ${OBJCOPY} outdir/ucore --strip-all -O binary outdir/ucore.bin
-    ${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore -d in_asm 2> dump
+#    ${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore
 else
     cd ../riscv-pk
 		rm build -r || true
 		mkdir -p build && cd build
-    ../configure \
-				${RISCV_PK_CONFIGURE_FLAGS} \
+    ../configure ${RISCV_PK_CONFIGURE_FLAGS} \
         --with-payload=../../kernel/outdir/ucore
     make
     cp bbl ../../kernel/outdir/kernel.bin
