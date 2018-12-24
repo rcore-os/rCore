@@ -85,16 +85,16 @@ impl PageTable for ActivePageTable {
     #[cfg(target_arch = "riscv64")]
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
         let vaddr = VirtAddr::new(vaddr);
-        let root_table: &RvPageTable = &*ROOT_PAGE_TABLE;
+        let root_table: &RvPageTable = unsafe { &*ROOT_PAGE_TABLE };
 
         let p3_table = if ! root_table[vaddr.p4_index()].flags().contains(EF::VALID) {
             return None
         } else {
             let p3_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.recursive_index,
-                self.recursive_index,
-                self.recursive_index,
-                vaddr.p4_index()).start_address().as_usize() as *mut PageTable) };
+                self.0.recursive_index,
+                self.0.recursive_index,
+                self.0.recursive_index,
+                vaddr.p4_index()).start_address().as_usize() as *mut RvPageTable) };
             p3_table
         };
 
@@ -102,10 +102,10 @@ impl PageTable for ActivePageTable {
             return None
         } else {
             let p2_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.recursive_index,
-                self.recursive_index,
+                self.0.recursive_index,
+                self.0.recursive_index,
                 vaddr.p4_index(),
-                vaddr.p3_index()).start_address().as_usize() as *mut PageTable) };
+                vaddr.p3_index()).start_address().as_usize() as *mut RvPageTable) };
             p2_table
         };
 
@@ -113,10 +113,10 @@ impl PageTable for ActivePageTable {
             return None
         } else {
             let p1_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.recursive_index,
+                self.0.recursive_index,
                 vaddr.p4_index(),
                 vaddr.p3_index(),
-                vaddr.p2_index()).start_address().as_usize() as *mut PageTable) };
+                vaddr.p2_index()).start_address().as_usize() as *mut RvPageTable) };
             p1_table
         };
 
@@ -224,13 +224,13 @@ impl ActivePageTable {
 impl Entry for PageEntry {
     #[cfg(target_arch = "riscv64")]
     fn update(&mut self) {
-        let addr = VirtAddr::new((self as *const _ as usize) << 9);
+        let mut addr: usize = (self as *const _ as usize) << 9;
         if (addr & 0x7000_0000_0000 != 0) {
             addr |= 0xFFFF_0000_0000_0000;
         } else {
             addr &= 0x0000_FFFF_FFFF_FFFF;
         }
-        sfence_vma(0, addr);
+        sfence_vma(0, VirtAddr::new(addr));
     }
     #[cfg(target_arch = "riscv32")]
     fn update(&mut self) {
