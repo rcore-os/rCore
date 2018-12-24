@@ -28,9 +28,9 @@ impl PageTable for ActivePageTable {
     *   the matched PageEntry
     */
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
-        // the flag for the new page entry
+        // use riscv::paging:Mapper::map_to,
+        // map the 4K `page` to the 4K `frame` with `flags`
         let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
-        // here page is for the virtual address while frame is for the physical, both of them is 4096 bytes align
         let page = Page::of_addr(VirtAddr::new(addr));
         let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
@@ -54,22 +54,83 @@ impl PageTable for ActivePageTable {
 
     /*
     * @param:
-    *   addr:input virtual address
+    *   addr: input virtual address
     * @brief:
     *   get the pageEntry of 'addr'
     * @retval:
     *   a mutable PageEntry reference of 'addr'
     */
-    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
-        if unsafe { !(*ROOT_PAGE_TABLE)[addr >> 22].flags().contains(EF::VALID) } {
+    #[cfg(target_arch = "riscv32")]
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
+        let vaddr = VirtAddr::new(vaddr);
+        if unsafe { !(*ROOT_PAGE_TABLE)[vaddr.p2_index()].flags().contains(EF::VALID) } {
             return None;
         }
-        let page = Page::of_addr(VirtAddr::new(addr));
-        // ???
-        let _ = self.0.translate_page(page);
-        let entry_addr = ((addr >> 10) & ((1 << 22) - 4)) | (RECURSIVE_INDEX << 22);
-        unsafe { Some(&mut *(entry_addr as *mut PageEntry)) }
+        let page = Page::of_addr(vaddr);
+        self.0.translate_page(page);
+        let entry_va = VirtAddr::from_page_table_indices(RECURSIVE_INDEX,
+                                                         vaddr.p2_index(),
+                                                         vaddr.p1_index() << 2);
+        unsafe { Some(&mut *(entry_va.as_usize() as *mut PageEntry)) }
     }
+
+    /*
+    * @param:
+    *   addr: input virtual address
+    * @brief:
+    *   get the pageEntry of 'addr'
+    * @retval:
+    *   a mutable PageEntry reference of 'addr'
+    */
+    #[cfg(target_arch = "riscv64")]
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
+        let vaddr = VirtAddr::new(vaddr);
+        let root_table: &RvPageTable = &*ROOT_PAGE_TABLE;
+
+        let p3_table = if ! root_table[vaddr.p4_index()].flags().contains(EF::VALID) {
+            return None
+        } else {
+            let p3_table = unsafe { &mut *(Page::from_page_table_indices(
+                self.recursive_index,
+                self.recursive_index,
+                self.recursive_index,
+                vaddr.p4_index()).start_address().as_usize() as *mut PageTable) };
+            p3_table
+        };
+
+        let p2_table = if ! p3_table[vaddr.p3_index()].flags().contains(EF::VALID) {
+            return None
+        } else {
+            let p2_table = unsafe { &mut *(Page::from_page_table_indices(
+                self.recursive_index,
+                self.recursive_index,
+                vaddr.p4_index(),
+                vaddr.p3_index()).start_address().as_usize() as *mut PageTable) };
+            p2_table
+        };
+
+        let p1_table = if ! p2_table[vaddr.p2_index()].flags().contains(EF::VALID) {
+            return None
+        } else {
+            let p1_table = unsafe { &mut *(Page::from_page_table_indices(
+                self.recursive_index,
+                vaddr.p4_index(),
+                vaddr.p3_index(),
+                vaddr.p2_index()).start_address().as_usize() as *mut PageTable) };
+            p1_table
+        };
+
+        let page = Page::of_addr(vaddr);
+        // ???
+        self.0.translate_page(page);
+        let entry_va = VirtAddr::from_page_table_indices(RECURSIVE_INDEX,
+                                                         vaddr.p4_index(), 
+                                                         vaddr.p3_index(), 
+                                                         vaddr.p2_index(),
+                                                         vaddr.p1_index() << 3);
+        unsafe { Some(&mut *(entry_va.as_usize() as *mut PageEntry)) }
+    }
+
 
     /*
     * @param:
@@ -108,8 +169,15 @@ impl PageTable for ActivePageTable {
 }
 
 // define the ROOT_PAGE_TABLE, and the virtual address of it?
+#[cfg(target_arch = "riscv32")]
 const ROOT_PAGE_TABLE: *mut RvPageTable =
     (((RECURSIVE_INDEX << 10) | (RECURSIVE_INDEX + 1)) << 12) as *mut RvPageTable;
+#[cfg(target_arch = "riscv64")]
+const ROOT_PAGE_TABLE: *mut RvPageTable =
+    ((RECURSIVE_INDEX    << 12 << 9 << 9 << 9) |
+    (RECURSIVE_INDEX     << 12 << 9 << 9) |
+    (RECURSIVE_INDEX     << 12 << 9) |
+    ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
@@ -123,6 +191,21 @@ impl ActivePageTable {
     * @brief:
     *   do something on the target physical frame?
     */
+    #[cfg(target_arch = "riscv64")]
+    fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
+        // Create a temporary page
+        let page = Page::of_addr(VirtAddr::new(0xffffffffcafebabe));
+        assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
+        // Map it to table
+        self.map(page.start_address().as_usize(), frame.start_address().as_usize());
+        // Call f
+        let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
+        f(self, table);
+        // Unmap the page
+        self.unmap(0xffffffffcafebabe);
+    }
+
+    #[cfg(target_arch = "riscv32")]
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
         // Create a temporary page
         let page = Page::of_addr(VirtAddr::new(0xcafebabe));
@@ -136,8 +219,20 @@ impl ActivePageTable {
         self.unmap(0xcafebabe);
     }
 }
+
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
+    #[cfg(target_arch = "riscv64")]
+    fn update(&mut self) {
+        let addr = VirtAddr::new((self as *const _ as usize) << 9);
+        if (addr & 0x7000_0000_0000 != 0) {
+            addr |= 0xFFFF_0000_0000_0000;
+        } else {
+            addr &= 0x0000_FFFF_FFFF_FFFF;
+        }
+        sfence_vma(0, addr);
+    }
+    #[cfg(target_arch = "riscv32")]
     fn update(&mut self) {
         let addr = VirtAddr::new((self as *const _ as usize) << 10);
         sfence_vma(0, addr);
@@ -182,7 +277,7 @@ impl PageEntry {
 
 #[derive(Debug)]
 pub struct InactivePageTable0 {
-    p2_frame: Frame,
+    root_frame: Frame,
 }
 
 impl InactivePageTable for InactivePageTable0 {
@@ -213,28 +308,29 @@ impl InactivePageTable for InactivePageTable0 {
             table.zero();
             table.set_recursive(RECURSIVE_INDEX, frame.clone());
         });
-        InactivePageTable0 { p2_frame: frame }
+        InactivePageTable0 { root_frame: frame }
     }
 
     /*
     * @param:
     *   f: a function to do something with the temporary modified activate page table
     * @brief:
-    *   temporarily map the inactive pagetable as an active p2page and apply f on the temporary modified active page table
+    *   temporarily make current `active_table`'s recursive entry point to 
+    *    `this` inactive table, so we can modify this inactive page table.
     */
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
-        active_table().with_temporary_map(&satp::read().frame(), |active_table, p2_table: &mut RvPageTable| {
-            let backup = p2_table[RECURSIVE_INDEX].clone();
+        active_table().with_temporary_map(&satp::read().frame(), |active_table, root_table: &mut RvPageTable| {
+            let backup = root_table[RECURSIVE_INDEX].clone();
 
             // overwrite recursive mapping
-            p2_table[RECURSIVE_INDEX].set(self.p2_frame.clone(), EF::VALID);
+            root_table[RECURSIVE_INDEX].set(self.root_frame.clone(), EF::VALID);
             sfence_vma_all();
 
             // execute f in the new context
             f(active_table);
 
             // restore recursive mapping to original p2 table
-            p2_table[RECURSIVE_INDEX] = backup;
+            root_table[RECURSIVE_INDEX] = backup;
             sfence_vma_all();
         });
     }
@@ -245,7 +341,7 @@ impl InactivePageTable for InactivePageTable0 {
     */
     unsafe fn activate(&self) {
         let old_frame = satp::read().frame();
-        let new_frame = self.p2_frame.clone();
+        let new_frame = self.root_frame.clone();
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(SATP_MODE, 0, new_frame);
@@ -263,7 +359,7 @@ impl InactivePageTable for InactivePageTable0 {
     */
     unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         let old_frame = satp::read().frame();
-        let new_frame = self.p2_frame.clone();
+        let new_frame = self.root_frame.clone();
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(SATP_MODE, 0, new_frame);
@@ -284,8 +380,13 @@ impl InactivePageTable for InactivePageTable0 {
     * @retval:
     *   self token
     */
+    #[cfg(target_arch = "riscv32")]
     fn token(&self) -> usize {
-        self.p2_frame.number() | (1 << 31) // as satp
+        self.root_frame.number() | (1 << 31) // as satp
+    }
+    #[cfg(target_arch = "riscv64")]
+    fn token(&self) -> usize {
+        0 // TODO
     }
 
     fn alloc_frame() -> Option<usize> {
@@ -300,13 +401,14 @@ impl InactivePageTable for InactivePageTable0 {
 #[cfg(target_arch = "riscv32")]
 const SATP_MODE: satp::Mode = satp::Mode::Sv32;
 #[cfg(target_arch = "riscv64")]
-const SATP_MODE: satp::Mode = satp::Mode::Sv39;
+const SATP_MODE: satp::Mode = satp::Mode::Sv48;
 
 impl InactivePageTable0 {
     /*
     * @brief:
     *   map the kernel code memory address (p2 page table) in the new inactive page table according the current active page table
     */
+    #[cfg(target_arch = "riscv32")]
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
@@ -326,12 +428,16 @@ impl InactivePageTable0 {
             table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
         });
     }
+    #[cfg(target_arch = "riscv64")]
+    fn map_kernel(&mut self) {
+        // TODO
+    }
 }
 
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p2_frame.start_address().as_usize());
+        Self::dealloc_frame(self.root_frame.start_address().as_usize());
     }
 }
 

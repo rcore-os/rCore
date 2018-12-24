@@ -65,11 +65,27 @@ fn init_frame_allocator() {
 }
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
-#[cfg(not(feature = "no_mmu"))]
+#[cfg(all(target_arch = "riscv32", not(feature = "no_mmu")))]
 fn remap_the_kernel() {
     let mut ms = MemorySet::new_bare();
     #[cfg(feature = "no_bbl")]
     ms.push(MemoryArea::new_identity(0x10000000, 0x10000008, MemoryAttr::default(), "serial"));
+    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
+    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
+    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
+    ms.push(MemoryArea::new_identity(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), "stack"));
+    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
+    unsafe { ms.activate(); }
+    unsafe { SATP = ms.token(); }
+    mem::forget(ms);
+    info!("kernel remap end");
+}
+
+#[cfg(all(target_arch = "riscv64", not(feature = "no_mmu")))]
+fn remap_the_kernel() {
+    let mut ms = MemorySet::new_bare();
+    #[cfg(feature = "no_bbl")]
+    ms.push(MemoryArea::new_identity(0x0000_0000_1000_0000, 0x0000_0000_1000_0008, MemoryAttr::default(), "serial"));
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));

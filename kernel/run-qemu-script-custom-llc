@@ -25,7 +25,6 @@ if ! [[ ${RV32} = 1 ]]; then
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
 	UCORE_USER_IMAGE="../user/img/ucore-riscv64.img"
 else
-	exit 1
 	TARGET_ARCH=riscv32
 	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
 	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
