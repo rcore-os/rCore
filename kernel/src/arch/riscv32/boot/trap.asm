@@ -8,6 +8,7 @@
 #   XLENB
 #   LOAD
 #   STORE
+#   TEST_BACK_TO_KERNEL
 
 .macro SAVE_ALL
     # If coming from userspace, preserve the user stack pointer and load
@@ -72,8 +73,8 @@ _save_context:
 .macro RESTORE_ALL
     LOAD s1, 32             # s1 = sstatus
     LOAD s2, 33             # s2 = sepc
-    andi s0, s1, 1 << 8
-    bnez s0, _restore_context   # back to S-mode? (sstatus.SPP = 1)
+    TEST_BACK_TO_KERNEL
+    bnez s0, _restore_context   # s0 = back to kernel?
 _save_kernel_sp:
     addi s0, sp, 36*XLENB
     csrw (xscratch), s0         # sscratch = kernel-sp

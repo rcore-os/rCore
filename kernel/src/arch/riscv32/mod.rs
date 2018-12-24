@@ -52,6 +52,10 @@ global_asm!("
     .equ xcause,    0x342
     .equ xtval,     0x343
     .macro XRET\n mret\n .endm
+    .macro TEST_BACK_TO_KERNEL  // s0 == back to kernel?
+        li   s3, 3 << 11
+        and  s0, s1, s3         // mstatus.MPP = 3
+    .endm
 ");
 #[cfg(not(feature = "m_mode"))]
 global_asm!("
@@ -61,6 +65,10 @@ global_asm!("
     .equ xcause,    0x142
     .equ xtval,     0x143
     .macro XRET\n sret\n .endm
+    .macro TEST_BACK_TO_KERNEL
+        andi s0, s1, 1 << 8     // sstatus.SPP = 1
+    .endm
+
 ");
 
 #[cfg(target_pointer_width = "32")]
