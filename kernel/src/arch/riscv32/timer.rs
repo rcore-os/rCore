@@ -37,7 +37,8 @@ pub fn init() {
     unsafe { mie::set_mtimer(); }
     #[cfg(not(feature = "m_mode"))]
     unsafe { sie::set_stimer(); }
-
+    #[cfg(feature = "board_k210")]
+    unsafe { assert_eq!(clint_timer_init(), 0); }
     set_next();
     info!("timer: init end");
 }
@@ -46,22 +47,23 @@ pub fn init() {
 * @brief: 
 *   set the next timer interrupt
 */
+#[cfg(not(feature = "board_k210"))]
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;
-    set_timer(get_cycle() + timebase);
+    sbi::set_timer(get_cycle() + timebase);
 }
 
-/*
-* @brief: 
-*   set time for timer interrupt
-*/
-fn set_timer(t: u64) {
-    #[cfg(feature = "no_bbl")]
+#[cfg(feature = "board_k210")]
+pub fn set_next() {
     unsafe {
-        asm!("csrw 0x321, $0; csrw 0x322, $1"
-        : : "r"(t as u32), "r"((t >> 32) as u32) : : "volatile");
+        assert_eq!(clint_timer_start(10, true), 0);
     }
-    #[cfg(not(feature = "no_bbl"))]
-    sbi::set_timer(t);
+}
+
+#[link(name = "kendryte")]
+#[cfg(feature = "board_k210")]
+extern "C" {
+    fn clint_timer_init() -> i32;
+    fn clint_timer_start(interval_ms: u64, single_shot: bool) -> i32;
 }

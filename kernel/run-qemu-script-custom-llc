@@ -536,6 +536,9 @@ gen_full_rlib
 
 #if ! [[ -f outdir/ucore ]]
 #then
+if [[ ${K210} = 1 ]]; then
+    export LINK_K210='-L native=kendryte'
+fi
 rustc --edition=2018 --crate-name ucore src/main.rs \
     --color always --crate-type bin --emit=link \
     -C opt-level=1 \
@@ -560,7 +563,7 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     --extern ucore_process=$PWD/outdir/libucore_process.rlib \
     --extern volatile=$PWD/outdir/libvolatile.rlib \
     --extern xmas_elf=$PWD/outdir/libxmas_elf.rlib \
-    -L native=outdir
+    -L native=outdir ${LINK_K210}
 #fi
 
 if [[ ${K210} = 1 ]]; then
