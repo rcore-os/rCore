@@ -1,14 +1,14 @@
     .section .text.boot
 boot:
-    //lui x1, 0x40000
-    //jalr x0, x1, 8
-
 	csrwi mie, 0
 	csrwi mip, 0
     csrwi mscratch, 0
 	csrwi medeleg, 0
 	csrwi mideleg, 0
-    csrwi mstatus, 0
+
+    // enable float unit
+	li t0, 0x00006000 // MSTATUS_FS
+    csrw mstatus, t0
 
     // uart init
     lui x1, 0x38000

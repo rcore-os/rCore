@@ -67,16 +67,28 @@ global_asm!("
 global_asm!("
     .equ XLENB,     4
     .equ XLENb,     32
+    .macro LOAD a1, a2
+        lw \\a1, \\a2*XLENB(sp)
+    .endm
+    .macro STORE a1, a2
+        sw \\a1, \\a2*XLENB(sp)
+    .endm
 ");
 #[cfg(target_pointer_width = "64")]
 global_asm!("
     .equ XLENB,     8
     .equ XLENb,     64
+    .macro LOAD a1, a2
+        ld \\a1, \\a2*XLENB(sp)
+    .endm
+    .macro STORE a1, a2
+        sd \\a1, \\a2*XLENB(sp)
+    .endm
 ");
 
 
 #[cfg(feature = "board_k210")]
-global_asm!(include_str!("boot/boot_k210.asm"));
+global_asm!(include_str!("board/k210/boot.asm"));
 global_asm!(include_str!("boot/entry.asm"));
 global_asm!(include_str!("boot/trap.asm"));
 
