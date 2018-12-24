@@ -50,7 +50,7 @@ gen_full_rlib() {
   cd outdir
   for X in ${CNAME}.*bc
   do
-    ${LLC} -march=${LLC_ARCH} -filetype=obj ${X}
+    ${LLC} -march=${LLC_ARCH} -filetype=obj -mattr=+m,+c ${X}
   done
   for X in ${CNAME}.*o
   do
