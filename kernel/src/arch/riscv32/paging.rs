@@ -1,4 +1,4 @@
-use crate::consts::{KERNEL_P2_INDEX, RECURSIVE_INDEX};
+use crate::consts::RECURSIVE_INDEX;
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 use riscv::addr::*;
@@ -10,6 +10,8 @@ use ucore_memory::memory_set::*;
 use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use log::*;
+#[cfg(target_arch = "riscv32")]
+use crate::consts::KERNEL_P2_INDEX;
 
 pub struct ActivePageTable(RecursivePageTable<'static>);
 
@@ -35,6 +37,7 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
+        info!("ActivePageTable: calling RecursivePageTable::map_to, va={:x}, pa={:x}, flags={:?}", page.start_address().as_usize(), frame.start_address().as_usize(), flags);
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap().flush();
         self.get_entry(addr).expect("fail to get entry")
@@ -174,14 +177,19 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
     (((RECURSIVE_INDEX << 10) | (RECURSIVE_INDEX + 1)) << 12) as *mut RvPageTable;
 #[cfg(target_arch = "riscv64")]
 const ROOT_PAGE_TABLE: *mut RvPageTable =
-    ((RECURSIVE_INDEX    << 12 << 9 << 9 << 9) |
-    (RECURSIVE_INDEX     << 12 << 9 << 9) |
-    (RECURSIVE_INDEX     << 12 << 9) |
-    ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
+    ((0xFFFF_0000_0000_0000) |
+     (RECURSIVE_INDEX     << 12 << 9 << 9 << 9) |
+     (RECURSIVE_INDEX     << 12 << 9 << 9) |
+     (RECURSIVE_INDEX     << 12 << 9) |
+     ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap())
+        // TODO: delete debug code
+        let rv = ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap());
+        info!("ROOT_PAGE_TABLE: {:x}, ActivePageTable::new.0.pagetable: {:x}",
+              ROOT_PAGE_TABLE as usize, unsafe { rv.0.root_table as *const _ as usize });
+        rv
     }
 
     /*
@@ -194,15 +202,37 @@ impl ActivePageTable {
     #[cfg(target_arch = "riscv64")]
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
         // Create a temporary page
-        let page = Page::of_addr(VirtAddr::new(0xffffffffcafebabe));
+        info!("enter with_temporary_map");
+        let page = Page::of_addr(VirtAddr::new(0xffffdeadcafebabe));
+
+        info!("translate page begin, self at {:x}, page: {:x} ({:o}, {:o}, {:o}, {:o})",
+               (self.0.root_table as *const _ as usize),
+               page.start_address().as_usize(), 
+               page.p4_index(), 
+               page.p3_index(), 
+               page.p2_index(), 
+               page.p1_index() );
+        info!("self info: recursive_index={:x}",
+               self.0.recursive_index);
+        info!("root_table[recursive_index]={:?}",
+               self.0.root_table[self.0.recursive_index]);
+        info!("root_table[recursive_index+1]={:?}",
+               self.0.root_table[self.0.recursive_index+1]);
+
         assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
+
+        info!("enter with_temporary_map check temporary mapped success");
         // Map it to table
         self.map(page.start_address().as_usize(), frame.start_address().as_usize());
+        // TODO: delete debug code
+        let t: usize = 0xffffdeadcafebabe;
+        info!("with_temporary_map: {:?}->{:?}, translate result {:?}", frame.start_address(), t, self.0.translate_page(page));
         // Call f
         let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
         f(self, table);
         // Unmap the page
-        self.unmap(0xffffffffcafebabe);
+        self.unmap(0xffffdeadcafebabe);
+        info!("leaving with_temporary_map");
     }
 
     #[cfg(target_arch = "riscv32")]
@@ -302,12 +332,19 @@ impl InactivePageTable for InactivePageTable0 {
     *   the inactive page table
     */
     fn new_bare() -> Self {
+        info!("InactivePageTable0:new bare begin");
         let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target)))
             .expect("failed to allocate frame");
-        active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
+        info!("new bare before with_temporary_map");
+        // TODO: delete debug code
+        let mut at = active_table();
+        info!("got active table");
+        at.with_temporary_map(&frame, |_, table: &mut RvPageTable| {
+            info!("enter closure of with_temporary_map");
             table.zero();
             table.set_recursive(RECURSIVE_INDEX, frame.clone());
         });
+        info!("new bare after with_temporary_map");
         InactivePageTable0 { root_frame: frame }
     }
 

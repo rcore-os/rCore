@@ -298,9 +298,16 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     pub fn new_bare() -> Self {
+        info!("new bare");
+        // TODO
+        info!("Vec::new begin");
+        let a = Vec::<MemoryArea>::new();
+        info!("Vec::new finish");
+        let pt = T::new_bare();
+        info!("T::new bare finish");
         MemorySet {
-            areas: Vec::<MemoryArea>::new(),
-            page_table: T::new_bare(),
+            areas: a, 
+            page_table: pt, 
         }
     }
     /*

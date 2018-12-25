@@ -23,8 +23,12 @@ pub type MemorySet = ucore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 #[cfg(target_arch = "x86_64")]
 pub type FrameAlloc = BitAlloc64K;
 
-// RISCV only have 8M memory
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+// RISCV32 has 8M memory
+#[cfg(target_arch = "riscv32")]
+pub type FrameAlloc = BitAlloc4K;
+
+// RISCV64 has 8M memory.
+#[cfg(target_arch = "riscv64")]
 pub type FrameAlloc = BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory
@@ -64,10 +68,17 @@ pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo:
 */
 pub fn alloc_frame() -> Option<usize> {
     // get the real address of the alloc frame
-    let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+    // TODO: delete debug code
+    info!("alloc_frame");
+    let mut ret = FRAME_ALLOCATOR.lock();
+    info!("alloc_frame _2");
+    let ret = ret.alloc();
+    info!("alloc_frame _3");
+    let ret = ret.map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
     trace!("Allocate frame: {:x?}", ret);
+    ret
     //do we need : unsafe { ACTIVE_TABLE_SWAP.force_unlock(); } ???
-    Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().expect("fail to swap out page")))
+    // Some(ret.unwrap_or_else(|| active_table_swap().swap_out_any::<InactivePageTable0>().ok().expect("fail to swap out page")))
 }
 
 pub fn dealloc_frame(target: usize) {
@@ -107,7 +118,7 @@ impl Drop for KernelStack {
 */
 #[cfg(not(feature = "no_mmu"))]
 pub fn page_fault_handler(addr: usize) -> bool {
-    info!("start handling swap in/out page fault");
+    info!("start handling swap in/out page fault, badva={:x}", addr);
     //unsafe { ACTIVE_TABLE_SWAP.force_unlock(); }
 
     /*LAB3 EXERCISE 1: YOUR STUDENT NUMBER

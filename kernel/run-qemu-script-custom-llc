@@ -19,7 +19,7 @@ fi
 
 if ! [[ ${RV32} = 1 ]]; then
 	TARGET_ARCH=riscv64
-	export LOG=info
+	export LOG=trace
 	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
@@ -466,6 +466,7 @@ rustc --crate-name riscv ../crate/riscv/src/lib.rs \
     --extern bare_metal=$PWD/outdir/libbare_metal.rlib \
     --extern bit_field=$PWD/outdir/libbit_field.rlib \
     --extern bitflags=$PWD/outdir/libbitflags.rlib \
+    --extern log=$PWD/outdir/liblog.rlib \
     --cap-lints allow
 gen_full_rlib
 fi
@@ -575,7 +576,7 @@ else
 		mkdir -p build && cd build
     ../configure ${RISCV_PK_CONFIGURE_FLAGS} \
         --with-payload=../../kernel/outdir/ucore
-    make
+    make -j32
     cp bbl ../../kernel/outdir/kernel.bin
     cd ../../kernel
     ${QEMU} -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin

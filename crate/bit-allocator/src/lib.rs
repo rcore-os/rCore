@@ -77,6 +77,7 @@ impl<T: BitAlloc> BitAlloc for BitAllocCascade16<T> {
 impl<T: BitAlloc> BitAllocCascade16<T> {
     fn for_range(&mut self, range: Range<usize>, f: impl Fn(&mut T, Range<usize>)) {
         let Range { start, end } = range;
+        assert!(start <= end);
         assert!(end <= Self::CAP);
         for i in start / T::CAP..=(end - 1) / T::CAP {
             let begin = if start / T::CAP == i { start % T::CAP } else { 0 };
