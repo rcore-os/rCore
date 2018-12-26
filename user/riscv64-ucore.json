@@ -1,0 +1,35 @@
+{
+  "llvm-target": "riscv64",
+  "data-layout": "e-m:e-p:64:64-i64:64-n64-S128",
+  "target-endian": "little",
+  "target-pointer-width": "64",
+  "target-c-int-width": "32",
+  "os": "none",
+  "arch": "riscv64",
+  "cpu": "generic-rv64",
+  "features": "",
+  "max-atomic-width": "32",
+  "linker": "rust-lld",
+  "linker-flavor": "ld.lld",
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/riscv32/boot/linker64.ld"
+    ]
+  },
+  "executables": true,
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "abi-blacklist": [
+    "cdecl",
+    "stdcall",
+    "fastcall",
+    "vectorcall",
+    "thiscall",
+    "aapcs",
+    "win64",
+    "sysv64",
+    "ptx-kernel",
+    "msp430-interrupt",
+    "x86-interrupt"
+  ]
+}

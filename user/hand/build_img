@@ -1,0 +1,14 @@
+#!/bin/bash
+ARCH=riscv64
+
+CC=${ARCH}-unknown-elf-gcc
+CFLAGS="-nostartfiles -nostdlib -nodefaultlibs -o output/a.out -T ${ARCH}.ld -fno-builtin"
+if ! [[ -d output ]]
+then
+	mkdir output
+fi
+
+#CFLAGS="${CFLAGS} -DRISCV_QEMU"
+
+${CC} ${CFLAGS} test.c
+mksfs zip output ./user-${ARCH}.img

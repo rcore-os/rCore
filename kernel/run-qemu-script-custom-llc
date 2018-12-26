@@ -22,15 +22,14 @@ if [[ ${RV32} = 1 ]]; then
 	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
 	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv32imac --disable-fp-emulation --host=riscv32-unknown-elf"
-	UCORE_USER_IMAGE="../user/img/ucore-rv32.img"
 else
 	TARGET_ARCH=riscv64
-	export LOG=warn
 	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
-	UCORE_USER_IMAGE="../user/img/ucore-riscv64.img"
 fi
+UCORE_USER_IMAGE="../user/hand/user-${TARGET_ARCH}.img"
+# UCORE_USER_IMAGE="../user/build/user-${TARGET_ARCH}.img"
 LLC=llc
 RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
 CARGO_PATH=~/.cargo
@@ -490,7 +489,11 @@ _user_img_start:
 		.incbin "${UCORE_USER_IMAGE}"
 _user_img_end:
 EOF
-${CC} outdir/sfsimg.S ${SFSIMG_CFLAGS} -c -o outdir/sfsimg.o
+if ! ${CC} outdir/sfsimg.S ${SFSIMG_CFLAGS} -c -o outdir/sfsimg.o
+then
+	echo "You should manually create sfs image!"
+	exit 1
+fi
 ${AR} r outdir/libsfsimg.a outdir/sfsimg.o
 fi
 
@@ -540,6 +543,7 @@ gen_full_rlib
 if [[ ${K210} = 1 ]]; then
     export LINK_K210='-L native=kendryte'
 fi
+echo "rustc crate-type bin to ${TARGET_JSON}"
 rustc --edition=2018 --crate-name ucore src/main.rs \
     --color always --crate-type bin --emit=link \
     -C opt-level=1 \

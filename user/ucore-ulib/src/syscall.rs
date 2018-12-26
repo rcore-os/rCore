@@ -45,7 +45,11 @@ impl fmt::Write for SysPutc {
 
 #[inline(always)]
 fn sys_call(id: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32 {
+    #[cfg(target_arch = "riscv64")]
+    let ret: i32 = 0;
+    #[cfg(target_arch = "riscv32")]
     let ret: i32;
+
     unsafe {
         #[cfg(target_arch = "riscv32")]
             asm!("ecall"

@@ -12,7 +12,7 @@ use crate::thread;
 use crate::util;
 
 /// System call dispatcher
-pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
+pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let ret = match id {
         // file
         100 => sys_open(args[0] as *const u8, args[1]),
@@ -28,9 +28,9 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> i32 {
         130 => sys_dup(args[0], args[1]),
 
         // process
-        001 => sys_exit(args[0] as i32),
+        001 => sys_exit(args[0] as isize),
         002 => sys_fork(tf),
-        003 => sys_wait(args[0], args[1] as *mut i32),
+        003 => sys_wait(args[0], args[1] as *mut isize),
         004 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
 //        005 => sys_clone(),
         010 => sys_yield(),
@@ -62,7 +62,7 @@ fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = get_file(fd)?.lock().read(slice)?;
-    Ok(len as i32)
+    Ok(len as isize)
 }
 
 fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
@@ -70,7 +70,7 @@ fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = get_file(fd)?.lock().write(slice)?;
-    Ok(len as i32)
+    Ok(len as isize)
 }
 
 fn sys_open(path: *const u8, flags: usize) -> SysResult {
@@ -89,7 +89,7 @@ fn sys_open(path: *const u8, flags: usize) -> SysResult {
     };
     let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
     process().files.insert(fd, Arc::new(Mutex::new(file)));
-    Ok(fd as i32)
+    Ok(fd as isize)
 }
 
 fn sys_close(fd: usize) -> SysResult {
@@ -146,12 +146,12 @@ fn sys_fork(tf: &TrapFrame) -> SysResult {
     let pid = processor().manager().add(context, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
     info!("fork: {} -> {}", thread::current().id(), pid);
-    Ok(pid as i32)
+    Ok(pid as isize)
 }
 
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
-fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
+fn sys_wait(pid: usize, code: *mut isize) -> SysResult {
     // TODO: check ptr
     loop {
         use alloc::vec;
@@ -166,7 +166,7 @@ fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
                     if !code.is_null() {
-                        unsafe { code.write(exit_code as i32); }
+                        unsafe { code.write(exit_code as isize); }
                     }
                     processor().manager().remove(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
@@ -240,11 +240,11 @@ fn sys_kill(pid: usize) -> SysResult {
 
 /// Get the current process id
 fn sys_getpid() -> SysResult {
-    Ok(thread::current().id() as i32)
+    Ok(thread::current().id() as isize)
 }
 
 /// Exit the current process
-fn sys_exit(exit_code: i32) -> SysResult {
+fn sys_exit(exit_code: isize) -> SysResult {
     let pid = thread::current().id();
     info!("exit: {}, code: {}", pid, exit_code);
     processor().manager().exit(pid, exit_code as usize);
@@ -263,7 +263,7 @@ fn sys_sleep(time: usize) -> SysResult {
 }
 
 fn sys_get_time() -> SysResult {
-    unsafe { Ok(crate::trap::TICK as i32) }
+    unsafe { Ok(crate::trap::TICK as isize) }
 }
 
 fn sys_lab6_set_priority(priority: usize) -> SysResult {
@@ -281,9 +281,9 @@ fn get_file(fd: usize) -> Result<&'static Arc<Mutex<File>>, SysError> {
     process().files.get(&fd).ok_or(SysError::InvalidFile)
 }
 
-pub type SysResult = Result<i32, SysError>;
+pub type SysResult = Result<isize, SysError>;
 
-#[repr(i32)]
+#[repr(isize)]
 #[derive(Debug)]
 pub enum SysError {
     VfsError,

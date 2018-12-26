@@ -24,7 +24,8 @@ pub fn init() {
     extern fn idle(_arg: usize) -> ! {
         loop { cpu::halt(); }
     }
-    for i in 0..4 {
+    // TODO: make #idle_thr equal to #cpu
+    for i in 0..1 {
         manager.add(ContextImpl::new_kernel(idle, i), 0);
     }
     crate::shell::run_user_shell();
