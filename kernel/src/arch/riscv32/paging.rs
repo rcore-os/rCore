@@ -420,8 +420,12 @@ impl InactivePageTable for InactivePageTable0 {
     }
     #[cfg(target_arch = "riscv64")]
     fn token(&self) -> usize {
-        unimplemented!();
-        0 // TODO
+        use bit_field::BitField;
+        info!("{}", self.root_frame.number());
+        let mut satp = self.root_frame.number();
+        satp.set_bits(44..60, 0);  // AS is 0
+        satp.set_bits(60..64, satp::Mode::Sv48 as usize);  // Mode is Sv48
+        satp
     }
 
     fn alloc_frame() -> Option<usize> {
