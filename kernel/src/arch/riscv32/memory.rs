@@ -3,7 +3,7 @@ use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 use log::*;
 use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR};
-use crate::consts::{MEMORY_OFFSET, MEMORY_END};
+use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERN_VA_BASE};
 use riscv::register::satp;
 
 #[cfg(feature = "no_mmu")]
@@ -48,7 +48,7 @@ fn init_frame_allocator() {
 
     // TODO: delete debug code
     let mut ba = FRAME_ALLOCATOR.lock();
-    let range = to_range((end as usize) - 0xFFFF_FFFF_0000_0000 + PAGE_SIZE, MEMORY_END);
+    let range = to_range((end as usize) - KERN_VA_BASE + PAGE_SIZE, MEMORY_END);
     info!("FrameAllocator insert {} .. {}", range.start, range.end);
     ba.insert(range);
     info!("FrameAllocator init end");

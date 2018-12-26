@@ -181,7 +181,7 @@ ifeq ($(arch), riscv32)
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
 endif
-	@CC=$(cc) LOG=trace cargo xbuild $(build_args)
+	@CC=$(cc) cargo xbuild $(build_args)
 endif
 
 

@@ -17,19 +17,19 @@ then
   exit 1
 fi
 
-if ! [[ ${RV32} = 1 ]]; then
+if [[ ${RV32} = 1 ]]; then
+	TARGET_ARCH=riscv32
+	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
+	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
+	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv32imac --disable-fp-emulation --host=riscv32-unknown-elf"
+	UCORE_USER_IMAGE="../user/img/ucore-rv32.img"
+else
 	TARGET_ARCH=riscv64
 	export LOG=trace
 	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
 	UCORE_USER_IMAGE="../user/img/ucore-riscv64.img"
-else
-	TARGET_ARCH=riscv32
-	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
-	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
-	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv32imac --disable-fp-emulation --host=riscv32-unknown-elf"
-	UCORE_USER_IMAGE="../user/img/ucore-rv32.img"
 fi
 LLC=llc
 RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
