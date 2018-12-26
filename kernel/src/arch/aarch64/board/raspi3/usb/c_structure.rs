@@ -1,10 +1,10 @@
-use super::c_structure_usb_1_11::*;
-use super::c_structure_usb_2_0::*;
-pub const MaximumDevices: i32 = 32;
-pub const MaxChildrenPerDevice: i32 = 10;
-pub const MaxInterfacesPerDevice: i32 = 8;
-pub const MaxEndpointsPerDevice: i32 = 16;
-pub const MaxHIDPerDevice: i32 = 4;
+pub use super::c_structure_usb_1_11::*;
+pub use super::c_structure_usb_2_0::*;
+pub const MaximumDevices: u32 = 32;
+pub const MaxChildrenPerDevice: u32 = 10;
+pub const MaxInterfacesPerDevice: u32 = 8;
+pub const MaxEndpointsPerDevice: u32 = 16;
+pub const MaxHIDPerDevice: u32 = 4;
 #[derive(PartialEq)]
 #[repr(i32)]
 pub enum RESULT {
@@ -65,7 +65,34 @@ pub struct UsbPipe {
     unsigned lowSpeedNodePort : 7;									// @18-24		In low speed transfers it is port device is on closest parent high speed hub
     unsigned lowSpeedNodePoint : 7;									// @25-31	In low speed transfers it is closest parent high speed hub
 */
-    rawfield : u32,
+    pub rawfield : u32,
+}
+impl UsbPipe {
+    const offset_MaxSize			:u32 =0;
+    const offset_Speed				:u32 =2;
+    const offset_EndPoint			:u32 =4;
+    const offset_Number				:u32 =8;
+    const offset_reserved			:u32 =16;
+    const offset_lowSpeedNodePort	:u32 =18;
+    const offset_lowSpeedNodePoint	:u32 =25;
+    pub fn getMaxSize(&self) -> UsbPacketSize {
+        use self::UsbPacketSize::*;
+        match (self.rawfield>>UsbPipe::offset_MaxSize) & 0b11 {
+            0 => Bits8,
+            1 => Bits16,
+            2 => Bits32,
+            _ => Bits64,
+        }
+    }
+    pub fn getSpeed(&self) -> UsbSpeed {
+        use self::UsbSpeed::*;
+        match (self.rawfield>>UsbPipe::offset_Speed) & 0b11 {
+            0 => USB_SPEED_HIGH,
+            1 => USB_SPEED_FULL,
+            _ => USB_SPEED_LOW
+        }
+    }
+    pub fn getNumber(&self) -> u32 {(self.rawfield>>UsbPipe::offset_Number) & 0xFF} //8 bit
 }
 /*--------------------------------------------------------------------------}
 { 			USB pipe control used mainly by internal routines				}
@@ -79,16 +106,16 @@ pub struct UsbPipeControl {
     unsigned Direction : 1;											// @24		Direction  1=IN, 0=OUT
     unsigned _reserved1 : 7;										// @25-31	
 */
-    rawfield : u32,
+    pub rawfield : u32,
 }
 /*--------------------------------------------------------------------------}
 { 	USB parent used mainly by internal routines (details of parent hub)		}
 {--------------------------------------------------------------------------*/
 #[repr(C, packed)]
 pub struct UsbParent {
-    Number : u8,											// @0	Unique device number of our parent sometimes called address or id
-    PortNumber : u8,										// @8	This is the port we are connected to on our parent hub
-    reserved : u16,											// @16  Reserved 16 bits
+    pub Number : u8,											// @0	Unique device number of our parent sometimes called address or id
+    pub PortNumber : u8,										// @8	This is the port we are connected to on our parent hub
+    pub reserved : u16,											// @16  Reserved 16 bits
 }
 /*--------------------------------------------------------------------------}
 { 			USB config control used mainly by internal routines				}
@@ -101,39 +128,44 @@ pub struct UsbConfigControl {
     enum UsbDeviceStatus Status : 8;								// @16 Device enumeration status .. USB_ATTACHED, USB_POWERED, USB_ADDRESSED, etc
     unsigned reserved : 8;											// @24-31
 */
-    rawfield : u32,
+    pub rawfield : u32,
 }
 /*--------------------------------------------------------------------------}
 {  Our structure that hold details about any USB device we have detected    }
 {--------------------------------------------------------------------------*/
 #[repr(C)]
-union UsbDevice_Payload {					// It can only be any of the different payloads
-    HubPayload: *mut HubDevice,				// If this is a USB gateway node of a hub this pointer will be set to the hub data which is about the ports
-    HidPayload: *mut HidDevice,				// If this node has a HID function this pointer will be to the HID payload
-    MassPayload: *mut MassStorageDevice,	// If this node has a MASS STORAGE function this pointer will be to the Mass Storage payload
+pub union UsbDevice_Payload {					// It can only be any of the different payloads
+    pub HubPayload: *mut HubDevice,				// If this is a USB gateway node of a hub this pointer will be set to the hub data which is about the ports
+    pub HidPayload: *mut HidDevice,				// If this node has a HID function this pointer will be to the HID payload
+    pub MassPayload: *mut MassStorageDevice,	// If this node has a MASS STORAGE function this pointer will be to the Mass Storage payload
 }
 #[repr(C)]
 pub struct UsbDevice {
-    ParentHub: UsbParent,						// Details of our parent hub
-    Pipe0: UsbPipe,								// Usb device pipe AKA pipe0	
-    PipeCtrl0: UsbPipeControl,					// Usb device pipe control AKA pipectrl0
-    Config: UsbConfigControl,					// Usb config control
+    pub ParentHub: UsbParent,						// Details of our parent hub
+    pub Pipe0: UsbPipe,								// Usb device pipe AKA pipe0	
+    pub PipeCtrl0: UsbPipeControl,					// Usb device pipe control AKA pipectrl0
+    pub Config: UsbConfigControl,					// Usb config control
     #[repr(align(4))]
-    MaxInterface: u8,							// Maxiumum interface in array (varies with config and usually a lot less than the max array size) 
+    pub MaxInterface: u8,							// Maxiumum interface in array (varies with config and usually a lot less than the max array size) 
     #[repr(align(4))]
-    Interfaces: [UsbInterfaceDescriptor; MaxInterfacesPerDevice as usize], // These are available interfaces on this device
+    pub Interfaces: [UsbInterfaceDescriptor; MaxInterfacesPerDevice as usize], // These are available interfaces on this device
     #[repr(align(4))]
-    Endpoints: [[UsbEndpointDescriptor; MaxInterfacesPerDevice as usize]; MaxEndpointsPerDevice as usize], // These are available endpoints on this device
+    pub Endpoints: [[UsbEndpointDescriptor; MaxInterfacesPerDevice as usize]; MaxEndpointsPerDevice as usize], // These are available endpoints on this device
     #[repr(align(4))]
-    Descriptor: usb_device_descriptor,			// Device descriptor it's accessed a bit so we have a copy to save USB bus ... align it for ARM7/8
-    PayLoadId: PayLoadType,						// Payload type being carried
-    Payload: UsbDevice_Payload,
+    pub Descriptor: usb_device_descriptor,			// Device descriptor it's accessed a bit so we have a copy to save USB bus ... align it for ARM7/8
+    pub PayLoadId: PayLoadType,						// Payload type being carried
+    pub Payload: UsbDevice_Payload,
 }
 /*--------------------------------------------------------------------------}
 {	 USB hub structure which is just extra data attached to a USB node	    }
 {--------------------------------------------------------------------------*/
 #[repr(C)]
-pub struct HubDevice;
+pub struct HubDevice {
+    pub MaxChildren: u32,
+    pub Children: [*mut UsbDevice;MaxChildrenPerDevice as usize],
+    #[repr(align(4))]
+    pub Descriptor: HubDescriptor,				// Hub descriptor it's accessed a bit so we have a copy to save USB bus ... align it for ARM7/8
+}
 /*--------------------------------------------------------------------------}
 {	 USB hid structure which is just extra data attached to a USB node	    }
 {--------------------------------------------------------------------------*/

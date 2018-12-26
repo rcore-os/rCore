@@ -37,7 +37,7 @@ extern "C"
 #endif
 
 //#define LOG(...)
-#define LOG(...) 0 //printf(__VA_ARGS__)
+#define LOG(...) //printf(__VA_ARGS__)
 #define LOG_DEBUG(...)
 //#define LOG_DEBUG(...) printf(__VA_ARGS__)
 
@@ -907,7 +907,7 @@ void UsbShowTree (struct UsbDevice *root, const int level, const char tee);
  23Mar17 LdB
  --------------------------------------------------------------------------*/
 RESULT HIDReadDescriptor (uint8_t devNumber,						// Device number (address) of the device to read 
-                           uint8_t hidIndex,							// Which hid configuration information is requested from
+                          uint8_t hidIndex,							// Which hid configuration information is requested from
                           uint8_t* Buffer,							// Pointer to a buffer to receive the descriptor
                           uint16_t Length);							// Maxium length of the buffer 
 

@@ -26,6 +26,10 @@ pub extern fn shell(_arg: usize) -> ! {
         if cmd == "" {
             continue;
         }
+        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "usb" {
+            test_usb();
+            continue;
+        }
         let name = cmd.split(' ').next().unwrap();
         if let Ok(file) = ROOT_INODE.lookup(name) {
             let data = file.read_as_vec().unwrap();
@@ -62,4 +66,12 @@ fn get_line() -> String {
 
 fn get_char() -> char {
     crate::fs::STDIN.pop()
+}
+
+// Kernel tests
+#[cfg(all(target_arch = "aarch64", feature = "board_raspi3"))]
+fn test_usb() {
+    use crate::arch::board::usb::*;
+    let root_ptr = get_root_hub();
+    UsbShowTree(root_ptr, 1, '+');
 }

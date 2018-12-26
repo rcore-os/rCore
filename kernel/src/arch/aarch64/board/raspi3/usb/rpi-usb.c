@@ -1711,9 +1711,11 @@ RESULT HCDChannelTransfer(const struct UsbPipe pipe, const struct UsbPipeControl
         tempSplit = DWC_HOST_CHANNEL[pipectrl.Channel].SplitCtrl;	// Fetch the split details
         result = HCDCheckErrorAndAction(tempInt,
             tempSplit.split_enable, &sendCtrl);						// Check transmisson RESULT and set action flags
-        if (result) LOG("Result: %i Action: 0x%08x tempInt: 0x%08x tempSplit: 0x%08x Bytes sent: %i\n",
+        if (result) {
+            LOG("Result: %i Action: 0x%08x tempInt: 0x%08x tempSplit: 0x%08x Bytes sent: %i\n",
             result, (unsigned int)sendCtrl.Raw32, (unsigned int)tempInt.Raw32, 
             (unsigned int)tempSplit.Raw32, result ? 0 : DWC_HOST_CHANNEL[pipectrl.Channel].TransferSize.size);
+        }
         if (sendCtrl.ActionFatalError) return result;				// Fatal error occured we need to bail
 
         sendCtrl.SplitTries = 0;									// Zero split tries count
@@ -1831,9 +1833,9 @@ RESULT HCDSumbitControlMessage (const struct UsbPipe pipe,			// Pipe structure (
             pipe.Number);											// Log error
         return OK;
     }
-    if (DWC_HOST_CHANNEL[pipectrl.Channel].TransferSize.size != 0)
+    if (DWC_HOST_CHANNEL[pipectrl.Channel].TransferSize.size != 0) {
         LOG_DEBUG("HCD: Warning non zero status transfer! %d.\n", DWC_HOST_CHANNEL[pipectrl.Channel].TransferSize.size);
-
+    }
     if (bytesTransferred) *bytesTransferred = lastTransfer;
     //LOG("\n");
     return OK;
@@ -2411,8 +2413,9 @@ RESULT HubCheckConnection(struct UsbDevice *device, uint8_t port) {
     data = device->HubPayload;
 
     if ((result = HCDReadHubPortStatus(device->Pipe0, port + 1, &portStatus.Raw32)) != OK) {
-        if (result != ErrorDisconnected)
+        if (result != ErrorDisconnected) {
             LOG("HUB: Failed to get hub port status (1) for %s.Port%d.\n", UsbGetDescription(device), port + 1);
+        }
         return result;
     }
 
@@ -2556,9 +2559,10 @@ RESULT EnumerateHub (struct UsbDevice *device) {
     LOG_DEBUG("HUB: Hub powering ports on.\n");
     for (int i = 0; i < data->MaxChildren; i++) {					// For each port
         if (HCDChangeHubPortFeature(device->Pipe0, FeaturePower,
-            i + 1, true) != OK)										// Power the port							
+            i + 1, true) != OK)	{									// Power the port
             LOG("HUB: device: %i could not power Port%d.\n",
                 device->Pipe0.Number, i + 1);						// Log error
+        }
     }
     timer_wait(data->Descriptor.PowerGoodDelay * 2000);				// Every hub has a different power stability delay
 
@@ -2764,22 +2768,30 @@ RESULT EnumerateDevice(struct UsbDevice *device, struct UsbDevice* ParentHub, ui
     
     if (device->Descriptor.iProduct != 0) {
         result = HCDReadStringDescriptor(device->Pipe0, device->Descriptor.iProduct, &buffer[0], sizeof(buffer));
-        if (result == OK) LOG("HCD:  -Product:       %s.\n", buffer);
+        if (result == OK) {
+            LOG("HCD:  -Product:       %s.\n", buffer);
+        }
     }
     
     if (device->Descriptor.iManufacturer != 0) {
         result = HCDReadStringDescriptor(device->Pipe0, device->Descriptor.iManufacturer, &buffer[0], sizeof(buffer));
-        if (result == OK) LOG("HCD:  -Manufacturer:  %s.\n", buffer);
+        if (result == OK) {
+            LOG("HCD:  -Manufacturer:  %s.\n", buffer);
+        }
     }
     if (device->Descriptor.iSerialNumber != 0) {
         result = HCDReadStringDescriptor(device->Pipe0, device->Descriptor.iSerialNumber, &buffer[0], sizeof(buffer));
-        if (result == OK) LOG("HCD:  -SerialNumber:  %s.\n", buffer);
+        if (result == OK) {
+            LOG("HCD:  -SerialNumber:  %s.\n", buffer);
+        }
     }
 
 
     if (device->Config.ConfigStringIndex != 0) {
         result = HCDReadStringDescriptor(device->Pipe0, device->Config.ConfigStringIndex, &buffer[0], sizeof(buffer));
-        if (result == OK) LOG("HCD:  -Configuration: %s.\n", buffer);
+        if (result == OK) {
+            LOG("HCD:  -Configuration: %s.\n", buffer);
+        }
     }
 
 

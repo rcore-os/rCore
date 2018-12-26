@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include "usb-dependency.h"
 
+// we need memset & memcpy, if `ld` found duplicated symbol, comment the defination
 /*
 void memset(void *d, int c, size_t n)
 {
@@ -198,3 +199,22 @@ bool mailbox_tag_message (uint32_t* response_buf,					// Pointer to response buf
     return false;													// Message failed
 }
 
+/*-------------------------------------------------------------------------*/
+
+/***************************************************************************}
+{                       Other Interface for RustOS                          }
+****************************************************************************/
+#include "rpi-usb.h"
+
+uint32_t _RustOS_CheckSize(uint32_t *sizebuffer, uint32_t length)
+{
+	uint32_t size[1]={
+			sizeof(struct UsbDevice),
+			sizeof(struct HubDevice),
+	}, len=sizeof(size)/sizeof(*size);
+	if(length!=len)
+		return len;
+	for(uint32_t i=0;i<len;++i)
+		sizebuffer[i]=size[i];
+	return 0;
+}
