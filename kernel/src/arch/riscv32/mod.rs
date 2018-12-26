@@ -6,6 +6,7 @@ pub mod memory;
 pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
+use log::*;
 
 #[no_mangle]
 pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: usize) -> ! {
@@ -27,11 +28,16 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
 
     crate::logging::init();
     interrupt::init();
+    info!("interrupt::init end");
     memory::init();
+    info!("memory::init end");
     timer::init();
+    info!("timer::init end");
     crate::process::init();
+    info!("crate::process::init end");
 
     unsafe { cpu::start_others(hart_mask); }
+    info!("going to crate::kmain");
     crate::kmain();
 }
 

@@ -25,10 +25,12 @@ pub fn init() {
     unsafe { sstatus::set_sum(); }  // Allow user memory access
     // initialize heap and Frame allocator
     init_frame_allocator();
+    info!("init_frame_allocator end");
     init_heap();
+    info!("init_heap end");
     // remap the kernel use 4K page
     remap_the_kernel();
-    loop { }
+    info!("remap_the_kernel end");
 }
 
 pub fn init_other() {
@@ -86,32 +88,21 @@ fn remap_the_kernel() {
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);
-    info!("kernel remap end");
 }
 
 #[cfg(all(target_arch = "riscv64", not(feature = "no_mmu")))]
 fn remap_the_kernel() {
-    error!("remap the kernel begin, satp: {:x}", satp::read().bits());
     let mut ms = MemorySet::new_bare();
-    info!("ms new bare");
     #[cfg(feature = "no_bbl")]
     ms.push(MemoryArea::new_identity(0x0000_0000_1000_0000, 0x0000_0000_1000_0008, MemoryAttr::default(), "serial"));
     ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
-    info!("ms new ident text");
     ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
-    info!("ms new ident data");
     ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
-    info!("ms new ident rodata");
     ms.push(MemoryArea::new_identity(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), "stack"));
-    info!("ms new ident rodatistack");
     ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
-    info!("ms push finish");
     unsafe { ms.activate(); }
-    info!("ms activate finish");
     unsafe { SATP = ms.token(); }
-    info!("satp token ok");
     mem::forget(ms);
-    error!("kernel remap end");
 }
 
 // First core stores its SATP here.

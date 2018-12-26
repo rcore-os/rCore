@@ -12,6 +12,8 @@ use ucore_memory::paging::*;
 use log::*;
 #[cfg(target_arch = "riscv32")]
 use crate::consts::KERNEL_P2_INDEX;
+#[cfg(target_arch = "riscv64")]
+use crate::consts::KERNEL_P4_INDEX;
 
 pub struct ActivePageTable(RecursivePageTable<'static>, PageEntry);
 
@@ -368,14 +370,6 @@ impl InactivePageTable for InactivePageTable0 {
     unsafe fn activate(&self) {
         let old_frame = satp::read().frame();
         let new_frame = self.root_frame.clone();
-        active_table().with_temporary_map(&new_frame, |_, table: &mut RvPageTable| {
-            info!("new_frame's pa: {:x}", new_frame.start_address().as_usize());
-            info!("entry 0o0: {:?}", table[0x0]);
-            info!("entry 0o774: {:?}", table[0x1fc]);
-            info!("entry 0o775: {:?}", table[0x1fd]);
-            info!("entry 0o776: {:?}", table[0x1fe]);
-            info!("entry 0o777: {:?}", table[0x1ff]);
-        });
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(SATP_MODE, 0, new_frame);
@@ -421,7 +415,6 @@ impl InactivePageTable for InactivePageTable0 {
     #[cfg(target_arch = "riscv64")]
     fn token(&self) -> usize {
         use bit_field::BitField;
-        info!("{}", self.root_frame.number());
         let mut satp = self.root_frame.number();
         satp.set_bits(44..60, 0);  // AS is 0
         satp.set_bits(60..64, satp::Mode::Sv48 as usize);  // Mode is Sv48
@@ -452,7 +445,7 @@ impl InactivePageTable0 {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
         let e1 = table[KERNEL_P2_INDEX];
-        // for larger heap memroy
+        // for larger heap memory
         let e2 = table[KERNEL_P2_INDEX + 1];
         let e3 = table[KERNEL_P2_INDEX + 2];
         assert!(!e1.is_unused());
@@ -467,10 +460,16 @@ impl InactivePageTable0 {
             table[KERNEL_P2_INDEX + 2].set(e3.frame(), EF::VALID | EF::GLOBAL);
         });
     }
+
     #[cfg(target_arch = "riscv64")]
     fn map_kernel(&mut self) {
-        unimplemented!();
-        // TODO
+        let table = unsafe { &mut *ROOT_PAGE_TABLE };
+        let e1 = table[KERNEL_P4_INDEX];
+        assert!(!e1.is_unused());
+
+        self.edit(|_| {
+            table[KERNEL_P4_INDEX] = e1;
+        });
     }
 }
 

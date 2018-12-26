@@ -17,7 +17,10 @@ pub const KERN_VA_BASE: usize = 0;
 pub const KERN_VA_BASE: usize = 0xFFFF_FFFF_0000_0000;
 
 #[cfg(target_arch = "riscv32")]
-pub const KERNEL_P2_INDEX: usize = 0x8000_0000 >> 22;
+pub const KERNEL_P2_INDEX: usize = 0x8000_0000 >> 12 >> 10;
+#[cfg(target_arch = "riscv64")]
+pub const KERNEL_P4_INDEX: usize = 0x0000_FFFF_8000_0000 >> 12 >> 9 >> 9 >> 9;
+
 #[cfg(feature = "board_k210")]
 pub const KERNEL_HEAP_SIZE: usize = 0x0010_0000;
 #[cfg(not(feature = "board_k210"))]
