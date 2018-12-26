@@ -153,6 +153,7 @@ impl Context {
     /// Push all callee-saved registers at the current kernel stack.
     /// Store current sp, switch to target.
     /// Pop all callee-saved registers, then return to the target.
+    #[cfg(target_arch = "riscv32")]
     #[naked]
     #[inline(never)]
     pub unsafe extern fn switch(&mut self, target: &mut Self) {
@@ -197,6 +198,55 @@ impl Context {
         addi sp, sp, 4*14
 
         sw zero, 0(a1)
+        ret"
+        : : : : "volatile" )
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    #[naked]
+    #[inline(never)]
+    pub unsafe extern fn switch(&mut self, target: &mut Self) {
+        asm!(
+        "
+        // save from's registers
+        addi sp, sp, -8*14
+        sd sp, 0(a0)
+        sd ra, 0*8(sp)
+        sd s0, 2*8(sp)
+        sd s1, 3*8(sp)
+        sd s2, 4*8(sp)
+        sd s3, 5*8(sp)
+        sd s4, 6*8(sp)
+        sd s5, 7*8(sp)
+        sd s6, 8*8(sp)
+        sd s7, 9*8(sp)
+        sd s8, 10*8(sp)
+        sd s9, 11*8(sp)
+        sd s10, 12*8(sp)
+        sd s11, 13*8(sp)
+        csrrs s11, 0x180, x0 // satp
+        sd s11, 1*8(sp)
+
+        // restore to's registers
+        ld sp, 0(a1)
+        ld s11, 1*8(sp)
+        csrrw x0, 0x180, s11 // satp
+        ld ra, 0*8(sp)
+        ld s0, 2*8(sp)
+        ld s1, 3*8(sp)
+        ld s2, 4*8(sp)
+        ld s3, 5*8(sp)
+        ld s4, 6*8(sp)
+        ld s5, 7*8(sp)
+        ld s6, 8*8(sp)
+        ld s7, 9*8(sp)
+        ld s8, 10*8(sp)
+        ld s9, 11*8(sp)
+        ld s10, 12*8(sp)
+        ld s11, 13*8(sp)
+        addi sp, sp, 8*14
+
+        sd zero, 0(a1)
         ret"
         : : : : "volatile" )
     }
