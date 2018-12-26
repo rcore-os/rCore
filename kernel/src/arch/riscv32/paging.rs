@@ -13,9 +13,11 @@ use log::*;
 #[cfg(target_arch = "riscv32")]
 use crate::consts::KERNEL_P2_INDEX;
 
-pub struct ActivePageTable(RecursivePageTable<'static>);
+pub struct ActivePageTable(RecursivePageTable<'static>, PageEntry);
 
-pub struct PageEntry(PageTableEntry);
+/// PageTableEntry: the contents of this entry.
+/// Page: this entry is the pte of page `Page`.
+pub struct PageEntry(PageTableEntry, Page);
 
 impl PageTable for ActivePageTable {
     type Entry = PageEntry;
@@ -65,16 +67,14 @@ impl PageTable for ActivePageTable {
     */
     #[cfg(target_arch = "riscv32")]
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
-        let vaddr = VirtAddr::new(vaddr);
-        if unsafe { !(*ROOT_PAGE_TABLE)[vaddr.p2_index()].flags().contains(EF::VALID) } {
+        let p2_table = unsafe { ROOT_PAGE_TABLE.as_mut().unwrap() };
+        let page = Page::of_addr(VirtAddr::new(vaddr));
+        if !p2_table[page.p2_index()].flags().contains(EF::VALID) {
             return None;
         }
-        let page = Page::of_addr(vaddr);
-        self.0.translate_page(page);
-        let entry_va = VirtAddr::from_page_table_indices(RECURSIVE_INDEX,
-                                                         vaddr.p2_index(),
-                                                         vaddr.p1_index() << 2);
-        unsafe { Some(&mut *(entry_va.as_usize() as *mut PageEntry)) }
+        let entry = edit_entry_of(&page, |entry| *entry);
+        self.1 = PageEntry(entry, page);
+        Some(&mut self.1)
     }
 
     /*
@@ -171,6 +171,18 @@ impl PageTable for ActivePageTable {
     }
 }
 
+#[cfg(target_arch = "riscv32")]
+fn edit_entry_of<T>(page: &Page, f: impl FnOnce(&mut PageTableEntry) -> T) -> T {
+    let p2_flags = unsafe { (*ROOT_PAGE_TABLE)[page.p2_index()].flags_mut() };
+    p2_flags.insert(EF::READABLE | EF::WRITABLE);
+    let entry_addr = (RECURSIVE_INDEX << 22) | (page.p2_index() << 12) | (page.p1_index() << 2);
+    let entry = unsafe { &mut *(entry_addr as *mut PageTableEntry) };
+    let ret = f(entry);
+    p2_flags.remove(EF::READABLE | EF::WRITABLE);
+    ret
+}
+
+
 // define the ROOT_PAGE_TABLE, and the virtual address of it?
 #[cfg(target_arch = "riscv32")]
 const ROOT_PAGE_TABLE: *mut RvPageTable =
@@ -186,7 +198,9 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         // TODO: delete debug code
-        let rv = ActivePageTable(RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap());
+        let rv = ActivePageTable(
+            RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap(),
+            ::core::mem::zeroed());
         info!("ROOT_PAGE_TABLE: {:x}, ActivePageTable::new.0.pagetable: {:x}",
               ROOT_PAGE_TABLE as usize, unsafe { rv.0.root_table as *const _ as usize });
         rv
@@ -264,17 +278,17 @@ impl Entry for PageEntry {
     }
     #[cfg(target_arch = "riscv32")]
     fn update(&mut self) {
-        let addr = VirtAddr::new((self as *const _ as usize) << 10);
-        sfence_vma(0, addr);
+        edit_entry_of(&self.1, |entry| *entry = self.0);
+        sfence_vma(0, self.1.start_address());
     }
     fn accessed(&self) -> bool { self.0.flags().contains(EF::ACCESSED) }
     fn dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
     fn writable(&self) -> bool { self.0.flags().contains(EF::WRITABLE) }
     fn present(&self) -> bool { self.0.flags().contains(EF::VALID | EF::READABLE) }
-    fn clear_accessed(&mut self) { self.as_flags().remove(EF::ACCESSED); }
-    fn clear_dirty(&mut self) { self.as_flags().remove(EF::DIRTY); }
-    fn set_writable(&mut self, value: bool) { self.as_flags().set(EF::WRITABLE, value); }
-    fn set_present(&mut self, value: bool) { self.as_flags().set(EF::VALID | EF::READABLE, value); }
+    fn clear_accessed(&mut self) { self.0.flags_mut().remove(EF::ACCESSED); }
+    fn clear_dirty(&mut self) { self.0.flags_mut().remove(EF::DIRTY); }
+    fn set_writable(&mut self, value: bool) { self.0.flags_mut().set(EF::WRITABLE, value); }
+    fn set_present(&mut self, value: bool) { self.0.flags_mut().set(EF::VALID | EF::READABLE, value); }
     fn target(&self) -> usize { self.0.addr().as_usize() }
     fn set_target(&mut self, target: usize) {
         let flags = self.0.flags();
@@ -284,25 +298,19 @@ impl Entry for PageEntry {
     fn writable_shared(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
     fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::RESERVED2) }
     fn set_shared(&mut self, writable: bool) {
-        let flags = self.as_flags();
+        let flags = self.0.flags_mut();
         flags.set(EF::RESERVED1, writable);
         flags.set(EF::RESERVED2, !writable);
     }
-    fn clear_shared(&mut self) { self.as_flags().remove(EF::RESERVED1 | EF::RESERVED2); }
+    fn clear_shared(&mut self) { self.0.flags_mut().remove(EF::RESERVED1 | EF::RESERVED2); }
     fn swapped(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
-    fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::RESERVED1, value); }
+    fn set_swapped(&mut self, value: bool) { self.0.flags_mut().set(EF::RESERVED1, value); }
     fn user(&self) -> bool { self.0.flags().contains(EF::USER) }
-    fn set_user(&mut self, value: bool) { self.as_flags().set(EF::USER, value); }
+    fn set_user(&mut self, value: bool) { self.0.flags_mut().set(EF::USER, value); }
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
-    fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::EXECUTABLE, value); }
+    fn set_execute(&mut self, value: bool) { self.0.flags_mut().set(EF::EXECUTABLE, value); }
     fn mmio(&self) -> bool { unimplemented!() }
     fn set_mmio(&mut self, value: bool) { unimplemented!() }
-}
-
-impl PageEntry {
-    fn as_flags(&mut self) -> &mut EF {
-        unsafe { &mut *(self as *mut _ as *mut EF) }
-    }
 }
 
 #[derive(Debug)]
@@ -423,6 +431,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
     #[cfg(target_arch = "riscv64")]
     fn token(&self) -> usize {
+        unimplemented!();
         0 // TODO
     }
 
@@ -450,12 +459,12 @@ impl InactivePageTable0 {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
         let e0 = table[0x40];
         let e1 = table[KERNEL_P2_INDEX];
-        assert!(!e1.is_unused());
         // for larger heap memroy
         let e2 = table[KERNEL_P2_INDEX + 1];
-        assert!(!e2.is_unused());
         let e3 = table[KERNEL_P2_INDEX + 2];
+        assert!(!e1.is_unused());
         assert!(!e2.is_unused());
+        assert!(!e3.is_unused());
 
         self.edit(|_| {
             table[0x40] = e0;
@@ -467,6 +476,7 @@ impl InactivePageTable0 {
     }
     #[cfg(target_arch = "riscv64")]
     fn map_kernel(&mut self) {
+        unimplemented!();
         // TODO
     }
 }

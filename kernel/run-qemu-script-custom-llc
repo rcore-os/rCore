@@ -579,5 +579,5 @@ else
     make -j32
     cp bbl ../../kernel/outdir/kernel.bin
     cd ../../kernel
-    ${QEMU} -smp cores=4 -nographic -machine virt -kernel outdir/kernel.bin
+    ${QEMU} -smp cores=1 -nographic -machine virt -kernel outdir/kernel.bin
 fi
