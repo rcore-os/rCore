@@ -25,7 +25,7 @@ if [[ ${RV32} = 1 ]]; then
 	UCORE_USER_IMAGE="../user/img/ucore-rv32.img"
 else
 	TARGET_ARCH=riscv64
-	export LOG=trace
+	export LOG=warn
 	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"

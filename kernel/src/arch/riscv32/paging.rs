@@ -281,16 +281,11 @@ impl ActivePageTable {
 
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
+    // TODO: merge below two
     #[cfg(target_arch = "riscv64")]
     fn update(&mut self) {
-        assert!(false, "can't update");
-        let mut addr: usize = (self as *const _ as usize) << 9;
-        if (addr & 0x7000_0000_0000 != 0) {
-            addr |= 0xFFFF_0000_0000_0000;
-        } else {
-            addr &= 0x0000_FFFF_FFFF_FFFF;
-        }
-        sfence_vma(0, VirtAddr::new(addr));
+        edit_entry_of(&self.1, |entry| *entry = self.0);
+        sfence_vma(0, self.1.start_address());
     }
     #[cfg(target_arch = "riscv32")]
     fn update(&mut self) {

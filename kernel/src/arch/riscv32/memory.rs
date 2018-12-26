@@ -91,7 +91,7 @@ fn remap_the_kernel() {
 
 #[cfg(all(target_arch = "riscv64", not(feature = "no_mmu")))]
 fn remap_the_kernel() {
-    info!("remap the kernel begin, satp: {:x}", satp::read().bits());
+    error!("remap the kernel begin, satp: {:x}", satp::read().bits());
     let mut ms = MemorySet::new_bare();
     info!("ms new bare");
     #[cfg(feature = "no_bbl")]
@@ -111,7 +111,7 @@ fn remap_the_kernel() {
     unsafe { SATP = ms.token(); }
     info!("satp token ok");
     mem::forget(ms);
-    info!("kernel remap end");
+    error!("kernel remap end");
 }
 
 // First core stores its SATP here.
