@@ -68,12 +68,8 @@ pub fn active_table_swap() -> MutexGuard<'static, SwapExt<ActivePageTable, fifo:
 */
 pub fn alloc_frame() -> Option<usize> {
     // get the real address of the alloc frame
-    // TODO: delete debug code
-    info!("alloc_frame");
     let mut ret = FRAME_ALLOCATOR.lock();
-    info!("alloc_frame _2");
     let ret = ret.alloc();
-    info!("alloc_frame _3");
     let ret = ret.map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
     trace!("Allocate frame: {:x?}", ret);
     ret

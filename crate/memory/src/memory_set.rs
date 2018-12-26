@@ -95,9 +95,17 @@ impl MemoryArea {
     **  @param  name: &'static str   the name of the memory area
     **  @retval MemoryArea           the memory area created
     */
+    // TODO: VirtAddr and PhysAddr should not be the same `usize`, it's not type safe.
+    #[cfg(target_arch = "riscv32")]
     pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
         assert!(start_addr <= end_addr, "invalid memory area");
         MemoryArea { start_addr, end_addr, phys_start_addr: Some(start_addr), flags, name }
+    }
+    #[cfg(target_arch = "riscv64")]
+    pub fn new_identity(start_addr: VirtAddr, end_addr: VirtAddr, flags: MemoryAttr, name: &'static str) -> Self {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        let paddr = start_addr - 0xFFFF_FFFF_0000_0000;
+        MemoryArea { start_addr, end_addr, phys_start_addr: Some(paddr), flags, name }
     }
     /*
     **  @brief  create a memory area from physics address
@@ -298,16 +306,9 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     pub fn new_bare() -> Self {
-        info!("new bare");
-        // TODO
-        info!("Vec::new begin");
-        let a = Vec::<MemoryArea>::new();
-        info!("Vec::new finish");
-        let pt = T::new_bare();
-        info!("T::new bare finish");
         MemorySet {
-            areas: a, 
-            page_table: pt, 
+            areas: Vec::<MemoryArea>::new(),
+            page_table: T::new_bare()
         }
     }
     /*
@@ -395,7 +396,6 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
                 area.map::<T>(pt);
             }
         });
-        info!("finish map in clone!");
         MemorySet {
             areas: self.areas.clone(),
             page_table,
@@ -405,7 +405,6 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
 
 impl<T: InactivePageTable> Drop for MemorySet<T> {
     fn drop(&mut self) {
-        info!("come into drop func for memoryset");
         self.clear();
     }
 }

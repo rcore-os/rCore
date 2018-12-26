@@ -39,7 +39,6 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
-        info!("ActivePageTable: calling RecursivePageTable::map_to, va={:x}, pa={:x}, flags={:?}", page.start_address().as_usize(), frame.start_address().as_usize(), flags);
         self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv).unwrap().flush();
         self.get_entry(addr).expect("fail to get entry")
     }
@@ -212,12 +211,9 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        // TODO: delete debug code
         let rv = ActivePageTable(
             RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap(),
             ::core::mem::zeroed());
-        info!("ROOT_PAGE_TABLE: {:x}, ActivePageTable::new.0.pagetable: {:x}",
-              ROOT_PAGE_TABLE as usize, unsafe { rv.0.root_table as *const _ as usize });
         rv
     }
 
@@ -231,37 +227,17 @@ impl ActivePageTable {
     #[cfg(target_arch = "riscv64")]
     fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut RvPageTable)) {
         // Create a temporary page
-        info!("enter with_temporary_map");
         let page = Page::of_addr(VirtAddr::new(0xffffdeadcafebabe));
-
-        info!("translate page begin, self at {:x}, page: {:x} ({:o}, {:o}, {:o}, {:o})",
-               (self.0.root_table as *const _ as usize),
-               page.start_address().as_usize(),
-               page.p4_index(),
-               page.p3_index(),
-               page.p2_index(),
-               page.p1_index() );
-        info!("self info: recursive_index={:x}",
-               self.0.recursive_index);
-        info!("root_table[recursive_index]={:?}",
-               self.0.root_table[self.0.recursive_index]);
-        info!("root_table[recursive_index+1]={:?}",
-               self.0.root_table[self.0.recursive_index+1]);
 
         assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
 
-        info!("enter with_temporary_map check temporary mapped success");
         // Map it to table
         self.map(page.start_address().as_usize(), frame.start_address().as_usize());
-        // TODO: delete debug code
-        let t: usize = 0xffffdeadcafebabe;
-        info!("with_temporary_map: {:?}->{:?}, translate result {:?}", frame.start_address(), t, self.0.translate_page(page));
         // Call f
         let table = unsafe { &mut *(page.start_address().as_usize() as *mut _) };
         f(self, table);
         // Unmap the page
         self.unmap(0xffffdeadcafebabe);
-        info!("leaving with_temporary_map");
     }
 
     #[cfg(target_arch = "riscv32")]
@@ -351,19 +327,13 @@ impl InactivePageTable for InactivePageTable0 {
     *   the inactive page table
     */
     fn new_bare() -> Self {
-        info!("InactivePageTable0:new bare begin");
         let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target)))
             .expect("failed to allocate frame");
-        info!("new bare before with_temporary_map");
-        // TODO: delete debug code
         let mut at = active_table();
-        info!("got active table");
         at.with_temporary_map(&frame, |_, table: &mut RvPageTable| {
-            info!("enter closure of with_temporary_map");
             table.zero();
             table.set_recursive(RECURSIVE_INDEX, frame.clone());
         });
-        info!("new bare after with_temporary_map");
         InactivePageTable0 { root_frame: frame }
     }
 
@@ -398,6 +368,14 @@ impl InactivePageTable for InactivePageTable0 {
     unsafe fn activate(&self) {
         let old_frame = satp::read().frame();
         let new_frame = self.root_frame.clone();
+        active_table().with_temporary_map(&new_frame, |_, table: &mut RvPageTable| {
+            info!("new_frame's pa: {:x}", new_frame.start_address().as_usize());
+            info!("entry 0o0: {:?}", table[0x0]);
+            info!("entry 0o774: {:?}", table[0x1fc]);
+            info!("entry 0o775: {:?}", table[0x1fd]);
+            info!("entry 0o776: {:?}", table[0x1fe]);
+            info!("entry 0o777: {:?}", table[0x1ff]);
+        });
         debug!("switch table {:x?} -> {:x?}", old_frame, new_frame);
         if old_frame != new_frame {
             satp::set(SATP_MODE, 0, new_frame);
@@ -494,7 +472,6 @@ impl InactivePageTable0 {
 
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
-        info!("PageTable dropping: {:?}", self);
         Self::dealloc_frame(self.root_frame.start_address().as_usize());
     }
 }
