@@ -33,9 +33,11 @@ fn putchar(c: u8) {
 
 pub fn getchar() -> char {
     let c = if cfg!(feature = "board_k210") {
-        unsafe {
-            while RXDATA.read_volatile() & (1 << 31) == 0 {}
-            (RXDATA as *const u8).read_volatile()
+        loop {
+            let rxdata = unsafe { RXDATA.read_volatile() };
+            if rxdata & (1 << 31) == 0 {
+                break rxdata as u8;
+            }
         }
     } else if cfg!(feature = "m_mode") {
         (super::BBL.mcall_console_getchar)() as u8

@@ -40,7 +40,7 @@ fn get_line() -> String {
     loop {
         let c = get_char();
         match c {
-            '\u{7f}' /* '\b' */ => {
+            '\u{8}' | '\u{7f}' /* '\b' */ => {
                 if s.pop().is_some() {
                     print!("\u{7f}");
                 }
