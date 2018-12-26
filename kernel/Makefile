@@ -164,7 +164,7 @@ else
 		--disable-fp-emulation \
 		--host=riscv32-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
-	make && \
+	make -j32 && \
 	cp bbl ../../kernel/$@
 endif
 else ifeq ($(arch), aarch64)

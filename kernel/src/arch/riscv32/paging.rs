@@ -40,8 +40,7 @@ impl PageTable for ActivePageTable {
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
         info!("ActivePageTable: calling RecursivePageTable::map_to, va={:x}, pa={:x}, flags={:?}", page.start_address().as_usize(), frame.start_address().as_usize(), flags);
-        self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
-            .unwrap().flush();
+        self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv).unwrap().flush();
         self.get_entry(addr).expect("fail to get entry")
     }
 
@@ -88,50 +87,16 @@ impl PageTable for ActivePageTable {
     #[cfg(target_arch = "riscv64")]
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut PageEntry> {
         let vaddr = VirtAddr::new(vaddr);
-        let root_table: &RvPageTable = unsafe { &*ROOT_PAGE_TABLE };
-
-        let p3_table = if ! root_table[vaddr.p4_index()].flags().contains(EF::VALID) {
-            return None
-        } else {
-            let p3_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.0.recursive_index,
-                self.0.recursive_index,
-                self.0.recursive_index,
-                vaddr.p4_index()).start_address().as_usize() as *mut RvPageTable) };
-            p3_table
-        };
-
-        let p2_table = if ! p3_table[vaddr.p3_index()].flags().contains(EF::VALID) {
-            return None
-        } else {
-            let p2_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.0.recursive_index,
-                self.0.recursive_index,
-                vaddr.p4_index(),
-                vaddr.p3_index()).start_address().as_usize() as *mut RvPageTable) };
-            p2_table
-        };
-
-        let p1_table = if ! p2_table[vaddr.p2_index()].flags().contains(EF::VALID) {
-            return None
-        } else {
-            let p1_table = unsafe { &mut *(Page::from_page_table_indices(
-                self.0.recursive_index,
-                vaddr.p4_index(),
-                vaddr.p3_index(),
-                vaddr.p2_index()).start_address().as_usize() as *mut RvPageTable) };
-            p1_table
-        };
-
         let page = Page::of_addr(vaddr);
-        // ???
-        self.0.translate_page(page);
-        let entry_va = VirtAddr::from_page_table_indices(RECURSIVE_INDEX,
-                                                         vaddr.p4_index(), 
-                                                         vaddr.p3_index(), 
-                                                         vaddr.p2_index(),
-                                                         vaddr.p1_index() << 3);
-        unsafe { Some(&mut *(entry_va.as_usize() as *mut PageEntry)) }
+
+        if ! self.0.is_mapped(
+                vaddr.p4_index(), vaddr.p3_index(), vaddr.p2_index(), vaddr.p1_index()) {
+            return None;
+        }
+
+        let entry = edit_entry_of(&page, |entry| *entry);
+        self.1 = PageEntry(entry, page);
+        Some(&mut self.1)
     }
 
 
@@ -145,7 +110,9 @@ impl PageTable for ActivePageTable {
     */
     fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
         use core::slice;
-        unsafe { slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE) }
+        unsafe {
+            slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE)
+        }
     }
 
     /*
@@ -173,14 +140,62 @@ impl PageTable for ActivePageTable {
 
 #[cfg(target_arch = "riscv32")]
 fn edit_entry_of<T>(page: &Page, f: impl FnOnce(&mut PageTableEntry) -> T) -> T {
-    let p2_flags = unsafe { (*ROOT_PAGE_TABLE)[page.p2_index()].flags_mut() };
+    let p2_table = unsafe { ROOT_PAGE_TABLE.as_mut().unwrap() };
+    let p1_table = unsafe {
+        &mut *(Page::from_page_table_indices(RECURSIVE_INDEX, page.p2_index()).
+               start_address().as_usize() as *mut RvPageTable)
+    };
+    let p2_flags = p2_table[page.p2_index()].flags_mut();
+
     p2_flags.insert(EF::READABLE | EF::WRITABLE);
-    let entry_addr = (RECURSIVE_INDEX << 22) | (page.p2_index() << 12) | (page.p1_index() << 2);
-    let entry = unsafe { &mut *(entry_addr as *mut PageTableEntry) };
-    let ret = f(entry);
+    let ret = f(&mut p1_table[page.p1_index()]);
     p2_flags.remove(EF::READABLE | EF::WRITABLE);
+
     ret
 }
+
+// TODO: better the gofy design
+#[cfg(target_arch = "riscv64")]
+fn edit_entry_of<T>(page: &Page, f: impl FnOnce(&mut PageTableEntry) -> T) -> T {
+    let p4_table = unsafe { ROOT_PAGE_TABLE.as_mut().unwrap() };
+    let p3_table = unsafe {
+        &mut *(Page::from_page_table_indices(
+                RECURSIVE_INDEX, RECURSIVE_INDEX, RECURSIVE_INDEX,
+                page.p4_index()).start_address().as_usize() as *mut RvPageTable)
+    };
+    let p2_table = unsafe {
+        &mut *(Page::from_page_table_indices(
+                RECURSIVE_INDEX, RECURSIVE_INDEX, page.p4_index(),
+                page.p3_index()).start_address().as_usize() as *mut RvPageTable)
+    };
+    let p1_table = unsafe {
+        &mut *(Page::from_page_table_indices(
+                RECURSIVE_INDEX, page.p4_index(), page.p3_index(),
+                page.p2_index()).start_address().as_usize() as *mut RvPageTable)
+    };
+    let p4_flags = p4_table[page.p4_index()].flags_mut();
+    let p3_flags = p3_table[page.p3_index()].flags_mut();
+    let p2_flags = p2_table[page.p2_index()].flags_mut();
+
+    p4_flags.insert(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+        p3_flags.insert(EF::READABLE | EF::WRITABLE)     ; sfence_vma_all();
+    p4_flags.remove(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+            p2_flags.insert(EF::READABLE | EF::WRITABLE) ; sfence_vma_all();
+    p4_flags.insert(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+        p3_flags.remove(EF::READABLE | EF::WRITABLE)     ; sfence_vma_all();
+    p4_flags.remove(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+    let ret = f(&mut p1_table[page.p1_index()])          ;
+    p4_flags.insert(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+        p3_flags.insert(EF::READABLE | EF::WRITABLE)     ; sfence_vma_all();
+    p4_flags.remove(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+            p2_flags.remove(EF::READABLE | EF::WRITABLE) ; sfence_vma_all();
+    p4_flags.insert(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+        p3_flags.remove(EF::READABLE | EF::WRITABLE)     ; sfence_vma_all();
+    p4_flags.remove(EF::READABLE | EF::WRITABLE)         ; sfence_vma_all();
+
+    ret
+}
+
 
 
 // define the ROOT_PAGE_TABLE, and the virtual address of it?
@@ -221,10 +236,10 @@ impl ActivePageTable {
 
         info!("translate page begin, self at {:x}, page: {:x} ({:o}, {:o}, {:o}, {:o})",
                (self.0.root_table as *const _ as usize),
-               page.start_address().as_usize(), 
-               page.p4_index(), 
-               page.p3_index(), 
-               page.p2_index(), 
+               page.start_address().as_usize(),
+               page.p4_index(),
+               page.p3_index(),
+               page.p2_index(),
                page.p1_index() );
         info!("self info: recursive_index={:x}",
                self.0.recursive_index);
@@ -268,6 +283,7 @@ impl ActivePageTable {
 impl Entry for PageEntry {
     #[cfg(target_arch = "riscv64")]
     fn update(&mut self) {
+        assert!(false, "can't update");
         let mut addr: usize = (self as *const _ as usize) << 9;
         if (addr & 0x7000_0000_0000 != 0) {
             addr |= 0xFFFF_0000_0000_0000;
@@ -360,7 +376,7 @@ impl InactivePageTable for InactivePageTable0 {
     * @param:
     *   f: a function to do something with the temporary modified activate page table
     * @brief:
-    *   temporarily make current `active_table`'s recursive entry point to 
+    *   temporarily make current `active_table`'s recursive entry point to
     *    `this` inactive table, so we can modify this inactive page table.
     */
     fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
