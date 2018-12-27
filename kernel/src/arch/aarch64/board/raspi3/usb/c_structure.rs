@@ -146,7 +146,8 @@ pub struct UsbDevice {
     pub PipeCtrl0: UsbPipeControl,					// Usb device pipe control AKA pipectrl0
     pub Config: UsbConfigControl,					// Usb config control
     #[repr(align(4))]
-    pub MaxInterface: u8,							// Maxiumum interface in array (varies with config and usually a lot less than the max array size) 
+    pub MaxInterface: u8,							// Maxiumum interface in array (varies with config and usually a lot less than the max array size)
+    _placeholder0: [u8; 3],
     #[repr(align(4))]
     pub Interfaces: [UsbInterfaceDescriptor; MaxInterfacesPerDevice as usize], // These are available interfaces on this device
     #[repr(align(4))]
@@ -170,9 +171,17 @@ pub struct HubDevice {
 {	 USB hid structure which is just extra data attached to a USB node	    }
 {--------------------------------------------------------------------------*/
 #[repr(C)]
-pub struct HidDevice;
+pub struct HidDevice {
+    pub Descriptor: [HidDescriptor;MaxHIDPerDevice as usize],	// HID descriptor of this device
+    pub HIDInterface: [u8;MaxHIDPerDevice as usize],			// The interface the HID descriptor is on
+    #[repr(align(4))]
+    pub MaxHID: u8,												// Maxiumum HID in array (usually less than the max array size) .. align it for ARM7/8
+    _placeholder0: [u8; 3],
+}
 /*--------------------------------------------------------------------------}
 {	USB mass storage structure which is extra data attached to a USB node   }
 {--------------------------------------------------------------------------*/
 #[repr(C)]
-pub struct MassStorageDevice;
+pub struct MassStorageDevice {
+    pub SCSI: u8,
+}

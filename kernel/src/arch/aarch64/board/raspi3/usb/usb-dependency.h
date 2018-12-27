@@ -9,7 +9,15 @@ extern "C" {									// Put extern C directive wrapper around
 #include <stdbool.h>
 #include <stddef.h>
 
+// RustOS
+void rustos_print(char const *s);
+bool _RustPowerOnUsb();
+bool _RustPowerOffUsb();
+// usb-dependency64.S
 void UsbDependencyInit (void);
+// emb-stdio.c
+int emb_printf(const char* fmt, ...);
+// existed symbol ... mysterious
 void memset(void *d, int c, size_t n);
 void memcpy(void *d, const void *s, size_t n);
 
@@ -201,14 +209,14 @@ uint64_t tick_difference (uint64_t us1, uint64_t us2);
 . RETURN: True for success, False for failure.
 . 04Jul17 LdB
 .--------------------------------------------------------------------------*/
-bool mailbox_write (MAILBOX_CHANNEL channel, uint32_t message);
+//bool mailbox_write (MAILBOX_CHANNEL channel, uint32_t message);
 
 /*-[mailbox_read]-----------------------------------------------------------}
 . This will read any pending data on the mailbox system on the given channel.
 . RETURN: The read value for success, 0xFEEDDEAD for failure.
 . 04Jul17 LdB
 .--------------------------------------------------------------------------*/
-uint32_t mailbox_read (MAILBOX_CHANNEL channel);
+//uint32_t mailbox_read (MAILBOX_CHANNEL channel);
 
 /*-[mailbox_tag_message]----------------------------------------------------}
 . This will post and execute the given variadic data onto the tags channel
@@ -220,9 +228,9 @@ uint32_t mailbox_read (MAILBOX_CHANNEL channel);
 .         False for failure and the response buffer is untouched.
 . 04Jul17 LdB
 .--------------------------------------------------------------------------*/
-bool mailbox_tag_message (uint32_t* response_buf,					// Pointer to response buffer (NULL = no response wanted)
-                          uint8_t data_count,						// Number of uint32_t data to be set for call
-                          ...);										// Variadic uint32_t values for call
+//bool mailbox_tag_message (uint32_t* response_buf,					// Pointer to response buffer (NULL = no response wanted)
+//                          uint8_t data_count,						// Number of uint32_t data to be set for call
+//                          ...);										// Variadic uint32_t values for call
 
 #ifdef __cplusplus								// If we are including to a C++ file
 }												// Close the extern C directive wrapper

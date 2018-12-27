@@ -36,6 +36,7 @@ fn main() {
 				cc::Build::new().file(&file_path).compile("sfsimg");
 				cc::Build::new()
 					.file("src/arch/aarch64/board/raspi3/usb/rpi-usb.c")
+					.file("src/arch/aarch64/board/raspi3/usb/emb-stdio.c")
 					.file("src/arch/aarch64/board/raspi3/usb/usb-dependency.c")
 					.file("src/arch/aarch64/board/raspi3/usb/usb-dependency64.S")
 					.flag("-ffreestanding")

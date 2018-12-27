@@ -46,5 +46,52 @@ pub enum HidReportType {
 /*--------------------------------------------------------------------------}
 { 		 USB HID 1.11 descriptor structure as per manual in 6.2.1		    }
 {--------------------------------------------------------------------------*/
+#[repr(u8)]
+pub enum HidCountry {
+        CountryNotSupported = 0,
+        Arabic = 1,
+        Belgian = 2,
+        CanadianBilingual = 3,
+        CanadianFrench = 4,
+        CzechRepublic = 5,
+        Danish = 6,
+        Finnish = 7,
+        French = 8,
+        German = 9,
+        Greek = 10,
+        Hebrew = 11,
+        Hungary = 12,
+        International = 13,
+        Italian = 14,
+        Japan = 15,
+        Korean = 16,
+        LatinAmerican = 17,
+        Dutch = 18,
+        Norwegian = 19,
+        Persian = 20,
+        Poland = 21,
+        Portuguese = 22,
+        Russian = 23,
+        Slovakian = 24,
+        Spanish = 25,
+        Swedish = 26,
+        SwissFrench = 27,
+        SwissGerman = 28,
+        Switzerland = 29,
+        Taiwan = 30,
+        TurkishQ = 31,
+        EnglishUk = 32,
+        EnglishUs = 33,
+        Yugoslavian = 34,
+        TurkishF = 35,
+}
+use super::c_structure_usb_2_0::{UsbDescriptorHeader};
 #[repr(C, packed)]
-pub struct HidDescriptor;
+pub struct HidDescriptor {
+    pub Header: UsbDescriptorHeader,							// +0x0 Length of this descriptor, +0x1 DEVICE descriptor type (enum DescriptorType)
+    pub HidVersion: u16, 										// (bcd version) +0x2
+    pub Countrycode: HidCountry,								// +0x4
+    pub DescriptorCount: u8,									// +0x5
+    pub usb_descriptor_type: u8,								// +0x6
+    pub Length: u16,											// +0x7
+}

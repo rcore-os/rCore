@@ -37,7 +37,7 @@ extern "C"
 #endif
 
 //#define LOG(...)
-#define LOG(...) //printf(__VA_ARGS__)
+#define LOG(...) emb_printf(__VA_ARGS__) //printf(__VA_ARGS__)
 #define LOG_DEBUG(...)
 //#define LOG_DEBUG(...) printf(__VA_ARGS__)
 

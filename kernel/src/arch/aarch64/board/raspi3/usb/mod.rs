@@ -20,3 +20,9 @@ pub fn get_root_hub() -> &'static mut UsbDevice {
         &mut *UsbGetRootHub()
     }
 }
+
+#[no_mangle]
+extern "C" fn rustos_print(s:*const u8) {
+    use crate::util::from_cstr;
+    print!("{}", unsafe{from_cstr(s)});
+}

@@ -10,6 +10,7 @@
 *******************************************************************************/
 #include <stdbool.h>			// C standard needed for bool
 #include <stdint.h>				// C standard needed for uint8_t, uint32_t, uint64_t etc
+#include <sys/cdefs.h>			// needed for __aligned
 #include "usb-dependency.h"     // Provide minimal rpi-SmartStart
 #include "rpi-usb.h"			// This units header
 
@@ -744,7 +745,7 @@ static_assert(sizeof(struct UsbSendControl) == 0x04, "Structure should be 32bits
 
 /* Aligned buffers for DMA which need to also be multiple of 4 bytes */
 /* Fortunately max packet size under USB2 is 1024 so that is a given */
-static uint8_t aligned_bufs[DWC_NUM_CHANNELS][USB2_MAX_PACKET_SIZE] __attribute((aligned(4)));
+static uint8_t aligned_bufs[DWC_NUM_CHANNELS][USB2_MAX_PACKET_SIZE] __attribute__((__aligned__(4)));
 
 
 bool PhyInitialised = false;
@@ -1221,22 +1222,24 @@ RESULT HcdProcessRootHubMessage (uint8_t* buffer, uint32_t bufferLength, struct 
  11Feb17 LdB
  --------------------------------------------------------------------------*/
 RESULT PowerOnUsb(void) {
-    uint32_t __attribute__((aligned(16))) mailbox_message[8];
-    mailbox_message[0] = sizeof(mailbox_message);
-    mailbox_message[1] = 0;
-    mailbox_message[2] = MAILBOX_TAG_SET_POWER_STATE;
-    mailbox_message[3] = 8;
-    mailbox_message[4] = 8;
-    mailbox_message[5] = 0x3;    // device = USB
-    mailbox_message[6] = 0x1;	 // 1 = on	
-    mailbox_message[7] = 0x0;
-
-    mailbox_write(MB_CHANNEL_TAGS, ARMaddrToGPUaddr(&mailbox_message[0]));
-    mailbox_read(MB_CHANNEL_TAGS);
-
-    if ((mailbox_message[1] == 0x80000000) && (mailbox_message[4] == 0x80000008)) {
-        return OK;
-    }
+//    uint32_t __attribute__((aligned(16))) mailbox_message[8];
+//    mailbox_message[0] = sizeof(mailbox_message);
+//    mailbox_message[1] = 0;
+//    mailbox_message[2] = MAILBOX_TAG_SET_POWER_STATE;
+//    mailbox_message[3] = 8;
+//    mailbox_message[4] = 8;
+//    mailbox_message[5] = 0x3;    // device = USB
+//    mailbox_message[6] = 0x1;	 // 1 = on
+//    mailbox_message[7] = 0x0;
+//
+//    mailbox_write(MB_CHANNEL_TAGS, ARMaddrToGPUaddr(&mailbox_message[0]));
+//    mailbox_read(MB_CHANNEL_TAGS);
+//
+//    if ((mailbox_message[1] == 0x80000000) && (mailbox_message[4] == 0x80000008)) {
+//        return OK;
+//    }
+	if(_RustPowerOnUsb())
+		return OK;
     return ErrorDevice;												// Failed to turn on
 }
 
@@ -1246,22 +1249,24 @@ RESULT PowerOnUsb(void) {
  11Feb17 LdB
  --------------------------------------------------------------------------*/
 RESULT PowerOffUsb(void) {
-    uint32_t __attribute__((aligned(16))) mailbox_message[8];
-    mailbox_message[0] = sizeof(mailbox_message);
-    mailbox_message[1] = 0;
-    mailbox_message[2] = MAILBOX_TAG_SET_POWER_STATE;
-    mailbox_message[3] = 8;
-    mailbox_message[4] = 8;
-    mailbox_message[5] = 0x3;    // device = USB
-    mailbox_message[6] = 0x0;	 // 1 = off	
-    mailbox_message[7] = 0x0;
-
-    mailbox_write(MB_CHANNEL_TAGS, ARMaddrToGPUaddr(&mailbox_message[0]));
-    mailbox_read(MB_CHANNEL_TAGS);
-
-    if ((mailbox_message[1] == 0x80000000) && (mailbox_message[4] == 0x80000008)) {
-        return OK;
-    }
+//    uint32_t __attribute__((aligned(16))) mailbox_message[8];
+//    mailbox_message[0] = sizeof(mailbox_message);
+//    mailbox_message[1] = 0;
+//    mailbox_message[2] = MAILBOX_TAG_SET_POWER_STATE;
+//    mailbox_message[3] = 8;
+//    mailbox_message[4] = 8;
+//    mailbox_message[5] = 0x3;    // device = USB
+//    mailbox_message[6] = 0x0;	 // 1 = off
+//    mailbox_message[7] = 0x0;
+//
+//    mailbox_write(MB_CHANNEL_TAGS, ARMaddrToGPUaddr(&mailbox_message[0]));
+//    mailbox_read(MB_CHANNEL_TAGS);
+//
+//    if ((mailbox_message[1] == 0x80000000) && (mailbox_message[4] == 0x80000008)) {
+//        return OK;
+//    }
+	if(_RustPowerOffUsb())
+		return OK;
     return ErrorDevice;												// Failed to turn on
 }
 
@@ -1812,8 +1817,8 @@ RESULT HCDSumbitControlMessage (const struct UsbPipe pipe,			// Pipe structure (
         intPipeCtrl.Direction = pipectrl.Direction;					// Set pipe direction as requested	
         if ((result = HCDChannelTransfer(pipe, intPipeCtrl,
             &buffer[0],	bufferLength, USB_PID_DATA1)) != OK) {		// Send or recieve the data
-            LOG("HCD: Could not transfer DATA to device %i.\n",
-                pipe.Number);										// Log error
+            LOG("HCD: Could not transfer DATA to device %i. Result=%d\n",
+                pipe.Number, result);								// Log error
             return OK;
         }
         if (pipectrl.Direction == USB_DIRECTION_IN) {				// In bound pipe as per original
@@ -2939,20 +2944,22 @@ RESULT UsbInitialise (void) {
     UsbDependencyInit();
     RESULT result;
     chfree = (1 << DWC_NUM_CHANNELS) - 1;							// Set the channel free bit masks
-
+    LOG("+HCDInitialise()\n");
     if ((result = HCDInitialise()) != OK) {							// Initialize host control driver
         LOG("FATAL ERROR: HCD failed to initialise.\n");			// Some hardware issue
         return result;												// Return any fatal error
     }
-
+    LOG("+HCDStart()\n");
     if ((result = HCDStart()) != OK) {								// Start the host control driver						
         LOG("USBD: Abort, HCD failed to start.\n");
         return result;												// Return any fatal error
     }
+    LOG("+UsbAttachRootHub()\n");
     if ((result = UsbAttachRootHub()) != OK) {						// Attach the root hub .. which will launch enumeration
         LOG("USBD: Failed to enumerate devices.\n");
         return result;												// Retrn any fatal error
     }
+    LOG("UsbInitialise Succeeded!\n");
     return OK;														// Return success
 }
 
@@ -3191,14 +3198,14 @@ const char* SpeedString[3] = { "High", "Full", "Low" };
 
 void UsbShowTree(struct UsbDevice *root, const int level, const char tee) {
     int maxPacket;
-//	for (int i = 0; i < level - 1; i++)
-//		if (TreeLevelInUse[i] == 0) printf("   ");
-//			else printf(" %c ", '\xB3');							// Draw level lines if in use	
+	for (int i = 0; i < level - 1; i++)
+		if (TreeLevelInUse[i] == 0) printf("   ");
+			else printf(" %c ", '\xB3');							// Draw level lines if in use
             maxPacket = SizeToNumber(root->Pipe0.MaxSize);			// Max packet size
-//	printf(" %c-%s id: %i port: %i speed: %s packetsize: %i %s\n", tee,
-//		UsbGetDescription(root), root->Pipe0.Number, root->ParentHub.PortNumber,
-//		SpeedString[root->Pipe0.Speed], maxPacket,
-//		(IsHid(root->Pipe0.Number)) ? "- HID interface" : "");		// Print this entry
+	printf(" %c-%s id: %i port: %i speed: %s packetsize: %i %s\n", tee,
+		UsbGetDescription(root), root->Pipe0.Number, root->ParentHub.PortNumber,
+		SpeedString[root->Pipe0.Speed], maxPacket,
+		(IsHid(root->Pipe0.Number)) ? "- HID interface" : "");		// Print this entry
     if (IsHub(root->Pipe0.Number)) {
         int lastChild = root->HubPayload->MaxChildren;
         for (int i = 0; i < lastChild; i++) {						// For each child of hub

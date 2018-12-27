@@ -208,9 +208,49 @@ bool mailbox_tag_message (uint32_t* response_buf,					// Pointer to response buf
 
 uint32_t _RustOS_CheckSize(uint32_t *sizebuffer, uint32_t length)
 {
-	uint32_t size[1]={
-			sizeof(struct UsbDevice),
-			sizeof(struct HubDevice),
+#define Align_Offset(Struct, Field) (uint32_t)(uintptr_t)&((struct Struct *)0)->Field
+#define Align_Sizeof(Struct) (uint32_t)sizeof(struct Struct)
+#define Alternate(_Rust, C) C
+	uint32_t const size[]={
+	        //pointer
+	        sizeof(void const *),
+	        sizeof(void *),
+	        //UsbDevice
+	        Align_Offset(UsbDevice, ParentHub),
+	        Align_Offset(UsbDevice, Pipe0),
+	        Align_Offset(UsbDevice, PipeCtrl0),
+	        Align_Offset(UsbDevice, Config),
+	        Align_Offset(UsbDevice, MaxInterface),
+	        Align_Offset(UsbDevice, Interfaces),
+	        Align_Offset(UsbDevice, Endpoints),
+	        Align_Offset(UsbDevice, Descriptor),
+	        Align_Offset(UsbDevice, PayLoadId),
+	        Align_Offset(UsbDevice, Alternate(Payload, HubPayload)),
+	        Align_Offset(UsbDevice, Alternate(Payload, HidPayload)),
+	        Align_Offset(UsbDevice, Alternate(Payload, MassPayload)),
+	        Align_Sizeof(UsbParent),
+	        Align_Sizeof(UsbPipe),
+	        Align_Sizeof(UsbPipeControl),
+	        Align_Sizeof(UsbConfigControl),
+	        Align_Sizeof(UsbInterfaceDescriptor),
+	        Align_Sizeof(UsbEndpointDescriptor),
+	        Align_Sizeof(usb_device_descriptor),
+	        Align_Sizeof(UsbDevice),
+	        //HubDevice
+	        Align_Offset(HubDevice, MaxChildren),
+	        Align_Offset(HubDevice, Children),
+	        Align_Offset(HubDevice, Descriptor),
+	        Align_Sizeof(HubDescriptor),
+	        Align_Sizeof(HubDevice),
+	        //HidDevice
+	        Align_Offset(HidDevice, Descriptor),
+	        Align_Offset(HidDevice, HIDInterface),
+	        Align_Offset(HidDevice, MaxHID),
+	        Align_Sizeof(HidDescriptor),
+	        Align_Sizeof(HidDevice),
+	        //MassStorageDevice
+	        Align_Offset(MassStorageDevice, SCSI),
+	        Align_Sizeof(MassStorageDevice),
 	}, len=sizeof(size)/sizeof(*size);
 	if(length!=len)
 		return len;

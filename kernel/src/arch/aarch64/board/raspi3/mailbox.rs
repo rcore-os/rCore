@@ -351,3 +351,52 @@ pub fn framebuffer_alloc(width: u32, height: u32, depth: u32) -> PropertyMailbox
         screen_size: ret.allocate.buf[1],
     })
 }
+
+/**
+    Set power state. Returns new state, with/without waiting for the power to 
+    become stable.
+    param device_id:
+        0x00000000: SD Card
+        0x00000001: UART0
+        0x00000002: UART1
+        0x00000003: USB HCD
+        0x00000004: I2C0
+        0x00000005: I2C1
+        0x00000006: I2C2
+        0x00000007: SPI
+        0x00000008: CCP2TX
+    param state:
+        Bit 0: 0=off, 1=on
+        Bit 1: 0=do not wait, 1=wait
+        Bits 2-31: reserved for future use (set to 0)
+    return:
+        case Ok(state): state is defined as follows
+            Bit 0: 0=off, 1=on
+            Bit 1: 0=device exists, 1=device does not exist
+            Bits 2-31: reserved for future use
+        case Err(_): failed
+*/
+pub fn set_power_state(device_id: u32, state: u32) -> PropertyMailboxResult<u32> {
+    let ret = send_one_tag!(RPI_FIRMWARE_SET_POWER_STATE, [device_id, state])?;
+    Ok(ret[1])
+}
+
+#[no_mangle]
+extern "C" fn _RustPowerOnUsb() -> bool {
+    let ret = set_power_state(3,1);
+    if let Ok(state) = ret {
+        if (state&0x1)==1 {true} else {false}
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+extern "C" fn _RustPowerOffUsb() -> bool {
+    let ret = set_power_state(3,0);
+    if let Ok(state) = ret {
+        if (state&0x1)==0 {true} else {false}
+    } else {
+        false
+    }
+}

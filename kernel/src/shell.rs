@@ -6,14 +6,14 @@ use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
 
 pub fn run_user_shell() {
-    if let Ok(inode) = ROOT_INODE.lookup("sh") {
-        println!("Going to user mode shell.");
-        println!("Use 'ls' to list available programs.");
-        let data = inode.read_as_vec().unwrap();
-        processor().manager().add(Process::new_user(data.as_slice(), "sh".split(' ')), 0);
-    } else {
+//    if let Ok(inode) = ROOT_INODE.lookup("sh") {
+//        println!("Going to user mode shell.");
+//        println!("Use 'ls' to list available programs.");
+//        let data = inode.read_as_vec().unwrap();
+//        processor().manager().add(Process::new_user(data.as_slice(), "sh".split(' ')), 0);
+//    } else {
         processor().manager().add(Process::new_kernel(shell, 0), 0);
-    }
+//    }
 }
 
 pub extern fn shell(_arg: usize) -> ! {
@@ -26,7 +26,19 @@ pub extern fn shell(_arg: usize) -> ! {
         if cmd == "" {
             continue;
         }
-        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "usb" {
+        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "irq enable" {
+            unsafe{crate::arch::interrupt::enable();}
+            continue;
+        }
+        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "irq disable" {
+            unsafe{crate::arch::interrupt::disable();}
+            continue;
+        }
+        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "usbinit" {
+            crate::arch::board::usb::init();
+            continue;
+        }
+        if cfg!(all(target_arch = "aarch64", feature = "board_raspi3")) && cmd == "usbshow" {
             test_usb();
             continue;
         }
@@ -73,5 +85,7 @@ fn get_char() -> char {
 fn test_usb() {
     use crate::arch::board::usb::*;
     let root_ptr = get_root_hub();
-    UsbShowTree(root_ptr, 1, '+');
+    unsafe {
+        UsbShowTree(root_ptr, 1, '+');
+    }
 }

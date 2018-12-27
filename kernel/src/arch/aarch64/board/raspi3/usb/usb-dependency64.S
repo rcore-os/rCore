@@ -30,9 +30,11 @@ UsbDependencyInit:
 // ARMaddrToGPUaddr -- AARCH64 Pi3 code
 // C Function: uint32_t ARMaddrToGPUaddr (void* ARMaddress);
 // Entry: x0 will have ARMAddress value
+// Constant 0x00000000: originally use 0xC0000000;
+//           now use 0, and it's a identity function
 //"================================================================"
 ARMaddrToGPUaddr:
-    mov x1, #0xC0000000						// ARM to VC conversion value
+    mov x1, #0x00000000						// ARM to VC conversion value
     orr x0, x0, x1							// Create bus address
     ret										// Return
 .balign	4
@@ -48,9 +50,11 @@ ARMaddrToGPUaddr:
 // GPUaddrToARMaddr -- AARCH64 Pi3 code
 // C Function: uint32_t GPUaddrToARMaddr (uint32_t BUSaddress);
 // Entry: x0 will have GPUAddress value
+// Constant 0x00000000: originally use 0xC0000000;
+//           now use 0, and it's a identity function
 //"================================================================"
 GPUaddrToARMaddr:
-    mov x1, ~0xC0000000						// ARM to VC conversion value	
+    mov x1, ~0x00000000						// ARM to VC conversion value
     and x0, x0, x1							// Create arm address
     ret										// Return
 .balign	4
