@@ -7,14 +7,14 @@
 | Raspberry Pi 3B+ | |
 |-------|---------|
 | 指令集 | ARMv8-A 64 bit |
-| 片上系统(SoC) | Broadcom BCM2837 |
+| 片上系统(SoC) | Broadcom BCM2837B0 |
 | 处理器(CPU) | 4 x Cortex-A53 1.4Ghz
 | 图形处理器(GPU) | Broadcom VideoCore IV |
 | 内存 | 1GB(与 GPU 共享) |
 
 ## 官方文档
 
-* [ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile](https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf)：Aarch64 的完整文档，有 7000 多页，最为详细。
+* [ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile](https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf)：AArch64 的完整文档，有 7000 多页，最为详细。
 * [ARM Cortex-A Series Programmer’s Guide for ARMv8-A](http://infocenter.arm.com/help/topic/com.arm.doc.den0024a/DEN0024A_v8_architecture_PG.pdf)：可认为是上一文档的精简版，仅有不到 300 页。
 * [BCM2837 ARM Peripherals](https://web.stanford.edu/class/cs140e/docs/BCM2837-ARM-Peripherals.pdf)：Raspberry Pi SoC BCM283x 系列的外围设备文档，包含对 GPIO、中断控制器、mini UART、System Timer 等外围设备的访问。
 * [BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)：仅用于如何使用 ARM Generic Timer。
