@@ -204,7 +204,23 @@ unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
 fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
     debug!("come in to memory_set_from");
     let mut ms = MemorySet::new();
-    let mut entry = None;
+    let mut entry = elf.header.pt2.entry_point() as usize;
+
+    // [NoMMU] Get total memory size and alloc space
+    let va_begin = elf.program_iter()
+        .filter(|ph| ph.get_type() == Ok(Type::Load))
+        .map(|ph| ph.virtual_addr()).min().unwrap() as usize;
+    let va_end = elf.program_iter()
+        .filter(|ph| ph.get_type() == Ok(Type::Load))
+        .map(|ph| ph.virtual_addr() + ph.mem_size()).max().unwrap() as usize;
+    let va_size = va_end - va_begin;
+    #[cfg(feature = "no_mmu")]
+    let target = ms.push(va_size);
+    #[cfg(feature = "no_mmu")]
+    { entry = entry - va_begin + target.as_ptr() as usize; }
+    #[cfg(feature = "board_k210")]
+    { entry += 0x40000000; }
+
     for ph in elf.program_iter() {
         if ph.get_type() != Ok(Type::Load) {
             continue;
@@ -219,7 +235,9 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
 
         // Get target slice
         #[cfg(feature = "no_mmu")]
-        let target = ms.push(mem_size);
+        let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];
+        #[cfg(feature = "no_mmu")]
+        info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
             ms.push(MemoryArea::new(virt_addr, virt_addr + mem_size, memory_attr_from(ph.flags()), ""));
@@ -234,13 +252,8 @@ fn memory_set_from<'a>(elf: &'a ElfFile<'a>) -> (MemorySet, usize) {
                 target[file_size..].iter_mut().for_each(|x| *x = 0);
             });
         }
-        // Find real entry point
-        if ph.flags().is_execute() {
-            let origin_entry = elf.header.pt2.entry_point() as usize;
-            entry = Some(origin_entry - virt_addr + target.as_ptr() as usize);
-        }
     }
-    (ms, entry.unwrap())
+    (ms, entry)
 }
 
 fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
