@@ -148,105 +148,70 @@ pub struct Context(usize);
 impl Context {
     /// Switch to another kernel thread.
     ///
-    /// Defined in `trap.asm`.
-    ///
     /// Push all callee-saved registers at the current kernel stack.
     /// Store current sp, switch to target.
     /// Pop all callee-saved registers, then return to the target.
-    #[cfg(target_arch = "riscv32")]
     #[naked]
     #[inline(never)]
     pub unsafe extern fn switch(&mut self, target: &mut Self) {
-        asm!(
-        "
+        #[cfg(target_arch = "riscv32")]
+        asm!(r"
+        .equ XLENB, 4
+        .macro Load reg, mem
+            lw \reg, \mem
+        .endm
+        .macro Store reg, mem
+            sw \reg, \mem
+        .endm");
+        #[cfg(target_arch = "riscv64")]
+        asm!(r"
+        .equ XLENB, 8
+        .macro Load reg, mem
+            ld \reg, \mem
+        .endm
+        .macro Store reg, mem
+            sd \reg, \mem
+        .endm");
+        asm!("
         // save from's registers
-        addi sp, sp, -4*14
-        sw sp, 0(a0)
-        sw ra, 0*4(sp)
-        sw s0, 2*4(sp)
-        sw s1, 3*4(sp)
-        sw s2, 4*4(sp)
-        sw s3, 5*4(sp)
-        sw s4, 6*4(sp)
-        sw s5, 7*4(sp)
-        sw s6, 8*4(sp)
-        sw s7, 9*4(sp)
-        sw s8, 10*4(sp)
-        sw s9, 11*4(sp)
-        sw s10, 12*4(sp)
-        sw s11, 13*4(sp)
-        csrrs s11, 0x180, x0 // satp
-        sw s11, 1*4(sp)
+        addi  sp, sp, (-XLENB*14)
+        Store sp, 0(a0)
+        Store ra, 0*XLENB(sp)
+        Store s0, 2*XLENB(sp)
+        Store s1, 3*XLENB(sp)
+        Store s2, 4*XLENB(sp)
+        Store s3, 5*XLENB(sp)
+        Store s4, 6*XLENB(sp)
+        Store s5, 7*XLENB(sp)
+        Store s6, 8*XLENB(sp)
+        Store s7, 9*XLENB(sp)
+        Store s8, 10*XLENB(sp)
+        Store s9, 11*XLENB(sp)
+        Store s10, 12*XLENB(sp)
+        Store s11, 13*XLENB(sp)
+        csrr  s11, satp
+        Store s11, 1*XLENB(sp)
 
         // restore to's registers
-        lw sp, 0(a1)
-        lw s11, 1*4(sp)
-        csrrw x0, 0x180, s11 // satp
-        lw ra, 0*4(sp)
-        lw s0, 2*4(sp)
-        lw s1, 3*4(sp)
-        lw s2, 4*4(sp)
-        lw s3, 5*4(sp)
-        lw s4, 6*4(sp)
-        lw s5, 7*4(sp)
-        lw s6, 8*4(sp)
-        lw s7, 9*4(sp)
-        lw s8, 10*4(sp)
-        lw s9, 11*4(sp)
-        lw s10, 12*4(sp)
-        lw s11, 13*4(sp)
-        addi sp, sp, 4*14
+        Load sp, 0(a1)
+        Load s11, 1*XLENB(sp)
+        csrw satp, s11
+        Load ra, 0*XLENB(sp)
+        Load s0, 2*XLENB(sp)
+        Load s1, 3*XLENB(sp)
+        Load s2, 4*XLENB(sp)
+        Load s3, 5*XLENB(sp)
+        Load s4, 6*XLENB(sp)
+        Load s5, 7*XLENB(sp)
+        Load s6, 8*XLENB(sp)
+        Load s7, 9*XLENB(sp)
+        Load s8, 10*XLENB(sp)
+        Load s9, 11*XLENB(sp)
+        Load s10, 12*XLENB(sp)
+        Load s11, 13*XLENB(sp)
+        addi sp, sp, (XLENB*14)
 
-        sw zero, 0(a1)
-        ret"
-        : : : : "volatile" )
-    }
-
-    #[cfg(target_arch = "riscv64")]
-    #[naked]
-    #[inline(never)]
-    pub unsafe extern fn switch(&mut self, target: &mut Self) {
-        asm!(
-        "
-        // save from's registers
-        addi sp, sp, -8*14
-        sd sp, 0(a0)
-        sd ra, 0*8(sp)
-        sd s0, 2*8(sp)
-        sd s1, 3*8(sp)
-        sd s2, 4*8(sp)
-        sd s3, 5*8(sp)
-        sd s4, 6*8(sp)
-        sd s5, 7*8(sp)
-        sd s6, 8*8(sp)
-        sd s7, 9*8(sp)
-        sd s8, 10*8(sp)
-        sd s9, 11*8(sp)
-        sd s10, 12*8(sp)
-        sd s11, 13*8(sp)
-        csrrs s11, 0x180, x0 // satp
-        sd s11, 1*8(sp)
-
-        // restore to's registers
-        ld sp, 0(a1)
-        ld s11, 1*8(sp)
-        csrrw x0, 0x180, s11 // satp
-        ld ra, 0*8(sp)
-        ld s0, 2*8(sp)
-        ld s1, 3*8(sp)
-        ld s2, 4*8(sp)
-        ld s3, 5*8(sp)
-        ld s4, 6*8(sp)
-        ld s5, 7*8(sp)
-        ld s6, 8*8(sp)
-        ld s7, 9*8(sp)
-        ld s8, 10*8(sp)
-        ld s9, 11*8(sp)
-        ld s10, 12*8(sp)
-        ld s11, 13*8(sp)
-        addi sp, sp, 8*14
-
-        sd zero, 0(a1)
+        Store zero, 0(a1)
         ret"
         : : : : "volatile" )
     }

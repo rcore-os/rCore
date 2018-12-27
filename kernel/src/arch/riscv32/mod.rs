@@ -74,29 +74,28 @@ global_asm!("
     .macro TEST_BACK_TO_KERNEL
         andi s0, s1, 1 << 8     // sstatus.SPP = 1
     .endm
-
 ");
 
-#[cfg(target_pointer_width = "32")]
-global_asm!("
+#[cfg(target_arch = "riscv32")]
+global_asm!(r"
     .equ XLENB,     4
     .equ XLENb,     32
     .macro LOAD a1, a2
-        lw \\a1, \\a2*XLENB(sp)
+        lw \a1, \a2*XLENB(sp)
     .endm
     .macro STORE a1, a2
-        sw \\a1, \\a2*XLENB(sp)
+        sw \a1, \a2*XLENB(sp)
     .endm
 ");
-#[cfg(target_pointer_width = "64")]
-global_asm!("
+#[cfg(target_arch = "riscv64")]
+global_asm!(r"
     .equ XLENB,     8
     .equ XLENb,     64
     .macro LOAD a1, a2
-        ld \\a1, \\a2*XLENB(sp)
+        ld \a1, \a2*XLENB(sp)
     .endm
     .macro STORE a1, a2
-        sd \\a1, \\a2*XLENB(sp)
+        sd \a1, \a2*XLENB(sp)
     .endm
 ");
 
