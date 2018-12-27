@@ -48,13 +48,13 @@
 * 使用 GDB 调试
 
     ```
-    make debug
+    make debug arch=aarch64
     ```
 
 * 反汇编
 
     ```
-    make asm
+    make asm arch=aarch64
     ```
 
 * 更多 Makefile 选项
@@ -74,7 +74,7 @@
 2. 写入 RustOS 内核镜像：
 
     ```
-    make install
+    make install arch=aarch64
     ```
 
 3. 连接 Raspberry Pi、CP2102 模块与 PC：
