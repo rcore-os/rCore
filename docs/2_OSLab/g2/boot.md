@@ -48,7 +48,18 @@ SECTIONS {
 
 ## boot.S
 
-CPU 启动代码位于 `kernel/src/arch/aarch64/boot/boot.S`，主要流程如下：
+CPU 启动代码位于 `kernel/src/arch/aarch64/boot/boot.S`，负责初始化一些系统寄存器，并将当前异常级别(exception level)切换到 EL1。
+
+AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
+
+* EL0: Applications.
+* EL1: OS kernel and associated functions that are typically described as privileged.
+* EL2: Hypervisor.
+* EL3: Secure monitor.
+
+在 RustOS 中，内核将运行在 EL1 上，用户程序将运行在 EL0 上。
+
+`boot.S` 的主要流程如下：
 
 1. 获取核的编号，目前只使用 0 号核，其余核将被闲置：
 
@@ -66,7 +77,7 @@ CPU 启动代码位于 `kernel/src/arch/aarch64/boot/boot.S`，主要流程如�
         b       halt
     ```
 
-2. 读取当前异常级别(Exception level)：
+2. 读取当前异常级别：
 
     ```armasm
     # read the current exception level into x0 (ref: C5.2.1)
