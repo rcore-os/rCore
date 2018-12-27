@@ -10,7 +10,10 @@ pub unsafe fn set_cpu_id(cpu_id: usize) {
 
 pub fn id() -> usize {
     let cpu_id;
+    #[cfg(not(feature = "m_mode"))]
     unsafe { asm!("mv $0, tp" : "=r"(cpu_id)); }
+    #[cfg(feature = "m_mode")]
+    unsafe { asm!("csrr $0, mhartid" : "=r"(cpu_id)); }
     cpu_id
 }
 
@@ -31,6 +34,5 @@ pub unsafe fn start_others(hart_mask: usize) {
 }
 
 pub fn halt() {
-    use riscv::asm::wfi;
-    unsafe { wfi() }
+    unsafe { riscv::asm::wfi() }
 }

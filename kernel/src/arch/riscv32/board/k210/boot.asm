@@ -33,4 +33,6 @@ boot:
     sw t0, 0(x1)
 
     csrr a0, mhartid
+    // FIXME: enable core 1
+    li a2, 0    // hart_mask
     j _start

@@ -10,7 +10,7 @@ use riscv::register::{
     sscratch as xscratch,
     stvec as xtvec,
 };
-use riscv::register::{mcause, mepc, sie};
+use riscv::register::{mcause, mepc, sie, mie};
 pub use self::context::*;
 use crate::memory::{MemorySet, InactivePageTable0};
 use log::*;
@@ -35,6 +35,9 @@ pub fn init() {
         // Enable IPI
         sie::set_ssoft();
         // Enable serial interrupt
+        #[cfg(feature = "m_mode")]
+        mie::set_mext();
+        #[cfg(not(feature = "m_mode"))]
         sie::set_sext();
         // NOTE: In M-mode: mie.MSIE is set by BBL.
         //                  mie.MEIE can not be set in QEMU v3.0

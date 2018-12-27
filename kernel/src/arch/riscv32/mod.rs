@@ -15,6 +15,8 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
     unsafe { cpu::set_cpu_id(hartid); }
 
     if hartid != 0 {
+        #[cfg(feature = "board_k210")]
+        loop {} // K210: if not, an assert will fail in spin::RwLock ???
         while unsafe { !cpu::has_started(hartid) }  { }
         println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
         others_main();
@@ -28,16 +30,11 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
 
     crate::logging::init();
     interrupt::init();
-    info!("interrupt::init end");
     memory::init();
-    info!("memory::init end");
     timer::init();
-    info!("timer::init end");
     crate::process::init();
-    info!("crate::process::init end");
 
     unsafe { cpu::start_others(hart_mask); }
-    info!("going to crate::kmain");
     crate::kmain();
 }
 
