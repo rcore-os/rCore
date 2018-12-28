@@ -2,25 +2,25 @@ use super::c_structure::*;
 
 extern "C" {
 /***************************************************************************}
-{					      PUBLIC INTERFACE ROUTINES			                }
+{                       PUBLIC INTERFACE ROUTINES                           }
 {                     rpi-usb.h: line 761 ~ line 948                        }
 ****************************************************************************/
 
 /*--------------------------------------------------------------------------}
-{						 PUBLIC USB DESCRIPTOR ROUTINES						}
+{                        PUBLIC USB DESCRIPTOR ROUTINES                     }
 {--------------------------------------------------------------------------*/
-    pub fn HCDGetDescriptor (pipe: UsbPipe,							// Pipe structure to send message thru (really just uint32_t)
-                         type0: usb_descriptor_type,				// The type of descriptor
-                         index: u8,									// The index of the type descriptor
-                         langId: u16,								// The language id
-                         buffer: *mut u8,							// Buffer to recieve descriptor
-                         length: u32,								// Maximumlength of descriptor
-                         recipient: u8,								// Recipient flags			
-                         bytesTransferred: *mut u32,				// Value at pointer will be updated with bytes transfered to/from buffer (NULL to ignore)
-                         runHeaderCheck: bool,						// Whether to run header check
+    pub fn HCDGetDescriptor (pipe: UsbPipe,                         // Pipe structure to send message thru (really just uint32_t)
+                         type0: usb_descriptor_type,                // The type of descriptor
+                         index: u8,                                 // The index of the type descriptor
+                         langId: u16,                               // The language id
+                         buffer: *mut u8,                           // Buffer to recieve descriptor
+                         length: u32,                               // Maximumlength of descriptor
+                         recipient: u8,                             // Recipient flags
+                         bytesTransferred: *mut u32,                // Value at pointer will be updated with bytes transfered to/from buffer (NULL to ignore)
+                         runHeaderCheck: bool,                      // Whether to run header check
     ) -> RESULT;
 /*--------------------------------------------------------------------------}
-{					 PUBLIC GENERIC USB INTERFACE ROUTINES					}
+{                    PUBLIC GENERIC USB INTERFACE ROUTINES                  }
 {--------------------------------------------------------------------------*/
     pub fn UsbInitialise() -> RESULT;
     pub fn IsHub(devNumber: u8) -> bool;
@@ -31,37 +31,37 @@ extern "C" {
     pub fn UsbGetRootHub() -> *mut UsbDevice;
     pub fn UsbDeviceAtAddress(devNumber: u8) -> *mut UsbDevice;
 /*--------------------------------------------------------------------------}
-{					 PUBLIC USB CHANGE CHECKING ROUTINES					}
+{                    PUBLIC USB CHANGE CHECKING ROUTINES                    }
 {--------------------------------------------------------------------------*/
     pub fn UsbCheckForChange();
 /*--------------------------------------------------------------------------}
-{					 PUBLIC DISPLAY USB INTERFACE ROUTINES					}
+{                    PUBLIC DISPLAY USB INTERFACE ROUTINES                  }
 {--------------------------------------------------------------------------*/
     pub fn UsbGetDescription(device:*mut UsbDevice) -> *const u8;
     // fn UsbShowTree: obsolete, use UsbShowTree() below
 /*--------------------------------------------------------------------------}
-{						 PUBLIC HID INTERFACE ROUTINES						}
+{                        PUBLIC HID INTERFACE ROUTINES                      }
 {--------------------------------------------------------------------------*/
-    pub fn HIDReadDescriptor(devNumber: u8,							// Device number (address) of the device to read 
-                              hidIndex: u8,							// Which hid configuration information is requested from
-                              Buffer: *mut u8,						// Pointer to a buffer to receive the descriptor
-                              Length: u16,							// Maxium length of the buffer
+    pub fn HIDReadDescriptor(devNumber: u8,                         // Device number (address) of the device to read 
+                              hidIndex: u8,                         // Which hid configuration information is requested from
+                              Buffer: *mut u8,                      // Pointer to a buffer to receive the descriptor
+                              Length: u16,                          // Maxium length of the buffer
     ) -> RESULT;
-    pub fn HIDReadReport(devNumber: u8,								// Device number (address) of the device to read
-                          hidIndex: u8,								// Which hid configuration information is requested from
-                          reportValue: u16,							// Hi byte = enum HidReportType  Lo Byte = Report Index (0 = default)  
-                          Buffer: *mut u8,							// Pointer to a buffer to recieve the report
-                          Length: u16,								// Length of the report
+    pub fn HIDReadReport(devNumber: u8,                             // Device number (address) of the device to read
+                          hidIndex: u8,                             // Which hid configuration information is requested from
+                          reportValue: u16,                         // Hi byte = enum HidReportType  Lo Byte = Report Index (0 = default)  
+                          Buffer: *mut u8,                          // Pointer to a buffer to recieve the report
+                          Length: u16,                              // Length of the report
     ) -> RESULT;
-    pub fn HIDWriteReport(devNumber: u8,							// Device number (address) of the device to write report to
-                           hidIndex: u8,							// Which hid configuration information is writing to
-                           reportValue: u16,						// Hi byte = enum HidReportType  Lo Byte = Report Index (0 = default) 
-                           Buffer: *mut u8,							// Pointer to a buffer containing the report
-                           Length: u16,								// Length of the report
+    pub fn HIDWriteReport(devNumber: u8,                            // Device number (address) of the device to write report to
+                           hidIndex: u8,                            // Which hid configuration information is writing to
+                           reportValue: u16,                        // Hi byte = enum HidReportType  Lo Byte = Report Index (0 = default) 
+                           Buffer: *mut u8,                         // Pointer to a buffer containing the report
+                           Length: u16,                             // Length of the report
     ) -> RESULT;
-    pub fn HIDSetProtocol(devNumber: u8,							// Device number (address) of the device
-                           interface: u8,							// Interface number to change protocol on
-                           protocol: u16,							// The protocol number request
+    pub fn HIDSetProtocol(devNumber: u8,                            // Device number (address) of the device
+                           interface: u8,                           // Interface number to change protocol on
+                           protocol: u16,                           // The protocol number request
     ) -> RESULT;
 
 /***************************************************************************}
@@ -84,28 +84,28 @@ pub unsafe fn UsbShowTree(root:&mut UsbDevice, level:i32, tee:char) {
             print!(" | ")                    // Draw level lines if in use
         }
     }
-    let maxPacket = SizeToNumber(root.Pipe0.getMaxSize());									// Max packet size
+    let maxPacket = SizeToNumber(root.Pipe0.getMaxSize());	                                // Max packet size
     println!(" {}-{} id: {} port: {} speed: {} packetsize: {} {}", tee,
         unsafe{from_cstr(UsbGetDescription(root))},
         root.Pipe0.getNumber(), root.ParentHub.PortNumber,
         SpeedString[root.Pipe0.getSpeed() as usize], maxPacket,
-        if unsafe{IsHid(root.Pipe0.getNumber() as u8)} {"- HID interface"} else {""});		// Print this entry
+        if unsafe{IsHid(root.Pipe0.getNumber() as u8)} {"- HID interface"} else {""});	    // Print this entry
     if unsafe{IsHub(root.Pipe0.getNumber() as u8)} {
         let lastChild = unsafe{(*root.Payload.HubPayload).MaxChildren} as i32;
-        for i in 0..lastChild-1 {															// For each child of hub
-            let mut nodetee = '=';															// Preset nodetee to end node ... "L"
-            for j in i..lastChild-2 {														// Check if any following child node is valid
+        for i in 0..lastChild-1 {	                                                        // For each child of hub
+            let mut nodetee = '=';	                                                        // Preset nodetee to end node ... "L"
+            for j in i..lastChild-2 {	                                                    // Check if any following child node is valid
                 if !unsafe{(*root.Payload.HubPayload).Children[(j + 1)as usize]}.is_null() {// We found a following node in use                    
-                    unsafe{TreeLevelInUse[level as usize] = 1;}								// Set tree level in use flag
-                    nodetee = '+';															// Change the node character to tee looks like this "├"
-                    break;																	// Exit loop j
+                    unsafe{TreeLevelInUse[level as usize] = 1;}	                            // Set tree level in use flag
+                    nodetee = '+';	                                                        // Change the node character to tee looks like this "├"
+                    break;	                                                                // Exit loop j
                 }
             }
-            if !unsafe{(*root.Payload.HubPayload).Children[i as usize]}.is_null() {			// If child valid
+            if !unsafe{(*root.Payload.HubPayload).Children[i as usize]}.is_null() {	        // If child valid
                 UsbShowTree(unsafe{&mut *(*root.Payload.HubPayload).Children[i as usize]},
-                    level + 1, nodetee);													// Iterate into child but level+1 down of coarse
+                    level + 1, nodetee);	                                                // Iterate into child but level+1 down of coarse
             }
-            unsafe{TreeLevelInUse[level as usize] = 0;}										// Clear level in use flag
+            unsafe{TreeLevelInUse[level as usize] = 0;}	                                    // Clear level in use flag
         }
     }
 }
