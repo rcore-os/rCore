@@ -1,7 +1,7 @@
 //! Serial driver for aarch64.
 
 use core::fmt::{Arguments, Write};
-use super::board::serial::{SerialRead, SERIAL_PORT};
+use super::board::serial::*;
 
 pub fn getchar() -> char {
     unsafe { SERIAL_PORT.force_unlock(); }

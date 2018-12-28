@@ -1,4 +1,3 @@
-use bit_allocator::{BitAlloc, BitAlloc64K};
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 use spin::{Mutex, MutexGuard};
@@ -44,9 +43,7 @@ pub struct ActivePageTable(RecursivePageTable<'static>);
 pub struct PageEntry(PageTableEntry);
 
 impl PageTable for ActivePageTable {
-    type Entry = PageEntry;
-
-    fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
             .unwrap().flush();
@@ -58,43 +55,20 @@ impl PageTable for ActivePageTable {
         flush.flush();
     }
 
-    fn get_entry(&mut self, addr: usize) -> Option<&mut PageEntry> {
+    fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
         for level in 0..3 {
             let entry = get_entry_ptr(addr, 4 - level);
             if unsafe { !(*entry).present() } { return None; }
         }
         unsafe { Some(&mut *(get_entry_ptr(addr, 1))) }
     }
-
-    fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
-        use core::slice;
-        unsafe { slice::from_raw_parts_mut((addr & !0xfffusize) as *mut u8, PAGE_SIZE) }
-    }
-
-    fn read(&mut self, addr: usize) -> u8 {
-        unsafe { *(addr as *const u8) }
-    }
-
-    fn write(&mut self, addr: usize, data: u8) {
-        unsafe { *(addr as *mut u8) = data; }
-    }
 }
+
+impl PageTableExt for ActivePageTable {}
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(RecursivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap())
-    }
-    fn with_temporary_map(&mut self, frame: &Frame, f: impl FnOnce(&mut ActivePageTable, &mut x86PageTable)) {
-        // Create a temporary page
-        let page = Page::of_addr(0xcafebabe);
-        assert!(self.0.translate_page(page).is_none(), "temporary page is already mapped");
-        // Map it to table
-        self.map(page.start_address().as_u64() as usize, frame.start_address().as_u64() as usize);
-        // Call f
-        let table = unsafe { &mut *page.start_address().as_mut_ptr() };
-        f(self, table);
-        // Unmap the page
-        self.unmap(0xcafebabe);
     }
 }
 
@@ -142,8 +116,8 @@ impl Entry for PageEntry {
     }
     fn execute(&self) -> bool { !self.0.flags().contains(EF::NO_EXECUTE) }
     fn set_execute(&mut self, value: bool) { self.as_flags().set(EF::NO_EXECUTE, !value); }
-    fn mmio(&self) -> bool { unimplemented!() }
-    fn set_mmio(&mut self, value: bool) { unimplemented!() }
+    fn mmio(&self) -> bool { false }
+    fn set_mmio(&mut self, value: bool) { }
 }
 
 fn get_entry_ptr(addr: usize, level: u8) -> *mut PageEntry {
@@ -166,16 +140,10 @@ pub struct InactivePageTable0 {
 impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
-    fn new() -> Self {
-        let mut pt = Self::new_bare();
-        pt.map_kernel();
-        pt
-    }
-
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(target))
-            .expect("failed to allocate frame");
-        active_table().with_temporary_map(&frame, |_, table: &mut x86PageTable| {
+        let target = alloc_frame().expect("failed to allocate frame");
+        let frame = Frame::of_addr(target);
+        active_table().with_temporary_map(target, |_, table: &mut x86PageTable| {
             table.zero();
             // set up recursive mapping for the table
             table[511].set_frame(frame.clone(), EF::PRESENT | EF::WRITABLE);
@@ -183,61 +151,6 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { p4_frame: frame }
     }
 
-    fn edit(&mut self, f: impl FnOnce(&mut Self::Active)) {
-        active_table().with_temporary_map(&Cr3::read().0, |active_table, p4_table: &mut x86PageTable| {
-            let backup = p4_table[0o777].clone();
-
-            // overwrite recursive mapping
-            p4_table[0o777].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITABLE);
-            tlb::flush_all();
-
-            // execute f in the new context
-            f(active_table);
-
-            // restore recursive mapping to original p4 table
-            p4_table[0o777] = backup;
-            tlb::flush_all();
-        });
-    }
-
-    unsafe fn activate(&self) {
-        let old_frame = Cr3::read().0;
-        let new_frame = self.p4_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            Cr3::write(new_frame, Cr3Flags::empty());
-        }
-    }
-
-    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        let old_frame = Cr3::read().0;
-        let new_frame = self.p4_frame.clone();
-        debug!("switch table {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            Cr3::write(new_frame, Cr3Flags::empty());
-        }
-        let ret = f();
-        debug!("switch table {:?} -> {:?}", new_frame, old_frame);
-        if old_frame != new_frame {
-            Cr3::write(old_frame, Cr3Flags::empty());
-        }
-        ret
-    }
-
-    fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as CR3
-    }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
-    }
-}
-
-impl InactivePageTable0 {
     fn map_kernel(&mut self) {
         let mut table = unsafe { &mut *(0xffffffff_fffff000 as *mut x86PageTable) };
         // Kernel at 0xffff_ff00_0000_0000
@@ -249,12 +162,47 @@ impl InactivePageTable0 {
             table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
         });
     }
+
+    fn token(&self) -> usize {
+        self.p4_frame.start_address().as_u64() as usize // as CR3
+    }
+
+    unsafe fn set_token(token: usize) {
+        Cr3::write(Frame::containing_address(PhysAddr::new(token as u64)), Cr3Flags::empty());
+    }
+
+    fn active_token() -> usize {
+        Cr3::read().0.start_address().as_u64() as usize
+    }
+
+    fn flush_tlb() {
+        tlb::flush_all();
+    }
+
+    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
+        let target = Cr3::read().0.start_address().as_u64() as usize;
+        active_table().with_temporary_map(target, |active_table, p4_table: &mut x86PageTable| {
+            let backup = p4_table[0o777].clone();
+
+            // overwrite recursive mapping
+            p4_table[0o777].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITABLE);
+            tlb::flush_all();
+
+            // execute f in the new context
+            let ret = f(active_table);
+
+            // restore recursive mapping to original p4 table
+            p4_table[0o777] = backup;
+            tlb::flush_all();
+            ret
+        })
+    }
 }
 
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
     }
 }
 

@@ -208,7 +208,7 @@ fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapF
 
     // Make new Context
     let iter = args.iter().map(|s| s.as_str());
-    let mut context = ContextImpl::new_user(buf.as_slice(), iter);
+    let mut context = Process::new_user(buf.as_slice(), iter);
 
     // Activate new page table
     unsafe { context.memory_set.activate(); }

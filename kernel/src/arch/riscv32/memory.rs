@@ -2,7 +2,7 @@ use core::{slice, mem};
 use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 use log::*;
-use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR};
+use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERN_VA_BASE};
 use riscv::register::satp;
 
@@ -48,14 +48,9 @@ fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
 
-    // TODO: delete debug code
     let mut ba = FRAME_ALLOCATOR.lock();
     let range = to_range((end as usize) - KERN_VA_BASE + PAGE_SIZE, MEMORY_END);
-    info!("FrameAllocator insert {} .. {}", range.start, range.end);
     ba.insert(range);
-    info!("FrameAllocator init end");
-    // DEBUG: trace code
-    trace!("init_frame_allocator: alloc={:x?}", ba.alloc());
 
     /*
     * @param:
@@ -75,31 +70,15 @@ fn init_frame_allocator() {
 }
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
-#[cfg(all(target_arch = "riscv32", not(feature = "no_mmu")))]
+#[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel() {
+    let offset = -(super::consts::KERN_VA_BASE as isize);
     let mut ms = MemorySet::new_bare();
-    #[cfg(feature = "no_bbl")]
-    ms.push(MemoryArea::new_identity(0x10000000, 0x10000008, MemoryAttr::default(), "serial"));
-    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
-    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
-    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
-    ms.push(MemoryArea::new_identity(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), "stack"));
-    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
-    unsafe { ms.activate(); }
-    unsafe { SATP = ms.token(); }
-    mem::forget(ms);
-}
-
-#[cfg(all(target_arch = "riscv64", not(feature = "no_mmu")))]
-fn remap_the_kernel() {
-    let mut ms = MemorySet::new_bare();
-    #[cfg(feature = "no_bbl")]
-    ms.push(MemoryArea::new_identity(0x0000_0000_1000_0000, 0x0000_0000_1000_0008, MemoryAttr::default(), "serial"));
-    ms.push(MemoryArea::new_identity(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), "text"));
-    ms.push(MemoryArea::new_identity(sdata as usize, edata as usize, MemoryAttr::default(), "data"));
-    ms.push(MemoryArea::new_identity(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), "rodata"));
-    ms.push(MemoryArea::new_identity(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), "stack"));
-    ms.push(MemoryArea::new_identity(sbss as usize, ebss as usize, MemoryAttr::default(), "bss"));
+    ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
+    ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");
+    ms.push(srodata as usize, erodata as usize, Linear::new(offset, MemoryAttr::default().readonly()), "rodata");
+    ms.push(bootstack as usize, bootstacktop as usize, Linear::new(offset, MemoryAttr::default()), "stack");
+    ms.push(sbss as usize, ebss as usize, Linear::new(offset, MemoryAttr::default()), "bss");
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);

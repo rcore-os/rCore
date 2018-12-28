@@ -28,8 +28,7 @@ else
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
 fi
-UCORE_USER_IMAGE="../user/hand/user-${TARGET_ARCH}.img"
-# UCORE_USER_IMAGE="../user/build/user-${TARGET_ARCH}.img"
+UCORE_USER_IMAGE="../user/img/ucore-${TARGET_ARCH}.img"
 LLC=llc
 RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
 CARGO_PATH=~/.cargo
@@ -39,6 +38,7 @@ CC=${TARGET_ARCH}-unknown-elf-gcc
 AR=${TARGET_ARCH}-unknown-elf-ar
 OBJCOPY=${TARGET_ARCH}-unknown-elf-objcopy
 QEMU=qemu-system-${TARGET_ARCH}
+export SMP=4
 
 
 
@@ -583,5 +583,5 @@ else
     make -j32
     cp bbl ../../kernel/outdir/kernel.bin
     cd ../../kernel
-    ${QEMU} -smp cores=1 -nographic -machine virt -kernel outdir/kernel.bin
+    ${QEMU} -smp cores=${SMP} -nographic -machine virt -kernel outdir/kernel.bin
 fi

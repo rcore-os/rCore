@@ -32,14 +32,16 @@ target := $(arch)-blog_os
 kernel := target/$(target)/$(mode)/ucore
 bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
-
 user_dir := ../user
-user_bin_path := $(user_dir)/target/$(arch)-ucore/debug
-user_bins := $(patsubst $(user_bin_path)/%.d, $(user_bin_path)/%, $(wildcard $(user_bin_path)/*.d))
-user_obj := build/$(arch)/user.o
 
 export ARCH = $(arch)
-export SFSIMG = $(user_dir)/build/user-$(arch).img
+export SMP = $(smp)
+#export SFSIMG = $(user_dir)/build/user-$(arch).img
+ifeq ($(arch), x86_64)
+export SFSIMG = $(user_dir)/img/ucore-i386.img
+else
+export SFSIMG = $(user_dir)/img/ucore-$(arch).img
+endif
 
 ### qemu options ###
 qemu_opts := \
@@ -79,6 +81,15 @@ features += no_bbl
 endif
 endif
 
+ifeq ($(board), raspi3)
+# qemu only has generic timer
+# TODO: configure system/generic timer automatically
+raspi3_timer ?= generic
+ifeq ($(raspi3_timer), generic)
+features += raspi3_use_generic_timer
+endif
+endif
+
 ifdef m_mode
 features += no_mmu m_mode
 bbl_m_mode := --enable-boot-machine
@@ -101,7 +112,7 @@ ifeq ($(uname), Darwin)
 prefix := x86_64-elf-
 endif
 else ifeq ($(arch), riscv32)
-prefix := riscv32-unknown-elf-
+prefix := riscv64-unknown-elf-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 endif
@@ -162,7 +173,7 @@ else
 		$(bbl_m_mode) \
 		--with-arch=rv32imac \
 		--disable-fp-emulation \
-		--host=riscv32-unknown-elf \
+		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
 	make -j32 && \
 	cp bbl ../../kernel/$@
@@ -188,11 +199,6 @@ endif
 ### user programs ###
 sfsimg:
 	@cd $(user_dir) && make sfsimg
-
-# make user.o from binary files
-$(user_obj): $(user_bins)
-	@cd $(user_bin_path) && \
-		$(ld) -o $(abspath $@) $(patsubst %, -b binary %, $(notdir $(user_bins)))
 
 
 ### install ###
