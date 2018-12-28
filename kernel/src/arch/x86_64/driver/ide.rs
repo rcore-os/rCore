@@ -88,7 +88,7 @@ impl IDE {
             }
 
             // ???
-            let mut data = [0; SECTOR_SIZE];
+            let data = [0; SECTOR_SIZE];
             asm!("rep insl" :: "{dx}"(self.base + ISA_DATA), "{rdi}"(data.as_ptr()), "{cx}"(SECTOR_SIZE) : "rdi" : "volatile");
         }
     }

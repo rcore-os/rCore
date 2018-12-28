@@ -1,7 +1,6 @@
 use bootloader::bootinfo::{BootInfo, MemoryRegionType};
 use core::sync::atomic::*;
 use log::*;
-use crate::consts::KERNEL_OFFSET;
 
 pub mod driver;
 pub mod cpu;

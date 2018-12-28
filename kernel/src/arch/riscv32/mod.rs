@@ -20,7 +20,7 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
         while unsafe { !cpu::has_started(hartid) }  { }
         println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
         others_main();
-        unreachable!();
+        //other_main -> !
     }
 
     unsafe { memory::clear_bss(); }

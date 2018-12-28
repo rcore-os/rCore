@@ -1,8 +1,8 @@
-use core::{slice, mem};
+use core::mem;
 use riscv::{addr::*, register::sstatus};
 use ucore_memory::PAGE_SIZE;
 use log::*;
-use crate::memory::{active_table, FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, MEMORY_ALLOCATOR, Linear};
+use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERN_VA_BASE};
 use riscv::register::satp;
 
@@ -98,6 +98,7 @@ pub unsafe fn clear_bss() {
 }
 
 // Symbols provided by linker script
+#[allow(dead_code)]
 extern {
     fn stext();
     fn etext();

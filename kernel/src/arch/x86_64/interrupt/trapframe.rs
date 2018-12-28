@@ -119,7 +119,7 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    pub unsafe extern fn switch(&mut self, target: &mut Self) {
+    pub unsafe extern fn switch(&mut self, _target: &mut Self) {
         asm!(
         "
         // push rip (by caller)

@@ -1,6 +1,6 @@
 //! System call
 
-use simple_filesystem::{INode, file::File, FileInfo, FileType};
+use simple_filesystem::{INode, file::File, FileInfo, FileType, FsError};
 use core::{slice, str};
 use alloc::{sync::Arc, vec::Vec, string::String};
 use spin::Mutex;
@@ -53,7 +53,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     };
     match ret {
         Ok(code) => code,
-        Err(_) => -1,
+        Err(err) => -(err as isize),
     }
 }
 
@@ -96,7 +96,7 @@ fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     match process().files.remove(&fd) {
         Some(_) => Ok(0),
-        None => Err(SysError::InvalidFile),
+        None => Err(SysError::Inval),
     }
 }
 
@@ -118,11 +118,11 @@ fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     let file = get_file(fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
-        return Err(SysError::InvalidArgument);
+        return Err(SysError::Inval);
     }
     let info = file.lock().info()?;
     if info.type_ != FileType::Dir || info.size <= dentry.entry_id() {
-        return Err(SysError::InvalidArgument);
+        return Err(SysError::Inval);
     }
     let name = file.lock().get_entry(dentry.entry_id())?;
     dentry.set_name(name.as_str());
@@ -133,7 +133,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
     info!("dup: {} {}", fd1, fd2);
     let file = get_file(fd1)?;
     if process().files.contains_key(&fd2) {
-        return Err(SysError::InvalidFile);
+        return Err(SysError::Inval);
     }
     process().files.insert(fd2, file.clone());
     Ok(0)
@@ -141,7 +141,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> SysResult {
-    let mut context = process().fork(tf);
+    let context = process().fork(tf);
     //memory_set_map_swappable(context.get_memory_set_mut());
     let pid = processor().manager().add(context, thread::current().id());
     //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
@@ -198,6 +198,9 @@ fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapF
             .collect()
     };
 
+    if args.len() <= 0 {
+        return Err(SysError::Inval);
+    }
     // Read program file
     let path = args[0].as_str();
     let inode = crate::fs::ROOT_INODE.lookup(path)?;
@@ -278,7 +281,7 @@ fn sys_putc(c: char) -> SysResult {
 }
 
 fn get_file(fd: usize) -> Result<&'static Arc<Mutex<File>>, SysError> {
-    process().files.get(&fd).ok_or(SysError::InvalidFile)
+    process().files.get(&fd).ok_or(SysError::Inval)
 }
 
 pub type SysResult = Result<isize, SysError>;
@@ -286,14 +289,41 @@ pub type SysResult = Result<isize, SysError>;
 #[repr(isize)]
 #[derive(Debug)]
 pub enum SysError {
-    VfsError,
-    InvalidFile,
-    InvalidArgument,
+    // ucore compatible error code
+    // note that ucore_plus use another error code table, which is a modified version of the ones used in linux
+    // name conversion E_XXXXX -> SysError::Xxxxx
+    // see https://github.com/oscourse-tsinghua/ucore_os_lab/blob/master/labcodes/lab8/libs/error.h
+    // we only add current used errors here
+    Inval = 3,// Invalid argument, also Invaild fd number.
+    Nomem = 4,// Out of memory, also used as no device space in ucore
+    Noent = 16,// No such file or directory
+    Isdir = 17,// Fd is a directory
+    Notdir = 18,// Fd is not a directory
+    Xdev = 19,// Cross-device link
+    Unimp = 20,// Not implemented
+    Exists = 23,// File exists
+    Notempty = 24,// Directory is not empty
+
+    #[allow(dead_code)]
+    Unspcified = 1,// A really really unknown error.
 }
 
-impl From<()> for SysError {
-    fn from(_: ()) -> Self {
-        SysError::VfsError
+impl From<FsError> for SysError {
+    fn from(error: FsError) -> Self {
+        match error {
+            FsError::NotSupported => SysError::Unimp,
+            FsError::NotFile => SysError::Isdir,
+            FsError::IsDir => SysError::Isdir,
+            FsError::NotDir => SysError::Notdir,
+            FsError::EntryNotFound => SysError::Noent,
+            FsError::EntryExist => SysError::Exists,
+            FsError::NotSameFs => SysError::Xdev,
+            FsError::InvalidParam => SysError::Inval,
+            FsError::NoDeviceSpace => SysError::Nomem,
+            FsError::DirRemoved => SysError::Noent,
+            FsError::DirNotEmpty => SysError::Notempty,
+            FsError::WrongFs => SysError::Inval,
+        }
     }
 }
 
@@ -374,7 +404,10 @@ impl From<FileInfo> for Stat {
             mode: match info.type_ {
                 FileType::File => StatMode::FILE,
                 FileType::Dir => StatMode::DIR,
-                _ => StatMode::NULL,
+                // _ => StatMode::NULL,
+                //Note: we should mark FileType as #[non_exhaustive]
+                //      but it is currently not implemented for enum
+                //      see rust-lang/rust#44109
             },
             nlinks: info.nlinks as u32,
             blocks: info.blocks as u32,

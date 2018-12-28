@@ -1,7 +1,6 @@
 //! Kernel shell
 
 use alloc::string::String;
-use alloc::vec::Vec;
 use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
 

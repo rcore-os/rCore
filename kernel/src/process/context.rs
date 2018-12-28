@@ -4,10 +4,10 @@ use log::*;
 use simple_filesystem::file::File;
 use spin::Mutex;
 use ucore_process::Context;
-use xmas_elf::{ElfFile, header, program::{Flags, ProgramHeader, SegmentData, Type}};
+use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 
 use crate::arch::interrupt::{Context as ArchContext, TrapFrame};
-use crate::memory::{ByFrame, Delay, FrameAllocator, GlobalFrameAlloc, KernelStack, MemoryArea, MemoryAttr, MemorySet};
+use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 
 // TODO: avoid pub
 pub struct Process {
@@ -110,7 +110,7 @@ impl Process {
     pub fn fork(&self, tf: &TrapFrame) -> Box<Context> {
         info!("COME into fork!");
         // Clone memory set, make a new page table
-        let mut memory_set = self.memory_set.clone();
+        let memory_set = self.memory_set.clone();
         info!("finish mmset clone in fork!");
 
         // MMU:   copy data to the new space
@@ -149,7 +149,6 @@ unsafe fn push_slice<T: Copy>(mut sp: usize, vs: &[T]) -> usize {
 unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
     where Iter: Iterator<Item=&'a str>
 {
-    use core::{ptr, slice};
     let mut sp = stack_top;
     let mut argv = Vec::new();
     for arg in args {

@@ -3,7 +3,6 @@
 //! Implemented for every architecture, used by OS.
 
 use super::*;
-use log::*;
 #[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
 pub use self::ext::*;

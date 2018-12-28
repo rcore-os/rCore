@@ -7,14 +7,11 @@
 //! - `new_kernel_context`: Construct a `Context` of the new kernel thread
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
 use core::marker::PhantomData;
-use core::ptr;
 use core::time::Duration;
 use log::*;
 use crate::processor::*;
 use crate::process_manager::*;
-use crate::scheduler::Scheduler;
 
 #[linkage = "weak"]
 #[no_mangle]
@@ -26,7 +23,7 @@ fn processor() -> &'static Processor {
 #[linkage = "weak"]
 #[no_mangle]
 /// Construct a `Context` of the new kernel thread
-fn new_kernel_context(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+fn new_kernel_context(_entry: extern fn(usize) -> !, _arg: usize) -> Box<Context> {
     unimplemented!("thread: Please implement and export `new_kernel_context`")
 }
 

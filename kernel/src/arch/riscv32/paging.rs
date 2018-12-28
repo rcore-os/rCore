@@ -6,8 +6,6 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::register::satp;
-use ucore_memory::memory_set::*;
-use ucore_memory::PAGE_SIZE;
 use ucore_memory::paging::*;
 use log::*;
 #[cfg(target_arch = "riscv32")]
@@ -51,7 +49,7 @@ impl PageTable for ActivePageTable {
     */
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
-        let (frame, flush) = self.0.unmap(page).unwrap();
+        let (_, flush) = self.0.unmap(page).unwrap();
         flush.flush();
     }
 
@@ -217,7 +215,7 @@ impl Entry for PageEntry {
     fn execute(&self) -> bool { self.0.flags().contains(EF::EXECUTABLE) }
     fn set_execute(&mut self, value: bool) { self.0.flags_mut().set(EF::EXECUTABLE, value); }
     fn mmio(&self) -> bool { false }
-    fn set_mmio(&mut self, value: bool) { }
+    fn set_mmio(&mut self, _value: bool) { }
 }
 
 #[derive(Debug)]

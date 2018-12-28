@@ -79,7 +79,7 @@ mod rr {
             *rest == 0
         }
 
-        fn set_priority(&mut self, pid: usize, priority: u8) {
+        fn set_priority(&mut self, _pid: usize, _priority: u8) {
         }
 
         fn move_to_head(&mut self, pid: usize) {

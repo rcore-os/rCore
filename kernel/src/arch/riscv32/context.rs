@@ -153,7 +153,7 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    pub unsafe extern fn switch(&mut self, target: &mut Self) {
+    pub unsafe extern fn switch(&mut self, _target: &mut Self) {
         #[cfg(target_arch = "riscv32")]
         asm!(r"
         .equ XLENB, 4
@@ -256,7 +256,7 @@ impl Context {
     * @retval:
     *   a Context struct with the pointer to the kernel stack top - 1 as its only element
     */
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),

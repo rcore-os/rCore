@@ -1,6 +1,5 @@
 // Copy from Redox
 
-use core::fmt::{self, Write};
 use x86_64::instructions::port::Port;
 use spin::Mutex;
 use uart_16550::SerialPort;
@@ -27,7 +26,7 @@ impl SerialRead for SerialPort {
     fn receive(&mut self) -> u8 {
         unsafe {
             let ports = self as *mut _ as *mut [Port<u8>; 6];
-            let line_sts = &(*ports)[5];
+            let _line_sts = &(*ports)[5];
             let data = &(*ports)[0];
             data.read()
         }

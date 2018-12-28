@@ -5,7 +5,7 @@ use ucore_memory::PAGE_SIZE;
 use atags::atags::Atags;
 use aarch64::{barrier, regs::*, addr::*};
 use aarch64::paging::{PhysFrame as Frame, memory_attribute::*};
-use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryArea, MemoryAttr, MemorySet, Linear};
+use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 
 /// Memory initialization.
 pub fn init() {

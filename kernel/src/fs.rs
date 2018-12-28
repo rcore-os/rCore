@@ -1,7 +1,6 @@
 use simple_filesystem::*;
 use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
 use core::any::Any;
-use core::slice;
 use lazy_static::lazy_static;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
@@ -27,8 +26,10 @@ lazy_static! {
     };
 }
 
+#[cfg(not(target_arch = "x86_64"))]
 struct MemBuf(&'static [u8]);
 
+#[cfg(not(target_arch = "x86_64"))]
 impl MemBuf {
     unsafe fn new(begin: unsafe extern fn(), end: unsafe extern fn()) -> Self {
         use core::slice;
@@ -36,6 +37,7 @@ impl MemBuf {
     }
 }
 
+#[cfg(not(target_arch = "x86_64"))]
 impl Device for MemBuf {
     fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Option<usize> {
         let slice = self.0;
@@ -43,7 +45,7 @@ impl Device for MemBuf {
         buf[..len].copy_from_slice(&slice[offset..offset + len]);
         Some(len)
     }
-    fn write_at(&mut self, offset: usize, buf: &[u8]) -> Option<usize> {
+    fn write_at(&mut self, _offset: usize, _buf: &[u8]) -> Option<usize> {
         None
     }
 }
@@ -52,11 +54,13 @@ impl Device for MemBuf {
 impl BlockedDevice for ide::IDE {
     const BLOCK_SIZE_LOG2: u8 = 9;
     fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
+        use core::slice;
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.read(block_id as u64, 1, buf).is_ok()
     }
     fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
+        use core::slice;
         assert!(buf.len() >= ide::BLOCK_SIZE);
         let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.write(block_id as u64, 1, buf).is_ok()
@@ -104,35 +108,36 @@ lazy_static! {
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
-        fn info(&self) -> Result<FileInfo> { unimplemented!() }
-        fn sync(&self) -> Result<()> { unimplemented!() }
-        fn resize(&self, len: usize) -> Result<()> { unimplemented!() }
-        fn create(&self, name: &str, type_: FileType) -> Result<Arc<INode>> { unimplemented!() }
-        fn unlink(&self, name: &str) -> Result<()> { unimplemented!() }
-        fn link(&self, name: &str, other: &Arc<INode>) -> Result<()> { unimplemented!() }
-        fn rename(&self, old_name: &str, new_name: &str) -> Result<()> { unimplemented!() }
-        fn move_(&self, old_name: &str, target: &Arc<INode>, new_name: &str) -> Result<()> { unimplemented!() }
-        fn find(&self, name: &str) -> Result<Arc<INode>> { unimplemented!() }
-        fn get_entry(&self, id: usize) -> Result<String> { unimplemented!() }
+        fn info(&self) -> Result<FileInfo> { Err(FsError::NotSupported) }
+        fn sync(&self) -> Result<()> { Ok(()) }
+        fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
+        fn create(&self, _name: &str, _type_: FileType) -> Result<Arc<INode>> { Err(FsError::NotDir) }
+        fn unlink(&self, _name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { Err(FsError::NotDir) }
+        fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
+        fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
+        fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };
 }
 
 impl INode for Stdin {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         buf[0] = self.pop() as u8;
         Ok(1)
     }
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> { unimplemented!() }
     impl_inode!();
 }
 
 impl INode for Stdout {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> { unimplemented!() }
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         use core::str;
-        let s = str::from_utf8(buf).map_err(|_| ())?;
+        //we do not care the utf-8 things, we just want to print it!
+        let s = unsafe{ str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
     }
