@@ -207,7 +207,7 @@ if controller.is_pending() {
 }
 ```
 
-其中使用了 crate `bcm2837`，位于 `crate/bcm2837` 中，是一个封装良好的访问 RPi3 底层外围设备的库。
+其中使用了 crate bcm2837，位于 `crate/bcm2837` 中，是一个封装良好的访问 RPi3 底层外围设备的库。
 
 然后会遍历所有其他未处理的 IRQ，如果该 IRQ 已注册，就调用它的处理函数：
 
