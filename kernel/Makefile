@@ -8,7 +8,7 @@
 #   make clean                  Clean
 #
 # Options:
-#   arch = x86_64 | riscv32 | aarch64
+#   arch = x86_64 | riscv32 | riscv64 | aarch64
 #   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
@@ -66,6 +66,14 @@ ifdef m_mode
 qemu_opts += -cpu rv32imacu-nommu
 endif
 
+else ifeq ($(arch), riscv64)
+qemu_opts += \
+	-machine virt \
+	-kernel $(bin)
+ifdef m_mode
+qemu_opts += -cpu rv64imacu-nommu
+endif
+
 else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
@@ -110,6 +118,8 @@ prefix := x86_64-elf-
 endif
 else ifeq ($(arch), riscv32)
 prefix := riscv64-unknown-elf-
+else ifeq ($(arch), riscv64)
+prefix := riscv64-unknown-elf-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 endif
@@ -133,21 +143,17 @@ clean:
 doc:
 	@cargo rustdoc -- --document-private-items
 
-run: build sfsimg justrun
+run: build justrun
 
 justrun:
-	@qemu-system-$(arch) $(qemu_opts) || [ $$? -eq 11 ] # run qemu and assert it exit 11
+	@qemu-system-$(arch) $(qemu_opts)
 
 debug: $(kernel) $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
-ifeq ($(arch), x86_64)
-build: kernel
-else
 build: $(bin)
-endif
 
 asm:
 	@$(objdump) -dS $(kernel) | less
@@ -160,9 +166,6 @@ sym:
 
 $(bin): kernel
 ifeq ($(arch), riscv32)
-ifeq ($(board), fpga)
-	@cp $(kernel) $@
-else
 	@cd ../riscv-pk && \
 	mkdir -p build && \
 	cd build && \
@@ -174,21 +177,37 @@ else
 		--with-payload=$(abspath $(kernel)) && \
 	make -j32 && \
 	cp bbl ../../kernel/$@
+else ifeq ($(arch), riscv64)
+ifeq ($(board), k210)
+	@$(objcopy) $(kernel) --strip-all -O binary $@
+else
+	@cd ../riscv-pk && \
+	mkdir -p build && \
+	cd build && \
+	../configure \
+		$(bbl_m_mode) \
+		--with-arch=rv64imac \
+		--disable-fp-emulation \
+		--host=riscv64-unknown-elf \
+		--with-payload=$(abspath $(kernel)) && \
+	make -j32 && \
+	cp bbl ../../kernel/$@
 endif
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 endif
 
-ifeq ($(arch), x86_64)
 kernel:
+ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
-else
-kernel: sfsimg
-ifeq ($(arch), riscv32)
+else ifeq ($(arch), riscv32)
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
-endif
+	@CC=$(cc) cargo xbuild $(build_args)
+else ifeq ($(arch), riscv64)
+	@./build-rv64
+else ifeq ($(arch), aarch64)
 	@CC=$(cc) cargo xbuild $(build_args)
 endif
 

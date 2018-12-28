@@ -12,7 +12,7 @@ pub fn init() {
 
     let heap_bottom = end as usize;
     let heap_size = MEMORY_END - heap_bottom;
-    unsafe { MEMORY_ALLOCATOR.lock().init(heap_bottom, heap_size); }
+    unsafe { crate::memory::MEMORY_ALLOCATOR.lock().init(heap_bottom, heap_size); }
     info!("available memory: [{:#x}, {:#x})", heap_bottom, MEMORY_END);
 }
 

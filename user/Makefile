@@ -24,7 +24,12 @@ endif
 
 .PHONY: all clean build-rust build-c build mksfs sfsimg
 
+# not support riscv64 now
+ifeq ($(arch), riscv64)
+all:
+else
 all: $(sfsimg)
+endif
 
 build-rust:
 	@echo Building user rust programs

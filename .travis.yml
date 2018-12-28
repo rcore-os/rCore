@@ -23,15 +23,17 @@ addons:
 
 env:
   matrix:
+    - ARCH="riscv64"
+    - ARCH="riscv64" OPTS="board=k210"
     - ARCH="riscv32"
     - ARCH="riscv32" OPTS="m_mode=1"
     - ARCH="x86_64"
     - ARCH="aarch64"
 
 install:
-  - if [ $ARCH = riscv32 ]; then
-      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-linux-ubuntu14";
-      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-20181127-x86_64-apple-darwin";
+  - if [ $ARCH = riscv32 ] || [ $ARCH = riscv64 ]; then
+      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.1.0-2018.12.0-x86_64-linux-ubuntu14";
+      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.1.0-2018.12.0-x86_64-apple-darwin";
       wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
       tar xf $FILE.tar.gz;
       export PATH=$PATH:$PWD/$FILE/bin;

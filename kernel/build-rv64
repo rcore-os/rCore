@@ -1,6 +1,6 @@
 #!/bin/bash
 # The contents are adopted from xbuild verbose output.
-# Output files are in $PWD/outdir
+# Output files are in target/${ARCH}-blog_os/debug
 #
 # Usage:
 #   Just run
@@ -10,29 +10,21 @@
 #		set the environment variable `RV32` to "1"
 set -e
 
-if ! [[ -d outdir ]]
-then
-  echo "You have to \`mkdir outdir\` first."
-  echo "If you know what you're doing, do this yourself, otherwise quit."
-  exit 1
-fi
-
 if [[ ${RV32} = 1 ]]; then
 	TARGET_ARCH=riscv32
 	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
 	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
-	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv32imac --disable-fp-emulation --host=riscv32-unknown-elf"
 else
 	TARGET_ARCH=riscv64
 	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
-	RISCV_PK_CONFIGURE_FLAGS="--with-arch=rv64imac --disable-fp-emulation --host=riscv64-unknown-elf"
 fi
 UCORE_USER_IMAGE="../user/img/ucore-${TARGET_ARCH}.img"
-LLC=llc
+LLC=$PWD/../tools/llc
 RUST_SRC_PATH=$(rustc --print sysroot)/lib/rustlib/src/rust/src
 CARGO_PATH=~/.cargo
 LLC_ARCH=${TARGET_ARCH}
+OUTDIR=$PWD/target/${TARGET_ARCH}-blog_os/debug
 TARGET_JSON=$PWD/${TARGET_ARCH}-blog_os.json
 CC=${TARGET_ARCH}-unknown-elf-gcc
 AR=${TARGET_ARCH}-unknown-elf-ar
@@ -40,13 +32,45 @@ OBJCOPY=${TARGET_ARCH}-unknown-elf-objcopy
 QEMU=qemu-system-${TARGET_ARCH}
 export SMP=4
 
+#============================================================================
+# Check env before build
 
+mkdir -p ${OUTDIR}
+
+# auto download K210 SDK lib
+if [[ ${board} = k210 ]] && ! [[ -f ${OUTDIR}/libkendryte.a ]]
+then
+    wget https://github.com/wangrunji0408/RustOS/releases/download/v0.1/libkendryte.a
+    mv libkendryte.a ${OUTDIR}
+fi
+
+# auto download llc
+if ! [[ -f ${LLC} ]]
+then
+    cd ../tools
+if [[ $(uname) = Linux ]]; then
+    wget https://github.com/wangrunji0408/RustOS/releases/download/v0.1/llc-ubuntu
+    mv llc-ubuntu llc
+else
+    wget https://github.com/wangrunji0408/RustOS/releases/download/v0.1/llc-macOS
+    mv llc-macOS llc
+fi
+    chmod +x llc
+    cd ../kernel
+fi
+
+# if some crates are not exist, build for riscv32 first
+if ! [[ -f $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58*/src/lib.rs ]]
+then
+    make kernel arch=riscv32 board=none
+fi
 
 #============================================================================
 # Stupid long implementation
 
 gen_full_rlib() {
-  cd outdir
+  PWD0=${PWD}
+  cd ${OUTDIR}
   for X in ${CNAME}.*bc
   do
     ${LLC} -march=${LLC_ARCH} -filetype=obj -mattr=+m,+c ${X}
@@ -55,27 +79,27 @@ gen_full_rlib() {
   do
     ${AR} r lib${CNAME}.rlib ${X}
   done
-  cd ..
+  cd ${PWD0}
 }
 
 #
 # Basic dependencies
 CNAME=core
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name ${CNAME} $RUST_SRC_PATH/libcore/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=3 \
     -C debuginfo=2 \
     -Z force-unstable-if-unmarked \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON
 gen_full_rlib
 fi
 
 # Note: In recent nightly, compiler_builtins has been removed from rust_src.
 CNAME=compiler_builtins
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.2/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -84,58 +108,58 @@ rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc629
     -Z force-unstable-if-unmarked \
     --cfg 'feature="compiler-builtins"' \
     --cfg 'feature="mem"' \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
 CNAME=alloc
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name alloc $RUST_SRC_PATH/liballoc/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=3 \
     -C debuginfo=2 \
     -Z force-unstable-if-unmarked \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
 
 CNAME=semver_parser
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name semver_parser $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/semver-parser-0.7.0/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
-    -L $PWD/outdir \
+    --out-dir ${OUTDIR} \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=cfg_if
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name cfg_if $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/cfg-if-0.1.6/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=spin
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name spin $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/spin-0.4.10/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -146,75 +170,75 @@ rustc --crate-name spin $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/spi
     --cfg 'feature="default"' \
     --cfg 'feature="once"' \
     --cfg 'feature="unstable"' \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=static_assertions
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name static_assertions $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/static_assertions-0.3.1/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bit_field
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bit_field $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bit_field-0.9.0/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=zero
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name zero $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/zero-0.1.2/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bit_vec
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bit_vec $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58*/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bitflags
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bitflags $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bitflags-1.0.4/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -222,74 +246,74 @@ rustc --crate-name bitflags $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823
     -C debuginfo=2 \
     -C debug-assertions=on \
     --cfg 'feature="default"' \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=volatile
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name volatile $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/volatile-0.2.5/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=once
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name once $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/once-0.3.3/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bbl
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bbl $PWD/../crate/bbl/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
 CNAME=log
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name log $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/log-0.4.6/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=linked_list_allocator
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name linked_list_allocator $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/linked_list_allocator-0.6.3/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -299,15 +323,15 @@ rustc --crate-name linked_list_allocator $CARGO_PATH/registry/src/github.com-1ec
     --cfg 'feature="default"' \
     --cfg 'feature="spin"' \
     --cfg 'feature="use_spin"' \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=lazy_static
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name lazy_static $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/lazy_static-1.2.0/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -316,95 +340,95 @@ rustc --crate-name lazy_static $CARGO_PATH/registry/src/github.com-1ecc6299db9ec
     -C debug-assertions=on \
     --cfg 'feature="spin"' \
     --cfg 'feature="spin_no_std"' \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 #
 
 CNAME=xmas_elf
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name xmas_elf $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/xmas-elf-0.6.2/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bit_allocator
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bit_allocator $PWD/../crate/bit-allocator/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir 
+    -L ${OUTDIR} 
 gen_full_rlib
 fi
 
 
 CNAME=simple_filesystem
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/simplefilesystem-rust-868ccb44dbeefdea/249383f*/src/lib.rs \
+rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/simplefilesystem-rust-868ccb44dbeefdea/48b3c26*/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
-    --extern bit_vec=$PWD/outdir/libbit_vec.rlib \
-    --extern spin=$PWD/outdir/libspin.rlib \
-    --extern static_assertions=$PWD/outdir/libstatic_assertions.rlib \
+    -L ${OUTDIR} \
+    --extern bit_vec=${OUTDIR}/libbit_vec.rlib \
+    --extern spin=${OUTDIR}/libspin.rlib \
+    --extern static_assertions=${OUTDIR}/libstatic_assertions.rlib \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=ucore_process
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --edition=2018 --crate-name ucore_process $PWD/../crate/process/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    --extern log=$PWD/outdir/liblog.rlib \
-    --extern spin=$PWD/outdir/libspin.rlib \
-    -L $PWD/outdir 
+    --extern log=${OUTDIR}/liblog.rlib \
+    --extern spin=${OUTDIR}/libspin.rlib \
+    -L ${OUTDIR} 
 gen_full_rlib
 fi
 
 CNAME=ucore_memory
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --edition=2018 --crate-name ucore_memory $PWD/../crate/memory/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    --extern log=$PWD/outdir/liblog.rlib \
-    -L $PWD/outdir 
+    --extern log=${OUTDIR}/liblog.rlib \
+    -L ${OUTDIR} 
 gen_full_rlib
 fi
 
 CNAME=semver
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name semver $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/semver-0.9.0/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
@@ -412,75 +436,75 @@ rustc --crate-name semver $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/s
     -C debuginfo=2 \
     -C debug-assertions=on \
     --cfg 'feature="default"' \
-    --out-dir $PWD/outdir \
-    -L $PWD/outdir \
-    --extern semver_parser=$PWD/outdir/libsemver_parser.rlib \
+    --out-dir ${OUTDIR} \
+    -L ${OUTDIR} \
+    --extern semver_parser=${OUTDIR}/libsemver_parser.rlib \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=rustc_version
 # omit build_script_build
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name rustc_version $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/rustc_version-0.2.3/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
-    -L $PWD/outdir \
-    --extern semver=$PWD/outdir/libsemver.rlib \
+    --out-dir ${OUTDIR} \
+    -L ${OUTDIR} \
+    --extern semver=${OUTDIR}/libsemver.rlib \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=bare_metal
 # omit build_script_build
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name bare_metal $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/bare-metal-0.2.4/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
+    -L ${OUTDIR} \
     --cap-lints allow
 gen_full_rlib
 fi
 
 CNAME=riscv
-if ! [[ -f outdir/${CNAME}.o ]]
+if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
 rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/f7bea54*/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
-    --extern bare_metal=$PWD/outdir/libbare_metal.rlib \
-    --extern bit_field=$PWD/outdir/libbit_field.rlib \
-    --extern bitflags=$PWD/outdir/libbitflags.rlib \
-    --extern log=$PWD/outdir/liblog.rlib \
+    -L ${OUTDIR} \
+    --extern bare_metal=${OUTDIR}/libbare_metal.rlib \
+    --extern bit_field=${OUTDIR}/libbit_field.rlib \
+    --extern bitflags=${OUTDIR}/libbitflags.rlib \
+    --extern log=${OUTDIR}/liblog.rlib \
     --cap-lints allow
 gen_full_rlib
 fi
 
 
 # Hand generate build.rs
-if ! [[ -f outdir/libatomic_rt.a ]]
+if ! [[ -f ${OUTDIR}/libatomic_rt.a ]]
 then
-${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -O3 -c -o outdir/compiler_rt.o
-${AR} r outdir/libatomic_rt.a outdir/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -O3 -c -o ${OUTDIR}/compiler_rt.o
+${AR} r ${OUTDIR}/libatomic_rt.a ${OUTDIR}/compiler_rt.o
 fi
 
-if ! [[ -f outdir/libsfsimg.a ]]
+if ! [[ -f ${OUTDIR}/libsfsimg.a ]]
 then
-cat >outdir/sfsimg.S <<EOF
+cat >${OUTDIR}/sfsimg.S <<EOF
 		.section .rodata
 		.align 12
 		.global _user_img_start
@@ -489,21 +513,21 @@ _user_img_start:
 		.incbin "${UCORE_USER_IMAGE}"
 _user_img_end:
 EOF
-if ! ${CC} outdir/sfsimg.S ${SFSIMG_CFLAGS} -c -o outdir/sfsimg.o
+if ! ${CC} ${OUTDIR}/sfsimg.S ${SFSIMG_CFLAGS} -c -o ${OUTDIR}/sfsimg.o
 then
 	echo "You should manually create sfs image!"
 	exit 1
 fi
-${AR} r outdir/libsfsimg.a outdir/sfsimg.o
+${AR} r ${OUTDIR}/libsfsimg.a ${OUTDIR}/sfsimg.o
 fi
 
 #make sfsimg
 
 
 CNAME=ucore
-#if ! [[ -f outdir/${CNAME}.o ]]
+#if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 #then
-if [[ ${K210} = 1 ]]; then
+if [[ ${board} = k210 ]]; then
     export UCORE_FEATURE_ARGS='--cfg feature="m_mode" --cfg feature="no_mmu" --cfg feature="board_k210"'
     cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
 else
@@ -515,32 +539,32 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     -C debuginfo=2 \
     -C debug-assertions=on \
     ${UCORE_FEATURE_ARGS} \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
-    --extern bbl=$PWD/outdir/libbbl.rlib \
-    --extern bit_allocator=$PWD/outdir/libbit_allocator.rlib \
-    --extern bit_field=$PWD/outdir/libbit_field.rlib \
-    --extern bitflags=$PWD/outdir/libbitflags.rlib \
-    --extern lazy_static=$PWD/outdir/liblazy_static.rlib \
-    --extern linked_list_allocator=$PWD/outdir/liblinked_list_allocator.rlib \
-    --extern log=$PWD/outdir/liblog.rlib \
-    --extern once=$PWD/outdir/libonce.rlib \
-    --extern riscv=$PWD/outdir/libriscv.rlib \
-    --extern simple_filesystem=$PWD/outdir/libsimple_filesystem.rlib \
-    --extern spin=$PWD/outdir/libspin.rlib \
-    --extern ucore_memory=$PWD/outdir/libucore_memory.rlib \
-    --extern ucore_process=$PWD/outdir/libucore_process.rlib \
-    --extern volatile=$PWD/outdir/libvolatile.rlib \
-    --extern xmas_elf=$PWD/outdir/libxmas_elf.rlib  \
-    -L native=outdir -l static=sfsimg -l static=atomic_rt
+    -L ${OUTDIR} \
+    --extern bbl=${OUTDIR}/libbbl.rlib \
+    --extern bit_allocator=${OUTDIR}/libbit_allocator.rlib \
+    --extern bit_field=${OUTDIR}/libbit_field.rlib \
+    --extern bitflags=${OUTDIR}/libbitflags.rlib \
+    --extern lazy_static=${OUTDIR}/liblazy_static.rlib \
+    --extern linked_list_allocator=${OUTDIR}/liblinked_list_allocator.rlib \
+    --extern log=${OUTDIR}/liblog.rlib \
+    --extern once=${OUTDIR}/libonce.rlib \
+    --extern riscv=${OUTDIR}/libriscv.rlib \
+    --extern simple_filesystem=${OUTDIR}/libsimple_filesystem.rlib \
+    --extern spin=${OUTDIR}/libspin.rlib \
+    --extern ucore_memory=${OUTDIR}/libucore_memory.rlib \
+    --extern ucore_process=${OUTDIR}/libucore_process.rlib \
+    --extern volatile=${OUTDIR}/libvolatile.rlib \
+    --extern xmas_elf=${OUTDIR}/libxmas_elf.rlib  \
+    -L native=${OUTDIR} -l static=sfsimg -l static=atomic_rt
 
 gen_full_rlib
 #fi
 
-#if ! [[ -f outdir/ucore ]]
+#if ! [[ -f ${OUTDIR}/ucore ]]
 #then
-if [[ ${K210} = 1 ]]; then
+if [[ ${board} = k210 ]]; then
     export LINK_K210='-L native=kendryte'
 fi
 echo "rustc crate-type bin to ${TARGET_JSON}"
@@ -549,39 +573,24 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     -C opt-level=1 \
     -C debuginfo=2 \
     -C debug-assertions=on \
-    --out-dir $PWD/outdir \
+    --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L $PWD/outdir \
-    --extern bbl=$PWD/outdir/libbbl.rlib \
-    --extern bit_allocator=$PWD/outdir/libbit_allocator.rlib \
-    --extern bit_field=$PWD/outdir/libbit_field.rlib \
-    --extern bitflags=$PWD/outdir/libbitflags.rlib \
-    --extern lazy_static=$PWD/outdir/liblazy_static.rlib \
-    --extern linked_list_allocator=$PWD/outdir/liblinked_list_allocator.rlib \
-    --extern log=$PWD/outdir/liblog.rlib \
-    --extern once=$PWD/outdir/libonce.rlib \
-    --extern riscv=$PWD/outdir/libriscv.rlib \
-    --extern simple_filesystem=$PWD/outdir/libsimple_filesystem.rlib \
-    --extern spin=$PWD/outdir/libspin.rlib \
-    --extern ucore=$PWD/outdir/libucore.rlib \
-    --extern ucore_memory=$PWD/outdir/libucore_memory.rlib \
-    --extern ucore_process=$PWD/outdir/libucore_process.rlib \
-    --extern volatile=$PWD/outdir/libvolatile.rlib \
-    --extern xmas_elf=$PWD/outdir/libxmas_elf.rlib \
-    -L native=outdir ${LINK_K210}
+    -L ${OUTDIR} \
+    --extern bbl=${OUTDIR}/libbbl.rlib \
+    --extern bit_allocator=${OUTDIR}/libbit_allocator.rlib \
+    --extern bit_field=${OUTDIR}/libbit_field.rlib \
+    --extern bitflags=${OUTDIR}/libbitflags.rlib \
+    --extern lazy_static=${OUTDIR}/liblazy_static.rlib \
+    --extern linked_list_allocator=${OUTDIR}/liblinked_list_allocator.rlib \
+    --extern log=${OUTDIR}/liblog.rlib \
+    --extern once=${OUTDIR}/libonce.rlib \
+    --extern riscv=${OUTDIR}/libriscv.rlib \
+    --extern simple_filesystem=${OUTDIR}/libsimple_filesystem.rlib \
+    --extern spin=${OUTDIR}/libspin.rlib \
+    --extern ucore=${OUTDIR}/libucore.rlib \
+    --extern ucore_memory=${OUTDIR}/libucore_memory.rlib \
+    --extern ucore_process=${OUTDIR}/libucore_process.rlib \
+    --extern volatile=${OUTDIR}/libvolatile.rlib \
+    --extern xmas_elf=${OUTDIR}/libxmas_elf.rlib \
+    -L native=${OUTDIR} ${LINK_K210}
 #fi
-
-if [[ ${K210} = 1 ]]; then
-    ${OBJCOPY} outdir/ucore --strip-all -O binary outdir/ucore.bin
-#    ${QEMU} -nographic -cpu sifive-e51 -machine sifive_e -kernel outdir/ucore
-else
-    cd ../riscv-pk
-		rm build -r || true
-		mkdir -p build && cd build
-    ../configure ${RISCV_PK_CONFIGURE_FLAGS} \
-        --with-payload=../../kernel/outdir/ucore
-    make -j32
-    cp bbl ../../kernel/outdir/kernel.bin
-    cd ../../kernel
-    ${QEMU} -smp cores=${SMP} -nographic -machine virt -kernel outdir/kernel.bin
-fi
