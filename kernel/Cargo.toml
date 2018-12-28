@@ -1,18 +1,28 @@
 [package]
 name = "ucore"
 version = "0.1.0"
-authors = ["Runji Wang <wangrunji0408@163.com>"]
 edition = "2018"
+authors = [
+    "WangRunji <wangrunji0408@163.com>",
+    "Ben Pig Chu <benpichu@gmail.com>",
+    "dzy <daizy15@mails.tsinghua.edu.cn>",
+    "equation314 <equation618@gmail.com>",
+    "cfgbd <cfgbdv@163.com>",
+    "koumingyang <1761674434@qq.com>",
+    "lcy1996 <992195697@qq.com>",
+    "chenqiuhao <haohao0924@126.com>",
+    "maoyuchaxue <wangjt15@mails.tsinghua.edu.cn>"
+]
 
 [features]
-# Without BBL (for riscv32 FPGA board)
-no_bbl = []
-# Disable paging (for riscv32)
+# Disable paging (for riscv)
 no_mmu = []
-# Kernel in M-mode (for riscv32)
+# Kernel in M-mode (for riscv)
 m_mode = ["no_mmu"]
 # (for aarch64 RaspberryPi3)
 board_raspi3 = ["bcm2837"]
+# (for riscv64)
+board_k210 = ["m_mode"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 
 [profile.dev]
@@ -35,13 +45,11 @@ lazy_static = { version = "1.2", features = ["spin_no_std"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 ucore-memory = { path = "../crate/memory" }
 ucore-process = { path = "../crate/process" }
-simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust", branch = "multi-thread" }
+simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { git = "https://github.com/wangrunji0408/bootloader" }
 apic = { git = "https://github.com/wangrunji0408/APIC-Rust" }
-#bootloader = { path = "../crate/bootloader" }
-#apic = { path = "../crate/apic" }
 x86_64 = "0.3"
 raw-cpuid = "6.0"
 uart_16550 = "0.1"
@@ -55,9 +63,6 @@ bbl = { path = "../crate/bbl" }
 aarch64 = { git = "https://github.com/equation314/aarch64" }
 atags = { path = "../crate/atags" }
 bcm2837 = { path = "../crate/bcm2837", optional = true }
-
-[patch.'https://github.com/wangrunji0408/SimpleFileSystem-Rust']
-simple-filesystem = { git = "https://github.com/benpigchu/SimpleFileSystem-Rust", branch = "ucore-fs-enhance" }
 
 [package.metadata.bootimage]
 default-target = "x86_64-blog_os.json"

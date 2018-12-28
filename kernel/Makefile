@@ -14,8 +14,8 @@
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = SFS image path of user programs
 #   smp  = 1 | 2 | ...          SMP core number
-#   board = none                Running on qemu
-#         | fpga                Only available on riscv32, build without bbl, run on board
+#   board = none                Running on QEMU
+#         | k210                Only available on riscv64, build without bbl, run on K210
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   m_mode                      Only available on riscv32, build for M-Mode, without MMU
 
@@ -41,6 +41,9 @@ ifeq ($(arch), x86_64)
 export SFSIMG = $(user_dir)/img/ucore-i386.img
 else
 export SFSIMG = $(user_dir)/img/ucore-$(arch).img
+endif
+ifeq ($(arch), aarch64)
+board := raspi3
 endif
 
 ### qemu options ###
@@ -75,12 +78,6 @@ qemu_opts += -d $(d)
 endif
 
 ### build args ###
-ifeq ($(arch), riscv32)
-ifeq ($(board), fpga)
-features += no_bbl
-endif
-endif
-
 ifeq ($(board), raspi3)
 # qemu only has generic timer
 # TODO: configure system/generic timer automatically
