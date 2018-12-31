@@ -24,8 +24,6 @@ board ?= none
 mode ?= debug
 LOG  ?= debug
 smp  ?= 4
-# NOTE: crate 'process' use this name 'm_mode' as an environment
-#		to set interrupt (MIE or SIE)
 m_mode ?=
 
 target := $(arch)-blog_os
@@ -34,6 +32,7 @@ bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
 user_dir := ../user
 
+### export environments ###
 export ARCH = $(arch)
 export SMP = $(smp)
 #export SFSIMG = $(user_dir)/build/user-$(arch).img
@@ -45,6 +44,11 @@ endif
 ifeq ($(arch), aarch64)
 board := raspi3
 endif
+ifeq ($(board), k210)
+m_mode := 1
+endif
+# crate 'process' use this to set interrupt (MIE or SIE)
+export M_MODE = $(m_mode)
 
 ### qemu options ###
 qemu_opts := \
