@@ -12,11 +12,11 @@ set -e
 
 if [[ ${RV32} = 1 ]]; then
 	TARGET_ARCH=riscv32
-	COMPILER_RT_CFLAGS="-march=rv32ia -mabi=ilp32 -O3"
+	COMPILER_RT_CFLAGS="-march=rv32imac -mabi=ilp32 -O3"
 	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
 else
 	TARGET_ARCH=riscv64
-	COMPILER_RT_CFLAGS="-march=rv64ia -mabi=lp64 -O3"
+	COMPILER_RT_CFLAGS="-march=rv64imac -mabi=lp64 -O3"
 	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
 fi
 UCORE_USER_IMAGE="../user/img/ucore-${TARGET_ARCH}.img"
@@ -60,7 +60,7 @@ fi
 fi
 
 # if some crates are not exist, build for riscv32 first
-if ! [[ -f $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58*/src/lib.rs ]]
+if ! [[ -f $CARGO_PATH/git/checkouts/bit-vec-437fa4a002bd318d/9861a58/src/lib.rs ]]
 then
     make kernel arch=riscv32 board=none
 fi

@@ -10,24 +10,21 @@ fn main() {
 	let arch: String = std::env::var("ARCH").unwrap();
 	match arch.as_str() {
 		"x86_64" => {
-			// cc::Build::new()
-			// 	.file("src/arch/x86_64/driver/apic/lapic.c")
-			// 	.file("src/arch/x86_64/driver/keyboard/keyboard.c")
-			// 	.flag("-mcmodel=large")
-			// 	.compile("cobj");
 			gen_vector_asm().unwrap();
 		}
 		"riscv32" => {
+			println!("cargo:rerun-if-changed=src/arch/riscv32/compiler_rt.c");
 			cc::Build::new()
 				.file("src/arch/riscv32/compiler_rt.c")
-				.flag("-march=rv32ia")
+				.flag("-march=rv32imac")
 				.flag("-mabi=ilp32")
     			.flag("-Wno-builtin-declaration-mismatch")
+    			.flag("-O3")
 				.compile("atomic_rt");
 			if let Ok(file_path) = gen_sfsimg_asm() {
 				cc::Build::new()
 					.file(&file_path)
-					.flag("-march=rv32ia")
+					.flag("-march=rv32imac")
 					.flag("-mabi=ilp32")
 					.compile("sfsimg");
 			}

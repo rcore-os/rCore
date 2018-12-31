@@ -10,7 +10,7 @@
      v: UnsafeCell<u8>,
  }
  
-@@ -265,6 +268,44 @@
+@@ -265,6 +268,59 @@
  pub const ATOMIC_BOOL_INIT: AtomicBool = AtomicBool::new(false);
  
  #[cfg(target_has_atomic = "8")]
@@ -40,12 +40,27 @@
 +    ///
 +    #[inline]
 +    #[stable(feature = "rust1", since = "1.0.0")]
-+    #[cfg(target_has_atomic = "cas")]
 +    pub fn compare_and_swap(&self, current: bool, new: bool, order: Ordering) -> bool {
-+        loop {
-+            if let Ok(val) = unsafe { atomic_compare_exchange(self.v.get(), current as u32, new as u32, order, order) } {
-+                return val != 0;
-+            }
++        match self.compare_exchange(current, new, order, strongest_failure_ordering(order)) {
++            Ok(x) => x,
++            Err(x) => x,
++        }
++    }
++
++    ///
++    #[inline]
++    #[stable(feature = "extended_compare_and_swap", since = "1.10.0")]
++    pub fn compare_exchange(&self,
++                            current: bool,
++                            new: bool,
++                            success: Ordering,
++                            failure: Ordering)
++                            -> Result<bool, bool> {
++        match unsafe {
++            atomic_compare_exchange(self.v.get(), current as u32, new as u32, success, failure)
++        } {
++            Ok(x) => Ok(x != 0),
++            Err(x) => Err(x != 0),
 +        }
 +    }
 +}
