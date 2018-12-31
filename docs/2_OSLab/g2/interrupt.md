@@ -2,7 +2,7 @@
 
 ## AArch64 异常模型
 
-> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile, capture D1.1, D1.7, D1.10, D1.11, D1.13, D1.14, D1.16.
+> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile: capture D1.1, D1.7, D1.10, D1.11, D1.13, D1.14, D1.16.
 
 在 AArch64 中，各种中断被统称为**异常**(exception)，包括：
 

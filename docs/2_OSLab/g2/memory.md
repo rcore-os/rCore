@@ -2,7 +2,7 @@
 
 ## AArch64 虚拟内存系统
 
-> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile, capture D5: The AArch64 Virtual Memory System Architecture.
+> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile: capture D5, The AArch64 Virtual Memory System Architecture.
 
 (注：完整的 AArch64 文档中描述了许多可选的配置，如页大小、翻译表级数等，以下描述都是指在 RustOS 中的实现，不代表只有这一种实现方式)
 
