@@ -62,14 +62,14 @@
     * `mode=debug|release`：指定 `debug` 还是 `release` 模式。默认 `debug`。
     * `graphic=on|off`：是否启用图形输出。默认 `on`。
     * `smp=1|2|3|4|...`：指定 SMP 的核数。目前 aarch64 的 SMP 未实现，该选项无效。
-    * `raspi3_timer=system/generic`：使用 Raspberry Pi 的 System Timer 还是 Generic Timer。默认 `generic`，且在 QEMU 中只能使用 Generic Timer。
+    * `raspi3_timer=system|generic`：使用 Raspberry Pi 的 System Timer 还是 Generic Timer。默认 `generic`，且在 QEMU 中只能使用 Generic Timer。
     * `prefix=<prefix>`：指定 aarch64 工具链前缀。默认 `aarch64-none-elf-`，某些 Linux 中的工具链前缀为 `aarch64-linux-gnu-`。
     * `LOG=off|error|warn|info|debug|trace`：指定输出日志的级别。默认 `warn`。
     * `SFSIMG=<sfsimg>`：用户程序 SFS 镜像路径。默认 `../user/img/ucore-aarch64.img`，即用 C 语言编写的直接从原 uCore 中移植过来的用户程序。如欲使用 Rust 编写的用户程序可将其设为 `../user/build/user-aarch64.img`。
 
 ## 在真机上运行
 
-1. 往 SD 卡中写入 [Raspbian](https://www.raspberrypi.org/downloads/raspbian/) 原版系统镜像：直接看 <https://www.raspberrypi.org/documentation/installation/installing-images>。然后需要将原版的 `config.txt` 替换为 `tools/raspi-firmware/config.txt`。
+1. 往 SD 卡中写入 [Raspbian](https://www.raspberrypi.org/downloads/raspbian/) 原版系统镜像：直接看 <https://www.raspberrypi.org/documentation/installation/installing-images>。然后需要将原版的 `config.txt` 替换为 [tools/raspi-firmware/config.txt](../../../tools/raspi-firmware/config.txt)。
 
 2. 写入 RustOS 内核镜像：
 

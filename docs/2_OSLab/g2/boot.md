@@ -13,7 +13,7 @@
 
 ## linker.ld
 
-链接脚本位于 `kernel/src/arch/aarch64/boot/linker.ld`，主要内容如下：
+链接脚本位于 [kernel/src/arch/aarch64/boot/linker.ld](../../../kernel/src/arch/aarch64/boot/linker.ld)，主要内容如下：
 
 ```
 SECTIONS {
@@ -41,14 +41,14 @@ SECTIONS {
 几个要点：
 
 * CPU 最先从 `.text.boot (0x80000)` 处开始执行。
-* 在 `boot.S` 中做好了必要的初始化后，将跳转到 `.text.entry/_start (0x100000)`，再从这里跳转到 Rust 代码 `rust_main()`。
-* `boot.S` 的偏移为 `0x80000`，Rust 代码的偏移为 `0x100000`。
+* 在 [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 中做好了必要的初始化后，将跳转到 `_start (0x100000)`，再从这里跳转到 Rust 代码 `rust_main()`。
+* [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 的偏移为 `0x80000`，Rust 代码的偏移为 `0x100000`。
 * 跳转到 `rust_main()` 后，`0x0~0x100000` 这段内存将被作为内核栈，大小为 1MB，栈顶即 `bootstacktop (0x100000)`。
-* `boot.S` 结束后还未启用 MMU，可直接访问物理地址。
+* [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 结束后还未启用 MMU，可直接访问物理地址。
 
 ## boot.S
 
-CPU 启动代码位于 `kernel/src/arch/aarch64/boot/boot.S`，负责初始化一些系统寄存器，并将当前异常级别(exception level)切换到 EL1。
+CPU 启动代码位于 [kernel/src/arch/aarch64/boot/boot.S](../../../kernel/src/arch/aarch64/boot/boot.S)，负责初始化一些系统寄存器，并将当前异常级别(exception level)切换到 EL1。
 
 AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
 
@@ -59,7 +59,7 @@ AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
 
 在 RustOS 中，内核将运行在 EL1 上，用户程序将运行在 EL0 上。
 
-`boot.S` 的主要流程如下：
+[boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 的主要流程如下：
 
 1. 获取核的编号，目前只使用 0 号核，其余核将被闲置：
 
@@ -192,7 +192,7 @@ AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
 
 ## rust_main
 
-在 `boot.S` 初始化完毕后，会进入 Rust 函数 `rust_main()`：
+在 [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 初始化完毕后，会进入 [kernel/src/arch/aarch64/mod.rs](../../../kernel/src/arch/aarch64/mod.rs#L19) 的 Rust 函数 `rust_main()`：
 
 ```rust
 /// The entry point of kernel
@@ -222,4 +222,4 @@ pub extern "C" fn rust_main() -> ! {
 5. 初始化内存管理，包括物理页帧分配器与内核堆分配器，最后会建立一个新的页表重新映射内核；
 6. 初始化其他设备驱动，包括 Frambuffer、Console、Timer；
 7. 初始化进程管理，包括线程调度器、进程管理器，并为每个核建立一个 idle 线程，最后会加载 SFS 文件系统加入用户态 shell 进程；
-8. 最后调用 `crate::kmain()`，按调度器轮流运行创建的线程。
+8. 最后调用 `crate::kmain()`，按调度器轮流执行创建的线程。

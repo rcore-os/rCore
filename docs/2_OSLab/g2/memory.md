@@ -120,7 +120,7 @@ AArch64 拥有 64 位地址，支持两段虚拟内存地址空间，分别为�
 
 #### Cache 操作 (C5.3)
 
-Cache 是主存的缓存，如果一个物理地址在 cache 中命中，将不会访问主存，而是直接从 cache 中得到数据。Cache 又分为指令 cache 与 数据 cache，分别作用在取指与普通访存时。
+**Cache** 是主存的缓存，如果一个物理地址在 cache 中命中，将不会访问主存，而是直接从 cache 中得到数据。Cache 又分为指令 cache 与 数据 cache，分别作用在取指与普通访存时。
 
 当通过普通访存的形式修改了代码段的数据，并跳转到了这里运行，此时需要刷新指令 cache，以防取指时从指令 cache 中取到旧的数据。指令 cache 可使用下列代码一次性全部清空：
 
@@ -144,11 +144,11 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 
 在上下文切换时，需要修改 TTBR1_EL1 寄存器，如果不刷新 TLB 也不使用 ASID，TLB 中将会保留旧进程的虚拟——物理地址映射关系，导致进程访问错误的物理地址。不过如果每次上下文切换都刷新 TLB，开销又较大。
 
-ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下文切换时，每个进程会被分配一个唯一的 ASID，并将其保存到 `TTBR1_EL1` 的高 16 位中。此时 TLB 中会同时记录一个虚拟地址及其进程的 ASID 对应的物理地址，使得不同进程的相同虚拟地址在 TLB 中也会被映射为不同的物理地址。
+**ASID** (Address Space ID) 的引入就是为了避免在上下文切换过程中刷新 TLB。详见“上下文切换”相关章节。
 
 ## RustOS 中的实现
 
-在 RustOS 中，aarch64 平台相关的内存管理主要实现在 `kernel/src/arch/aarch64/memory.rs` 与 `kernel/src/arch/aarch64/paging.rs` 中。此外，crate [aarch64](https://github.com/equation314/aarch64) 类似其他平台下的 x86_64、riscv 库，封装了对 aarch64 底层系统寄存器、翻译表的访问。
+在 RustOS 中，aarch64 平台相关的内存管理主要实现在 [kernel/src/arch/aarch64/memory.rs](../../../kernel/src/arch/aarch64/memory.rs) 与 [kernel/src/arch/aarch64/paging.rs](../../../kernel/src/arch/aarch64/paging.rs) 中。此外，crate [aarch64](https://github.com/equation314/aarch64) 类似其他平台下的 x86_64、riscv 库，封装了对 aarch64 底层系统寄存器、翻译表的访问。
 
 (注：为了保持与其他平台的一致性，下文使用“页表”指代“翻译表”，并且下文中页表的级数 1, 2, 3, 4 分别指官方文档中翻译表的级数 3, 2, 1, 0)
 
@@ -156,11 +156,11 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
 
 ### aarch64 库中的页表
 
-与其他平台一样，页表实现在内核代码 `paging.rs` 中，其实只是套了层壳，诸如 map 等复杂操作的实现位于 aarch64 库中。
+与其他平台一样，页表实现在内核代码 [paging.rs](../../../kernel/src/arch/aarch64/paging.rs) 中，其实只是套了层壳，诸如 map 等复杂操作的实现位于 aarch64 库中。
 
 #### 页表描述符
 
-在 `aarch64/src/paging/page_table.rs` 中实现了页表(`PageTable`)与页表项(`PageTableEntry`)。页表有 512 个项，每个页表项是一个 64 位描述符。一个页表项描述符由下面 3 部分字段构成：
+在 [aarch64/src/paging/page_table.rs](https://github.com/equation314/aarch64/blob/master/src/paging/page_table.rs) 中实现了页表(`PageTable`)与页表项(`PageTableEntry`)。页表有 512 个项，每个页表项是一个 64 位描述符。一个页表项描述符由下面 3 部分字段构成：
 
 1. **地址**(address)：位于描述符的第 12 到 47 位。根据描述符的 `TABLE_OR_PAGE` 位，分别指向下列 3 种地址：
 
@@ -199,7 +199,7 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
     |  59  |     PXNTable      |                       该页表所映射的所有内存都是特权级下不可执行的                        |
     |  60  |      XNTable      |                       该页表所映射的所有内存都是非特权级下不可执行的                       |
 
-3. **属性**(attribute)：属性字段指明了这段内存的内存属性，包括内存类型(位 2、3、4)与可共享性(位 8、9)。在 `aarch64/src/paging/memory_attribute.rs` 中预定义了 3 中内存属性，分别为：
+3. **属性**(attribute)：属性字段指明了这段内存的内存属性，包括内存类型(位 2、3、4)与可共享性(位 8、9)。在 [aarch64/src/paging/memory_attribute.rs](https://github.com/equation314/aarch64/blob/master/src/paging/memory_attribute.rs) 中预定义了 3 中内存属性，分别为：
 
     1. Normal：普通可缓存内存，cache 属性为 Write-Back Non-transient Read-Allocate Write-Allocate，内部共享；
     2. Device：Device-nGnRE 类型的内存，不可缓存，外部共享；
@@ -216,7 +216,7 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
 * 2 级页表：`R || R || IA[47..39] || IA[38..30]`；
 * 1 级页表：`R || IA[47..39] || IA[38..30] || IA[29..21]`；
 
-在 `aarch64/src/paging/recursive.rs` 中，为结构体 `RecursivePageTable` 实现了一系列函数，主要几个如下：
+在 [aarch64/src/paging/recursive.rs](https://github.com/equation314/aarch64/blob/master/src/paging/recursive.rs) 中，为结构体 `RecursivePageTable` 实现了一系列函数，主要的几个如下：
 
 * `new(table: PageTable)`：将虚拟地址表示的 `table` 作为 4 级页表，新建 `RecursivePageTable` 对象；
 * `map_to(self, page: Page<Size4KiB>, frame: PhysFrame<Size4KiB>, flags: PageTableFlags, attr: PageTableAttribute, allocator: FrameAllocator<Size4KiB>)`：将虚拟地址表示的**页** `page`，映射为物理地址表示的**帧** `frame`，并设置标志位 `flags` 和属性 `attr`，如果需要新分配页表就用 `allocator` 分配。页与帧的大小都是 4KB；
@@ -224,17 +224,17 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
 
 ### 实现内存管理
 
-下面是 `memory.rs` 与 `paging.rs` 中对内存管理的实现。
+下面是 [memory.rs](../../../kernel/src/arch/aarch64/memory.rs) 与 [paging.rs](../../../kernel/src/arch/aarch64/paging.rs) 中对内存管理的实现。
 
 #### 启用 MMU
 
-由于在真机上使用原子指令需要 MMU 的支持，应该尽量早地启用 MMU，而 `boot.S` 中并没有建立页表与启用 MMU，所以启动完毕一进入 `rust_main()` 函数，就会调用 `memory.rs` 里的 `init_serial_early()` 函数来启用 MMU。
+由于在真机上使用原子指令需要 MMU 的支持，应该尽量早地启用 MMU，而 [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 中并没有建立页表与启用 MMU，所以启动完毕一进入 `rust_main()` 函数，就会调用 [memory.rs](../../../kernel/src/arch/aarch64/memory.rs#L20) 里的 `init_mmu_early()` 函数来启用 MMU。
 
 该函数主要做了下面三件事：
 
 1. 建立一个临时的地址翻译系统。
 
-    这部分的代码主要位于 `paging.rs` 里的 `setup_temp_page_table()` 函数。这个地址翻译系统只是临时的，未进行细致的权限控制，更细致的地址翻译系统将在下节“重新映射内核地址空间”中建立。
+    这部分的代码主要位于 [paging.rs](../../../kernel/src/arch/aarch64/paging.rs#L14) 里的 `setup_temp_page_table()` 函数。这个地址翻译系统只是临时的，未进行细致的权限控制，更细致的地址翻译系统将在下节“重新映射内核地址空间”中建立。
 
     该过程共需要三个 4KB 大小的页面，分别用于第 2~4 级页表。然后按下图方式映射：
 
@@ -304,7 +304,7 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
 
 #### 初始化内存管理
 
-这部分实现在 `memory.rs` 里的 `init()` 函数中。包含下列三部分：
+这部分实现在 [memory.rs](../../../kernel/src/arch/aarch64/memory.rs#L12) 里的 `init()` 函数中。包含下列三部分：
 
 1. 探测物理内存，初始化物理页帧分配器：由函数 `init_frame_allocator()`，先用 atags 库探测出可用物理内存的区间 `[start, end]`，然后以 4KB 大小的页为单位插入 `FRAME_ALLOCATOR` 中。由于 Raspberry Pi 3 拥有 1GB 内存，物理页帧数多达 256K，所以需要使用 `bit_allocator::BitAlloc1M`。
 
@@ -325,7 +325,7 @@ ASID 的引入就是为了避免在上下文切换过程中刷新 TLB。上下�
 
 `InactivePageTable` 定义了一个**非活跃页表**，准确地说是由第 4 级页表基址指定的一套地址翻译系统，一般随着 `MemorySet` 的建立而建立。除了在 `remap_the_kernel()` 中建立的是内核新页表，其他时候都是用户页表。
 
-在不同的平台下需要各自实现以下函数(`paging.rs` 中)：
+在不同的平台下需要各自实现以下函数([paging.rs](../../../kernel/src/arch/aarch64/paging.rs#L183) 中)：
 
 * `new_bare()`：新建一套地址翻译系统。首先调用 `alloc_frame()` 分配一个物理页帧用于存放唯一的 4 级页表，然后修改该物理页帧，使得其最后一项映射到自身，即建立自映射页表。通过调用 `active_table().with_temporary_map()` 让当前活跃的页表新建一个临时的映射，可在页表被激活后也能修改任意物理页帧。
 * `token()`：获取该翻译系统的页表基址，即第 4 级页表的物理地址。

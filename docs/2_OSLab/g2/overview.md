@@ -10,7 +10,9 @@
 | 片上系统(SoC) | Broadcom BCM2837B0 |
 | 处理器(CPU) | 4 x Cortex-A53 1.4Ghz
 | 图形处理器(GPU) | Broadcom VideoCore IV |
-| 内存 | 1GB(与 GPU 共享) |
+| 内存 | 1GB (与 GPU 共享) |
+
+## AArch64 简介
 
 ## 官方文档
 
