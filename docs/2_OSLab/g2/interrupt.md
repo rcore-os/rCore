@@ -1,4 +1,4 @@
-# 中断
+# 中断与异常
 
 ## AArch64 异常模型
 
@@ -72,7 +72,7 @@
 
 ## RustOS 中的实现
 
-中断部分的代码主要位于 `kernel/src/arch/aarch64/interrupt/` 中。
+中断与异常部分的代码主要位于 `kernel/src/arch/aarch64/interrupt/` 中。
 
 ### 异常启用与屏蔽
 
@@ -92,7 +92,7 @@ pub unsafe fn disable() {
 }
 ```
 
-此外，也可在中断返回前通过修改保存的 `SPSR` 寄存器启用或屏蔽中断，详见 `interrupt/context.rs` 中的 `TrapFrame::new_kernel_thread()` 与 `TrapFrame::new_user_thread()` 函数。
+此外，也可在异常返回前通过修改保存的 `SPSR` 寄存器启用或屏蔽异常，详见 `interrupt/context.rs` 中的 `TrapFrame::new_kernel_thread()` 与 `TrapFrame::new_user_thread()` 函数。
 
 ### 异常向量
 

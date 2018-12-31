@@ -1,6 +1,6 @@
-# 启动
+# 启动与初始化
 
-## 启动流程
+## 树莓派启动流程
 
 树莓派的启动流程如下：
 
@@ -189,3 +189,37 @@ AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
         bl      rust_main
         b       halt
     ```
+
+## rust_main
+
+在 `boot.S` 初始化完毕后，会进入 Rust 函数 `rust_main()`：
+
+```rust
+/// The entry point of kernel
+#[no_mangle] // don't mangle the name of this function
+pub extern "C" fn rust_main() -> ! {
+    memory::init_mmu_early(); // Enable mmu and paging
+    board::init_serial_early();
+
+    crate::logging::init();
+    interrupt::init();
+    memory::init();
+    driver::init();
+    println!("{}", LOGO);
+
+    crate::process::init();
+
+    crate::kmain();
+}
+```
+
+流程如下：
+
+1. 建立临时页表，启动 MMU；
+2. 初始化串口输入输出，可以使用 `println!()` 等宏了；
+3. 初始化 logging 模块，可以使用 `info!()`、`error!()` 等宏了；
+4. 初始化中断，其实就是设置了异常向量基址；
+5. 初始化内存管理，包括物理页帧分配器与内核堆分配器，最后会建立一个新的页表重新映射内核；
+6. 初始化其他设备驱动，包括 Frambuffer、Console、Timer；
+7. 初始化进程管理，包括线程调度器、进程管理器，并为每个核建立一个 idle 线程，最后会加载 SFS 文件系统加入用户态 shell 进程；
+8. 最后调用 `crate::kmain()`，按调度器轮流运行创建的线程。
