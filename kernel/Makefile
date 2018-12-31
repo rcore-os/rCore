@@ -26,10 +26,11 @@ LOG  ?= debug
 smp  ?= 4
 m_mode ?=
 
-target := $(arch)-blog_os
+target := $(arch)
 kernel := target/$(target)/$(mode)/ucore
 bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
+bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 
 ### export environments ###
@@ -107,7 +108,7 @@ endif
 ifneq ($(board), none)
 features += board_$(board)
 endif
-build_args := --target $(target).json --features "$(features)"
+build_args := --target targets/$(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args += --release
@@ -142,7 +143,6 @@ all: kernel
 clean:
 	@cargo clean
 	@cd $(user_dir) && make clean
-	@rm -rf ../riscv-pk/build
 
 doc:
 	@cargo rustdoc -- --document-private-items
@@ -170,32 +170,30 @@ sym:
 
 $(bin): kernel
 ifeq ($(arch), riscv32)
-	@cd ../riscv-pk && \
-	mkdir -p build && \
-	cd build && \
-	../configure \
+	@mkdir -p target/$(target)/bbl && \
+	cd target/$(target)/bbl && \
+	$(bbl_path)/configure \
 		$(bbl_m_mode) \
 		--with-arch=rv32imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
 	make -j32 && \
-	cp bbl ../../kernel/$@
+	cp bbl $(abspath $@)
 else ifeq ($(arch), riscv64)
 ifeq ($(board), k210)
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 else
-	@cd ../riscv-pk && \
-	mkdir -p build && \
-	cd build && \
-	../configure \
+	@mkdir -p target/$(target)/bbl && \
+	cd target/$(target)/bbl && \
+	$(bbl_path)/configure \
 		$(bbl_m_mode) \
 		--with-arch=rv64imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
 	make -j32 && \
-	cp bbl ../../kernel/$@
+	cp bbl $(abspath $@)
 endif
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(kernel) --strip-all -O binary $@
@@ -238,4 +236,11 @@ install: $(bin)
 	sudo umount $(sd_card)
 endif
 
+endif
+
+ifeq ($(board), k210)
+.PHONY:
+install: $(bin)
+	## baudrate no more than 600000
+	@python3 ../tools/k210/kflash.py $(bin) -b 600000
 endif
