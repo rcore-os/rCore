@@ -56,7 +56,7 @@
     }
     ```
 
-    每个进程控制块 `Process` ([kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L13)) 都会维护一个平台相关的 `Context` 对象，在 aarch64 中包含下列信息：
+    每个进程控制块 `Process` ([kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L13)) 都会维护一个平台相关的 `Context` 对象，在 AArch64 中包含下列信息：
 
     1. `stack_top`：内核栈顶地址；
     2. `ttbr`：页表基址；
@@ -79,13 +79,13 @@ pub unsafe fn switch(&mut self, target: &mut Self) {
 
 ### 页表切换与 ASID 机制
 
-首先进行的是页表的切换，即向 `TTBR1_EL1` 寄存器写入目标线程页表基址 `target.ttbr`。一般来说，切换页表后需要刷新 TLB，不过 aarch64 引入了 ASID (Address Space ID) 机制来避免频繁刷新 TLB。
+首先进行的是页表的切换，即向 `TTBR1_EL1` 寄存器写入目标线程页表基址 `target.ttbr`。一般来说，切换页表后需要刷新 TLB，不过 ARMv8 引入了 ASID (Address Space ID) 机制来避免频繁刷新 TLB。
 
 #### ASID 机制
 
-在页表项描述符中，有一个 `nG` 位，如果该位为 0，表示这页内存是全局可访问的(用于内核空间)；如果该位为 1，表示这页内存不是全局可访问的，只有特定线程可访问。具体地，如果页表项中该位为 1，当访问相应虚拟地址更新 TLB 时，会有额外的信息被写入 TLB，该信息即 ASID，由操作系统分配，下次在 TLB 中查找该虚拟地址时就会检查 TLB 表项中的 ASID 是否与当前 ASID 匹配。相当于为不同的 ASID 各自创建了一个页表。
+在页表项描述符中，有一个 nG 位，如果该位为 0，表示这页内存是全局可访问的(用于内核空间)；如果该位为 1，表示这页内存不是全局可访问的，只有特定线程可访问。具体地，如果页表项中该位为 1，当访问相应虚拟地址更新 TLB 时，会有额外的信息被写入 TLB，该信息即 ASID，由操作系统分配，下次在 TLB 中查找该虚拟地址时就会检查 TLB 表项中的 ASID 是否与当前 ASID 匹配。相当于为不同的 ASID 各自创建了一个页表。
 
-ASID 的大小可以为 8 位或 16 位，由 `TCR_EL1` 的 `AS` 字段指定，当前的 ASID 保存在 TTBR 的高位中，也可以由 `TCR_EL1` 的 `A1` 字段指定是 `TTBR0_EL1` 还是 `TTBR1_EL1`。在 RustOS 中，ASID 大小为 16 位，当前 ASID 保存在 `TTBR1_EL1` 的高 16 位。
+ASID 的大小可以为 8 位或 16 位，由 `TCR_EL1` 的 AS 字段指定，当前的 ASID 保存在 TTBR 的高位中，也可以由 `TCR_EL1` 的 `A1` 字段指定是 `TTBR0_EL1` 还是 `TTBR1_EL1`。在 RustOS 中，ASID 大小为 16 位，当前 ASID 保存在 `TTBR1_EL1` 的高 16 位。
 
 在 `switch()` 函数里，首先会为目标线程分配一个 ASID，然后同时将该 ASID 与 `target.ttbr` 写入 `TTBR1_EL1` 即可，无需进行 TLB 刷新。
 
@@ -178,9 +178,9 @@ ret
 
 为什么只保存了 `sp` 与 callee-saved 寄存器，而不是所有寄存器？因为执行上下文切换就是在调用一个函数，在调用前后编译器会自动保存并恢复 caller-saved 寄存器(调用者保存，即 `x0~x18`)。
 
-### 特权级切换
+### 异常级别切换
 
-特权级保存在 `TrapFrame` 的 `spsr` 中，在中断返回后即能自动进行特权级切换。通过构造特定的 `spsr` 可让新线程运行在指定的特权级。
+异常发生前的异常级别保存在 `TrapFrame` 中 `spsr` 的相应位，在异常返回后会恢复给 PSTATE，实现异常级别切换。通过构造特定的 `spsr` 可让新线程运行在指定的异常级别。
 
 ## 创建新线程
 

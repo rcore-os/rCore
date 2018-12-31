@@ -4,7 +4,7 @@
 
 > 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile, capture D5: The AArch64 Virtual Memory System Architecture.
 
-(注：AArch64 可能拥有一些可选的配置，如页大小、页表级数等，以下描述都是指在 RustOS 中的实现，不代表只有这一种实现方式)
+(注：完整的 AArch64 文档中描述了许多可选的配置，如页大小、翻译表级数等，以下描述都是指在 RustOS 中的实现，不代表只有这一种实现方式)
 
 ### 地址空间 (D5.1.3)
 
@@ -148,7 +148,7 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 
 ## RustOS 中的实现
 
-在 RustOS 中，aarch64 平台相关的内存管理主要实现在 [kernel/src/arch/aarch64/memory.rs](../../../kernel/src/arch/aarch64/memory.rs) 与 [kernel/src/arch/aarch64/paging.rs](../../../kernel/src/arch/aarch64/paging.rs) 中。此外，crate [aarch64](https://github.com/equation314/aarch64) 类似其他平台下的 x86_64、riscv 库，封装了对 aarch64 底层系统寄存器、翻译表的访问。
+在 RustOS 中，AArch64 平台相关的内存管理主要实现在 [kernel/src/arch/aarch64/memory.rs](../../../kernel/src/arch/aarch64/memory.rs) 与 [kernel/src/arch/aarch64/paging.rs](../../../kernel/src/arch/aarch64/paging.rs) 中。此外，crate [aarch64](https://github.com/equation314/aarch64) 类似其他平台下的 x86_64、riscv 库，封装了对 AArch64 底层系统寄存器、翻译表的访问。
 
 (注：为了保持与其他平台的一致性，下文使用“页表”指代“翻译表”，并且下文中页表的级数 1, 2, 3, 4 分别指官方文档中翻译表的级数 3, 2, 1, 0)
 
@@ -333,8 +333,8 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 * `active_token()`：获取当前活跃页表的页表基址寄存器内容。RustOS 中是读取 `TTBR1_EL1`。
 * `flush_tlb()`：刷新 TLB 以立即生效对地址翻译系统的修改。
 * `edit()`：让该翻译系统变得可编辑。本质上是将当前活跃页表(`TTBR0_EL1` 指向的页表)的递归索引指向该翻译系统的第 4 级页表，使得所有对该翻译系统第 1~4 级页表的访问，都可直接通过自映射机制构造相应的虚拟地址来实现。同时由于不修改当前活跃页表的其他表项，对内核地址空间可正常访问。
-* `new()`：建立用户页表时调用，会同时调用 `new_bare()` 和 `map_kernel()`。不过在 aarch64 下不需要 `map_kernel()`。
-* `map_kernel()`：为了让用户程序陷入中断后能访问内核地址空间，需要在用户页表中映射内核的地址空间，通过 `edit()` 函数修改自身来实现。使用 `new()` 建立用户页表时会额外调用该函数。不过在 aarch64 下可使用 `TTBR0_EL1` 与 `TTBR1_EL1` 区分内核页表与用户页表，所以 aarch64 下该函数无效。
+* `new()`：建立用户页表时调用，会同时调用 `new_bare()` 和 `map_kernel()`。不过在 AArch64 下不需要 `map_kernel()`。
+* `map_kernel()`：为了让用户程序陷入中断后能访问内核地址空间，需要在用户页表中映射内核的地址空间，通过 `edit()` 函数修改自身来实现。使用 `new()` 建立用户页表时会额外调用该函数。不过在 AArch64 下可使用 `TTBR0_EL1` 与 `TTBR1_EL1` 区分内核页表与用户页表，所以 AArch64 下该函数无效。
 
 #### 分离内核页表与用户页表
 

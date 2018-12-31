@@ -17,7 +17,7 @@
 
 ```
 SECTIONS {
-  . = 0x80000; /* Raspbery Pi 3 Aarch64 (kernel8.img) load address */
+  . = 0x80000; /* Raspbery Pi 3 AArch64 (kernel8.img) load address */
 
   .boot : {
     KEEP(*(.text.boot)) /* from boot.S */
@@ -48,16 +48,9 @@ SECTIONS {
 
 ## boot.S
 
-CPU 启动代码位于 [kernel/src/arch/aarch64/boot/boot.S](../../../kernel/src/arch/aarch64/boot/boot.S)，负责初始化一些系统寄存器，并将当前异常级别(exception level)切换到 EL1。
-
-AArch64 有 4 个异常级别，相当于 x86 的特权级，分别为：
-
-* EL0: Applications.
-* EL1: OS kernel and associated functions that are typically described as privileged.
-* EL2: Hypervisor.
-* EL3: Secure monitor.
-
 在 RustOS 中，内核将运行在 EL1 上，用户程序将运行在 EL0 上。
+
+CPU 启动代码位于 [kernel/src/arch/aarch64/boot/boot.S](../../../kernel/src/arch/aarch64/boot/boot.S)，负责初始化一些系统寄存器，并将当前异常级别切换到 EL1。
 
 [boot.S](../../../kernel/src/arch/aarch64/boot/boot.S) 的主要流程如下：
 

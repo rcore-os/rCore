@@ -51,20 +51,18 @@
 
 ### 异常屏蔽
 
-某些异常可以被**屏蔽**(mask)，即发生时不跳转到相应的异常向量。可被屏蔽的异常包括所有异步异常与调试时的同步异常(debug exceptions)，共 4 种，分别由 `DAIF` 4 个位控制：
+某些异常可以被**屏蔽**(mask)，即发生时不跳转到相应的异常向量。可被屏蔽的异常包括所有异步异常与调试时的同步异常(debug exceptions)，共 4 种，分别由 PSTATE 中 `DAIF` 字段的 4 个位控制：
 
 1. `D`: Debug exception
 2. `A`: SError interrupt
 3. `I`: IRQ interrupt
 4. `F`: FIQ interrupt
 
-可通过设置 `SPSR_ELx`、`DAIF`、`DAIFSet` 、`DAIFClr` 等特殊目的寄存器(special-purpose registers)中相应的位来选择屏蔽或取消屏蔽相应的异常。
-
 ### 异常返回
 
-当发生异常时，异常返回地址会被设置，保存在**异常链接寄存器**(Exception Link Register, ELR) `ELR_ELx` 中。
+当发生异常时，异常返回地址会被设置，保存在**异常链接寄存器**(Exception Link Register, ELR) `ELR_ELx` 中；当前的**进程状态 PSTATE** 会保存在**保存的进程状态寄存器**(Saved Process Status Register, SPSR) `SPSR_ELx` 中。
 
-异常返回使用 **`eret`** 指令完成。当异常返回时，`PC` 会根据当前特权级被恢复为 `ELR_ELx` 中的，**进程状态** `PSTATE` (process state)也会被恢复为 `SPSR_ELx` 中的。`PSTATE` 是当前进程状态信息的抽象，保存在 `SPSR_ELx` 中，包含条件标志位 `NZCV`、异常屏蔽位 `DAIF`、当前特权级等信息。如果修改了 `SPSR_ELx` 中相应的位并进行异常返回，就能实现异常级别切换、异常开启/屏蔽等功能。
+异常返回使用 **`eret`** 指令完成。当异常返回时，`pc` 会根据当前特权级被恢复为 `ELR_ELx` 中的，PSTATE 也会被恢复为 `SPSR_ELx` 中的。通过修改 `SPSR_ELx` 中相应的位并进行异常返回，就能使 PSTATE 被修改，从而实现异常级别切换、异常开启/屏蔽等功能。
 
 ### 系统调用
 
@@ -76,7 +74,7 @@
 
 ### 异常启用与屏蔽
 
-在 [interrupt/mod.rs](../../../kernel/src/arch/aarch64/interrupt/mod.rs#L24) 中使用了 `DAIFClr` 与 `DAIFSet` 特殊目的寄存器分别实现了异常的启用与屏蔽(仅针对 IRQ)，分别为 `enable()` 与 `disable()` 函数，代码如下：
+在 [interrupt/mod.rs](../../../kernel/src/arch/aarch64/interrupt/mod.rs#L24) 中，通过写入 `DAIFClr` 与 `DAIFSet` 特殊寄存器修改 PSTATE，分别实现了异常的启用与屏蔽(仅针对 IRQ)，代码如下：
 
 ```rust
 /// Enable the interrupt (only IRQ).
@@ -92,7 +90,7 @@ pub unsafe fn disable() {
 }
 ```
 
-此外，也可在异常返回前通过修改保存的 `SPSR` 寄存器启用或屏蔽异常，详见 [interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L26) 中的 `TrapFrame::new_kernel_thread()` 与 `TrapFrame::new_user_thread()` 函数。
+此外，也可在异常返回前修改保存的 `SPSR_EL1` 寄存器，使得异常返回时 PSTATE 改变，从而实现启用或屏蔽异常，详见 [interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L26) 中的 `TrapFrame::new_kernel_thread()` 与 `TrapFrame::new_user_thread()` 函数。
 
 ### 异常向量
 
@@ -137,7 +135,7 @@ __trapret:
 流程如下：
 
 1. 首先通过宏 `SAVE_ALL` 保存各寄存器，构成 `TrapFrame`；
-2. 然后构造函数参数 `x0`、`x1`、`x2`，分别表示异常类型、异常症状 `ESR`、`TrapFrame`，并调用 Rust 异常处理函数 `rust_trap()`；
+2. 然后构造函数参数 `x0`、`x1`、`x2`，分别表示异常类型、异常症状 ESR、`TrapFrame`，并调用 Rust 异常处理函数 `rust_trap()`；
 3. 当该函数返回时，通过宏 `RESTORE_ALL` 从 `TrapFrame` 中恢复各寄存器；
 4. 最后通过 `eret` 指令进行异常返回。
 
@@ -157,17 +155,17 @@ pub struct TrapFrame {
 }
 ```
 
-目前保存的寄存器包括：通用寄存器 `x0~x30`、异常返回地址 `ELR`、栈指针 `SP`、进程状态 `SPSR`。由于在 `aarch64-blog_os.json` 中禁用了 `NEON` 指令，不需要保存 `q0~q31` 这些 SIMD/FP 寄存器。
+目前保存的寄存器包括：通用寄存器 `x0~x30`、异常返回地址 `elr_el1`、用户栈指针 `sp_el0`、进程状态 `spsr_el1`。由于在 `aarch64-blog_os.json` 中禁用了 NEON 指令，不需要保存 `q0~q31` 这些 SIMD/FP 寄存器。
 
 `rust_trap()` 函数定义在 [interrupt/handler.rs](../../../kernel/src/arch/aarch64/interrupt/handler.rs#L43) 中。首先判断传入的 `kind`：
 
-* 如果是 `Synchronous`：在 [interrupt/syndrome.rs](../../../kernel/src/arch/aarch64/interrupt/syndrome.rs) 中解析 `ESR`，根据具体的异常类别分别处理断点指令、系统调用、缺页异常等。
-* 如果是 `IRQ`：调用 `handle_irq()` 函数处理 IRQ。
+* 如果是 `Synchronous`：在 [interrupt/syndrome.rs](../../../kernel/src/arch/aarch64/interrupt/syndrome.rs) 中解析 ESR，根据具体的异常类别分别处理断点指令、系统调用、缺页异常等。
+* 如果是 IRQ：调用 `handle_irq()` 函数处理 IRQ。
 * 其他类型的异常(SError interrupt、Debug exception)暂不做处理，直接调用 `crate::trap::error()`。
 
 #### 系统调用
 
-如果 `ESR` 的异常类别是 `SVC`，则说明该异常由系统调用指令 `svc` 触发，紧接着会调用 `handle_syscall()` 函数。
+如果 ESR 的异常类别是 SVC，则说明该异常由系统调用指令 `svc` 触发，紧接着会调用 `handle_syscall()` 函数。
 
 RustOS 的系统调用方式如下(实现在 [user/ucore-ulib/src/syscall.rs](../../../user/ucore-ulib/src/syscall.rs#L47) 中)：
 
@@ -195,7 +193,7 @@ RustOS 的系统调用方式如下(实现在 [user/ucore-ulib/src/syscall.rs](..
 
 #### IRQ
 
-如果该异常是 IRQ，则会调用 [kernel/src/arch/aarch64/board/raspi3/irq.rs](../../../kernel/src/arch/aarch64/board/raspi3/irq.rs#L8) 中的 `handle_irq()` 函数。该函数与 board 相关，即使都是在 aarch64 下，不同 board 的 IRQ 处理方式也不一样，所以放到了模块 [kernel/src/arch/aarch64/board/raspi3](../../../kernel/src/arch/aarch64/board/raspi3/) 中，表示是 RPi3 特有的 IRQ 处理方式。
+如果该异常是 IRQ，则会调用 [kernel/src/arch/aarch64/board/raspi3/irq.rs](../../../kernel/src/arch/aarch64/board/raspi3/irq.rs#L8) 中的 `handle_irq()` 函数。该函数与具体的硬件板子相关，即使都是在 AArch64 下，不同 board 的 IRQ 处理方式也不一样，所以放到了模块 [kernel/src/arch/aarch64/board/raspi3](../../../kernel/src/arch/aarch64/board/raspi3/) 中，表示是 RPi3 特有的 IRQ 处理方式。
 
 该函数首先会判断是否有时钟中断，如果有就先处理时钟中断：
 
