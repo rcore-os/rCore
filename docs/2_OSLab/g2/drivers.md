@@ -239,105 +239,6 @@ pub fn write_byte(&mut self, byte: u8) {
     self.registers.AUX_MU_IO_REG.write(byte);
 }
 ```
-
-## Mailbox
-
-> 参考：https://github.com/raspberrypi/firmware/wiki/Mailboxes
-
-Mailbox 是树莓派上 ARM CPU 与 VideoCore IV GPU 之间通信的渠道。Mailbox 能够识别一段按特定格式存储的请求指令，包含请求代码、请求长度、请求参数等信息，GPU 会根据请求的指令完成相应的操作，并将结果写在原处。
-
-BCM283x 系列有两个 mailbox，一般 MB0 总是用于 GPU 向 CPU 发送消息 MB1 总是用于 CPU 向 GPU 发送消息，对 CPU 来说即一个只读一个只写。
-
-Mailbox 有若干通道(channels)，不同通道提供不同种类的功能。一般使用 property tags 通道(编号为 8)，即 mailbox property interface。
-
-### 基本读写
-
-> 参考：https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes
-
-对 mailbox 的基本读写实现在 crate [bcm2837](../../../crate/bcm2837/) 的 [mailbox.rs](../../../crate/bcm2837/src/mailbox.rs) 中。一般一次操作是向 mailbox 写入请求的地址，然后读 mailbox 来轮询等待操作完成。注意读写 mailbox 时只有数据的高 28 位有效，低 4 位被用于存放通道，所以如果写入的是一个地址则该地址必须 16 字节对齐。
-
-读的流程如下：
-
-1. 读状态寄存器 MAIL0_STA，直到 empty 位没有被设置；
-2. 从 MAIL0_RD 寄存器读取数据；
-3. 如果数据的最低 4 位不与要读的通道匹配，则回到 1；
-4. 否则返回数据的高 28 位。
-
-```rust
-pub fn read(&self, channel: MailboxChannel) -> u32 {
-    loop {
-        while self.registers.MAIL0_STA.read() & (MailboxStatus::MailboxEmpty as u32) != 0 {}
-        let data = self.registers.MAIL0_RD.read();
-        if data & 0xF == channel as u32 {
-            return data & !0xF;
-        }
-    }
-}
-```
-
-写的流程如下：
-
-1. 读状态寄存器 MAIL1_STA，直到 full 位没有被设置；
-3. 将数据(高 28 位)与通道(低 4 位)拼接，写入 MAIL1_WRT 寄存器。
-
-```rust
-pub fn write(&mut self, channel: MailboxChannel, data: u32) {
-    while self.registers.MAIL1_STA.read() & (MailboxStatus::MailboxFull as u32) != 0 {}
-    self.registers.MAIL1_WRT.write((data & !0xF) | (channel as u32));
-}
-```
-
-### Mailbox property interface
-
-> 参考：https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-
-Mailbox property interface 提供了丰富的访问底层硬件的接口，包括电源、温度、DMA、GPU、内存、Framebuffer 等模块。RustOS 中封装了一系列 mailbox property interface 函数，实现在 [kernel/src/arch/aarch64/board/raspi3/mailbox.rs](../../../kernel/src/arch/aarch64/board/raspi3/mailbox.rs) 中。
-
-向 mailbox property interface 发送的请求需要符合一定的格式。在 RustOS 中，对 mailbox property interface 的一个功能调用被称为一个 `PropertyMailboxTag`，格式如下：
-
-```rust
-#[repr(C, packed)]
-struct PropertyMailboxTag<T: Sized> {
-    id: PropertyMailboxTagId,
-    buf_size: u32,
-    req_resp_size: u32,
-    buf: T,
-}
-```
-
-这里的 `buf` 一般是一个 32 位无符号整数的数组。一个或多个 `PropertyMailboxTag` 可构成一个 `PropertyMailboxRequest`，这是最终需要向 mailbox 发送的请求，格式如下：
-
-```rust
-#[repr(C, packed)]
-struct PropertyMailboxRequest<T: Sized> {
-    buf_size: u32,
-    req_resp_code: PropertyMailboxStatus,
-    buf: T,
-    end_tag: PropertyMailboxTagId,
-}
-```
-
-这里的 `buf` 可以是多个大小不一的 `PropertyMailboxTag` 构成的数组，不过内存布局必须连续而没有空隙。
-
-为了方便构造这两个结构体，定义了宏 `send_one_tag!()` 与 `send_request!()`：
-
-* `send_request!($tags: ident)`：发送一个或多个 `PropertyMailboxTag`。这会构建一个 16 字节对齐的 `PropertyMailboxRequest` 结构体，将其地址写入 mailbox。等待 GPU 操作完毕后，返回被修改过的 `PropertyMailboxTag` 列表。
-
-* `send_one_tag!($id: expr, [$($arg: expr),*])`：这会根据 `id` 与 32 位无符号整数的数组构造一个 `PropertyMailboxTag` 结构体，然后通过宏 `send_request!()` 发送给 mailbox，返回被修改过的数组。
-
-有了这两个宏，就可以非常方便地实现所需的 mailbox property interface 功能了。例如获取 framebuffer 物理大小：
-
-```rust
-pub fn framebuffer_get_physical_size() -> PropertyMailboxResult<(u32, u32)> {
-    let ret = send_one_tag!(RPI_FIRMWARE_FRAMEBUFFER_GET_PHYSICAL_WIDTH_HEIGHT, [0, 0])?;
-    Ok((ret[0], ret[1]))
-}
-```
-
-`framebuffer_alloc()` 函数是一次性发送多个大小不一的 `PropertyMailboxTag` 的例子。
-
-需要注意的是，当启用 MMU 与 cache 后，在访问 mailbox 的前后都需要刷新整个 `PropertyMailboxRequest` 结构的数据缓存，因为这里涉及到 GPU 与 CPU 的数据共享，必须时刻保证主存与 cache 中数据的一致性。
-
 ## Timer
 
 BCM283x 系列可用下列三种不同的时钟：
@@ -459,6 +360,164 @@ fn is_pending(&self) -> bool {
 }
 ```
 
+## Mailbox
+
+> 参考：https://github.com/raspberrypi/firmware/wiki/Mailboxes
+
+Mailbox 是树莓派上 ARM CPU 与 VideoCore IV GPU 之间通信的渠道。Mailbox 能够识别一段按特定格式存储的请求指令，包含请求代码、请求长度、请求参数等信息，GPU 会根据请求的指令完成相应的操作，并将结果写在原处。
+
+BCM283x 系列有两个 mailbox，一般 MB0 总是用于 GPU 向 CPU 发送消息 MB1 总是用于 CPU 向 GPU 发送消息，对 CPU 来说即一个只读一个只写。
+
+Mailbox 有若干通道(channels)，不同通道提供不同种类的功能。一般使用 property tags 通道(编号为 8)，即 mailbox property interface。
+
+### 基本读写
+
+> 参考：https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes
+
+对 mailbox 的基本读写实现在 crate [bcm2837](../../../crate/bcm2837/) 的 [mailbox.rs](../../../crate/bcm2837/src/mailbox.rs) 中。一般一次操作是向 mailbox 写入请求的地址，然后读 mailbox 来轮询等待操作完成。注意读写 mailbox 时只有数据的高 28 位有效，低 4 位被用于存放通道，所以如果写入的是一个地址则该地址必须 16 字节对齐。
+
+读的流程如下：
+
+1. 读状态寄存器 MAIL0_STA，直到 empty 位没有被设置；
+2. 从 MAIL0_RD 寄存器读取数据；
+3. 如果数据的最低 4 位不与要读的通道匹配，则回到 1；
+4. 否则返回数据的高 28 位。
+
+```rust
+pub fn read(&self, channel: MailboxChannel) -> u32 {
+    loop {
+        while self.registers.MAIL0_STA.read() & (MailboxStatus::MailboxEmpty as u32) != 0 {}
+        let data = self.registers.MAIL0_RD.read();
+        if data & 0xF == channel as u32 {
+            return data & !0xF;
+        }
+    }
+}
+```
+
+写的流程如下：
+
+1. 读状态寄存器 MAIL1_STA，直到 full 位没有被设置；
+3. 将数据(高 28 位)与通道(低 4 位)拼接，写入 MAIL1_WRT 寄存器。
+
+```rust
+pub fn write(&mut self, channel: MailboxChannel, data: u32) {
+    while self.registers.MAIL1_STA.read() & (MailboxStatus::MailboxFull as u32) != 0 {}
+    self.registers.MAIL1_WRT.write((data & !0xF) | (channel as u32));
+}
+```
+
+### Mailbox property interface
+
+> 参考：https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+
+Mailbox property interface 提供了丰富的访问底层硬件的接口，包括电源、温度、DMA、GPU、内存、Framebuffer 等模块。RustOS 中封装了一系列 mailbox property interface 函数，实现在 [kernel/src/arch/aarch64/board/raspi3/mailbox.rs](../../../kernel/src/arch/aarch64/board/raspi3/mailbox.rs) 中。
+
+向 mailbox property interface 发送的请求需要符合一定的格式。在 RustOS 中，对 mailbox property interface 的一个功能调用被称为一个 `PropertyMailboxTag`，格式如下：
+
+```rust
+#[repr(C, packed)]
+struct PropertyMailboxTag<T: Sized> {
+    id: PropertyMailboxTagId,
+    buf_size: u32,
+    req_resp_size: u32,
+    buf: T,
+}
+```
+
+这里的 `buf` 一般是一个 32 位无符号整数的数组。一个或多个 `PropertyMailboxTag` 可构成一个 `PropertyMailboxRequest`，这是最终需要向 mailbox 发送的请求，格式如下：
+
+```rust
+#[repr(C, packed)]
+struct PropertyMailboxRequest<T: Sized> {
+    buf_size: u32,
+    req_resp_code: PropertyMailboxStatus,
+    buf: T,
+    end_tag: PropertyMailboxTagId,
+}
+```
+
+这里的 `buf` 可以是多个大小不一的 `PropertyMailboxTag` 构成的数组，不过内存布局必须连续而没有空隙。
+
+为了方便构造这两个结构体，定义了宏 `send_one_tag!()` 与 `send_request!()`：
+
+* `send_request!($tags: ident)`：发送一个或多个 `PropertyMailboxTag`。这会构建一个 16 字节对齐的 `PropertyMailboxRequest` 结构体，将其地址写入 mailbox。等待 GPU 操作完毕后，返回被修改过的 `PropertyMailboxTag` 列表。
+
+* `send_one_tag!($id: expr, [$($arg: expr),*])`：这会根据 `id` 与 32 位无符号整数的数组构造一个 `PropertyMailboxTag` 结构体，然后通过宏 `send_request!()` 发送给 mailbox，返回被修改过的数组。
+
+有了这两个宏，就可以非常方便地实现所需的 mailbox property interface 功能了。例如获取 framebuffer 物理分辨率：
+
+```rust
+pub fn framebuffer_get_physical_size() -> PropertyMailboxResult<(u32, u32)> {
+    let ret = send_one_tag!(RPI_FIRMWARE_FRAMEBUFFER_GET_PHYSICAL_WIDTH_HEIGHT, [0, 0])?;
+    Ok((ret[0], ret[1]))
+}
+```
+
+`framebuffer_alloc()` 函数是一次性发送多个大小不一的 `PropertyMailboxTag` 的例子。
+
+需要注意的是，当启用 MMU 与 cache 后，在访问 mailbox 的前后都需要刷新整个 `PropertyMailboxRequest` 结构的数据缓存，因为这里涉及到 GPU 与 CPU 的数据共享，必须时刻保证主存与 cache 中数据的一致性。
+
 ## Framebuffer
+
+Framebuffer 是一块内存缓存区，树莓派的 GPU 会将其中的数据转换为 HDMI 信号，输出给显示器。Framebuffer 的底层访问接口通过 mailbox property interface 实现。在 RustOS 中，树莓派的 framebuffer 实现在 [kernel/src/arch/aarch64/board/raspi3/fb.rs](../../../kernel/src/arch/aarch64/board/raspi3/fb.rs) 中。
+
+### 相关数据结构
+
+[fb.rs](../../../kernel/src/arch/aarch64/board/raspi3/fb.rs) 中定义了下列结构体：
+
+* `FramebufferInfo`：framebuffer 的信息，包括：
+
+    + 实际可见的分辨率 `xres`、`yres`
+    + 虚拟的分辨率 `xres_virtual`、`yres_virtual`
+    + 位置偏移 `xoffset`、`yoffset`
+    + 颜色深度 `depth`
+    + 一行的字节数 `pitch`
+    + GPU 总线地址 `bus_addr`
+    + 大小 `screen_size`
+
+* `ColorDepth`：表示颜色深度的枚举值，目前支持 16 位和 32 位颜色深度；
+* `ColorBuffer`：一个 union 类型，可将同一个 framebuffer 基址解析为下列三种类型：
+
+    + 一个 32 位无符号整数，表示 framebuffer 基址的虚拟地址；
+    + 一个类型为 16 位整数，大小为 framebuffer 分辨率的数组，表示 16 位颜色深度下的每个像素点；
+    + 一个类型为 32 位整数，大小为 framebuffer 分辨率的数组，表示 32 位颜色深度下的每个像素点；
+
+    ```rust
+    union ColorBuffer {
+        base_addr: usize,
+        buf16: &'static mut [u16],
+        buf32: &'static mut [u32],
+    }
+    ```
+
+    该 union 还提供了 `read16()`、`write16()`、`read32()`、`write32()` 等函数用于直接读写不同颜色深度下的 framebuffer；
+
+* `Framebuffer`：具体的 framebuffer 结构体：
+
+    ```rust
+    pub struct Framebuffer {
+        pub fb_info: FramebufferInfo,
+        pub color_depth: ColorDepth,
+        buf: ColorBuffer,
+    }
+    ```
+
+### 初始化
+
+Framebuffer 在函数 `Framebuffer::new()` 中初始化。流程如下：
+
+1. 通过 mailbox property interface，获取 framebuffer 物理分辨率、颜色深度等信息。也可以不获取，而是手动设置；
+2. 设置好相关参数，调用 `mailbox::framebuffer_alloc()` 由 GPU 分配 framebuffer，构造出 `FramebufferInfo` 结构体；
+3. 将 framebuffer GPU 总线地址转换为物理内存地址，然后调用 `memory::ioremap()` 将这段内存做对等映射，内存属性为 NormalNonCacheable；
+4. 构造出 `Framebuffer` 结构体并返回。
+
+### 读写
+
+可通过 `Framebuffer::read()` 和 `Framebuffer::write()` 函数读取 framebuffer 中的一个像素，或写入一个像素。
+
+为了提升连续区域读写的速度，还实现了 `Framebuffer::copy()` 与 `Framebuffer::fill()` 函数，分别用于拷贝一块区域、将一块区域都置为同一颜色。具体做法是将连续几个像素拼成一个 64 位整数，以减少访存次数。
+
+`Framebuffer::clear()` 函数用于将屏幕清空(黑屏)。
 
 ## Console
