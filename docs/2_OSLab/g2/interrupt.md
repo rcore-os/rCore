@@ -2,7 +2,7 @@
 
 ## AArch64 异常模型
 
-> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile: capture D1.1, D1.7, D1.10, D1.11, D1.13, D1.14, D1.16.
+> 参考：ARMv8 Reference Manual: chapter D1.1, D1.7, D1.10, D1.11, D1.13, D1.14, D1.16.
 
 在 AArch64 中，各种中断被统称为**异常**(exception)，包括：
 
@@ -47,7 +47,7 @@
 | LowerAArch64         | `0x400`     | `0x480` | `0x500` | `0x580` |
 | LowerAArch32         | `0x600`     | `0x680` | `0x700` | `0x780` |
 
-如果该异常是 Synchronous 或 SError，**异常症状寄存器**(Exception Syndrome Register, ESR)将被设置，用于记录具体的异常类别 EC (exception class) 与 ISS (Instruction Specific Syndrome)。在 EL1、EL2、EL3 下各有一个 ESR 寄存器 `ESR_ELx`。具体的 EC、ISS 编码见官网文档 ARMv8 Reference Manual D1.10.4 节。
+如果该异常是 Synchronous 或 SError，**异常症状寄存器**(Exception Syndrome Register, ESR)将被设置，用于记录具体的异常类别 EC (exception class) 与 ISS (Instruction Specific Syndrome)。在 EL1、EL2、EL3 下各有一个 ESR 寄存器 `ESR_ELx`。具体的 EC、ISS 编码见官方文档 ARMv8 Reference Manual D1.10.4 节。
 
 ### 异常屏蔽
 

@@ -2,7 +2,7 @@
 
 ## AArch64 虚拟内存系统
 
-> 参考：ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile: capture D5, The AArch64 Virtual Memory System Architecture.
+> 参考：ARMv8 Reference Manual: chapter D5, The AArch64 Virtual Memory System Architecture.
 
 (注：完整的 AArch64 文档中描述了许多可选的配置，如页大小、翻译表级数等，以下描述都是指在 RustOS 中的实现，不代表只有这一种实现方式)
 
@@ -69,7 +69,7 @@ AArch64 拥有 64 位地址，支持两段虚拟内存地址空间，分别为�
 
 ![](img/block-page-descriptor_attributes.png)
 
-各字段的具体说明详见官网文档 ARMv8 Reference Manual D5.3.3 节。
+各字段的具体说明详见官方文档 ARMv8 Reference Manual D5.3.3 节。
 
 ### 内存属性 (D5.5)
 

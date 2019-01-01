@@ -29,6 +29,7 @@ pub fn new() -> Controller {
 这些外围设备的最底层驱动实现在 crate [bcm2837](../../../crate/bcm2837/) 中，包括：
 
 * GPIO
+* Interrupt
 * Mini UART
 * Mailbox
 * Timer
@@ -36,7 +37,6 @@ pub fn new() -> Controller {
 一些稍微高级的与具体硬件板子相关的驱动实现在 [kernel/src/arch/aarch64/board/raspi3](../../../kernel/src/arch/aarch64/board/raspi3/) 中，包括：
 
 * Framebuffer
-* IRQ
 * Mailbox property interface
 * Serial
 
@@ -55,7 +55,7 @@ pub fn new() -> Controller {
 
 ### 设置引脚模式
 
-引脚模式有 8 种：输入、输出与 alternative function 0~5。根据引脚编号向相应的 `FSEL` 寄存器的相应位写入模式代码即可。
+引脚模式有 8 种：输入、输出与 alternative function 0~5。根据引脚编号向相应的 GPFSELx 寄存器的相应位写入模式代码即可。
 
 ```rust
 pub fn into_alt(self, function: Function) -> Gpio<Alt> {
@@ -81,12 +81,12 @@ pub fn into_input(self) -> Gpio<Input> {
 
 引脚的上拉/下拉状态有 3 种：上拉(`10`)、下拉(`01`)与不拉(`00`)。设置该状态的流程如下：
 
-1. 向 `PUD` 寄存器写入状态代码；
+1. 向 GPPUD 寄存器写入状态代码；
 2. 等待 150 个时钟周期；
-3. 根据引脚编号向相应的 `PUDCLK` 寄存器的相应位写入 1；
+3. 根据引脚编号向相应的 GPPUDCLK0/1 寄存器的相应位写入 1；
 4. 等待 150 个时钟周期；
-5. 向 `PUD` 寄存器写入 0；
-6. 根据引脚编号向相应的 `PUDCLK` 寄存器的相应位写入 0。
+5. 向 GPPUD 寄存器写入 0；
+6. 根据引脚编号向相应的 GPPUDCLK0/1 寄存器的相应位写入 0。
 
 ```rust
 pub fn set_gpio_pd(&mut self, pud_value: u8) {
@@ -98,6 +98,82 @@ pub fn set_gpio_pd(&mut self, pud_value: u8) {
     delay(150);
     self.registers.PUD.write(0);
     self.registers.PUDCLK[index as usize].write(0);
+}
+```
+
+## Interrupt
+
+> 参考：BCM2837 ARM Peripherals: chapter 7, Interrupts.
+
+该设备为其他外围设备提供异步异常(中断)支持，实现在 crate [bcm2837](../../../crate/bcm2837/) 的 [interrupt.rs](../../../crate/bcm2837/src/interrupt.rs) 中。目前只有对 IRQ 的支持，没有对 FIQ 的支持。
+
+当中断发生时，IRQ basic pending 寄存器中的某些位会被设置，表示哪个 basic IRQ 待处理(详见 BCM2837 ARM Peripherals 第 114 页的表)。如果其第 8 或 9 位被设置，则需要进一步到 IRQ pending 1/2 寄存器中去查找。此时共有 64 个中断，部分如下(详见第 113 页的表)：
+
+|  编号  |       中断       |
+|--------|------------------|
+|   1    |  system timer 1  |
+|   3    |  system timer 3  |
+|   9    |  USB controller  |
+|   29   |     Aux int      |
+|   49   |     gpio[0]      |
+|   50   |     gpio[1]      |
+|   51   |     gpio[2]      |
+|   52   |     gpio[3]      |
+|   57   |     uart_int     |
+|  ...   |       ...        |
+
+目前 RustOS 只支持上表中的 IRQ，不支持其他 basic IRQ。在 RustOS 中用到了 System Timer 与 mini UART 的 IRQ，分别为 system timer 1 (1) 与 Aux int (29)。
+
+在 [kernel/src/arch/aarch64/board/raspi3/irq.rs](../../../kernel/src/arch/aarch64/board/raspi3/irq.rs#L23) 中实现了 IRQ 的注册，只需调用 `register_irq()` 函数绑定 IRQ 编号与处理函数，在 `handle_irq()` 里就会自动处理已注册的中断。
+
+### 启用与禁用中断
+
+只需分别向 Enable IRQs 1/2 和 Disable IRQs 1/2 寄存器的相应位写 1 即可：
+
+```rust
+pub fn enable(&mut self, int: Interrupt) {
+    self.registers.EnableIRQ[int as usize / 32].write(1 << (int as usize) % 32);
+}
+
+pub fn disable(&mut self, int: Interrupt) {
+    self.registers.DisableIRQ[int as usize / 32].write(1 << (int as usize) % 32);
+}
+```
+
+### 获取待处理的中断
+
+只需读取 IRQ pending 1/2 寄存器中的相应位，就能知道某一 IRQ 是否待处理：
+
+```rust
+pub fn is_pending(&self, int: Interrupt) -> bool {
+    self.registers.IRQPending[int as usize / 32].read() & (1 << (int as usize) % 32) != 0
+}
+```
+
+此外也可将当前所有待处理的 IRQ 构成一个迭代器方便遍历：
+
+```rust
+pub struct PendingInterrupts(u64);
+
+impl Iterator for PendingInterrupts {
+    type Item = usize;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let int = self.0.trailing_zeros();
+        if int < 64 {
+            self.0 &= !(1 << int);
+            Some(int as usize)
+        } else {
+            None
+        }
+    }
+}
+
+pub fn pending_interrupts(&self) -> PendingInterrupts {
+    let irq1 = self.registers.IRQPending[0].read() as u64;
+    let irq2 = self.registers.IRQPending[1].read() as u64;
+    PendingInterrupts((irq2 << 32) | irq1)
 }
 ```
 
@@ -113,7 +189,7 @@ RustOS 中 mini UART 的驱动主要实现在 crate [bcm2837](../../../crate/bcm
 
 初始化 mini UART 的流程如下：
 
-1. 向 `AUX_ENABLES` 寄存写 1，启用 mini UART；
+1. 向 AUX_ENABLES 寄存器写 1，启用 mini UART；
 2. 将 GPIO 的 14/15 引脚都设为 alternative function ALT5 (TXD1/RXD1) 模式，并都设为不拉状态；
 3. 配置 mini UART 参数：
 
@@ -182,8 +258,8 @@ Mailbox 有若干通道(channels)，不同通道提供不同种类的功能。�
 
 读的流程如下：
 
-1. 读状态寄存器 `MAIL0_STA`，直到 `MailboxEmpty` 位没有被设置；
-2. 从 `MAIL0_RD` 寄存器读取数据；
+1. 读状态寄存器 MAIL0_STA，直到 empty 位没有被设置；
+2. 从 MAIL0_RD 寄存器读取数据；
 3. 如果数据的最低 4 位不与要读的通道匹配，则回到 1；
 4. 否则返回数据的高 28 位。
 
@@ -201,8 +277,8 @@ pub fn read(&self, channel: MailboxChannel) -> u32 {
 
 写的流程如下：
 
-1. 读状态寄存器 `MAIL1_STA`，直到 `MailboxFull` 位没有被设置；
-3. 将数据(高 28 位)与通道(低 4 位)拼接，写入 `MAIL1_WRT` 寄存器。
+1. 读状态寄存器 MAIL1_STA，直到 full 位没有被设置；
+3. 将数据(高 28 位)与通道(低 4 位)拼接，写入 MAIL1_WRT 寄存器。
 
 ```rust
 pub fn write(&mut self, channel: MailboxChannel, data: u32) {
@@ -264,9 +340,124 @@ pub fn framebuffer_get_physical_size() -> PropertyMailboxResult<(u32, u32)> {
 
 ## Timer
 
+BCM283x 系列可用下列三种不同的时钟：
+
+* System Timer：BCM2837 ARM Peripherals 第 12 章，IO 基地址为 `0x3F003000`，最常用的时钟，但是在 QEMU 中不可用；
+* ARM Timer：BCM2837 ARM Peripherals 第 14 章，IO 基地址为 `0x3F00B400`，在 QEMU 中也不可用，RustOS 并未实现；
+* Generic Timer：ARMv8 Reference Manual 第 D10 章，通过 AArch64 系统寄存器访问 CPU 的时钟，外围设备只提供了中断控制(IO 基地址为 `0x40000000`)，可同时在 QEMU 与真机上使用。
+
+时钟主要实现在 crate [bcm2837](../../../crate/bcm2837/) 的 [timer](../../../crate/bcm2837/src/timer) 模块中。可以指定 crate bcm2837 的 feature `use_generic_timer` 来选择是否使用 Generic Timer。在 [mod.rs](../../../crate/bcm2837/src/timer/mod.rs#L12) 中提供了以下 `trait`，具体的时钟驱动需要实现这些函数：
+
+```rust
+/// The Raspberry Pi timer.
+pub trait BasicTimer {
+    /// Returns a new instance.
+    fn new() -> Self;
+
+    /// Initialization timer.
+    fn init(&mut self);
+
+    /// Reads the timer's counter and returns the 64-bit counter value.
+    /// The returned value is the number of elapsed microseconds.
+    fn read(&self) -> u64;
+
+    /// Sets up a match in timer 1 to occur `us` microseconds from now. If
+    /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
+    /// interrupt will be issued in `us` microseconds.
+    fn tick_in(&mut self, us: u32);
+
+    /// Returns `true` if timer interruption is pending. Otherwise, returns `false`.
+    fn is_pending(&self) -> bool;
+}
+```
+
+在 [kernel/src/arch/aarch64/board/raspi3/timer.rs](../../../kernel/src/arch/aarch64/board/raspi3/timer.rs) 中对这些函数进行了简单封装。在 [kernel/src/arch/aarch64/board/raspi3/irq.rs](../../../kernel/src/arch/aarch64/board/raspi3/irq.rs#L9) 的 `handler_irq()` 函数中处理了时钟中断：
+
+```rust
+let controller = bcm2837::timer::Timer::new();
+if controller.is_pending() {
+    super::timer::set_next();
+    crate::trap::timer();
+}
+```
+
 ### System Timer
 
+> 参考：BCM2837 ARM Peripherals: chapter 12, System Timer.
+
+System Timer 通过 CS、CLO、CHI 等 IO 地址访问时钟，通过上文 Interrupt 节描述的 IRQ 控制器提供中断(IRQ 编号为 system timer 1)。实现方式如下：
+
+* 初始化：使用 [interrupt](../../../crate/bcm2837/src/interrupt.rs#L68) 模块的 `enable()` 函数启用 system timer 1 IRQ；
+* 当前时刻：分别读取时钟计数器的高、低 32 位(CLO、CHI)，再拼接起来得到 64 位计数器值(单位微秒)；
+* 设置下一次中断的时刻：向 System Timer Compare 1 (C1) 寄存器写入当前计数器值加上时间间隔，同时向 System Timer Control/Status (CS) 寄存器的第 1 位写入 1 表示当前的中断已被处理好；
+* 判断是否有时钟中断：使用 [interrupt](../../../crate/bcm2837/src/interrupt.rs#L78) 模块的 `is_pending()` 函数。
+
+```rust
+fn init(&mut self) {
+    Controller::new().enable(Interrupt::Timer1);
+}
+
+fn read(&self) -> u64 {
+    let low = self.registers.CLO.read();
+    let high = self.registers.CHI.read();
+    ((high as u64) << 32) | (low as u64)
+}
+
+fn tick_in(&mut self, us: u32) {
+    let current_low = self.registers.CLO.read();
+    let compare = current_low.wrapping_add(us);
+    self.registers.COMPARE[SystemTimerId::Timer1 as usize].write(compare);
+    self.registers.CS.write(1 << (SystemTimerId::Timer1 as usize)); // unmask
+}
+
+fn is_pending(&self) -> bool {
+    let controller = Controller::new();
+    controller.is_pending(Interrupt::Timer1)
+}
+```
+
 ### Generic Timer
+
+> 参考：
+> 1. ARMv8 Reference Manual: chapter D10, The Generic Timer in AArch64 state.
+> 2. BCM2836 ARM-local peripherals (Quad-A7 control): section 4.6, Core timers interrupts; section 4.10, Core interrupt sources.
+
+RustOS 实现的 Generic Timer 是 CPU 在 EL1 下的 Physical Timer，可通过下列 AArch64 系统寄存器访问：
+
+|  Generic Timer 系统寄存器  |                        名称                        |                      描述                      |
+|----------------------------|----------------------------------------------------|------------------------------------------------|
+|        `CNTFRQ_EL0`        |          Counter-timer Frequency register          |  获取时钟的频率，单位 Hz，典型的值为 62.5 MHz  |
+|        `CNTP_CTL_EL0`       |   Counter-timer Physical Timer Control register    |  控制 Physical Timer 是否启用，中断是否屏蔽等  |
+|      `CNTP_TVAL_EL0`       |  Counter-timer Physical Timer TimerValue register  |       下一次时钟中断要再经过多少时钟周期。每当时钟计数器增加 1，该值就会减少 1，如果该值为 0 了就会触发时钟中断 |
+|        `CNTPCT_EL0`        |       Counter-timer Physical Count register        |               获取时钟计数器的值               |
+
+而 Generic Timer 的中断控制器需要通过 `0x40000000` 开始的那些 IO 地址访问。Generic Timer 实现方式如下：
+
+* 初始化：将 `CNTP_CTL_EL0` 寄存器的 ENABLE 位置为 1，启用 CPU Physical Timer；将 Core0 timers Interrupt control 的 CNTPNSIRQ 位置为 1，开启中断；
+* 当前时刻：读取 `CNTPCT_EL0` 寄存器获得当前时钟计数器的值，再与时钟频率 `CNTFRQ_EL0` 经过简单的换算即能得到以微秒为单位的当前时刻；
+* 设置下一次中断的时刻：向 `CNTP_TVAL_EL0` 寄存器写入时间间隔对应的时钟周期数；
+* 判断是否有时钟中断：判断 Core0 IRQ Source 的 CNTPNSIRQ 位是否为 1。
+
+```rust
+fn init(&mut self) {
+    self.registers.CORE_TIMER_IRQCNTL[0].write(1 << (CoreInterrupt::CNTPNSIRQ as u8));
+    CNTP_CTL_EL0.write(CNTP_CTL_EL0::ENABLE::SET);
+}
+
+fn read(&self) -> u64 {
+    let cntfrq = CNTFRQ_EL0.get(); // 62500000
+    (CNTPCT_EL0.get() * 1000000 / (cntfrq as u64)) as u64
+}
+
+fn tick_in(&mut self, us: u32) {
+    let cntfrq = CNTFRQ_EL0.get(); // 62500000
+    CNTP_TVAL_EL0.set(((cntfrq as f64) * (us as f64) / 1000000.0) as u32);
+}
+
+fn is_pending(&self) -> bool {
+    self.registers.CORE_IRQ_SRC[0].read() & (1 << (CoreInterrupt::CNTPNSIRQ as u8)) != 0
+}
+```
 
 ## Framebuffer
 

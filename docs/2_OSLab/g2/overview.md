@@ -27,7 +27,7 @@
 * EL2: Hypervisor.
 * EL3: Secure monitor.
 
-级别越高，特权(privilege)越高。一般称 EL0 为非特权级(unprivileged)，其他的为特权级(unprivileged)。
+级别越高，特权(privilege)越高。一般称 EL0 为非特权级(unprivileged)，其他的为特权级(privileged)。
 
 ### 寄存器
 
@@ -83,8 +83,8 @@ AArch64 有下列**特殊寄存器**(Special-purpose registers)：
 |  系统寄存器_ELx  |                  名称                   |             描述             |
 |------------------|-----------------------------------------|------------------------------|
 |       CTR        |           Cache Type Register           |       获取 cache 信息        |
-|       ESR        |       Exception Syndrome Register       |      保存发生异常的原因      |
-|       FAR        |         Fault Address Register          |  保存发生访存错误的虚拟地址  |
+|       ESR        |       Exception Syndrome Register       |        发生异常的原因        |
+|       FAR        |         Fault Address Register          |    发生访存错误的虚拟地址    |
 |       HCR        |    Hypervisor Configuration Register    |     配置 EL2 下的虚拟化      |
 |       MAIR       |  Memory Attribute Indirection Register  |         配置内存属性         |
 |      MPIDR       |    Multiprocessor Affinity Register     |      多核系统中核的编号      |
@@ -117,10 +117,10 @@ crate [aarch64](https://github.com/equation314/aarch64) 的 [regs](https://githu
 
 ## 官方文档
 
-* [ARM Architecture Reference Manual ARMv8, for ARMv8-A architecture profile](https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf)：AArch64 的完整文档，有 7000 多页，最为详细。
+* [ARM Architecture Reference Manual, for ARMv8-A architecture profile](https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf)：AArch64 的完整文档，有 7000 多页，最为详细。
 * [ARM Cortex-A Series Programmer’s Guide for ARMv8-A](http://infocenter.arm.com/help/topic/com.arm.doc.den0024a/DEN0024A_v8_architecture_PG.pdf)：可认为是上一文档的精简版，仅有不到 300 页。
 * [BCM2837 ARM Peripherals](https://web.stanford.edu/class/cs140e/docs/BCM2837-ARM-Peripherals.pdf)：Raspberry Pi SoC BCM283x 系列的外围设备文档，包含对 GPIO、中断控制器、mini UART、System Timer 等外围设备的访问。
-* [BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)：仅用于如何使用 ARM Generic Timer。
+* [BCM2836 ARM-local peripherals (Quad-A7 control)](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)：仅用于如何使用 AArch64 Generic Timer 的中断。
 * [Raspberry Pi firmware](https://github.com/raspberrypi/firmware)：Raspberry Pi 二进制固件，部分开源，其中最有价值的是 [mailbox](https://github.com/raspberrypi/firmware/wiki) 的文档。
 
 ## 其他参考
