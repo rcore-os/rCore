@@ -203,7 +203,7 @@ impl Framebuffer {
         let mut value: usize = 0;
         let repeat = USIZE * 8 / self.fb_info.depth as usize;
         let mask = ((1u64 << self.fb_info.depth) - 1) as usize;
-        for i in 0..repeat {
+        for _i in 0..repeat {
             value <<= self.fb_info.depth;
             value += pixel as usize & mask;
         }
