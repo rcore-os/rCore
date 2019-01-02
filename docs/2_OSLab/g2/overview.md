@@ -35,10 +35,10 @@
 
 AArch64 有 31 个 64 位**通用寄存器**(General-purpose registers) `X0~X30`，每个 64 位寄存器都有一个 32 位的版本 `W0~W30`。寄存器的使用规范一般如下：
 
-* 参数寄存器 (Argument registers, `X0~X7`)：作为函数调用时的参数，返回值保存在 `X0`；
-* 调用者保存寄存器(Caller-saved temporary registers, `X9~X15`)：在函数调用前，如果调用者需要保护这些寄存器中的值直到函数调用之后，则调用者需要将它们保存到当前栈帧上，而被调用者可直接使用而不必保存与恢复；
+* 参数寄存器 (Argument registers, `X0~X7`)：作为函数调用时的参数，返回值保存在 `X0`。
+* 调用者保存寄存器(Caller-saved temporary registers, `X9~X15`)：在函数调用前，如果调用者需要保护这些寄存器中的值直到函数调用之后，则调用者需要将它们保存到当前栈帧上，而被调用者可直接使用而不必保存与恢复。
 * 被调用者保存寄存器(Callee-saved registers, `X19~X29`)：在函数调用中，如果该函数需要修改这些寄存器，则需要在函数开始执行前将它们保存到当前栈帧上，并在返回时恢复它们。
-* 帧指针寄存器(Frame point register, `FP` 或 `X29`)：用于保存当前函数的栈帧指针；
+* 帧指针寄存器(Frame point register, `FP` 或 `X29`)：用于保存当前函数的栈帧指针。
 * 链接寄存器(Link register, `LR` 或 `X30`)：用于保存函数返回的地址，执行 `ret` 指令会跳转到 `LR`。
 
 ![](img/general-register.png)
@@ -47,10 +47,10 @@ AArch64 有 31 个 64 位**通用寄存器**(General-purpose registers) `X0~X30`
 
 AArch64 有下列**特殊寄存器**(Special-purpose registers)：
 
-* 零寄存器(Zero register, ZR)：被映射为立即数 0，可分别用 `WZR/XZR` 访问 32/64 位版本；
-* 程序计数器(Program counter, `PC`)：当前指令的地址，64 位；
-* 栈指针(Stack pointer, `SP`)：当前栈顶地址，64 位。在每个异常级别下都有一个栈指针，分别为 `SP_EL0`、`SP_EL1`、`SP_EL2`、`SP_EL3`，直接访问 `SP` 时会根据当前异常级别自动选择对应的(如果 `SPSel = 0`，则在任何异常级别下都使用 `SP_EL0`)；
-* 异常链接寄存器(Exception Link Register, ELR)：用于保存异常返回的地址，在异常级别 1~3 下分别为 `ELR_ELx`，执行 `eret` 指令进行异常返回时会根据当前异常级别跳转到相应的 ELR；
+* 零寄存器(Zero register, ZR)：被映射为立即数 0，可分别用 `WZR/XZR` 访问 32/64 位版本。
+* 程序计数器(Program counter, `PC`)：当前指令的地址，64 位。
+* 栈指针(Stack pointer, `SP`)：当前栈顶地址，64 位。在每个异常级别下都有一个栈指针，分别为 `SP_EL0`、`SP_EL1`、`SP_EL2`、`SP_EL3`，直接访问 `SP` 时会根据当前异常级别自动选择对应的(如果 `SPSel = 0`，则在任何异常级别下都使用 `SP_EL0`)。
+* 异常链接寄存器(Exception Link Register, ELR)：用于保存异常返回的地址，在异常级别 1~3 下分别为 `ELR_ELx`，执行 `eret` 指令进行异常返回时会根据当前异常级别跳转到相应的 ELR。
 * 保存的进程状态寄存器(Saved Process Status Register, SPSR)：用于保存异常发生时的进程状态(PSTATE)，在异常级别 1~3 下分别为 `SPSR_ELx`。执行 `eret` 指令进行异常返回时会根据当前异常级别，从相应的 SPSR 恢复进程状态。
 
 #### 进程状态
@@ -71,7 +71,7 @@ AArch64 有下列**特殊寄存器**(Special-purpose registers)：
     + `I`: IRQ interrupt mask bit
     + `F`: FIQ interrupt mask bit
 
-* 当前异常级别(Current Exception level, `CurrentEL`)：获取当前的异常级别；
+* 当前异常级别(Current Exception level, `CurrentEL`)：获取当前的异常级别。
 * 栈指针选择(Stack Pointer Select, `SPSel`)：如果为 1，则在不同异常级别下分别使用相应的 `SP_ELx` 作为 `SP`，否则任何时候都使用 `SP_EL0` 作为 `SP`。
 
 当异常发生时，当前的 PSTATE 会根据进入哪个异常级别保存到相应的 `SPSR_ELx` 中。

@@ -81,11 +81,11 @@ pub fn into_input(self) -> Gpio<Input> {
 
 引脚的上拉/下拉状态有 3 种：上拉(`10`)、下拉(`01`)与不拉(`00`)。设置该状态的流程如下：
 
-1. 向 GPPUD 寄存器写入状态代码；
-2. 等待 150 个时钟周期；
-3. 根据引脚编号向相应的 GPPUDCLK0/1 寄存器的相应位写入 1；
-4. 等待 150 个时钟周期；
-5. 向 GPPUD 寄存器写入 0；
+1. 向 GPPUD 寄存器写入状态代码。
+2. 等待 150 个时钟周期。
+3. 根据引脚编号向相应的 GPPUDCLK0/1 寄存器的相应位写入 1。
+4. 等待 150 个时钟周期。
+5. 向 GPPUD 寄存器写入 0。
 6. 根据引脚编号向相应的 GPPUDCLK0/1 寄存器的相应位写入 0。
 
 ```rust
@@ -189,15 +189,15 @@ RustOS 中 mini UART 的驱动主要实现在 crate [bcm2837](../../../crate/bcm
 
 初始化 mini UART 的流程如下：
 
-1. 向 AUX_ENABLES 寄存器写 1，启用 mini UART；
-2. 将 GPIO 的 14/15 引脚都设为 alternative function ALT5 (TXD1/RXD1) 模式，并都设为不拉状态；
+1. 向 AUX_ENABLES 寄存器写 1，启用 mini UART。
+2. 将 GPIO 的 14/15 引脚都设为 alternative function ALT5 (TXD1/RXD1) 模式，并都设为不拉状态。
 3. 配置 mini UART 参数：
 
-    1. 暂时禁用接收器与发送器；
-    2. 启用接收中断，禁用发送中断；
-    3. 设置数据大小为 8 bit；
-    4. 设置 RTS line 为 high；
-    5. 设置波特率为 115200；
+    1. 暂时禁用接收器与发送器。
+    2. 启用接收中断，禁用发送中断。
+    3. 设置数据大小为 8 bit。
+    4. 设置 RTS line 为 high。
+    5. 设置波特率为 115200。
     6. 重新启用接收器与发送器。
 
 ```rust
@@ -243,8 +243,8 @@ pub fn write_byte(&mut self, byte: u8) {
 
 BCM283x 系列可用下列三种不同的时钟：
 
-* System Timer：BCM2837 ARM Peripherals 第 12 章，IO 基地址为 `0x3F003000`，最常用的时钟，但是在 QEMU 中不可用；
-* ARM Timer：BCM2837 ARM Peripherals 第 14 章，IO 基地址为 `0x3F00B400`，在 QEMU 中也不可用，RustOS 并未实现；
+* System Timer：BCM2837 ARM Peripherals 第 12 章，IO 基地址为 `0x3F003000`，最常用的时钟，但是在 QEMU 中不可用。
+* ARM Timer：BCM2837 ARM Peripherals 第 14 章，IO 基地址为 `0x3F00B400`，在 QEMU 中也不可用，RustOS 并未实现。
 * Generic Timer：ARMv8 Reference Manual 第 D10 章，通过 AArch64 系统寄存器访问 CPU 的时钟，外围设备只提供了中断控制(IO 基地址为 `0x40000000`)，可同时在 QEMU 与真机上使用。
 
 时钟主要实现在 crate [bcm2837](../../../crate/bcm2837/) 的 [timer](../../../crate/bcm2837/src/timer) 模块中。可以指定 crate bcm2837 的 feature `use_generic_timer` 来选择是否使用 Generic Timer。在 [mod.rs](../../../crate/bcm2837/src/timer/mod.rs#L12) 中提供了以下 `trait`，具体的时钟驱动需要实现这些函数：
@@ -288,9 +288,9 @@ if controller.is_pending() {
 
 System Timer 通过 CS、CLO、CHI 等 IO 地址访问时钟，通过上文 Interrupt 节描述的 IRQ 控制器提供中断(IRQ 编号为 system timer 1)。实现方式如下：
 
-* 初始化：使用 [interrupt](../../../crate/bcm2837/src/interrupt.rs#L68) 模块的 `enable()` 函数启用 system timer 1 IRQ；
-* 当前时刻：分别读取时钟计数器的高、低 32 位(CLO、CHI)，再拼接起来得到 64 位计数器值(单位微秒)；
-* 设置下一次中断的时刻：向 System Timer Compare 1 (C1) 寄存器写入当前计数器值加上时间间隔，同时向 System Timer Control/Status (CS) 寄存器的第 1 位写入 1 表示当前的中断已被处理好；
+* 初始化：使用 [interrupt](../../../crate/bcm2837/src/interrupt.rs#L68) 模块的 `enable()` 函数启用 system timer 1 IRQ。
+* 当前时刻：分别读取时钟计数器的高、低 32 位(CLO、CHI)，再拼接起来得到 64 位计数器值(单位微秒)。
+* 设置下一次中断的时刻：向 System Timer Compare 1 (C1) 寄存器写入当前计数器值加上时间间隔，同时向 System Timer Control/Status (CS) 寄存器的第 1 位写入 1 表示当前的中断已被处理好。
 * 判断是否有时钟中断：使用 [interrupt](../../../crate/bcm2837/src/interrupt.rs#L78) 模块的 `is_pending()` 函数。
 
 ```rust
@@ -334,9 +334,9 @@ RustOS 实现的 Generic Timer 是 CPU 在 EL1 下的 Physical Timer，可通过
 
 而 Generic Timer 的中断控制器需要通过 `0x40000000` 开始的那些 IO 地址访问。Generic Timer 实现方式如下：
 
-* 初始化：将 `CNTP_CTL_EL0` 寄存器的 ENABLE 位置为 1，启用 CPU Physical Timer；将 Core0 timers Interrupt control 的 CNTPNSIRQ 位置为 1，开启中断；
-* 当前时刻：读取 `CNTPCT_EL0` 寄存器获得当前时钟计数器的值，再与时钟频率 `CNTFRQ_EL0` 经过简单的换算即能得到以微秒为单位的当前时刻；
-* 设置下一次中断的时刻：向 `CNTP_TVAL_EL0` 寄存器写入时间间隔对应的时钟周期数；
+* 初始化：将 `CNTP_CTL_EL0` 寄存器的 ENABLE 位置为 1，启用 CPU Physical Timer；将 Core0 timers Interrupt control 的 CNTPNSIRQ 位置为 1，开启中断。
+* 当前时刻：读取 `CNTPCT_EL0` 寄存器获得当前时钟计数器的值，再与时钟频率 `CNTFRQ_EL0` 经过简单的换算即能得到以微秒为单位的当前时刻。
+* 设置下一次中断的时刻：向 `CNTP_TVAL_EL0` 寄存器写入时间间隔对应的时钟周期数。
 * 判断是否有时钟中断：判断 Core0 IRQ Source 的 CNTPNSIRQ 位是否为 1。
 
 ```rust
@@ -378,9 +378,9 @@ Mailbox 有若干通道(channels)，不同通道提供不同种类的功能。�
 
 读的流程如下：
 
-1. 读状态寄存器 MAIL0_STA，直到 empty 位没有被设置；
-2. 从 MAIL0_RD 寄存器读取数据；
-3. 如果数据的最低 4 位不与要读的通道匹配，则回到 1；
+1. 读状态寄存器 MAIL0_STA，直到 empty 位没有被设置。
+2. 从 MAIL0_RD 寄存器读取数据。
+3. 如果数据的最低 4 位不与要读的通道匹配，则回到 1。
 4. 否则返回数据的高 28 位。
 
 ```rust
@@ -397,8 +397,8 @@ pub fn read(&self, channel: MailboxChannel) -> u32 {
 
 写的流程如下：
 
-1. 读状态寄存器 MAIL1_STA，直到 full 位没有被设置；
-3. 将数据(高 28 位)与通道(低 4 位)拼接，写入 MAIL1_WRT 寄存器。
+1. 读状态寄存器 MAIL1_STA，直到 full 位没有被设置。
+2. 将数据(高 28 位)与通道(低 4 位)拼接，写入 MAIL1_WRT 寄存器。
 
 ```rust
 pub fn write(&mut self, channel: MailboxChannel, data: u32) {
@@ -476,12 +476,12 @@ Framebuffer 是一块内存缓存区，树莓派的 GPU 会将其中的数据转
     + GPU 总线地址 `bus_addr`
     + 大小 `screen_size`
 
-* `ColorDepth`：表示颜色深度的枚举值，目前支持 16 位和 32 位颜色深度；
+* `ColorDepth`：表示颜色深度的枚举值，目前支持 16 位和 32 位颜色深度。
 * `ColorBuffer`：一个 union 类型，可将同一个 framebuffer 基址解析为下列三种类型：
 
-    + 一个 32 位无符号整数，表示 framebuffer 基址的虚拟地址；
-    + 一个类型为 16 位整数，大小为 framebuffer 分辨率的数组，表示 16 位颜色深度下的每个像素点；
-    + 一个类型为 32 位整数，大小为 framebuffer 分辨率的数组，表示 32 位颜色深度下的每个像素点；
+    + 一个 32 位无符号整数，表示 framebuffer 基址的虚拟地址。
+    + 一个类型为 16 位整数，大小为 framebuffer 分辨率的数组，表示 16 位颜色深度下的每个像素点。
+    + 一个类型为 32 位整数，大小为 framebuffer 分辨率的数组，表示 32 位颜色深度下的每个像素点。
 
     ```rust
     union ColorBuffer {
@@ -491,7 +491,7 @@ Framebuffer 是一块内存缓存区，树莓派的 GPU 会将其中的数据转
     }
     ```
 
-    该 union 还提供了 `read16()`、`write16()`、`read32()`、`write32()` 等函数用于直接读写不同颜色深度下的 framebuffer；
+    该 union 还提供了 `read16()`、`write16()`、`read32()`、`write32()` 等函数用于直接读写不同颜色深度下的 framebuffer。
 
 * `Framebuffer`：具体的 framebuffer 结构体：
 
@@ -507,9 +507,9 @@ Framebuffer 是一块内存缓存区，树莓派的 GPU 会将其中的数据转
 
 Framebuffer 在函数 `Framebuffer::new()` 中初始化。流程如下：
 
-1. 通过 mailbox property interface，获取 framebuffer 物理分辨率、颜色深度等信息。也可以不获取，而是手动设置；
-2. 设置好相关参数，调用 `mailbox::framebuffer_alloc()` 由 GPU 分配 framebuffer，构造出 `FramebufferInfo` 结构体；
-3. 将 framebuffer GPU 总线地址转换为物理内存地址，然后调用 `memory::ioremap()` 将这段内存做对等映射，内存属性为 NormalNonCacheable；
+1. 通过 mailbox property interface，获取 framebuffer 物理分辨率、颜色深度等信息。也可以不获取，而是手动设置。
+2. 设置好相关参数，调用 `mailbox::framebuffer_alloc()` 由 GPU 分配 framebuffer，构造出 `FramebufferInfo` 结构体。
+3. 将 framebuffer GPU 总线地址转换为物理内存地址，然后调用 `memory::ioremap()` 将这段内存做对等映射，内存属性为 NormalNonCacheable。
 4. 构造出 `Framebuffer` 结构体并返回。
 
 ### 读写
@@ -521,3 +521,84 @@ Framebuffer 在函数 `Framebuffer::new()` 中初始化。流程如下：
 `Framebuffer::clear()` 函数用于将屏幕清空(黑屏)。
 
 ## Console
+
+有了 framebuffer，就可以将显示器作为输出设备显示字符了。为此
+Console (控制台) 是一个平台无关的抽象输出设备，表示屏幕上要显示的字符矩阵。该设备负责将字符转成像素点写入 framebuffer 中，以实现显示器中字符的显示，并支持颜色、字体等多种效果。
+
+Console 驱动实现在模块 [kernel/src/arch/aarch64/driver/console](../../../kernel/src/arch/aarch64/driver/console/) 中，依赖 framebuffer，包含下面几部分：
+
+1. 控制台主体([mod.rs](../../../kernel/src/arch/aarch64/driver/console/mod.rs))
+2. 颜色([color.rs](../../../kernel/src/arch/aarch64/driver/console/color.rs))
+3. 字体([fonts](../../../kernel/src/arch/aarch64/driver/console/fonts))
+4. ANSI 转移序列解析器([escape_parser.rs](../../../kernel/src/arch/aarch64/driver/console/escape_parser.rs))
+
+### 控制台主体
+
+包含下列结构体：
+
+* `ConsoleChar`：控制台中的字符，由 ASCII 码 `ascii_char` 与字符属性 `attr` (详见下节“ANSI 转移序列解析器”)构成。
+* `ConsoleBuffer`：控制台字符缓冲区，是一个 `num_row` 行 `num_col` 列，元素类型是 `ConsoleChar` 的二维数组。主要包含以下函数：
+
+    + `write()`：向 `(row, col)` 处写入一个字符 `ch`。这会根据给定的字体与字符属性，将字符转成像素点呈现在 framebuffer 上。
+    + `new_line()`：向字符缓冲区的底部插入一个新行，并将原来的内容都向上平移一行。在真机上测试时，发现 framebuffer 读的速度非常慢，所以没有用 `Framebuffer::copy()` 函数直接拷贝 framebuffer 内容，而是根据新的字符缓冲区重新绘制。
+    + `clear()`：清空屏幕与字符缓冲区内容。
+
+* `Console`：具体的控制台结构体，通过传入的字体泛型 `<F: Font>` 构造，包含当前光标位置 `(row, col)`、 ANSI 转移序列解析器 `parser` 以及控制台字符缓冲区 `buffer`，主要包含以下函数：
+
+    + `new()`：根据 `FramebufferInfo` 新建一个 `Console` 对象。当前字体下字符的高、宽与 framebuffer 分辨率将决定字符缓冲区的大小。
+    + `write_byte()`：向当前光标位置处写入一个字符。这会根据具体是什么字符进行相应的操作，包括：直接显示该字符、换行、删除前一个字符、传给转移序列解析器。
+    + `new_line()`：换行。如果当前光标位于字符缓冲区最底部则会调用 `ConsoleBuffer::new_line()` 移动屏幕内容。
+    + `clear()`：清空并初始化。
+
+    此外，`Console` 实现了 trait `fmt::Write` 的 `write_str()` 函数，这样就可以用 `write_fmt()` 格式化输出了。
+
+### 颜色
+
+该模块定义了 16 种颜色(8 种标准颜色与 8 种高亮的标准颜色)，并提供了将 RGB 值转换为 framebuffer 可识别的 16/32 位像素值的方法。
+
+### 字体
+
+该模块定义了统一的字体接口：
+
+```rust
+pub trait Font {
+    const HEIGHT: usize;
+    const WIDTH: usize;
+
+    /// the `y` coordinate of underline.
+    const UNDERLINE: usize;
+    /// the `y` coordinate of strikethrough.
+    const STRIKETHROUGH: usize;
+
+    /// Whether the character `byte` is visible at `(x, y)`.
+    fn get(byte: u8, x: usize, y: usize) -> bool;
+}
+```
+
+添加一种字体只需实现该 trait 即可，支持下划线与删除线。目前内置了一种 8x16 的字体(直接从 linux 中拷贝而来，[CP437 编码](https://en.wikipedia.org/wiki/Code_page_437))。
+
+### ANSI 转移序列解析器
+
+> 参考：https://en.wikipedia.org/wiki/ANSI_escape_code
+
+为了在控制台上支持文字颜色等选项，RustOS 实现了一个简易的 ANSI 转移序列(ANSI escape sequences)解析器，可识别标准的ANSI 转移序列并呈现在屏幕上，支持下列 SGR (Select Graphic Rendition) 字符属性：
+
+|  SGR 代码  |          效果          |
+|------------|------------------------|
+|     0      |       重置为默认       |
+|     4      |         下划线         |
+|     7      |    反转前景与背景色    |
+|     9      |         删除线         |
+|     24     |       取消下划线       |
+|     27     |  取消反转前景与背景色  |
+|     29     |       取消删除线       |
+|   30~37    |       设置前景色       |
+|   40~47    |       设置背景色       |
+|   90~97    |     设置高亮前景色     |
+|  100~107   |     设置高亮背景色     |
+
+具体实现时，结构体 `EscapeParser` 维护了一个状态机，通过 `parse()` 函数传入一个字符，转移状态，解析出 SGR 参数并更新当前字符属性；通过 `char_attribute()` 函数获取当前的字符属性。
+
+目前显示效果与在终端下使用 `screen` 获取串口输出的效果一致，如在 QEMU 中运行 `fantastic_text` 测例的效果如下：
+
+![](img/fantastic-text.png)

@@ -58,9 +58,9 @@
 
     每个进程控制块 `Process` ([kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L13)) 都会维护一个平台相关的 `Context` 对象，在 AArch64 中包含下列信息：
 
-    1. `stack_top`：内核栈顶地址；
-    2. `ttbr`：页表基址；
-    3. `asid`：Address Space ID，详见下文“页表切换与 ASID 机制”。
+    1. `stack_top`：内核栈顶地址
+    2. `ttbr`：页表基址
+    3. `asid`：Address Space ID，详见下文“页表切换与 ASID 机制”
 
 ## 切换流程
 
@@ -135,8 +135,8 @@ impl AsidAllocator {
 
 分配的流程如下：
 
-1. 判断 `old_asid` 是否等于 `self.0.generation`，如果相等说明这一代的 ASID 还是有效的，直接返回 `old_asid`；
-2. 否则，`old_asid` 已失效，如果当前代的 65535 个 ASID 没有分配完，就直接分配下一个；
+1. 判断 `old_asid` 是否等于 `self.0.generation`，如果相等说明这一代的 ASID 还是有效的，直接返回 `old_asid`。
+2. 否则，`old_asid` 已失效，如果当前代的 65535 个 ASID 没有分配完，就直接分配下一个。
 3. 如果当前代的 65535 个 ASID 都分配完了，就开始新的一代，同时刷新 TLB。
 
 ### 寄存器与栈的切换
@@ -171,10 +171,10 @@ ret
 
 流程如下：
 
-1. 保存**当前栈顶** `sp` 到 `_self_stack` (`x0`)，保存 **callee-saved 寄存器**到当前栈上；
-2. 从 `_target_stack` (`x1`) 获取目标线程的**内核栈顶**，从目标线程内核栈顶恢复 **callee-saved 寄存器**；
-4. 将 `sp` 设为目标线程内核栈顶，将 `_target_stack` (`x1`) 里的内容清空；
-5. 使用 `ret` 指令返回，这会跳转到目标线程 `lr` 寄存器中存放的地址。
+1. 保存**当前栈顶** `sp` 到 `_self_stack` (`x0`)，保存 **callee-saved 寄存器**到当前栈上。
+2. 从 `_target_stack` (`x1`) 获取目标线程的**内核栈顶**，从目标线程内核栈顶恢复 **callee-saved 寄存器**。
+3. 将 `sp` 设为目标线程内核栈顶，将 `_target_stack` (`x1`) 里的内容清空。
+4. 使用 `ret` 指令返回，这会跳转到目标线程 `lr` 寄存器中存放的地址。
 
 为什么只保存了 `sp` 与 callee-saved 寄存器，而不是所有寄存器？因为执行上下文切换就是在调用一个函数，在调用前后编译器会自动保存并恢复 caller-saved 寄存器(调用者保存，即 `x0~x18`)。
 
@@ -186,8 +186,8 @@ ret
 
 线程可通过下列三种方式创建：
 
-1. 创建新的**内核线程**：直接给出一个内核函数；
-2. 创建新的**用户线程**：解析 ELF 文件；
+1. 创建新的**内核线程**：直接给出一个内核函数。
+2. 创建新的**用户线程**：解析 ELF 文件。
 3. 从一个线程 **fork** 出一个新线程：通过 `fork` 系统调用。
 
 三种线程的平台无关创建流程实现在 [kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L40) 里，最终会分别调用 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L146) 里的 `new_kernel_thread()`、`new_user_thread()` 和 `new_fork()` 这三个函数创建平台相关的 `Context` 结构。

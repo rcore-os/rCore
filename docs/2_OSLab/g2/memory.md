@@ -45,8 +45,8 @@ AArch64 拥有 64 位地址，支持两段虚拟内存地址空间，分别为�
 
 翻译表描述符即翻译表项，由一段地址空间的基址与这段地址空间的属性构成。根据这段地址空间的用处不同，将描述符分为 3 类：
 
-1. **页描述符**(page descriptor)：该描述符中的地址指向一个 4KB 大小的页；
-2. **块描述符**(block descriptor)：该描述符中的地址指向一个 1GB 或 2MB 大小的块；
+1. **页描述符**(page descriptor)：该描述符中的地址指向一个 4KB 大小的页。
+2. **块描述符**(block descriptor)：该描述符中的地址指向一个 1GB 或 2MB 大小的块。
 3. **表描述符**(table descriptor)：该描述符中的地址指向另一个翻译表。
 
 #### 第 0, 1, 2 级翻译表描述符
@@ -86,8 +86,8 @@ AArch64 拥有 64 位地址，支持两段虚拟内存地址空间，分别为�
 
 可共享性分为 3 种：
 
-1. 不可共享，即每个核都不与其他核共享这段内存；
-2. 内部共享，即多核之间可以共享这段内存；
+1. 不可共享，即每个核都不与其他核共享这段内存。
+2. 内部共享，即多核之间可以共享这段内存。
 3. 外部共享，即除了多核之间外，CPU 与 GPU 之间也可共享这段内存。
 
 在块/页描述符的 SH 字段可设置内存的可共享性。
@@ -164,8 +164,8 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 
 1. **地址**(address)：位于描述符的第 12 到 47 位。根据描述符的 `TABLE_OR_PAGE` 位，分别指向下列 3 种地址：
 
-    1. 页描述符(page descriptor)：该地址指向一个 4KB 大小的页，该地址 4KB 对齐；
-    2. 块描述符(block descriptor)：该地址指向一个 1GB 或 2MB 大小的块，该地址 1GB 或 2MB 对齐；
+    1. 页描述符(page descriptor)：该地址指向一个 4KB 大小的页，该地址 4KB 对齐。
+    2. 块描述符(block descriptor)：该地址指向一个 1GB 或 2MB 大小的块，该地址 1GB 或 2MB 对齐。
     3. 表描述符(table descriptor)：该地址指向另一个页表，该地址 4KB 对齐。
 
 2. **标志位**(flags)：仅由一个位来表示的内存属性。对于表/块描述符包含下列位：
@@ -201,8 +201,8 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 
 3. **属性**(attribute)：属性字段指明了这段内存的内存属性，包括内存类型(位 2、3、4)与可共享性(位 8、9)。在 [aarch64/src/paging/memory_attribute.rs](https://github.com/equation314/aarch64/blob/master/src/paging/memory_attribute.rs) 中预定义了 3 中内存属性，分别为：
 
-    1. Normal：普通可缓存内存，cache 属性为 Write-Back Non-transient Read-Allocate Write-Allocate，内部共享；
-    2. Device：Device-nGnRE 类型的内存，不可缓存，外部共享；
+    1. Normal：普通可缓存内存，cache 属性为 Write-Back Non-transient Read-Allocate Write-Allocate，内部共享。
+    2. Device：Device-nGnRE 类型的内存，不可缓存，外部共享。
     3. NormalNonCacheable：普通不可缓存内存，外部共享。
 
 #### 自映射机制
@@ -211,15 +211,15 @@ Cache line 的大小可通过 `CTR_EL0` 寄存器读取，一般为 16 个 WORD�
 
 具体地，设**递归索引**为 `R` (RustOS 中为 `0o777 = 512`，即页表的最后一项)，只需将第 4 级页表的第 `R` 项映射为第 4 级页表自身即可建立自映射页表。这样一来，一个虚拟地址 `IA` 的四级页表分别被以下虚拟地址所映射(`||` 表示比特串的连接)：
 
-* 4 级页表：`R || R || R || R`；
-* 3 级页表：`R || R || R || IA[47..39]`；
-* 2 级页表：`R || R || IA[47..39] || IA[38..30]`；
-* 1 级页表：`R || IA[47..39] || IA[38..30] || IA[29..21]`；
+* 4 级页表：`R || R || R || R`
+* 3 级页表：`R || R || R || IA[47..39]`
+* 2 级页表：`R || R || IA[47..39] || IA[38..30]`
+* 1 级页表：`R || IA[47..39] || IA[38..30] || IA[29..21]`
 
 在 [aarch64/src/paging/recursive.rs](https://github.com/equation314/aarch64/blob/master/src/paging/recursive.rs) 中，为结构体 `RecursivePageTable` 实现了一系列函数，主要的几个如下：
 
-* `new(table: PageTable)`：将虚拟地址表示的 `table` 作为 4 级页表，新建 `RecursivePageTable` 对象；
-* `map_to(self, page: Page<Size4KiB>, frame: PhysFrame<Size4KiB>, flags: PageTableFlags, attr: PageTableAttribute, allocator: FrameAllocator<Size4KiB>)`：将虚拟地址表示的**页** `page`，映射为物理地址表示的**帧** `frame`，并设置标志位 `flags` 和属性 `attr`，如果需要新分配页表就用 `allocator` 分配。页与帧的大小都是 4KB；
+* `new(table: PageTable)`：将虚拟地址表示的 `table` 作为 4 级页表，新建 `RecursivePageTable` 对象。
+* `map_to(self, page: Page<Size4KiB>, frame: PhysFrame<Size4KiB>, flags: PageTableFlags, attr: PageTableAttribute, allocator: FrameAllocator<Size4KiB>)`：将虚拟地址表示的**页** `page`，映射为物理地址表示的**帧** `frame`，并设置标志位 `flags` 和属性 `attr`，如果需要新分配页表就用 `allocator` 分配。页与帧的大小都是 4KB。
 * `unmap(self, page: Page<Size4KiB>)`：取消虚拟地址表示的页 `page` 的映射。
 
 ### 实现内存管理

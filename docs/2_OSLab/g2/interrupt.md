@@ -134,9 +134,9 @@ __trapret:
 
 流程如下：
 
-1. 首先通过宏 `SAVE_ALL` 保存各寄存器，构成 `TrapFrame`；
-2. 然后构造函数参数 `x0`、`x1`、`x2`，分别表示异常类型、异常症状 ESR、`TrapFrame`，并调用 Rust 异常处理函数 `rust_trap()`；
-3. 当该函数返回时，通过宏 `RESTORE_ALL` 从 `TrapFrame` 中恢复各寄存器；
+1. 首先通过宏 `SAVE_ALL` 保存各寄存器，构成 `TrapFrame`。
+2. 然后构造函数参数 `x0`、`x1`、`x2`，分别表示异常类型、异常症状 ESR、`TrapFrame`，并调用 Rust 异常处理函数 `rust_trap()`。
+3. 当该函数返回时，通过宏 `RESTORE_ALL` 从 `TrapFrame` 中恢复各寄存器。
 4. 最后通过 `eret` 指令进行异常返回。
 
 `TrapFrame` 定义在 [interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L12)中，结构如下：
@@ -169,9 +169,9 @@ pub struct TrapFrame {
 
 RustOS 的系统调用方式如下(实现在 [user/ucore-ulib/src/syscall.rs](../../../user/ucore-ulib/src/syscall.rs#L47) 中)：
 
-* 将系统调用号保存在寄存器 `x8`，将 6 参数分别保存在寄存器 `x0~x5` 中；
-* 执行系统调用指令 `svc 0`；
-* 系统调用返回值保存在寄存器 `x0` 中。
+1. 将系统调用号保存在寄存器 `x8`，将 6 参数分别保存在寄存器 `x0~x5` 中。
+2. 执行系统调用指令 `svc 0`。
+3. 系统调用返回值保存在寄存器 `x0` 中。
 
 在 `handle_syscall()` 函数中，会从 `TrapFrame` 保存的寄存器中恢复系统调用参数，并调用 `crate::syscall::syscall()` 进行具体的系统调用。
 
