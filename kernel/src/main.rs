@@ -3,4 +3,4 @@
 #![cfg_attr(test, allow(dead_code, unused_macros, unused_imports))]
 
 #[allow(unused_imports)]
-use ucore;
+use rcore;

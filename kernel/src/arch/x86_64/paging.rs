@@ -1,6 +1,6 @@
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
-use ucore_memory::paging::*;
+use rcore_memory::paging::*;
 use x86_64::instructions::tlb;
 use x86_64::PhysAddr;
 use x86_64::registers::control::{Cr3, Cr3Flags};

@@ -1,8 +1,8 @@
 [package]
-name = "ucore-user-programs"
+name = "rcore-user-programs"
 version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
 edition = "2018"
 
 [dependencies]
-"ucore-ulib" = { path = "ucore-ulib" }
+"rcore-ulib" = { path = "rcore-ulib" }

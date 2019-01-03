@@ -28,7 +28,7 @@ smp  ?= 4
 m_mode ?=
 
 target := $(arch)
-kernel := target/$(target)/$(mode)/ucore
+kernel := target/$(target)/$(mode)/rcore
 bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
 bbl_path := $(PWD)/../riscv-pk
@@ -149,6 +149,7 @@ objcopy := $(prefix)objcopy
 cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
+export CC=$(cc)
 
 .PHONY: all clean run build asm doc justrun debug kernel sfsimg install
 
@@ -220,11 +221,11 @@ else ifeq ($(arch), riscv32)
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
-	@CC=$(cc) cargo xbuild $(build_args)
+	@cargo xbuild $(build_args)
 else ifeq ($(arch), riscv64)
 	@./build-rv64
 else ifeq ($(arch), aarch64)
-	@CC=$(cc) cargo xbuild $(build_args)
+	@cargo xbuild $(build_args)
 endif
 
 

@@ -4,7 +4,7 @@ arch ?= riscv32
 mode ?= debug
 
 rust_src_dir := src/bin
-rust_bin_path := target/$(arch)-ucore/$(mode)
+rust_bin_path := target/$(arch)-rcore/$(mode)
 user_rust_bins := $(patsubst $(rust_src_dir)/%.rs, $(rust_bin_path)/%, $(wildcard $(rust_src_dir)/*.rs))
 c_src_dir :=
 c_bin_path :=
@@ -17,7 +17,7 @@ sfsimg := $(build_path)/user-$(arch).img
 
 mksfs := mksfs
 
-build_args := --target $(arch)-ucore.json
+build_args := --target targets/$(arch)-rcore.json
 ifeq ($(mode), release)
 build_args := $(build_args) --release
 endif

@@ -1,10 +1,6 @@
 #!/bin/bash
 # The contents are adopted from xbuild verbose output.
-# Output files are in target/${ARCH}-blog_os/debug
-#
-# Usage:
-#   Just run
-#   $ ./run-qemu-script-custom-llc
+# Output files are in target/${ARCH}/debug
 #
 # By default riscv64 is built. To build for riscv32,
 #		set the environment variable `RV32` to "1"
@@ -12,12 +8,10 @@ set -e
 
 if [[ ${RV32} = 1 ]]; then
 	TARGET_ARCH=riscv32
-	COMPILER_RT_CFLAGS="-march=rv32imac -mabi=ilp32 -O3"
-	SFSIMG_CFLAGS="-march=rv32ia -mabi=ilp32"
+	CFLAGS="-march=rv32imac -mabi=ilp32"
 else
 	TARGET_ARCH=riscv64
-	COMPILER_RT_CFLAGS="-march=rv64imac -mabi=lp64 -O3"
-	SFSIMG_CFLAGS="-march=rv64ia -mabi=lp64"
+	CFLAGS="-march=rv64imac -mabi=lp64"
 fi
 UCORE_USER_IMAGE="../user/img/ucore-${TARGET_ARCH}.img"
 LLC=$PWD/../tools/llc
@@ -101,7 +95,7 @@ fi
 CNAME=compiler_builtins
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.2/src/lib.rs \
+rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.3/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=3 \
     -C debuginfo=2 \
@@ -396,10 +390,10 @@ rustc --edition=2018 --crate-name simple_filesystem $CARGO_PATH/git/checkouts/si
 gen_full_rlib
 fi
 
-CNAME=ucore_process
+CNAME=rcore_process
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --edition=2018 --crate-name ucore_process $PWD/../crate/process/src/lib.rs \
+rustc --edition=2018 --crate-name rcore_process $PWD/../crate/process/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -412,10 +406,10 @@ rustc --edition=2018 --crate-name ucore_process $PWD/../crate/process/src/lib.rs
 gen_full_rlib
 fi
 
-CNAME=ucore_memory
+CNAME=rcore_memory
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --edition=2018 --crate-name ucore_memory $PWD/../crate/memory/src/lib.rs \
+rustc --edition=2018 --crate-name rcore_memory $PWD/../crate/memory/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -498,7 +492,7 @@ fi
 # Hand generate build.rs
 if ! [[ -f ${OUTDIR}/libatomic_rt.a ]]
 then
-${CC} src/arch/riscv32/compiler_rt.c ${COMPILER_RT_CFLAGS} -O3 -c -o ${OUTDIR}/compiler_rt.o
+${CC} src/arch/riscv32/compiler_rt.c ${CFLAGS} -O3 -Wno-builtin-declaration-mismatch -c -o ${OUTDIR}/compiler_rt.o
 ${AR} r ${OUTDIR}/libatomic_rt.a ${OUTDIR}/compiler_rt.o
 fi
 
@@ -513,7 +507,7 @@ _user_img_start:
 		.incbin "${UCORE_USER_IMAGE}"
 _user_img_end:
 EOF
-if ! ${CC} ${OUTDIR}/sfsimg.S ${SFSIMG_CFLAGS} -c -o ${OUTDIR}/sfsimg.o
+if ! ${CC} ${OUTDIR}/sfsimg.S ${CFLAGS} -c -o ${OUTDIR}/sfsimg.o
 then
 	echo "You should manually create sfs image!"
 	exit 1
@@ -524,7 +518,7 @@ fi
 #make sfsimg
 
 
-CNAME=ucore
+CNAME=rcore
 #if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 #then
 if [[ ${board} = k210 ]]; then
@@ -533,7 +527,7 @@ if [[ ${board} = k210 ]]; then
 else
     cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
 fi
-rustc --edition=2018 --crate-name ucore src/lib.rs \
+rustc --edition=2018 --crate-name rcore src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -553,8 +547,8 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
     --extern riscv=${OUTDIR}/libriscv.rlib \
     --extern simple_filesystem=${OUTDIR}/libsimple_filesystem.rlib \
     --extern spin=${OUTDIR}/libspin.rlib \
-    --extern ucore_memory=${OUTDIR}/libucore_memory.rlib \
-    --extern ucore_process=${OUTDIR}/libucore_process.rlib \
+    --extern rcore_memory=${OUTDIR}/librcore_memory.rlib \
+    --extern rcore_process=${OUTDIR}/librcore_process.rlib \
     --extern volatile=${OUTDIR}/libvolatile.rlib \
     --extern xmas_elf=${OUTDIR}/libxmas_elf.rlib  \
     -L native=${OUTDIR} -l static=sfsimg -l static=atomic_rt
@@ -562,13 +556,13 @@ rustc --edition=2018 --crate-name ucore src/lib.rs \
 gen_full_rlib
 #fi
 
-#if ! [[ -f ${OUTDIR}/ucore ]]
+#if ! [[ -f ${OUTDIR}/rcore ]]
 #then
 if [[ ${board} = k210 ]]; then
     export LINK_K210='-L native=kendryte'
 fi
 echo "rustc crate-type bin to ${TARGET_JSON}"
-rustc --edition=2018 --crate-name ucore src/main.rs \
+rustc --edition=2018 --crate-name rcore src/main.rs \
     --color always --crate-type bin --emit=link \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -587,9 +581,9 @@ rustc --edition=2018 --crate-name ucore src/main.rs \
     --extern riscv=${OUTDIR}/libriscv.rlib \
     --extern simple_filesystem=${OUTDIR}/libsimple_filesystem.rlib \
     --extern spin=${OUTDIR}/libspin.rlib \
-    --extern ucore=${OUTDIR}/libucore.rlib \
-    --extern ucore_memory=${OUTDIR}/libucore_memory.rlib \
-    --extern ucore_process=${OUTDIR}/libucore_process.rlib \
+    --extern rcore=${OUTDIR}/librcore.rlib \
+    --extern rcore_memory=${OUTDIR}/librcore_memory.rlib \
+    --extern rcore_process=${OUTDIR}/librcore_process.rlib \
     --extern volatile=${OUTDIR}/libvolatile.rlib \
     --extern xmas_elf=${OUTDIR}/libxmas_elf.rlib \
     -L native=${OUTDIR} ${LINK_K210}

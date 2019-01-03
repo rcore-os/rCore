@@ -6,7 +6,7 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::register::satp;
-use ucore_memory::paging::*;
+use rcore_memory::paging::*;
 use log::*;
 #[cfg(target_arch = "riscv32")]
 use crate::consts::KERNEL_P2_INDEX;

@@ -9,8 +9,8 @@ typedef unsigned u32;
 // K210 doesn't support atomic operation on 0x40000000 (io port)
 // We have to detect it and move it to 0x80000000
 inline u32* fix_ptr32(u32 *ptr) {
-    return (u32)ptr < 0x80000000?
-            (u32*)((u32)ptr + 0x40000000):
+    return ptr < (u32*)0x80000000?
+            ptr + 0x40000000 / sizeof(u32):
             ptr;
 }
 
@@ -79,8 +79,8 @@ typedef unsigned long long u64;
 // K210 doesn't support atomic operation on 0x40000000 (io port)
 // We have to detect it and move it to 0x80000000
 inline u64* fix_ptr64(u64 *ptr) {
-    return (u64)ptr < 0x80000000?
-            (u64*)((u64)ptr + 0x40000000):
+    return ptr < (u64*)0x80000000?
+            ptr + 0x40000000 / sizeof(u64):
             ptr;
 }
 

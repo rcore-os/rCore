@@ -2,9 +2,9 @@
 #![no_main]
 
 #[macro_use]
-extern crate ucore_ulib;
-use ucore_ulib::io::getc;
-use ucore_ulib::syscall::{sys_exec, sys_fork, sys_wait};
+extern crate rcore_ulib;
+use rcore_ulib::io::getc;
+use rcore_ulib::syscall::{sys_exec, sys_fork, sys_wait};
 
 pub fn get_line(buffer: &mut [u8]) -> usize {
     let mut pos: usize = 0;

@@ -2,7 +2,7 @@
 #![no_main]
 
 #[macro_use]
-extern crate ucore_ulib;
+extern crate rcore_ulib;
 
 macro_rules! color_text {
     ($text:expr, $color:expr) => {{

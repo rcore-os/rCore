@@ -1,5 +1,5 @@
 [package]
-name = "ucore-process"
+name = "rcore-process"
 version = "0.1.0"
 authors = ["WangRunji <wangrunji0408@163.com>"]
 edition = "2018"

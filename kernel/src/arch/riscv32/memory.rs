@@ -1,6 +1,6 @@
 use core::mem;
 use riscv::{addr::*, register::sstatus};
-use ucore_memory::PAGE_SIZE;
+use rcore_memory::PAGE_SIZE;
 use log::*;
 use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERN_VA_BASE};

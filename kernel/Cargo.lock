@@ -204,6 +204,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcore"
+version = "0.1.0"
+dependencies = [
+ "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
+ "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
+ "atags 0.1.0",
+ "bbl 0.1.0",
+ "bcm2837 0.1.0",
+ "bit-allocator 0.1.0",
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bootloader 0.3.4 (git+https://github.com/wangrunji0408/bootloader)",
+ "cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pc-keyboard 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rcore-memory 0.1.0",
+ "rcore-process 0.1.0",
+ "riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)",
+ "simple-filesystem 0.1.0 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rcore-memory"
+version = "0.1.0"
+dependencies = [
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rcore-process"
+version = "0.1.0"
+dependencies = [
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "register"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -301,52 +347,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ucore"
-version = "0.1.0"
-dependencies = [
- "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
- "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
- "atags 0.1.0",
- "bbl 0.1.0",
- "bcm2837 0.1.0",
- "bit-allocator 0.1.0",
- "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "bootloader 0.3.4 (git+https://github.com/wangrunji0408/bootloader)",
- "cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "pc-keyboard 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)",
- "simple-filesystem 0.1.0 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ucore-memory 0.1.0",
- "ucore-process 0.1.0",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ucore-memory"
-version = "0.1.0"
-dependencies = [
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ucore-process"
-version = "0.1.0"
-dependencies = [
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

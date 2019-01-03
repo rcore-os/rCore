@@ -1,5 +1,5 @@
 //! Page table implementations for aarch64.
-use ucore_memory::paging::*;
+use rcore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};

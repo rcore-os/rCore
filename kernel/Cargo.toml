@@ -1,5 +1,5 @@
 [package]
-name = "ucore"
+name = "rcore"
 version = "0.1.0"
 edition = "2018"
 authors = [
@@ -44,8 +44,8 @@ volatile = "0.2"
 linked_list_allocator = "0.6"
 lazy_static = { version = "1.2", features = ["spin_no_std"] }
 bit-allocator = { path = "../crate/bit-allocator" }
-ucore-memory = { path = "../crate/memory" }
-ucore-process = { path = "../crate/process" }
+rcore-memory = { path = "../crate/memory" }
+rcore-process = { path = "../crate/process" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
@@ -66,8 +66,8 @@ atags = { path = "../crate/atags" }
 bcm2837 = { path = "../crate/bcm2837", optional = true }
 
 [package.metadata.bootimage]
-default-target = "x86_64-blog_os.json"
-output = "target/x86_64-blog_os/bootimage.bin"
+default-target = "targets/x86_64.json"
+output = "target/x86_64/bootimage.bin"
 minimum-image-size = 0      # The minimum output file size (in MiB)
 # The command invoked on `bootimage run`
 # (the "{}" will be replaced with the path to the bootable disk image)

@@ -1,11 +1,11 @@
 [[package]]
-name = "ucore-ulib"
+name = "rcore-ulib"
 version = "0.1.0"
 
 [[package]]
-name = "ucore-user-programs"
+name = "rcore-user-programs"
 version = "0.1.0"
 dependencies = [
- "ucore-ulib 0.1.0",
+ "rcore-ulib 0.1.0",
 ]
 

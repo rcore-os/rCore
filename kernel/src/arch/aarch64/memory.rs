@@ -6,7 +6,7 @@ use aarch64::paging::{memory_attribute::*, PhysFrame as Frame};
 use aarch64::{addr::*, barrier, regs::*};
 use atags::atags::Atags;
 use log::*;
-use ucore_memory::PAGE_SIZE;
+use rcore_memory::PAGE_SIZE;
 
 /// Memory initialization.
 pub fn init() {

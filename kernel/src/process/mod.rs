@@ -1,5 +1,5 @@
 pub use self::context::Process;
-pub use ucore_process::*;
+pub use rcore_process::*;
 use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use crate::arch::cpu;
 use alloc::{boxed::Box, sync::Arc};

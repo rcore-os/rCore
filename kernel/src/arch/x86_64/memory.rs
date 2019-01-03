@@ -3,7 +3,7 @@ use crate::consts::KERNEL_OFFSET;
 // Depends on kernel
 use crate::memory::{FRAME_ALLOCATOR, init_heap, active_table};
 use super::{BootInfo, MemoryRegionType};
-use ucore_memory::paging::*;
+use rcore_memory::paging::*;
 use once::*;
 use log::*;
 

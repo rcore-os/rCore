@@ -2,9 +2,9 @@ pub use crate::arch::paging::*;
 use bit_allocator::BitAlloc;
 use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
-use ucore_memory::*;
-use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
+use rcore_memory::*;
+use rcore_memory::cow::CowExt;
+pub use rcore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
 use crate::process::{process};
 use crate::sync::{SpinNoIrqLock, SpinNoIrq, MutexGuard};
 use lazy_static::*;
@@ -12,10 +12,10 @@ use log::*;
 use linked_list_allocator::LockedHeap;
 
 #[cfg(not(feature = "no_mmu"))]
-pub type MemorySet = ucore_memory::memory_set::MemorySet<InactivePageTable0>;
+pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 
 #[cfg(feature = "no_mmu")]
-pub type MemorySet = ucore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
+pub type MemorySet = rcore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 
 // x86_64 support up to 256M memory
 #[cfg(target_arch = "x86_64")]
@@ -112,7 +112,7 @@ pub static MEMORY_ALLOCATOR: LockedHeap = LockedHeap::empty();
 #[derive(Debug, Clone, Copy)]
 pub struct NoMMUSupportImpl;
 
-impl ucore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
+impl rcore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
     type Alloc = LockedHeap;
     fn allocator() -> &'static Self::Alloc {
         &MEMORY_ALLOCATOR
@@ -128,7 +128,7 @@ pub fn page_fault_handler(_addr: usize) -> bool {
 //pub mod test {
 //    pub fn cow() {
 //        use super::*;
-//        use ucore_memory::cow::test::test_with;
+//        use rcore_memory::cow::test::test_with;
 //        test_with(&mut active_table());
 //    }
 //}
