@@ -8,13 +8,14 @@
 #   make clean                  Clean
 #
 # Options:
-#   arch = x86_64 | riscv32 | riscv64 | aarch64
+#   arch    = x86_64 | riscv32 | riscv64 | aarch64
 #   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
-#   SFSIMG = SFS image path of user programs
-#   smp  = 1 | 2 | ...          SMP core number
-#   board = none                Running on QEMU
+#   SFSIMG = <sfsimg>              SFS image path of user programs
+#   smp     = 1 | 2 | ...           SMP core number
+#   graphic = on | off              enable/disable qemu graphical output
+#   board   = none                Running on QEMU
 #         | k210                Only available on riscv64, build without bbl, run on K210
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   m_mode                      Only available on riscv32, build for M-Mode, without MMU
@@ -51,10 +52,15 @@ endif
 # crate 'process' use this to set interrupt (MIE or SIE)
 export M_MODE = $(m_mode)
 
+ifeq ($(arch), aarch64)
+graphic ?= on
+else
+graphic ?= off
+endif
+
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(smp) \
-	-nographic
+	-smp cores=$(smp)
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -86,11 +92,19 @@ qemu_opts += \
 	-kernel $(bin)
 endif
 
+ifneq ($(graphic), on)
+qemu_opts += -nographic
+endif
+
 ifdef d
 qemu_opts += -d $(d)
 endif
 
 ### build args ###
+ifneq ($(graphic), on)
+features += nographic
+endif
+
 ifeq ($(board), raspi3)
 # qemu only has generic timer
 # TODO: configure system/generic timer automatically

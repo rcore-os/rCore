@@ -85,8 +85,8 @@ pub trait Entry {
     fn set_user(&mut self, value: bool);
     fn execute(&self) -> bool;
     fn set_execute(&mut self, value: bool);
-    fn mmio(&self) -> bool;
-    fn set_mmio(&mut self, value: bool);
+    fn mmio(&self) -> u8;
+    fn set_mmio(&mut self, value: u8);
 }
 
 /// An inactive page table

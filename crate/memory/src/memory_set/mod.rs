@@ -82,7 +82,7 @@ pub struct MemoryAttr {
     user: bool,
     readonly: bool,
     execute: bool,
-    mmio: bool,
+    mmio: u8,
 }
 
 impl MemoryAttr {
@@ -110,8 +110,12 @@ impl MemoryAttr {
         self.execute = true;
         self
     }
-    pub fn mmio(mut self) -> Self {
-        self.mmio = true;
+    /*
+    **  @brief  set the MMIO type
+    **  @retval MemoryAttr           the memory attribute itself
+    */
+    pub fn mmio(mut self, value: u8) -> Self {
+        self.mmio = value;
         self
     }
     /*

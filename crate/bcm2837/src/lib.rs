@@ -5,6 +5,7 @@ extern crate volatile;
 
 pub mod gpio;
 pub mod timer;
+pub mod mailbox;
 pub mod mini_uart;
 pub mod interrupt;
 

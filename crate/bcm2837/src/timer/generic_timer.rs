@@ -1,5 +1,6 @@
 extern crate aarch64;
 
+use super::BasicTimer;
 use aarch64::regs::*;
 use volatile::*;
 
@@ -43,41 +44,33 @@ struct Registers {
 }
 
 /// The ARM generic timer.
-pub struct Timer {
+pub struct GenericTimer {
     registers: &'static mut Registers,
 }
 
-impl Timer {
-    /// Returns a new instance of `Timer`.
-    pub fn new() -> Timer {
-        Timer {
+impl BasicTimer for GenericTimer {
+    fn new() -> Self {
+        GenericTimer {
             registers: unsafe { &mut *(GEN_TIMER_REG_BASE as *mut Registers) },
         }
     }
 
-    /// Reads the generic timer's counter and returns the 64-bit counter value.
-    /// The returned value is the number of elapsed microseconds.
-    pub fn read(&self) -> u64 {
-        let cntfrq = CNTFRQ_EL0.get(); // 62500000
-        (CNTPCT_EL0.get() * 1000000 / (cntfrq as u64)) as u64
-    }
-
-    /// Sets up a match in timer 1 to occur `us` microseconds from now. If
-    /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
-    /// interrupt will be issued in `us` microseconds.
-    pub fn tick_in(&mut self, us: u32) {
-        let cntfrq = CNTFRQ_EL0.get(); // 62500000
-        CNTP_TVAL_EL0.set(((cntfrq as f64) * (us as f64) / 1000000.0) as u32);
-    }
-
-    /// Initialization timer
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         self.registers.CORE_TIMER_IRQCNTL[0].write(1 << (CoreInterrupt::CNTPNSIRQ as u8));
         CNTP_CTL_EL0.write(CNTP_CTL_EL0::ENABLE::SET);
     }
 
-    /// Returns `true` if timer interruption is pending. Otherwise, returns `false`.
-    pub fn is_pending(&self) -> bool {
+    fn read(&self) -> u64 {
+        let cntfrq = CNTFRQ_EL0.get(); // 62500000
+        (CNTPCT_EL0.get() * 1000000 / (cntfrq as u64)) as u64
+    }
+
+    fn tick_in(&mut self, us: u32) {
+        let cntfrq = CNTFRQ_EL0.get(); // 62500000
+        CNTP_TVAL_EL0.set(((cntfrq as f64) * (us as f64) / 1000000.0) as u32);
+    }
+
+    fn is_pending(&self) -> bool {
         self.registers.CORE_IRQ_SRC[0].read() & (1 << (CoreInterrupt::CNTPNSIRQ as u8)) != 0
     }
 }

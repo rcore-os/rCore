@@ -1,11 +1,12 @@
 //! Memory initialization for aarch64.
 
+use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use super::paging::MMIOType;
+use aarch64::paging::{memory_attribute::*, PhysFrame as Frame};
+use aarch64::{addr::*, barrier, regs::*};
+use atags::atags::Atags;
 use log::*;
 use ucore_memory::PAGE_SIZE;
-use atags::atags::Atags;
-use aarch64::{barrier, regs::*, addr::*};
-use aarch64::paging::{PhysFrame as Frame, memory_attribute::*};
-use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 
 /// Memory initialization.
 pub fn init() {
@@ -30,8 +31,8 @@ pub fn init_mmu_early() {
 
     // device.
     MAIR_EL1.write(
-        MAIR_EL1::Attr0.val(MairDevice::config_value()) +
-        MAIR_EL1::Attr1.val(MairNormal::config_value()) +
+        MAIR_EL1::Attr0.val(MairNormal::config_value()) +
+        MAIR_EL1::Attr1.val(MairDevice::config_value()) +
         MAIR_EL1::Attr2.val(MairNormalNonCacheable::config_value()),
     );
 
@@ -62,19 +63,19 @@ pub fn init_mmu_early() {
     // Switch the MMU on.
     //
     // First, force all previous changes to be seen before the MMU is enabled.
-    unsafe { barrier::isb(barrier::SY); }
+    unsafe { barrier::isb(barrier::SY) }
 
     // Enable the MMU and turn on data and instruction caching.
     SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
 
     // Force MMU init to complete before next instruction
-    unsafe { barrier::isb(barrier::SY); }
+    unsafe { barrier::isb(barrier::SY) }
 }
 
 fn init_frame_allocator() {
+    use crate::consts::MEMORY_OFFSET;
     use bit_allocator::BitAlloc;
     use core::ops::Range;
-    use crate::consts::MEMORY_OFFSET;
 
     let (start, end) = memory_map().expect("failed to find memory map");
     let mut ba = FRAME_ALLOCATOR.lock();
@@ -82,20 +83,22 @@ fn init_frame_allocator() {
     info!("FrameAllocator init end");
 
     /*
-    * @param:
-    *   start: start address
-    *   end: end address
-    * @brief:
-    *   transform the memory address to the page number
-    * @retval:
-    *   the page number range from start address to end address
-    */
+     * @param:
+     *   start: start address
+     *   end: end address
+     * @brief:
+     *   transform the memory address to the page number
+     * @retval:
+     *   the page number range from start address to end address
+     */
     fn to_range(start: usize, end: usize) -> Range<usize> {
         let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
         let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;
         page_start..page_end
     }
 }
+
+static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
@@ -107,11 +110,19 @@ fn remap_the_kernel() {
     ms.push(sbss as usize, ebss as usize, Linear::new(0, MemoryAttr::default()), "bss");
 
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
-    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio()), "io_remap");
+    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
 
-    unsafe { ms.get_page_table_mut().activate_as_kernel(); }
-    ::core::mem::forget(ms);
+    unsafe { ms.get_page_table_mut().activate_as_kernel() }
+    unsafe { KERNEL_MEMORY_SET = Some(ms) }
     info!("kernel remap end");
+}
+
+pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
+    if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
+        ms.push(start, start + len, Linear::new(0, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8)), name);
+        return start;
+    }
+    0
 }
 
 /// Returns the (start address, end address) of the available memory on this
@@ -131,7 +142,7 @@ fn memory_map() -> Option<(usize, usize)> {
     None
 }
 
-extern {
+extern "C" {
     fn bootstacktop();
     fn stext();
     fn etext();
