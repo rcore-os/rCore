@@ -30,7 +30,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         // process
         001 => sys_exit(args[0] as isize),
         002 => sys_fork(tf),
-        003 => sys_wait(args[0], args[1] as *mut isize),
+        003 => sys_wait(args[0], args[1] as *mut i32),
         004 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
 //        005 => sys_clone(),
         010 => sys_yield(),
@@ -142,16 +142,14 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> SysResult {
     let context = process().fork(tf);
-    //memory_set_map_swappable(context.get_memory_set_mut());
     let pid = processor().manager().add(context, thread::current().id());
-    //memory_set_map_swappable(processor.get_context_mut(pid).get_memory_set_mut());
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid as isize)
 }
 
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
-fn sys_wait(pid: usize, code: *mut isize) -> SysResult {
+fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
     // TODO: check ptr
     loop {
         use alloc::vec;
@@ -166,7 +164,7 @@ fn sys_wait(pid: usize, code: *mut isize) -> SysResult {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
                     if !code.is_null() {
-                        unsafe { code.write(exit_code as isize); }
+                        unsafe { code.write(exit_code as i32); }
                     }
                     processor().manager().remove(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
