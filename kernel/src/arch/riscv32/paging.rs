@@ -243,16 +243,23 @@ impl InactivePageTable for InactivePageTable0 {
     #[cfg(target_arch = "riscv32")]
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e0 = table[0x40];
-        let e1 = table[KERNEL_P2_INDEX];
-        let e2 = table[KERNEL_P2_INDEX + 1];
-        let e3 = table[KERNEL_P2_INDEX + 2];
+        extern {
+            fn start();
+            fn end();
+        }
+        let mut entrys: [PageTableEntry; 16] = unsafe { core::mem::uninitialized() };
+        let entry_start = start as usize >> 22;
+        let entry_end = (end as usize >> 22) + 1;
+        let entry_count = entry_end - entry_start;
+        for i in 0..entry_count {
+            entrys[i] = table[entry_start + i];
+        }
 
         self.edit(|_| {
-            table[0x40] = e0;
-            table[KERNEL_P2_INDEX] = e1;
-            table[KERNEL_P2_INDEX + 1] = e2;
-            table[KERNEL_P2_INDEX + 2] = e3;
+            // NOTE: 'table' now refers to new page table
+            for i in 0..entry_count {
+                table[entry_start + i] = entrys[i];
+            }
         });
     }
 
