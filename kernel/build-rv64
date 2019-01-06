@@ -95,17 +95,28 @@ fi
 CNAME=compiler_builtins
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --crate-name compiler_builtins $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.3/src/lib.rs \
-    --color always --crate-type lib --emit=metadata,llvm-bc \
-    -C opt-level=3 \
-    -C debuginfo=2 \
-    -Z force-unstable-if-unmarked \
-    --cfg 'feature="compiler-builtins"' \
-    --cfg 'feature="mem"' \
-    --out-dir ${OUTDIR} \
-    --target $TARGET_JSON \
-    -L ${OUTDIR}
-gen_full_rlib
+
+	if [[ -d $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.3 ]]
+	then
+		COMPILER_BUILTINS_PATH=$CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.3
+	elif [[ -d $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.4 ]]
+	then
+		COMPILER_BUILTINS_PATH=$CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.4
+	else
+		echo "Cannot find compiler_builtins crate! Please file an issue report"
+	fi
+
+	rustc --crate-name compiler_builtins ${COMPILER_BUILTINS_PATH}/src/lib.rs \
+			--color always --crate-type lib --emit=metadata,llvm-bc \
+			-C opt-level=3 \
+			-C debuginfo=2 \
+			-Z force-unstable-if-unmarked \
+			--cfg 'feature="compiler-builtins"' \
+			--cfg 'feature="mem"' \
+			--out-dir ${OUTDIR} \
+			--target $TARGET_JSON \
+			-L ${OUTDIR}
+	gen_full_rlib
 fi
 
 CNAME=alloc
@@ -367,7 +378,7 @@ rustc --crate-name bit_allocator $PWD/../crate/bit-allocator/src/lib.rs \
     -C debug-assertions=on \
     --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
-    -L ${OUTDIR} 
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
@@ -393,7 +404,7 @@ fi
 CNAME=rcore_process
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --edition=2018 --crate-name rcore_process $PWD/../crate/process/src/lib.rs \
+M_MODE="" rustc --edition=2018 --crate-name rcore_process $PWD/../crate/process/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \
@@ -402,7 +413,7 @@ rustc --edition=2018 --crate-name rcore_process $PWD/../crate/process/src/lib.rs
     --target $TARGET_JSON \
     --extern log=${OUTDIR}/liblog.rlib \
     --extern spin=${OUTDIR}/libspin.rlib \
-    -L ${OUTDIR} 
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
@@ -417,7 +428,7 @@ rustc --edition=2018 --crate-name rcore_memory $PWD/../crate/memory/src/lib.rs \
     --out-dir ${OUTDIR} \
     --target $TARGET_JSON \
     --extern log=${OUTDIR}/liblog.rlib \
-    -L ${OUTDIR} 
+    -L ${OUTDIR}
 gen_full_rlib
 fi
 
