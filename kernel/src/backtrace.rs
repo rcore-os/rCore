@@ -1,3 +1,5 @@
+use core::intrinsics::size_of;
+
 extern "C" {
     fn stext();
     fn etext();
@@ -45,7 +47,7 @@ pub fn backtrace() {
         let mut current_fp = fp();
         let mut stack_num = 0;
         while current_pc >= stext as usize && current_pc <= etext as usize && current_fp as usize != 0 {
-            println!("#{} {:#018X} fp {:#018X}", stack_num, current_pc - 4, current_fp);
+            println!("#{} {:#018X} fp {:#018X}", stack_num, current_pc - size_of::<usize>(), current_fp);
             stack_num = stack_num + 1;
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
             {
