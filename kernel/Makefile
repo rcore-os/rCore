@@ -5,6 +5,7 @@
 #   make doc                    Generate docs
 #   make asm                    Open the deassemble file of the last build
 #   make header                 Open 'objdump -h' of the last build
+#   make addr2line              Use addr2line to recover line info in backtrace
 #   make clean                  Clean
 #
 # Options:
@@ -262,3 +263,7 @@ install: $(bin)
 	## baudrate no more than 600000
 	@python3 ../tools/k210/kflash.py $(bin) -b 600000
 endif
+
+.PHONY:
+addr2line:
+	@python3 ../tools/addr2line.py $(prefix)addr2line $(arch)
