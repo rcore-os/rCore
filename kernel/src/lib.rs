@@ -6,7 +6,6 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
-#![feature(core_intrinsics)]
 #![no_std]
 
 // just keep it ...

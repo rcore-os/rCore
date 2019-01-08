@@ -1,4 +1,4 @@
-use core::intrinsics::size_of;
+use core::mem::size_of;
 
 extern "C" {
     fn stext();
