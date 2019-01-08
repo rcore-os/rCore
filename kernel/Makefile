@@ -141,6 +141,7 @@ else ifeq ($(arch), riscv64)
 prefix := riscv64-unknown-elf-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
+hash $(prefix)ld 2>/dev/null || {prefix := aarch64-elf- }
 endif
 
 ld := $(prefix)ld
