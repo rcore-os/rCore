@@ -102,6 +102,9 @@ then
 	elif [[ -d $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.4 ]]
 	then
 		COMPILER_BUILTINS_PATH=$CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.4
+	elif [[ -d $CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.5 ]]
+	then
+		COMPILER_BUILTINS_PATH=$CARGO_PATH/registry/src/github.com-1ecc6299db9ec823/compiler_builtins-0.1.5
 	else
 		echo "Cannot find compiler_builtins crate! Please file an issue report"
 	fi
