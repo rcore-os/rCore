@@ -5,14 +5,14 @@ extern "C" {
 
 /// Returns the current frame pointer.
 #[inline(always)]
-#[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn fp() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("mov $0, x29" : "=r"(ptr));
     }
-    #[cfg(target_arch = "riscv64")]
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
         asm!("mv $0, s0" : "=r"(ptr));
     }
@@ -22,14 +22,14 @@ pub fn fp() -> usize {
 
 /// Returns the current link register.
 #[inline(always)]
-#[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn lr() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("mov $0, x30" : "=r"(ptr));
     }
-    #[cfg(target_arch = "riscv64")]
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
         asm!("mv $0, ra" : "=r"(ptr));
     }
@@ -39,17 +39,17 @@ pub fn lr() -> usize {
 
 // Print the backtrace starting from the caller
 pub fn backtrace() {
-    #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+    #[cfg(any(target_arch = "aarch64", target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
         let mut current_pc = lr();
         let mut current_fp = fp();
         let mut stack_num = 0;
         while current_pc >= stext as usize && current_pc <= etext as usize && current_fp as usize != 0 {
-            println!("#{} {:#018X} fp {:#18X}", stack_num, current_pc - 4, current_fp);
+            println!("#{} {:#018X} fp {:#018X}", stack_num, current_pc - 4, current_fp);
             stack_num = stack_num + 1;
-            #[cfg(target_arch = "riscv64")]
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
             {
-                current_fp = *((current_fp - 16) as *const usize);
+                current_fp = *(current_fp as *const usize).offset(-2);
                 current_pc = *(current_fp as *const usize).offset(-1);
             }
             #[cfg(target_arch = "aarch64")]
