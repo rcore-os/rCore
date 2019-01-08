@@ -40,8 +40,8 @@ install:
     fi
   - if [ $ARCH = aarch64 ]; then
     if [ $TRAVIS_OS_NAME = linux ]; then
-      wget https://web.stanford.edu/class/cs140e/files/aarch64-none-elf-linux-x64.tar.gz;
-      tar -xzvf aarch64-none-elf-linux-x64.tar.gz;
+      wget https://developer.arm.com/-/media/Files/downloads/gnu-a/8.2-2018.11/gcc-arm-8.2-2018.11-x86_64-aarch64-elf.tar.xz?revision=90d1fe0a-42d7-439c-8ea6-bb7234b2f540&la=en -O aarch64-none-elf-linux-x64.tar.xz;
+      tar -xvf aarch64-none-elf-linux-x64.tar.xz;
       export PATH=$PATH:$PWD/aarch64-none-elf/bin;
     elif [ $TRAVIS_OS_NAME = osx ]; then
       brew tap SergioBenitez/osxct;
