@@ -28,6 +28,7 @@ mod fs;
 mod sync;
 mod trap;
 mod shell;
+mod backtrace;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

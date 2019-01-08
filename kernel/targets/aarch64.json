@@ -31,5 +31,6 @@
   "target-endian": "little",
   "target-pointer-width": "64",
   "target-family": "unix",
-  "disable-redzone": true
+  "disable-redzone": true,
+  "eliminate-frame-pointer": false
 }
