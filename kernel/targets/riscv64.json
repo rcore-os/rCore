@@ -31,5 +31,6 @@
     "ptx-kernel",
     "msp430-interrupt",
     "x86-interrupt"
-  ]
+  ],
+  "eliminate-frame-pointer": false
 }
