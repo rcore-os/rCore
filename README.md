@@ -4,6 +4,8 @@
 
 Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 
+Its former repo name is https://github.com/oscourse-tsinghua/RustOS .
+
 Going to be the next generation teaching operating system.
 
 Supported architectures: x86_64, RISCV32/64, AArch64， MIPS(future)
