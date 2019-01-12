@@ -26,4 +26,5 @@ pub fn init_driver() {
     #[cfg(not(feature = "nographic"))]
     fb::init();
     timer::init();
+	usb::init();
 }
