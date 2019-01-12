@@ -85,7 +85,6 @@ lazy_static! {
     pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
 }
 
-
 pub fn init() {
     SERIAL_PORT.lock().init();
 }

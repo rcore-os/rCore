@@ -1,5 +1,6 @@
 use crate::arch::interrupt::TrapFrame;
 use bcm2837::interrupt::Controller;
+use bcm2837::timer::BasicTimer;
 
 pub use bcm2837::interrupt::Interrupt;
 
