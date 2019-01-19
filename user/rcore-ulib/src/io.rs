@@ -1,9 +1,11 @@
+use alloc::string::String;
 use core::fmt::{self, Write};
 use core::option::Option;
-use crate::syscall::{sys_write, sys_read, sys_putc};
 
-pub const STDIN: usize=0;
-pub const STDOUT: usize=1;
+use crate::syscall::{sys_putc, sys_read, sys_write};
+
+pub const STDIN: usize = 0;
+pub const STDOUT: usize = 1;
 
 #[macro_export]
 macro_rules! print {
@@ -26,22 +28,51 @@ pub fn print_putc(args: fmt::Arguments) {
     SysPutc.write_fmt(args).unwrap();
 }
 
-pub fn getc() -> Option<u8>{
-	use core::mem::uninitialized;
-	let mut c:[u8;1] = unsafe { uninitialized() };
-	let ret=sys_read(STDIN,c.as_mut_ptr(),1);
-	match ret {
-		1 => Some(c[0]),
-		0 => None,
-		_ => panic!(),
-	}
+pub fn getc() -> Option<u8> {
+    let mut c = 0u8;
+    let ret = sys_read(STDIN, &mut c, 1);
+    match ret {
+        1 => Some(c),
+        0 => None,
+        _ => panic!(),
+    }
 }
 
-pub fn putc(c:u8){
-	sys_putc(c);
+pub fn get_line() -> String {
+    let mut s = String::new();
+    loop {
+        let ret = getc();
+        match ret {
+            None => return s,
+            Some(byte) => {
+                let c = byte as char;
+                match c {
+                    '\x08' | '\x7f' /* '\b' */ => {
+                        if s.pop().is_some() {
+                            print!("\x08 \x08");
+                        }
+                    }
+                    ' '...'\x7e' => {
+                        s.push(c);
+                        print!("{}", c);
+                    }
+                    '\n' | '\r' => {
+                        print!("\n");
+                        return s;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+pub fn putc(c: u8) {
+    sys_putc(c);
 }
 
 struct StdOut;
+
 struct SysPutc;
 
 impl fmt::Write for StdOut {
