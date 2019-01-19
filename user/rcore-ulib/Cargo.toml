@@ -5,3 +5,4 @@ authors = ["WangRunji <wangrunji0408@163.com>"]
 edition = "2018"
 
 [dependencies]
+linked_list_allocator = "0.6"

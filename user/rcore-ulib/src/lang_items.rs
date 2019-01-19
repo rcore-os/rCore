@@ -1,5 +1,7 @@
 use crate::syscall::{sys_close, sys_dup, sys_exit, sys_open};
 use crate::io::{O_RDONLY, O_WRONLY, STDIN, STDOUT};
+use crate::ALLOCATOR;
+
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 
@@ -31,6 +33,12 @@ fn initfd(fd2: usize, path: &str, open_flags: usize) -> i32 {
     return ret;
 }
 
+fn init_heap() {
+    const HEAP_SIZE: usize = 0x1000;
+    static mut HEAP: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+    unsafe { ALLOCATOR.lock().init(HEAP.as_ptr() as usize, HEAP_SIZE); }
+}
+
 #[no_mangle]
 pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> ! {
     let fd = initfd(STDIN, "stdin:", O_RDONLY);
@@ -42,6 +50,7 @@ pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> ! {
         panic!("open <stdout> failed: {}.", fd);
     }
 
+    init_heap();
     main();
     sys_exit(0)
 }
@@ -65,19 +74,4 @@ fn oom(_: Layout) -> ! {
 #[no_mangle]
 pub extern "C" fn abort() -> ! {
     sys_exit(2)
-}
-
-#[no_mangle]
-pub extern "C" fn __mulsi3(mut a: u32, mut b: u32) -> u32 {
-    let mut r: u32 = 0;
-
-    while a > 0 {
-        if a & 1 > 0 {
-            r += b;
-        }
-        a >>= 1;
-        b <<= 1;
-    }
-
-    r
 }
