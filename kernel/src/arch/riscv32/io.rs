@@ -51,6 +51,14 @@ pub fn getchar() -> char {
     }
 }
 
+pub fn getchar_option() -> Option<char> {
+    let c = sbi::console_getchar() as isize;
+    match c {
+        -1 => None,
+        c => Some(c as u8 as char),
+    }
+}
+
 pub fn putfmt(fmt: Arguments) {
     SerialPort.write_fmt(fmt).unwrap();
 }

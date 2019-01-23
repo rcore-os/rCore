@@ -43,3 +43,5 @@ pub const MEMORY_END: usize = 0x8100_0000;
 pub const USER_STACK_OFFSET: usize = 0x70000000;
 pub const USER_STACK_SIZE: usize = 0x10000;
 pub const USER32_STACK_OFFSET: usize = USER_STACK_OFFSET;
+
+pub const MAX_DTB_SIZE: usize = 0x2000;

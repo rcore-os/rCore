@@ -35,3 +35,7 @@ pub unsafe fn start_others(hart_mask: usize) {
 pub fn halt() {
     unsafe { riscv::asm::wfi() }
 }
+
+pub fn fence() {
+    unsafe { asm!("fence" ::: "memory"); }
+}

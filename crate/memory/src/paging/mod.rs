@@ -42,6 +42,16 @@ pub trait PageTable {
     fn write(&mut self, addr: VirtAddr, data: u8) {
         unsafe { (addr as *mut u8).write(data) }
     }
+
+    /// When 'vaddr' is not mapped, map it to 'paddr'.
+    fn map_if_not_exists(&mut self, vaddr: VirtAddr, paddr: usize) -> bool {
+        if let None = self.get_entry(vaddr) {
+            self.map(vaddr, paddr);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Page Table Entry

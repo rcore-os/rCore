@@ -28,6 +28,8 @@ mod fs;
 mod sync;
 mod trap;
 mod shell;
+mod drivers;
+mod net;
 mod backtrace;
 
 #[allow(dead_code)]

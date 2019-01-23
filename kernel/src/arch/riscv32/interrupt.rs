@@ -11,6 +11,7 @@ use riscv::register::{
     stvec as xtvec,
 };
 use riscv::register::{mcause, mepc, sie, mie};
+use crate::drivers::DRIVERS;
 pub use self::context::*;
 use log::*;
 
@@ -92,12 +93,12 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
         // M-mode only
-        Trap::Interrupt(I::MachineExternal) => serial(),
+        Trap::Interrupt(I::MachineExternal) => external(),
         Trap::Interrupt(I::MachineSoft) => ipi(),
         Trap::Interrupt(I::MachineTimer) => timer(),
         Trap::Exception(E::MachineEnvCall) => sbi(tf),
 
-        Trap::Interrupt(I::SupervisorExternal) => serial(),
+        Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
@@ -116,8 +117,34 @@ fn sbi(tf: &mut TrapFrame) {
     tf.sepc += 4;
 }
 
-fn serial() {
-    crate::trap::serial(super::io::getchar());
+fn external() {
+    // true means handled, false otherwise
+    let handlers = [try_process_serial, try_process_drivers];
+    for handler in handlers.iter() {
+        if handler() == true {
+            break
+        }
+    }
+}
+
+fn try_process_serial() -> bool {
+    match super::io::getchar_option() {
+        Some(ch) => {
+            crate::trap::serial(ch);
+            true
+        }
+        None => false
+    }
+}
+
+fn try_process_drivers() -> bool {
+    let mut drivers = DRIVERS.lock();
+    for driver in drivers.iter_mut() {
+        if driver.try_handle_interrupt() == true {
+            return true
+        }
+    }
+    return false
 }
 
 fn ipi() {

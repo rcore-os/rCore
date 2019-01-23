@@ -28,8 +28,9 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
 
     crate::logging::init();
     interrupt::init();
-    memory::init();
+    memory::init(dtb);
     timer::init();
+    crate::drivers::init(dtb);
     crate::process::init();
 
     unsafe { cpu::start_others(hart_mask); }

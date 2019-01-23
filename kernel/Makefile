@@ -25,6 +25,7 @@ arch ?= riscv32
 board ?= none
 mode ?= debug
 LOG  ?= debug
+graphic ?= off
 smp  ?= 4
 m_mode ?=
 
@@ -101,6 +102,12 @@ ifdef d
 qemu_opts += -d $(d)
 endif
 
+ifeq ($(graphic), off)
+qemu_opts += -nographic
+else
+qemu_opts += -serial stdio
+endif
+
 ### build args ###
 ifneq ($(graphic), on)
 features += nographic
@@ -152,10 +159,10 @@ objdump := $(prefix)objdump
 objcopy := $(prefix)objcopy
 cc := $(prefix)gcc
 as := $(prefix)as
-gdb := $(prefix)gdb
+gdb := gdb
 export CC=$(cc)
 
-.PHONY: all clean run build asm doc justrun debug kernel sfsimg install
+.PHONY: all clean run build asm doc justrun debug kernel sfsimg install runnet
 
 all: kernel
 
@@ -167,9 +174,20 @@ doc:
 	@cargo rustdoc -- --document-private-items
 
 run: build justrun
+runnet: build justrunnet
+runui: build justrunui
 
 justrun:
 	@qemu-system-$(arch) $(qemu_opts)
+
+justrunnet: build
+	@sudo qemu-system-$(arch) $(qemu_opts) \
+		-netdev type=tap,id=net0,script=no,downscript=no \
+		-device virtio-net-device,netdev=net0 \
+
+justrunui: build
+	@qemu-system-$(arch) $(qemu_opts) \
+		-device virtio-gpu-device \
 
 debug: $(kernel) $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &

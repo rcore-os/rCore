@@ -42,7 +42,9 @@ bitflags = "1.0"
 bit_field = "0.9"
 volatile = "0.2"
 linked_list_allocator = "0.6"
+device_tree = { git = "https://github.com/jiegec/device_tree-rs" }
 lazy_static = { version = "1.2", features = ["spin_no_std"] }
+smoltcp = { version = "0.5.0", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 rcore-memory = { path = "../crate/memory" }
 rcore-process = { path = "../crate/process" }
