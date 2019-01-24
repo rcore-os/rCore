@@ -1,5 +1,5 @@
 pub use self::context::Process;
-pub use rcore_process::*;
+pub use rcore_thread::*;
 use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use crate::arch::cpu;
 use alloc::{boxed::Box, sync::Arc};
@@ -10,7 +10,7 @@ pub mod context;
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
     let scheduler = Box::new(scheduler::RRScheduler::new(5));
-    let manager = Arc::new(ProcessManager::new(scheduler, MAX_PROCESS_NUM));
+    let manager = Arc::new(ThreadPool::new(scheduler, MAX_PROCESS_NUM));
 
     unsafe {
         for cpu_id in 0..MAX_CPU_NUM {

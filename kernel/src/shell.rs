@@ -3,6 +3,7 @@
 use alloc::string::String;
 use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
+use crate::thread;
 
 pub fn run_user_shell() {
     if let Ok(inode) = ROOT_INODE.lookup("sh") {

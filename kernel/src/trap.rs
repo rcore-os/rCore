@@ -14,7 +14,7 @@ pub fn timer() {
 
 pub fn error(tf: &TrapFrame) -> ! {
     error!("{:#x?}", tf);
-    let pid = processor().pid();
+    let pid = processor().tid();
     error!("On CPU{} Process {}", cpu::id(), pid);
 
     processor().manager().exit(pid, 0x100);

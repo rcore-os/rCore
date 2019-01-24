@@ -3,7 +3,7 @@ use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::V
 use log::*;
 use simple_filesystem::file::File;
 use spin::Mutex;
-use rcore_process::Context;
+use rcore_thread::Context;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 
 use crate::arch::interrupt::{Context as ArchContext, TrapFrame};

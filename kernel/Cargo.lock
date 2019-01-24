@@ -248,7 +248,7 @@ dependencies = [
  "pc-keyboard 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcore-memory 0.1.0",
- "rcore-process 0.1.0",
+ "rcore-thread 0.1.0",
  "riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)",
  "simple-filesystem 0.1.0 (git+https://github.com/wangrunji0408/SimpleFileSystem-Rust)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -267,7 +267,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rcore-process"
+name = "rcore-thread"
 version = "0.1.0"
 dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
