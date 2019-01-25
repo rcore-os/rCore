@@ -45,11 +45,20 @@ pub trait PageTable {
 
     /// When 'vaddr' is not mapped, map it to 'paddr'.
     fn map_if_not_exists(&mut self, vaddr: VirtAddr, paddr: usize) -> bool {
-        if let None = self.get_entry(vaddr) {
-            self.map(vaddr, paddr);
-            true
-        } else {
-            false
+        let entry = self.get_entry(vaddr);
+        match entry {
+            None => {
+                self.map(vaddr, paddr);
+                true
+            },
+            Some(page_table_entry) => {
+                if page_table_entry.present() {
+                    false
+                } else {
+                    self.map(vaddr, paddr);
+                    true
+                }
+            }
         }
     }
 }

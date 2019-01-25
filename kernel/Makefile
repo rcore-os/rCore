@@ -77,7 +77,9 @@ qemu_opts += \
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
-	-kernel $(bin)
+	-kernel $(bin) \
+	-drive file=$(SFSIMG),format=raw,id=sfs \
+	-device virtio-blk-device,drive=sfs
 ifdef m_mode
 qemu_opts += -cpu rv32imacu-nommu
 endif
@@ -85,7 +87,9 @@ endif
 else ifeq ($(arch), riscv64)
 qemu_opts += \
 	-machine virt \
-	-kernel $(bin)
+	-kernel $(bin) \
+	-drive file=$(SFSIMG),format=raw,id=sfs \
+	-device virtio-blk-device,drive=sfs
 ifdef m_mode
 qemu_opts += -cpu rv64imacu-nommu
 endif
@@ -93,7 +97,7 @@ endif
 else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
-	-serial null \
+	-serial null -serial mon:stdio \
 	-kernel $(bin)
 endif
 
@@ -103,8 +107,6 @@ endif
 
 ifeq ($(graphic), off)
 qemu_opts += -nographic
-else
-qemu_opts += -serial stdio
 endif
 
 ### build args ###
@@ -192,6 +194,7 @@ justrunnet: build
 justrunui: build
 	@qemu-system-$(arch) $(qemu_opts) \
 		-device virtio-gpu-device \
+		-device virtio-mouse-device
 
 debug: $(kernel) $(bin)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &

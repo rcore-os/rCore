@@ -17,6 +17,7 @@ use crate::memory::active_table;
 
 use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
+use super::test::mandelbrot;
 
 const VIRTIO_GPU_EVENT_DISPLAY : u32 = 1 << 0;
 
@@ -24,13 +25,10 @@ struct VirtIOGpu {
     interrupt_parent: u32,
     interrupt: u32,
     header: usize,
-    // 0 for transmit, 1 for cursor
-    queue_num: u32,
-    queue_address: usize,
-    queue_page: [usize; 2],
-    last_used_idx: u16,
+    queue_buffer: [usize; 2],
     frame_buffer: usize,
-    rect: VirtIOGpuRect
+    rect: VirtIOGpuRect,
+    queues: [VirtIOVirtqueue; 2]
 }
 
 #[repr(C)]
@@ -46,7 +44,7 @@ bitflags! {
         const VIRGL = 1 << 0;
         const EDID = 1 << 1;
         // device independent
-        const NOFIFY_ON_EMPTY = 1 << 24; // legacy
+        const NOTIFY_ON_EMPTY = 1 << 24; // legacy
         const ANY_LAYOUT = 1 << 27; // legacy
         const RING_INDIRECT_DESC = 1 << 28;
         const RING_EVENT_IDX = 1 << 29;
@@ -180,7 +178,10 @@ struct VirtIOGpuResourceFlush {
 }
 
 const VIRTIO_QUEUE_TRANSMIT: usize = 0;
-const VIRTIO_QUEUE_RECEIVE: usize = 1;
+const VIRTIO_QUEUE_CURSOR: usize = 1;
+
+const VIRTIO_BUFFER_TRANSMIT: usize = 0;
+const VIRTIO_BUFFER_RECEIVE: usize = 1;
 
 const VIRTIO_GPU_RESOURCE_ID: u32 = 0xbabe;
 
@@ -194,13 +195,11 @@ impl Driver for VirtIOGpu {
         // ensure header page is mapped
         active_table().map_if_not_exists(self.header as usize, self.header as usize);
 
-        let mut header = unsafe { &mut *(self.header as *mut VirtIOHeader) };
+        let header = unsafe { &mut *(self.header as *mut VirtIOHeader) };
         let interrupt = header.interrupt_status.read();
         if interrupt != 0 {
             header.interrupt_ack.write(interrupt);
             debug!("Got interrupt {:?}", interrupt);
-            let response = unsafe { &mut *(self.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
-            debug!("response in interrupt: {:?}", response);
             return true;
         }
         return false;
@@ -211,51 +210,24 @@ impl Driver for VirtIOGpu {
     }
 }
 
-fn setup_rings(driver: &mut VirtIOGpu) {
-    let mut ring = unsafe { 
-        &mut *((driver.queue_address + size_of::<VirtIOVirtqueueDesc>() * driver.queue_num as usize) as *mut VirtIOVirtqueueAvailableRing) 
-    };
-
-    // re-add two buffers to desc
-    // chaining read buffer and write buffer into one desc
-    for buffer in 0..2 {
-        let mut desc = unsafe { &mut *(driver.queue_address as *mut VirtIOVirtqueueDesc).add(buffer) };
-        desc.addr.write(driver.queue_page[buffer] as u64);
-        desc.len.write(PAGE_SIZE as u32);
-        if buffer == VIRTIO_QUEUE_TRANSMIT {
-            // device readable
-            desc.flags.write(VirtIOVirtqueueFlag::NEXT.bits());
-            desc.next.write(1);
-        } else {
-            // device writable
-            desc.flags.write(VirtIOVirtqueueFlag::WRITE.bits());
-        }
-        ring.ring[buffer].write(0);
-    }
-}
-
-fn notify_device(driver: &mut VirtIOGpu) {
-    let mut header = unsafe { &mut *(driver.header as *mut VirtIOHeader) };
-    let mut ring = unsafe { 
-        &mut *((driver.queue_address + size_of::<VirtIOVirtqueueDesc>() * driver.queue_num as usize) as *mut VirtIOVirtqueueAvailableRing) 
-    };
-    ring.idx.write(ring.idx.read() + 1);
-    header.queue_notify.write(0);
+fn request(driver: &mut VirtIOGpu) {
+    let input = unsafe { slice::from_raw_parts(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *const u8, PAGE_SIZE) };
+    let output = unsafe { slice::from_raw_parts(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *const u8, PAGE_SIZE) };
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].add_and_notify(&[input], &[output], 0);
 }
 
 fn setup_framebuffer(driver: &mut VirtIOGpu) {
     // get display info
-    setup_rings(driver);
-    let mut request_get_display_info = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuCtrlHdr) };
+    let request_get_display_info = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuCtrlHdr) };
     *request_get_display_info = VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_GET_DISPLAY_INFO);
-    notify_device(driver);
-    let response_get_display_info = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuRespDisplayInfo) };
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_get_display_info = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuRespDisplayInfo) };
     info!("response: {:?}", response_get_display_info);
     driver.rect = response_get_display_info.rect;
 
     // create resource 2d
-    setup_rings(driver);
-    let mut request_resource_create_2d = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuResourceCreate2D) };
+    let request_resource_create_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceCreate2D) };
     *request_resource_create_2d = VirtIOGpuResourceCreate2D {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_CREATE_2D),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
@@ -263,8 +235,9 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
         width: response_get_display_info.rect.width,
         height: response_get_display_info.rect.height
     };
-    notify_device(driver);
-    let response_resource_create_2d = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_resource_create_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_resource_create_2d);
 
     // alloc continuous pages for the frame buffer
@@ -274,8 +247,7 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
     } as usize;
     mandelbrot(driver.rect.width, driver.rect.height, frame_buffer as *mut u32);
     driver.frame_buffer = frame_buffer;
-    setup_rings(driver);
-    let mut request_resource_attach_backing = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuResourceAttachBacking) };
+    let request_resource_attach_backing = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceAttachBacking) };
     *request_resource_attach_backing = VirtIOGpuResourceAttachBacking {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
@@ -284,88 +256,30 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
         length: size,
         padding: 0
     };
-    notify_device(driver);
-    let response_resource_attach_backing = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
-    debug!("response: {:?}", response_resource_attach_backing);
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_resource_attach_backing = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    info!("response: {:?}", response_resource_attach_backing);
 
     // map frame buffer to screen
-    setup_rings(driver);
-    let mut request_set_scanout = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuSetScanout) };
+    let request_set_scanout = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuSetScanout) };
     *request_set_scanout = VirtIOGpuSetScanout {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_SET_SCANOUT),
         rect: response_get_display_info.rect,
         scanout_id: 0,
         resource_id: VIRTIO_GPU_RESOURCE_ID
     };
-    notify_device(driver);
-    let response_set_scanout = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_set_scanout = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_set_scanout);
 
     flush_frame_buffer_to_screen(driver);
 }
 
-// from Wikipedia
-fn hsv_to_rgb(h: u32, s: f32, v: f32) -> (f32, f32, f32) {
-    let hi = (h / 60) % 6;
-    let f = (h % 60) as f32 / 60.0;
-    let p = v * (1.0 - s);
-    let q = v * (1.0 - f * s);
-    let t = v * (1.0 - (1.0 - f) * s);
-    match hi {
-        0 => (v, t, p),
-        1 => (q, v, p),
-        2 => (p, v, t),
-        3 => (p, q, v),
-        4 => (t, p, v),
-        5 => (v, p, q),
-        _ => unreachable!()
-    }
-}
-
-fn mandelbrot(width: u32, height: u32, frame_buffer: *mut u32) {
-    let size = width * height * 4;
-    let frame_buffer_data = unsafe {
-        slice::from_raw_parts_mut(frame_buffer as *mut u32, (size / 4) as usize)
-    };
-    for x in 0..width {
-        for y in 0..height {
-            let index = y * width + x;
-            let scale = 5e-3;
-            let xx = (x as f32 - width as f32 / 2.0) * scale;
-            let yy = (y as f32 - height as f32 / 2.0) * scale;
-            let mut re = xx as f32;
-            let mut im = yy as f32;
-            let mut iter: u32 = 0;
-            loop {
-                iter = iter + 1;
-                let new_re = re * re - im * im + xx as f32;
-                let new_im = re * im * 2.0 + yy as f32;
-                if new_re * new_re + new_im * new_im > 1e3 {
-                    break;
-                }
-                re = new_re;
-                im = new_im;
-
-                if iter == 60 {
-                    break;
-                }
-            }
-            iter = iter * 6;
-            let (r, g, b) = hsv_to_rgb(iter, 1.0, 0.5);
-            let rr = (r * 256.0) as u32;
-            let gg = (g * 256.0) as u32;
-            let bb = (b * 256.0) as u32;
-            let color = (bb << 16) | (gg << 8) | rr;
-            frame_buffer_data[index as usize] = color;
-        }
-        println!("working on x {}/{}", x, width);
-    }
-}
-
 fn flush_frame_buffer_to_screen(driver: &mut VirtIOGpu) {
     // copy data from guest to host
-    setup_rings(driver);
-    let mut request_transfer_to_host_2d = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuTransferToHost2D) };
+    let request_transfer_to_host_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuTransferToHost2D) };
     *request_transfer_to_host_2d = VirtIOGpuTransferToHost2D {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D),
         rect: driver.rect,
@@ -373,49 +287,43 @@ fn flush_frame_buffer_to_screen(driver: &mut VirtIOGpu) {
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         padding: 0
     };
-    notify_device(driver);
-    let response_transfer_to_host_2d = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_transfer_to_host_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_transfer_to_host_2d);
 
     // flush data to screen
-    setup_rings(driver);
-    let mut request_resource_flush = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_TRANSMIT] as *mut VirtIOGpuResourceFlush) };
+    let request_resource_flush = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceFlush) };
     *request_resource_flush = VirtIOGpuResourceFlush {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_FLUSH),
         rect: driver.rect,
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         padding: 0
     };
-    notify_device(driver);
-    let response_resource_flush = unsafe { &mut *(driver.queue_page[VIRTIO_QUEUE_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    request(driver);
+    driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
+    let response_resource_flush = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_resource_flush);
 }
 
 pub fn virtio_gpu_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
     let from = reg.as_slice().read_be_u64(0).unwrap();
-    let mut header = unsafe { &mut *(from as *mut VirtIOHeader) };
+    let header = unsafe { &mut *(from as *mut VirtIOHeader) };
 
     header.status.write(VirtIODeviceStatus::DRIVER.bits());
 
-    let mut device_features_bits: u64;
-    header.device_features_sel.write(0); // device features [0, 32)
-    device_features_bits = header.device_features.read().into();
-    header.device_features_sel.write(1); // device features [32, 64)
-    device_features_bits = device_features_bits + ((header.device_features.read() as u64) << 32);
+    let device_features_bits = header.read_device_features();
     let device_features = VirtIOGpuFeature::from_bits_truncate(device_features_bits);
     info!("Device features {:?}", device_features);
 
     // negotiate these flags only
     let supported_features = VirtIOGpuFeature::empty();
     let driver_features = (device_features & supported_features).bits();
-    header.driver_features_sel.write(0); // driver features [0, 32)
-    header.driver_features.write((driver_features & 0xFFFFFFFF) as u32);
-    header.driver_features_sel.write(1); // driver features [32, 64)
-    header.driver_features.write(((driver_features & 0xFFFFFFFF00000000) >> 32) as u32);
+    header.write_driver_features(driver_features);
 
     // read configuration space
-    let mut config = unsafe { &mut *((from + 0x100) as *mut VirtIOGpuConfig) };
+    let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOGpuConfig) };
     info!("Config: {:?}", config);
 
     // virtio 4.2.4 Legacy interface
@@ -427,48 +335,22 @@ pub fn virtio_gpu_init(node: &Node) {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
         header: from as usize,
-        queue_num,
-        queue_address: 0,
-        queue_page: [0, 0],
-        last_used_idx: 0,
+        queue_buffer: [0, 0],
         frame_buffer: 0,
-        rect: VirtIOGpuRect::default()
+        rect: VirtIOGpuRect::default(),
+        queues: [VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num),
+                    VirtIOVirtqueue::new(header, VIRTIO_QUEUE_CURSOR, queue_num)]
     };
 
-    // 0 for control, 1 for cursor, we use controlq only
-    for queue in 0..2 {
-        header.queue_sel.write(queue);
-        assert_eq!(header.queue_pfn.read(), 0); // not in use
-        // 0 for transmit, 1 for receive
-        let queue_num_max = header.queue_num_max.read();
-        assert!(queue_num_max >= queue_num); // queue available
-        let size = virtqueue_size(queue_num as usize, PAGE_SIZE);
-        assert!(size % PAGE_SIZE == 0);
-        // alloc continuous pages
-        let address = unsafe {
-            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size, PAGE_SIZE).unwrap())
+    for buffer in 0..2 {
+        // allocate a page for each buffer
+        let page = unsafe {
+            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
         } as usize;
-
-        debug!("queue {} using page address {:#X} with size {}", queue, address as usize, size);
-
-        header.queue_num.write(queue_num);
-        header.queue_align.write(PAGE_SIZE as u32);
-        header.queue_pfn.write((address as u32) >> 12);
-
-        if queue == 0 {
-            driver.queue_address = address;
-            // 0 for transmit, 1 for receive
-            for buffer in 0..2 {
-                // allocate a page for each buffer
-                let page = unsafe {
-                    HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
-                } as usize;
-                driver.queue_page[buffer as usize] = page;
-                debug!("buffer {} using page address {:#X}", buffer, page as usize);
-            }
-        }
-        header.queue_notify.write(queue);
+        driver.queue_buffer[buffer as usize] = page;
+        debug!("buffer {} using page address {:#X}", buffer, page as usize);
     }
+
     header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
     setup_framebuffer(&mut driver);

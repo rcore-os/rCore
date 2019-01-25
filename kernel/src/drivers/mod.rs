@@ -9,14 +9,18 @@ use crate::sync::SpinNoIrqLock;
 mod device_tree;
 pub mod bus;
 pub mod net;
+pub mod block;
 mod gpu;
+mod input;
 
 pub enum DeviceType {
     Net,
-    Gpu
+    Gpu,
+    Input,
+    Block
 }
 
-pub trait Driver : Send {
+pub trait Driver : Send + AsAny {
     // if interrupt belongs to this driver, handle it and return true
     // return false otherwise
     fn try_handle_interrupt(&mut self) -> bool;
@@ -25,7 +29,7 @@ pub trait Driver : Send {
     fn device_type(&self) -> DeviceType;
 }
 
-pub trait NetDriver: Driver + AsAny {
+pub trait NetDriver: Driver {
     // get mac address for this device
     fn get_mac(&self) -> EthernetAddress;
 

@@ -1,25 +1,40 @@
 use simple_filesystem::*;
 use alloc::{boxed::Box, sync::Arc, string::String, collections::VecDeque, vec::Vec};
 use core::any::Any;
+use core::ops::Deref;
 use lazy_static::lazy_static;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::drivers::{self, AsAny};
+use crate::drivers::block::virtio_blk::VirtIOBlkDriver;
 
 lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
-        #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "aarch64"))]
+        #[cfg(not(feature = "link_user"))]
+        let device = {
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            {
+                Box::new(drivers::DRIVERS.lock().iter()
+                    .map(|device| device.deref().as_any().downcast_ref::<VirtIOBlkDriver>())
+                    .find(|maybe_blk| maybe_blk.is_some())
+                    .expect("VirtIOBlk not found")
+                    .unwrap().clone())
+            }
+            #[cfg(target_arch = "x86_64")]
+            {
+                Box::new(ide::IDE::new(1))
+            }
+        };
+        #[cfg(feature = "link_user")]
         let device = {
             extern {
                 fn _user_img_start();
                 fn _user_img_end();
             }
-            // Hard link user program
             Box::new(unsafe { MemBuf::new(_user_img_start, _user_img_end) })
         };
-        #[cfg(target_arch = "x86_64")]
-        let device = Box::new(ide::IDE::new(1));
 
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()
