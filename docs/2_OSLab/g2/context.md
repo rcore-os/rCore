@@ -1,6 +1,6 @@
 # 上下文切换
 
-平台无关的代码位于 [kernel/src/process/context.rs](../../../kernel/src/process/context.rs) 中，而平台相关(aarch64)的代码位于 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs) 中。
+平台无关的代码位于 [kernel/src/process/context.rs](../../../kernel/src/process/structs.rs) 中，而平台相关(aarch64)的代码位于 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs) 中。
 
 ## 相关数据结构
 
@@ -56,7 +56,7 @@
     }
     ```
 
-    每个进程控制块 `Process` ([kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L13)) 都会维护一个平台相关的 `Context` 对象，在 AArch64 中包含下列信息：
+    每个进程控制块 `Process` ([kernel/src/process/context.rs](../../../kernel/src/process/structs.rs#L13)) 都会维护一个平台相关的 `Context` 对象，在 AArch64 中包含下列信息：
 
     1. `stack_top`：内核栈顶地址
     2. `ttbr`：页表基址
@@ -64,7 +64,7 @@
 
 ## 切换流程
 
-在 [kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L22) 里，`switch_to()` 是平台无关的切换函数，最终会调用 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L129) 里平台相关的切换函数 `Context::switch()`：
+在 [kernel/src/process/context.rs](../../../kernel/src/process/structs.rs#L22) 里，`switch_to()` 是平台无关的切换函数，最终会调用 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L129) 里平台相关的切换函数 `Context::switch()`：
 
 ```rust
 pub unsafe fn switch(&mut self, target: &mut Self) {
@@ -190,7 +190,7 @@ ret
 2. 创建新的**用户线程**：解析 ELF 文件。
 3. 从一个线程 **fork** 出一个新线程：通过 `fork` 系统调用。
 
-三种线程的平台无关创建流程实现在 [kernel/src/process/context.rs](../../../kernel/src/process/context.rs#L40) 里，最终会分别调用 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L146) 里的 `new_kernel_thread()`、`new_user_thread()` 和 `new_fork()` 这三个函数创建平台相关的 `Context` 结构。
+三种线程的平台无关创建流程实现在 [kernel/src/process/context.rs](../../../kernel/src/process/structs.rs#L40) 里，最终会分别调用 [kernel/src/arch/aarch64/interrupt/context.rs](../../../kernel/src/arch/aarch64/interrupt/context.rs#L146) 里的 `new_kernel_thread()`、`new_user_thread()` 和 `new_fork()` 这三个函数创建平台相关的 `Context` 结构。
 
 在这三个函数里，会构造 `ContextData` 与 `TrapFrame` 结构，构成一个 `InitStack`，并向新线程的内核栈压入 `InitStack` 结构，最后将新内核栈顶地址、页表基址等信息构成 `Context` 结构返回。这两个结构的构造方式如下：
 

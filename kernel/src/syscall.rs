@@ -3,7 +3,7 @@
 use simple_filesystem::{INode, file::File, FileInfo, FileType, FsError};
 use core::{slice, str};
 use alloc::{sync::Arc, vec::Vec, string::String};
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 use log::*;
 use bitflags::bitflags;
 use crate::arch::interrupt::TrapFrame;
@@ -61,7 +61,8 @@ fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let len = get_file(fd)?.lock().read(slice)?;
+    let proc = process();
+    let len = get_file(&proc, fd)?.lock().read(slice)?;
     Ok(len as isize)
 }
 
@@ -69,7 +70,8 @@ fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    let len = get_file(fd)?.lock().write(slice)?;
+    let proc = process();
+    let len = get_file(&proc, fd)?.lock().write(slice)?;
     Ok(len as isize)
 }
 
@@ -103,7 +105,8 @@ fn sys_close(fd: usize) -> SysResult {
 fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     // TODO: check ptr
     info!("fstat: {}", fd);
-    let file = get_file(fd)?;
+    let proc = process();
+    let file = get_file(&proc, fd)?;
     let stat = Stat::from(file.lock().info()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
@@ -115,7 +118,8 @@ fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     // TODO: check ptr
     info!("getdirentry: {}", fd);
-    let file = get_file(fd)?;
+    let proc = process();
+    let file = get_file(&proc, fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
         return Err(SysError::Inval);
@@ -131,7 +135,8 @@ fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
 
 fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
     info!("dup: {} {}", fd1, fd2);
-    let file = get_file(fd1)?;
+    let proc = process();
+    let file = get_file(&proc, fd1)?;
     if process().files.contains_key(&fd2) {
         return Err(SysError::Inval);
     }
@@ -141,7 +146,7 @@ fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
 
 /// Fork the current process. Return the child's PID.
 fn sys_fork(tf: &TrapFrame) -> SysResult {
-    let context = process().fork(tf);
+    let context = current_thread().fork(tf);
     let pid = processor().manager().add(context, thread::current().id());
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid as isize)
@@ -207,19 +212,19 @@ fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapF
     unsafe { buf.set_len(size); }
     inode.read_at(0, buf.as_mut_slice())?;
 
-    // Make new Context
+    // Make new Thread
     let iter = args.iter().map(|s| s.as_str());
-    let mut context = Process::new_user(buf.as_slice(), iter);
+    let mut thread = Thread::new_user(buf.as_slice(), iter);
 
     // Activate new page table
-    unsafe { context.memory_set.activate(); }
+    unsafe { thread.proc.lock().memory_set.activate(); }
 
     // Modify the TrapFrame
-    *tf = unsafe { context.arch.get_init_tf() };
+    *tf = unsafe { thread.context.get_init_tf() };
 
     // Swap Context but keep KStack
-    ::core::mem::swap(&mut process().kstack, &mut context.kstack);
-    ::core::mem::swap(process(), &mut *context);
+    ::core::mem::swap(&mut current_thread().kstack, &mut thread.kstack);
+    ::core::mem::swap(current_thread(), &mut *thread);
 
     Ok(0)
 }
@@ -278,8 +283,8 @@ fn sys_putc(c: char) -> SysResult {
     Ok(0)
 }
 
-fn get_file(fd: usize) -> Result<&'static Arc<Mutex<File>>, SysError> {
-    process().files.get(&fd).ok_or(SysError::Inval)
+fn get_file<'a>(proc: &'a MutexGuard<'static, Process>, fd: usize) -> Result<&'a Arc<Mutex<File>>, SysError> {
+    proc.files.get(&fd).ok_or(SysError::Inval)
 }
 
 pub type SysResult = Result<isize, SysError>;
