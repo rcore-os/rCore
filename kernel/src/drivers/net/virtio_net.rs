@@ -272,7 +272,7 @@ bitflags! {
     }
 }
 
-#[repr(packed)]
+#[repr(C)]
 #[derive(Debug)]
 struct VirtIONetworkConfig {
     mac: [u8; 6],
@@ -280,7 +280,7 @@ struct VirtIONetworkConfig {
 }
 
 // virtio 5.1.6 Device Operation
-#[repr(packed)]
+#[repr(C)]
 #[derive(Debug)]
 struct VirtIONetHeader {
     flags: Volatile<u8>,
