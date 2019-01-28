@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use spin::Mutex;
 use log::*;
 use crate::scheduler::Scheduler;
-use crate::event_hub::EventHub;
+use crate::timer::Timer;
 
 struct Thread {
     status: Status,
@@ -38,7 +38,7 @@ pub trait Context {
 pub struct ThreadPool {
     threads: Vec<Mutex<Option<Thread>>>,
     scheduler: Mutex<Box<Scheduler>>,
-    event_hub: Mutex<EventHub<Event>>,
+    timer: Mutex<Timer<Event>>,
 }
 
 impl ThreadPool {
@@ -46,7 +46,7 @@ impl ThreadPool {
         ThreadPool {
             threads: new_vec_default(max_proc_num),
             scheduler: Mutex::new(scheduler),
-            event_hub: Mutex::new(EventHub::new()),
+            timer: Mutex::new(Timer::new()),
         }
     }
 
@@ -79,9 +79,9 @@ impl ThreadPool {
     /// Return true if time slice == 0.
     /// Called by timer interrupt handler.
     pub fn tick(&self, tid: Tid) -> bool {
-        let mut event_hub = self.event_hub.lock();
-        event_hub.tick();
-        while let Some(event) = event_hub.pop() {
+        let mut timer = self.timer.lock();
+        timer.tick();
+        while let Some(event) = timer.pop() {
             match event {
                 Event::Wakeup(tid) => self.set_status(tid, Status::Ready),
             }
@@ -133,7 +133,7 @@ impl ThreadPool {
             (Status::Ready, Status::Ready) => return,
             (Status::Ready, _) => self.scheduler.lock().remove(tid),
             (Status::Exited(_), _) => panic!("can not set status for a exited process"),
-            (Status::Sleeping, Status::Exited(_)) => self.event_hub.lock().remove(Event::Wakeup(tid)),
+            (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
             (_, Status::Ready) => self.scheduler.lock().insert(tid),
             _ => {}
         }
@@ -176,7 +176,7 @@ impl ThreadPool {
     pub fn sleep(&self, tid: Tid, time: usize) {
         self.set_status(tid, Status::Sleeping);
         if time != 0 {
-            self.event_hub.lock().push(time, Event::Wakeup(tid));
+            self.timer.lock().start(time, Event::Wakeup(tid));
         }
     }
 

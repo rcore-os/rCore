@@ -13,7 +13,7 @@ mod thread_pool;
 mod processor;
 pub mod scheduler;
 pub mod std_thread;
-mod event_hub;
+mod timer;
 mod interrupt;
 
 pub use crate::thread_pool::*;
