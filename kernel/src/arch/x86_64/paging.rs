@@ -40,8 +40,10 @@ pub struct PageEntry(PageTableEntry);
 impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
-        self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
-            .unwrap().flush();
+        unsafe {
+            self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
+                .unwrap().flush();
+        }
         unsafe { &mut *(get_entry_ptr(addr, 1)) }
     }
 
@@ -204,13 +206,13 @@ impl Drop for InactivePageTable0 {
 struct FrameAllocatorForX86;
 
 impl FrameAllocator<Size4KiB> for FrameAllocatorForX86 {
-    fn alloc(&mut self) -> Option<Frame> {
+    fn allocate_frame(&mut self) -> Option<Frame> {
         alloc_frame().map(|addr| Frame::of_addr(addr))
     }
 }
 
 impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
-    fn dealloc(&mut self, frame: Frame) {
+    fn deallocate_frame(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_u64() as usize);
     }
 }

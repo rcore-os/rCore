@@ -53,7 +53,7 @@ simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-R
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { git = "https://github.com/wangrunji0408/bootloader" }
 apic = { git = "https://github.com/wangrunji0408/APIC-Rust" }
-x86_64 = "0.3"
+x86_64 = "0.4"
 raw-cpuid = "6.0"
 uart_16550 = "0.1"
 pc-keyboard = "0.3"
