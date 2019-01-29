@@ -4,6 +4,7 @@ use alloc::prelude::*;
 use alloc::sync::Arc;
 use core::mem::size_of;
 use core::slice;
+use core::sync::atomic::{fence, Ordering};
 
 use bitflags::*;
 use device_tree::Node;
@@ -215,7 +216,7 @@ impl phy::TxToken for VirtIONetTxToken {
         desc.len.write((len + size_of::<VirtIONetHeader>()) as u32);
 
         // memory barrier
-        crate::arch::cpu::fence();
+        fence(Ordering::SeqCst);
         
         // add desc to available ring
         ring.idx.write(ring.idx.read() + 1);
@@ -376,7 +377,7 @@ pub fn virtio_net_init(node: &Node) {
             desc.flags.write(0);
         }
         // memory barrier
-        crate::arch::cpu::fence();
+        fence(Ordering::SeqCst);
 
 
         if queue == VIRTIO_QUEUE_RECEIVE {

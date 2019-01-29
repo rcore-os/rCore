@@ -30,7 +30,3 @@ pub fn halt() {
     use x86_64::instructions::hlt;
     hlt();
 }
-
-pub fn fence() {
-    unsafe { asm!("mfence" ::: "memory"); }
-}
