@@ -2,7 +2,7 @@
 
 引用
 --
-USB HCD驱动代码：[github: LdB-ECM/Raspberry-Pi/Arm32\\_64\\_USB](https://github.com/LdB-ECM/Raspberry-Pi/tree/master/Arm32_64_USB)
+USB HCD驱动代码：[github: LdB-ECM/Raspberry-Pi/Arm32\_64\_USB](https://github.com/LdB-ECM/Raspberry-Pi/tree/master/Arm32_64_USB)
 
 概念介绍
 --
