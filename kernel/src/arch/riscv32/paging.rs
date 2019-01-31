@@ -3,7 +3,7 @@ use crate::consts::RECURSIVE_INDEX;
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 use riscv::addr::*;
 use riscv::asm::{sfence_vma, sfence_vma_all};
-use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
+use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable, PageTableType};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::register::satp;
 use rcore_memory::paging::*;
@@ -58,7 +58,14 @@ impl PageTableExt for ActivePageTable {}
 const ROOT_PAGE_TABLE: *mut RvPageTable =
     ((RECURSIVE_INDEX     << 12 << 10) |
      ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
-#[cfg(target_arch = "riscv64")]
+#[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+const ROOT_PAGE_TABLE: *mut RvPageTable =
+    ((0xFFFF_0000_0000_0000) |
+     (0o777               << 12 << 9 << 9 << 9) |
+     (RECURSIVE_INDEX     << 12 << 9 << 9) |
+     (RECURSIVE_INDEX     << 12 << 9) |
+     ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
+#[cfg(all(target_arch = "riscv64", not(feature = "sv39")))]
 const ROOT_PAGE_TABLE: *mut RvPageTable =
     ((0xFFFF_0000_0000_0000) |
      (RECURSIVE_INDEX     << 12 << 9 << 9 << 9) |
@@ -67,9 +74,21 @@ const ROOT_PAGE_TABLE: *mut RvPageTable =
      ((RECURSIVE_INDEX+1) << 12)) as *mut RvPageTable;
 
 impl ActivePageTable {
+    #[cfg(target_arch = "riscv32")]
     pub unsafe fn new() -> Self {
         ActivePageTable(
             RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap(),
+            ::core::mem::uninitialized()
+        )
+    }
+    #[cfg(target_arch = "riscv64")]
+    pub unsafe fn new() -> Self {
+        #[cfg(feature = "sv39")]
+        let type_ = PageTableType::Sv39;
+        #[cfg(not(feature = "sv39"))]
+        let type_ = PageTableType::Sv48;
+        ActivePageTable(
+            RecursivePageTable::new(&mut *ROOT_PAGE_TABLE, type_).unwrap(),
             ::core::mem::uninitialized()
         )
     }
@@ -177,7 +196,10 @@ impl InactivePageTable for InactivePageTable0 {
         use bit_field::BitField;
         let mut satp = self.root_frame.number();
         satp.set_bits(44..60, 0);  // AS is 0
-        satp.set_bits(60..64, satp::Mode::Sv48 as usize);  // Mode is Sv48
+        #[cfg(feature = "sv39")]
+        satp.set_bits(60..64, satp::Mode::Sv39 as usize);
+        #[cfg(not(feature = "sv39"))]
+        satp.set_bits(60..64, satp::Mode::Sv48 as usize);
         satp
     }
 

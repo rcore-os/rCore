@@ -124,7 +124,12 @@ endif
 
 ifdef m_mode
 features += no_mmu m_mode
-bbl_m_mode := --enable-boot-machine
+riscv_pk_args := --enable-boot-machine
+endif
+
+ifeq ($(board), u540)
+features += sv39
+riscv_pk_args += --enable-sv39
 endif
 
 ifneq ($(board), none)
@@ -210,7 +215,7 @@ ifeq ($(arch), riscv32)
 	@mkdir -p target/$(target)/bbl && \
 	cd target/$(target)/bbl && \
 	$(bbl_path)/configure \
-		$(bbl_m_mode) \
+		$(riscv_pk_args) \
 		--with-arch=rv32imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
@@ -224,7 +229,7 @@ else
 	@mkdir -p target/$(target)/bbl && \
 	cd target/$(target)/bbl && \
 	$(bbl_path)/configure \
-		$(bbl_m_mode) \
+		$(riscv_pk_args) \
 		--with-arch=rv64imac \
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
