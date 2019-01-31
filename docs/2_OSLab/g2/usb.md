@@ -107,3 +107,15 @@ USB接口函数一览
                            protocol: u16,                           // The protocol number request
     ) -> RESULT;
 </pre>
+
+其他部分文档补充
+--
+
+- 本节所提到的源代码文件，都位于项目的kernel/src/arch/aarch64/board/raspi3/usb/目录下
+- 驱动内部函数较多，不便在文档中给出实现细节与功能说明，但是多数函数都有较详细的注释。可以通过函数注释了解函数用法。（usb.h）
+	- 有些注释提到了其他手册，其中部分手册可从本组的文档仓库下载
+	- [BCM2835-ARM-Peripherals.pdf](https://github.com/cfgbd/rustos/blob/master/usb/Raspberry/BCM2835-ARM-Peripherals.pdf)
+	- [ehci-specification-for-usb.pdf](https://github.com/cfgbd/rustos/blob/master/usb/usb/ehci-specification-for-usb.pdf)
+- `c_structure.rs`, `c_structure_usb_1_11.rs`, `c_structure_usb_2_0.rs`中重新实现了了usb.h中定义的所有常量、枚举类、结构体
+	- 有些位域(bit field)结构没法用rust实现，可参见c\_structure.rs中的UsbPipe类的替代方法
+	- 如需对这三个文件进行扩充，可参考本组的另一文档[USB代码分析.md](https://github.com/cfgbd/rustos/blob/master/usb/USB%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90.md)
