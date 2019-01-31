@@ -36,7 +36,7 @@ pub fn init(dtb: usize) {
 pub fn init_other() {
     unsafe {
         sstatus::set_sum();         // Allow user memory access
-        asm!("csrw 0x180, $0; sfence.vma" :: "r"(SATP) :: "volatile");
+        asm!("csrw satp, $0; sfence.vma" :: "r"(SATP) :: "volatile");
     }
 }
 
@@ -49,7 +49,7 @@ fn init_frame_allocator() {
     use core::ops::Range;
 
     let mut ba = FRAME_ALLOCATOR.lock();
-    let range = to_range((end as usize) - KERN_VA_BASE + PAGE_SIZE, MEMORY_END);
+    let range = to_range((end as usize) - KERN_VA_BASE + MEMORY_OFFSET + PAGE_SIZE, MEMORY_END);
     ba.insert(range);
 
     /*
@@ -72,7 +72,7 @@ fn init_frame_allocator() {
 /// Remap the kernel memory address with 4K page recorded in p1 page table
 #[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel(dtb: usize) {
-    let offset = -(super::consts::KERN_VA_BASE as isize);
+    let offset = -(KERN_VA_BASE as isize - MEMORY_OFFSET as isize);
     let mut ms = MemorySet::new_bare();
     ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
     ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");

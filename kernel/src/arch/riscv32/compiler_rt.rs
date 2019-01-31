@@ -4,5 +4,5 @@
 
 #[no_mangle]
 pub extern fn abort() {
-    loop {}
+    panic!("abort");
 }

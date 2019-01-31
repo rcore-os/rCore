@@ -553,7 +553,7 @@ fi
 CNAME=riscv
 if ! [[ -f ${OUTDIR}/${CNAME}.o ]]
 then
-rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/f7bea54*/src/lib.rs \
+rustc --crate-name riscv $CARGO_PATH/git/checkouts/riscv-1e845b622ce46f1d/f6f475e*/src/lib.rs \
     --color always --crate-type lib --emit=metadata,llvm-bc \
     -C opt-level=1 \
     -C debuginfo=2 \

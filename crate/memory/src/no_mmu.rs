@@ -3,7 +3,7 @@ use alloc::alloc::{Layout, GlobalAlloc};
 use core::marker::PhantomData;
 
 pub trait NoMMUSupport {
-    type Alloc: GlobalAlloc;
+    type Alloc: GlobalAlloc + 'static;
     fn allocator() -> &'static Self::Alloc;
 }
 
