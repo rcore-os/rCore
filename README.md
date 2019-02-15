@@ -1,6 +1,6 @@
 # rCore Plus
 
-[![Build Status](https://travis-ci.org/wangrunji0408/RustOS.svg?branch=master)](https://travis-ci.org/oscourse-tsinghua/RustOS)
+[![Build Status](https://travis-ci.org/oscourse-tsinghua/rcore_plus.svg?branch=master)](https://travis-ci.org/oscourse-tsinghua/rcore_plus)
 
 Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 
@@ -8,7 +8,7 @@ Its former repo name is https://github.com/oscourse-tsinghua/RustOS .
 
 Going to be the next generation teaching operating system.
 
-Supported architectures: x86_64, RISCV32/64, AArch64， MIPS(future)
+Supported architectures: x86_64, RISCV32/64, AArch64, MIPS(future)
 
 Tested boards: QEMU, labeled-RISCV, K210, Raspberry Pi 3B+
 
@@ -20,12 +20,14 @@ Tested boards: QEMU, labeled-RISCV, K210, Raspberry Pi 3B+
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-01-01
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-02-15
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
 * [bootimage](https://github.com/rust-osdev/bootimage) (for x86_64)
 * [RISCV64 GNU toolchain](https://www.sifive.com/boards) (for riscv32/64)
-* [AArch64 GNU toolchain](https://web.stanford.edu/class/cs140e/assignments/0-blinky/) (for aarch64)
+* [AArch64 GNU toolchain](https://cs140e.sergio.bz/assignments/0-blinky/) (for aarch64)
+
+See [Travis script](./.travis.yml) for details.
 
 ### How to run
 
@@ -35,9 +37,9 @@ cargo install cargo-xbuild bootimage
 ```
 
 ```bash
-git clone https://github.com//oscourse-tsinghua/rcore_plus.git --recursive
+git clone https://github.com/oscourse-tsinghua/rcore_plus.git --recursive
 cd rcore_plus/kernel
-rustup override set nightly-2019-01-01
+rustup override set nightly-2019-02-15
 make run arch={riscv32,riscv64,x86_64,aarch64}
 ```
 

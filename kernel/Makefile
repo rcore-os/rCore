@@ -18,6 +18,7 @@
 #   graphic = on | off              enable/disable qemu graphical output
 #   board   = none                Running on QEMU
 #         | k210                Only available on riscv64, build without bbl, run on K210
+#         | u540                Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   m_mode                      Only available on riscv32, build for M-Mode, without MMU
 
@@ -90,12 +91,8 @@ endif
 else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
-	-serial null -serial mon:stdio \
+	-serial null \
 	-kernel $(bin)
-endif
-
-ifneq ($(graphic), on)
-qemu_opts += -nographic
 endif
 
 ifdef d
