@@ -6,8 +6,10 @@ use std::io::{Result, Write};
 
 fn main() {
 	println!("cargo:rerun-if-env-changed=LOG");
+	println!("cargo:rerun-if-env-changed=BOARD");
 
 	let arch: String = std::env::var("ARCH").unwrap();
+	let board: String = std::env::var("BOARD").unwrap();
 	match arch.as_str() {
 		"x86_64" => {
 			gen_vector_asm().unwrap();
@@ -28,6 +30,10 @@ fn main() {
 					.flag("-march=rv64imac")
 					.flag("-mabi=lp64")
 					.compile("sfsimg");
+			}
+			if board == "k210" {
+				println!("cargo:rustc-link-search=native={}", "../tools/k210");
+				println!("cargo:rustc-link-lib=static=kendryte");
 			}
 		}
 		"aarch64" => {

@@ -36,9 +36,11 @@ bin := target/$(target)/$(mode)/kernel.bin
 bootimage := target/$(target)/bootimage.bin
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
+k210_lib := ../tools/k210/libkendryte.a
 
 ### export environments ###
 export ARCH = $(arch)
+export BOARD = $(board)
 export SMP = $(smp)
 #export SFSIMG = $(user_dir)/build/user-$(arch).img
 ifeq ($(arch), x86_64)
@@ -247,6 +249,12 @@ else ifeq ($(arch), riscv32)
 		src/arch/riscv32/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), riscv64)
+ifeq ($(board), k210)
+	@[[ -f $(k210_lib) ]] || wget https://github.com/wangrunji0408/RustOS/releases/download/v0.1/libkendryte.a -O $(k210_lib)
+	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+else
+	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch

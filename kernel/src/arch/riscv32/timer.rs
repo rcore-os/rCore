@@ -58,6 +58,7 @@ pub fn set_next() {
 pub fn set_next() {
     unsafe {
         assert_eq!(clint_timer_start(10, true), 0);
+        mstatus::clear_mie();   // mie is set on 'clint_timer_start'
     }
 }
 

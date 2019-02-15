@@ -15,7 +15,7 @@ import re
 import os
 
 BASH_TIPS = dict(NORMAL='\033[0m',BOLD='\033[1m',DIM='\033[2m',UNDERLINE='\033[4m',
-                    DEFAULT='\033[39', RED='\033[31m', YELLOW='\033[33m', GREEN='\033[32m',
+                    DEFAULT='\033[39m', RED='\033[31m', YELLOW='\033[33m', GREEN='\033[32m',
                     BG_DEFAULT='\033[49m', BG_WHITE='\033[107m')
 
 ERROR_MSG   = BASH_TIPS['RED']+BASH_TIPS['BOLD']+'[ERROR]'+BASH_TIPS['NORMAL']
@@ -465,18 +465,18 @@ class MAIXLoader:
         return data
 
     def reset_to_isp_kd233(self):
-        self._port.dtr = False
-        self._port.rts = False
+        self._port.setDTR (False)
+        self._port.setRTS (False)
         time.sleep(0.01)
         #print('-- RESET to LOW, IO16 to HIGH --')
         # Pull reset down and keep 10ms
-        self._port.dtr = True
-        self._port.rts = False
+        self._port.setDTR (True)
+        self._port.setRTS (False)
         time.sleep(0.01)
         #print('-- IO16 to LOW, RESET to HIGH --')
         # Pull IO16 to low and release reset
-        self._port.rts = True
-        self._port.dtr = False
+        self._port.setRTS (True)
+        self._port.setDTR (False)
         time.sleep(0.01)
 
     def reset_to_isp_dan(self):
@@ -495,18 +495,18 @@ class MAIXLoader:
         time.sleep(0.01)
 
     def reset_to_boot(self):
-        self._port.dtr = False
-        self._port.rts = False
+        self._port.setDTR (False)
+        self._port.setRTS (False)
         time.sleep(0.01)
         #print('-- RESET to LOW --')
         # Pull reset down and keep 10ms
-        self._port.dtr = True
-        self._port.rts = False
+        self._port.setRTS (False)
+        self._port.setDTR (True)
         time.sleep(0.01)
         #print('-- RESET to HIGH, BOOT --')
         # Pull IO16 to low and release reset
-        self._port.rts = False
-        self._port.dtr = False
+        self._port.setRTS (False)
+        self._port.setDTR (False)
         time.sleep(0.01)
 
     def greeting(self):
@@ -709,7 +709,7 @@ class MAIXLoader:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", help="COM Port", default="DEFAULT")
-    parser.add_argument("-c", "--chip", help="SPI Flash type, 1 for in-chip, 0 for on-board", default=1)
+    parser.add_argument("-c", "--chip", help="SPI Flash type, 0 for in-chip, 1 for on-board", default=1)
     parser.add_argument("-b", "--baudrate", type=int, help="UART baudrate for uploading firmware", default=115200)
     parser.add_argument("-l", "--bootloader", help="bootloader bin path", required=False, default=None)
     parser.add_argument("-k", "--key", help="AES key in hex, if you need encrypt your firmware.", required=False, default=None)
