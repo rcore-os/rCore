@@ -20,7 +20,7 @@ Tested boards: QEMU, labeled-RISCV, K210, Raspberry Pi 3B+
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-02-15
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-02-16
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
 * [bootimage](https://github.com/rust-osdev/bootimage) (for x86_64)
@@ -39,7 +39,6 @@ cargo install cargo-xbuild bootimage
 ```bash
 git clone https://github.com/oscourse-tsinghua/rcore_plus.git --recursive
 cd rcore_plus/kernel
-rustup override set nightly-2019-02-15
 make run arch={riscv32,riscv64,x86_64,aarch64}
 ```
 
