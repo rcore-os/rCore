@@ -250,7 +250,10 @@ else ifeq ($(arch), riscv32)
 		src/arch/riscv32/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), riscv64)
-	@./build-rv64
+	@-patch -p0 -N -b \
+		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
+		src/arch/riscv32/atomic.patch
+	@cargo xbuild $(build_args)
 else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
 endif
