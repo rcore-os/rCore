@@ -14,6 +14,7 @@ use volatile::{ReadOnly, Volatile, WriteOnly};
 use crate::arch::cpu;
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
+use crate::arch::consts::{KERN_VA_BASE, MEMORY_OFFSET};
 
 use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
@@ -252,7 +253,7 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         nr_entries: 1,
-        addr: frame_buffer as u64,
+        addr: (frame_buffer - KERN_VA_BASE + MEMORY_OFFSET) as u64,
         length: size,
         padding: 0
     };
