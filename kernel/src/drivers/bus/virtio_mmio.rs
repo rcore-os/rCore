@@ -15,6 +15,7 @@ use volatile::{ReadOnly, Volatile, WriteOnly};
 use crate::arch::memory;
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
+use crate::arch::consts::{KERN_VA_BASE, MEMORY_OFFSET};
 
 use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
@@ -96,7 +97,7 @@ impl VirtIOVirtqueue {
 
         header.queue_num.write(queue_num as u32);
         header.queue_align.write(align as u32);
-        header.queue_pfn.write((address as u32) >> 12);
+        header.queue_pfn.write(((address - KERN_VA_BASE + MEMORY_OFFSET) as u32) >> 12);
 
         // link desc together
         let desc = unsafe { slice::from_raw_parts_mut(address as *mut VirtIOVirtqueueDesc, queue_num) };
@@ -139,14 +140,14 @@ impl VirtIOVirtqueue {
         let mut cur = self.free_head;
         for i in 0..output.len() {
             desc[cur].flags.write(VirtIOVirtqueueFlag::NEXT.bits());
-            desc[cur].addr.write(output[i].as_ptr() as u64);
+            desc[cur].addr.write(output[i].as_ptr() as u64 - KERN_VA_BASE as u64 + MEMORY_OFFSET as u64);
             desc[cur].len.write(output[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
         }
         for i in 0..input.len() {
             desc[cur].flags.write((VirtIOVirtqueueFlag::NEXT | VirtIOVirtqueueFlag::WRITE).bits());
-            desc[cur].addr.write(input[i].as_ptr() as u64);
+            desc[cur].addr.write(input[i].as_ptr() as u64 - KERN_VA_BASE as u64 + MEMORY_OFFSET as u64);
             desc[cur].len.write(input[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
