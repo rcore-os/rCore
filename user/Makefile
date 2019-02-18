@@ -1,4 +1,4 @@
-# arch = {riscv32, x86_64, aarch64}
+# arch = {riscv32, riscv64, x86_64, aarch64}
 # mode = {debug, release}
 arch ?= riscv32
 mode ?= debug
@@ -24,12 +24,7 @@ endif
 
 .PHONY: all clean build-rust build-c build mksfs sfsimg
 
-# not support riscv64 now
-ifeq ($(arch), riscv64)
-all:
-else
 all: $(sfsimg)
-endif
 
 build-rust:
 	@echo Building user rust programs

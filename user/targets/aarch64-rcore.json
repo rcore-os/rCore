@@ -15,7 +15,7 @@
   "linker-is-gnu": true,
   "pre-link-args": {
     "ld.lld": [
-      "-Tsrc/arch/aarch64/user.ld"
+      "--image-base=0xffff000000000000"
     ]
   },
   "llvm-target": "aarch64-unknown-none",

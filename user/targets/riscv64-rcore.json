@@ -7,15 +7,10 @@
   "os": "none",
   "arch": "riscv64",
   "cpu": "generic-rv64",
-  "features": "",
-  "max-atomic-width": "32",
+  "features": "+m,+a,+c",
+  "max-atomic-width": "64",
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
-  "pre-link-args": {
-    "ld.lld": [
-      "-Tsrc/arch/riscv32/boot/linker64.ld"
-    ]
-  },
   "executables": true,
   "panic-strategy": "abort",
   "relocation-model": "static",
