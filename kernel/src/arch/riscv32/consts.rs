@@ -13,14 +13,14 @@ pub const RECURSIVE_INDEX: usize = 0o774;
 //  root_table[0776] points to a temp page table as leaf page
 
 #[cfg(target_arch = "riscv32")]
-pub const KERN_VA_BASE: usize = 0xC000_0000;
+pub const KERNEL_OFFSET: usize = 0xC000_0000;
 #[cfg(target_arch = "riscv64")]
-pub const KERN_VA_BASE: usize = 0xFFFF_FFFF_C000_0000;
+pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_C000_0000;
 
 #[cfg(target_arch = "riscv32")]
-pub const KERNEL_P2_INDEX: usize = (KERN_VA_BASE >> 12 >> 10) & 0x3ff;
+pub const KERNEL_P2_INDEX: usize = (KERNEL_OFFSET >> 12 >> 10) & 0x3ff;
 #[cfg(target_arch = "riscv64")]
-pub const KERNEL_P4_INDEX: usize = (KERN_VA_BASE >> 12 >> 9 >> 9 >> 9) & 0o777;
+pub const KERNEL_P4_INDEX: usize = (KERNEL_OFFSET >> 12 >> 9 >> 9 >> 9) & 0o777;
 
 #[cfg(feature = "board_k210")]
 pub const KERNEL_HEAP_SIZE: usize = 0x0010_0000;

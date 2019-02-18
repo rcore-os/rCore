@@ -3,7 +3,7 @@ use riscv::{addr::*, register::sstatus};
 use rcore_memory::PAGE_SIZE;
 use log::*;
 use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
-use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERN_VA_BASE};
+use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
 use riscv::register::satp;
 
 #[cfg(feature = "no_mmu")]
@@ -49,7 +49,7 @@ fn init_frame_allocator() {
     use core::ops::Range;
 
     let mut ba = FRAME_ALLOCATOR.lock();
-    let range = to_range((end as usize) - KERN_VA_BASE + MEMORY_OFFSET + PAGE_SIZE, MEMORY_END);
+    let range = to_range((end as usize) - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE, MEMORY_END);
     ba.insert(range);
 
     /*
@@ -72,7 +72,7 @@ fn init_frame_allocator() {
 /// Remap the kernel memory address with 4K page recorded in p1 page table
 #[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel(dtb: usize) {
-    let offset = -(KERN_VA_BASE as isize - MEMORY_OFFSET as isize);
+    let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
     let mut ms = MemorySet::new_bare();
     ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
     ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");
