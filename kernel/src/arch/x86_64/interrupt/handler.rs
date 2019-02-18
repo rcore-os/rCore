@@ -96,7 +96,8 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         SwitchToUser => to_user(tf),
         Syscall => syscall(tf),
         Syscall32 => syscall32(tf),
-        DivideError | GeneralProtectionFault | InvalidOpcode => error(tf),
+        InvalidOpcode => invalid_opcode(tf),
+        DivideError | GeneralProtectionFault => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 }
@@ -170,6 +171,18 @@ fn syscall32(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     let ret = crate::syscall::syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
     tf.rax = ret as usize;
+}
+
+/// Support `syscall` instruction
+fn invalid_opcode(tf: &mut TrapFrame) {
+    let opcode = unsafe { (tf.rip as *mut u16).read() };
+    const SYSCALL_OPCODE: u16 = 0x05_0f;
+    if opcode == SYSCALL_OPCODE {
+        syscall(tf);
+        tf.rip += 2;
+    } else {
+        crate::trap::error(tf);
+    }
 }
 
 fn error(tf: &TrapFrame) {
