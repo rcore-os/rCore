@@ -71,31 +71,32 @@ use log::*;
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     trace!("Interrupt: {:#x} @ CPU{}", tf.trap_num, super::super::cpu::id());
     // Dispatch
     match tf.trap_num as u8 {
-        T_BRKPT => breakpoint(),
-        T_DBLFLT => double_fault(tf),
-        T_PGFLT => page_fault(tf),
-        T_IRQ0...63 => {
-            let irq = tf.trap_num as u8 - T_IRQ0;
+        Breakpoint => breakpoint(),
+        DoubleFault => double_fault(tf),
+        PageFault => page_fault(tf),
+        IRQ0...63 => {
+            let irq = tf.trap_num as u8 - IRQ0;
             super::ack(irq); // must ack before switching
             match irq {
-                IRQ_TIMER => crate::trap::timer(),
-                IRQ_KBD => keyboard(),
-                IRQ_COM1 => com1(),
-                IRQ_COM2 => com2(),
-                IRQ_IDE => ide(),
+                Timer => crate::trap::timer(),
+                Keyboard => keyboard(),
+                COM1 => com1(),
+                COM2 => com2(),
+                IDE => ide(),
                 _ => panic!("Invalid IRQ number: {}", irq),
             }
         }
-        T_SWITCH_TOK => to_kernel(tf),
-        T_SWITCH_TOU => to_user(tf),
-        T_SYSCALL => syscall(tf),
-        T_SYSCALL32 => syscall32(tf),
-        T_DIVIDE | T_GPFLT | T_ILLOP => error(tf),
+        SwitchToKernel => to_kernel(tf),
+        SwitchToUser => to_user(tf),
+        Syscall => syscall(tf),
+        Syscall32 => syscall32(tf),
+        DivideError | GeneralProtectionFault | InvalidOpcode => error(tf),
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 }

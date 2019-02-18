@@ -4,9 +4,9 @@ use pc_keyboard::{Keyboard, ScancodeSet1, DecodedKey, layouts};
 use lazy_static::lazy_static;
 
 pub fn init() {
-    use crate::arch::interrupt::consts::*;
+    use crate::arch::interrupt::consts;
     use crate::arch::interrupt::enable_irq;
-	enable_irq(IRQ_KBD);
+	enable_irq(consts::Keyboard);
 }
 
 /// Receive character from keyboard

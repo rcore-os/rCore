@@ -19,7 +19,7 @@ lazy_static! {
         // * 某些保留中断号不允许设置，会触发panic
         // 于是下面用了一些trick绕过了它们
 
-        let ring3 = [T_SWITCH_TOK, T_SYSCALL, T_SYSCALL32];
+        let ring3 = [SwitchToKernel, Syscall, Syscall32];
 
         let mut idt = InterruptDescriptorTable::new();
         let entries = unsafe{ &mut *(&mut idt as *mut _ as *mut [Entry<HandlerFunc>; 256]) };
@@ -29,7 +29,7 @@ lazy_static! {
                 opt.set_privilege_level(PrivilegeLevel::Ring3);
                 opt.disable_interrupts(false);
             }
-            if i == T_DBLFLT as usize {
+            if i == DoubleFault as usize {
                 unsafe{ opt.set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); }
             }
         }
