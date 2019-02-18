@@ -10,6 +10,12 @@ fn sys_call(syscall_id: SyscallId, arg0: usize, arg1: usize, arg2: usize, arg3: 
             : "{x10}" (id), "{x11}" (arg0), "{x12}" (arg1), "{x13}" (arg2), "{x14}" (arg3), "{x15}" (arg4), "{x16}" (arg5)
             : "memory"
             : "volatile");
+        #[cfg(target_arch = "x86")]
+            asm!("int 0x80"
+            : "={eax}" (ret)
+            : "{eax}" (id), "{edx}" (arg0), "{ecx}" (arg1), "{ebx}" (arg2), "{edi}" (arg3), "{esi}" (arg4)
+            : "memory"
+            : "intel" "volatile");
         #[cfg(target_arch = "x86_64")]
             asm!("int 0x40"
             : "={rax}" (ret)
