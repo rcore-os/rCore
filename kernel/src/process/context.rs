@@ -9,6 +9,8 @@ use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use crate::arch::interrupt::{Context as ArchContext, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 
+use super::abi::ProcInitInfo;
+
 // TODO: avoid pub
 pub struct Process {
     pub arch: ArchContext,
@@ -86,8 +88,12 @@ impl Process {
         #[cfg(feature = "no_mmu")]
         let mut ustack_top = memory_set.push(USER_STACK_SIZE).as_ptr() as usize + USER_STACK_SIZE;
 
+        let init_info = ProcInitInfo {
+            args: args.map(|s| String::from(s)).collect(),
+            envs: BTreeMap::new(),
+        };
         unsafe {
-            memory_set.with(|| { ustack_top = push_args_at_stack(args, ustack_top) });
+            memory_set.with(|| { ustack_top = init_info.push_at(ustack_top) });
         }
 
         trace!("{:#x?}", memory_set);
@@ -134,31 +140,6 @@ impl Process {
             cwd: String::new(),
         })
     }
-}
-
-/// Push a slice at the stack. Return the new sp.
-unsafe fn push_slice<T: Copy>(mut sp: usize, vs: &[T]) -> usize {
-    use core::{mem::{size_of, align_of}, slice};
-    sp -= vs.len() * size_of::<T>();
-    sp -= sp % align_of::<T>();
-    slice::from_raw_parts_mut(sp as *mut T, vs.len())
-        .copy_from_slice(vs);
-    sp
-}
-
-unsafe fn push_args_at_stack<'a, Iter>(args: Iter, stack_top: usize) -> usize
-    where Iter: Iterator<Item=&'a str>
-{
-    let mut sp = stack_top;
-    let mut argv = Vec::new();
-    for arg in args {
-        sp = push_slice(sp, &[0u8]);
-        sp = push_slice(sp, arg.as_bytes());
-        argv.push(sp);
-    }
-    sp = push_slice(sp, argv.as_slice());
-    sp = push_slice(sp, &[argv.len()]);
-    sp
 }
 
 

@@ -6,6 +6,7 @@ use alloc::{boxed::Box, sync::Arc};
 use log::*;
 
 pub mod context;
+mod abi;
 
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
