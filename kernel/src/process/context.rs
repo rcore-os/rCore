@@ -136,7 +136,7 @@ impl Process {
             arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
             memory_set,
             kstack,
-            files: BTreeMap::default(),
+            files: self.files.clone(),
             cwd: String::new(),
         })
     }

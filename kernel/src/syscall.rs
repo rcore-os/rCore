@@ -15,37 +15,74 @@ use crate::util;
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let ret = match id {
         // file
-        100 => sys_open(args[0] as *const u8, args[1]),
-        101 => sys_close(args[0]),
-        102 => sys_read(args[0], args[1] as *mut u8, args[2]),
-        103 => sys_write(args[0], args[1] as *const u8, args[2]),
-        030 => sys_putc(args[0] as u8 as char),
-//        104 => sys_seek(),
-        110 => sys_fstat(args[0], args[1] as *mut Stat),
-//        111 => sys_fsync(),
-//        121 => sys_getcwd(),
-        128 => sys_getdirentry(args[0], args[1] as *mut DirEntry),
-        130 => sys_dup(args[0], args[1]),
+        000 => sys_read(args[0], args[1] as *mut u8, args[2]),
+        001 => sys_write(args[0], args[1] as *const u8, args[2]),
+        002 => sys_open(args[0] as *const u8, args[1]),
+        003 => sys_close(args[0]),
+//        004 => sys_stat(),
+        005 => sys_fstat(args[0], args[1] as *mut Stat),
+//        007 => sys_poll(),
+//        008 => sys_lseek(),
+//        009 => sys_mmap(),
+//        011 => sys_munmap(),
+//        013 => sys_sigaction(),
+//        019 => sys_readv(),
+//        020 => sys_writev(),
+//        021 => sys_access(),
+        024 => sys_yield(),
+        033 => sys_dup2(args[0], args[1]),
+//        034 => sys_pause(),
+        035 => sys_sleep(args[0]), // TODO: nanosleep
+        039 => sys_getpid(),
+//        040 => sys_getppid(),
+//        041 => sys_socket(),
+//        042 => sys_connect(),
+//        043 => sys_accept(),
+//        044 => sys_sendto(),
+//        045 => sys_recvfrom(),
+//        046 => sys_sendmsg(),
+//        047 => sys_recvmsg(),
+//        048 => sys_shutdown(),
+//        049 => sys_bind(),
+//        050 => sys_listen(),
+//        054 => sys_setsockopt(),
+//        055 => sys_getsockopt(),
+//        056 => sys_clone(),
+        057 => sys_fork(tf),
+        059 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
+        060 => sys_exit(args[0] as isize),
+        061 => sys_wait(args[0], args[1] as *mut i32), // TODO: wait4
+        062 => sys_kill(args[0]),
+//        072 => sys_fcntl(),
+//        074 => sys_fsync(),
+//        076 => sys_trunc(),
+//        077 => sys_ftrunc(),
+        078 => sys_getdirentry(args[0], args[1] as *mut DirEntry),
+//        079 => sys_getcwd(),
+//        080 => sys_chdir(),
+//        082 => sys_rename(),
+//        083 => sys_mkdir(),
+//        086 => sys_link(),
+//        087 => sys_unlink(),
+        096 => sys_get_time(), // TODO: sys_gettimeofday
+//        097 => sys_getrlimit(),
+//        098 => sys_getrusage(),
+//        133 => sys_mknod(),
+        141 => sys_set_priority(args[0]),
+//        160 => sys_setrlimit(),
+//        162 => sys_sync(),
+//        169 => sys_reboot(),
+//        293 => sys_pipe(),
 
-        // process
-        001 => sys_exit(args[0] as isize),
-        002 => sys_fork(tf),
-        003 => sys_wait(args[0], args[1] as *mut i32),
-        004 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
-//        005 => sys_clone(),
-        010 => sys_yield(),
-        011 => sys_sleep(args[0]),
-        012 => sys_kill(args[0]),
-        017 => sys_get_time(),
-        018 => sys_getpid(),
-        255 => sys_lab6_set_priority(args[0]),
-
-        // memory
-//        020 => sys_mmap(),
-//        021 => sys_munmap(),
-//        022 => sys_shmem(),
-//        031 => sys_pgdir(),
-
+        // for musl: empty impl
+        158 => {
+            warn!("sys_arch_prctl is unimplemented");
+            Ok(0)
+        }
+        218 => {
+            warn!("sys_set_tid_address is unimplemented");
+            Ok(0)
+        }
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
             crate::trap::error(tf);
@@ -129,8 +166,8 @@ fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     Ok(0)
 }
 
-fn sys_dup(fd1: usize, fd2: usize) -> SysResult {
-    info!("dup: {} {}", fd1, fd2);
+fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
+    info!("dup2: {} {}", fd1, fd2);
     let file = get_file(fd1)?;
     if process().files.contains_key(&fd2) {
         return Err(SysError::Inval);
@@ -267,7 +304,7 @@ fn sys_get_time() -> SysResult {
     unsafe { Ok(crate::trap::TICK as isize) }
 }
 
-fn sys_lab6_set_priority(priority: usize) -> SysResult {
+fn sys_set_priority(priority: usize) -> SysResult {
     let pid = thread::current().id();
     processor().manager().set_priority(pid, priority as u8);
     Ok(0)
