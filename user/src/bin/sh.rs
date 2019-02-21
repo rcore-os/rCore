@@ -4,12 +4,12 @@
 
 extern crate alloc;
 #[macro_use]
-extern crate rcore_ulib;
+extern crate rcore_user;
 
 use alloc::vec::Vec;
 
-use rcore_ulib::io::get_line;
-use rcore_ulib::syscall::{sys_exec, sys_fork, sys_wait};
+use rcore_user::io::get_line;
+use rcore_user::syscall::{sys_exec, sys_fork, sys_wait};
 
 // IMPORTANT: Must define main() like this
 #[no_mangle]

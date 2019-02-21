@@ -1,8 +1,8 @@
 [package]
-name = "rcore-user-programs"
+name = "rcore-user"
 version = "0.1.0"
 authors = ["Runji Wang <wangrunji0408@163.com>"]
 edition = "2018"
 
 [dependencies]
-"rcore-ulib" = { path = "rcore-ulib" }
+linked_list_allocator = "0.6"

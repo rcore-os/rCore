@@ -9,17 +9,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rcore-ulib"
+name = "rcore-user"
 version = "0.1.0"
 dependencies = [
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "rcore-user-programs"
-version = "0.1.0"
-dependencies = [
- "rcore-ulib 0.1.0",
 ]
 
 [[package]]
