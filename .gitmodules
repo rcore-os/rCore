@@ -1,3 +1,6 @@
 [submodule "riscv-pk"]
 	path = riscv-pk
 	url = https://github.com/riscv-and-rust-and-decaf/riscv-pk.git
+[submodule "user"]
+    path = user
+    url = https://github.com/wangrunji0408/rcore_user.git
