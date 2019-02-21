@@ -63,5 +63,5 @@ before_script:
     fi
 
 script:
+  - cd user && make sfsimg arch=$ARCH && cd ..
   - cd kernel && make build arch=$ARCH $OPTS && cd ..
-  - cd user && make arch=$ARCH

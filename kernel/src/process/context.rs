@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
 use log::*;
-use simple_filesystem::file::File;
+use simple_filesystem::{file::File, INode};
 use spin::Mutex;
 use rcore_process::Context;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
@@ -16,7 +16,7 @@ pub struct Process {
     pub arch: ArchContext,
     pub memory_set: MemorySet,
     pub kstack: KernelStack,
-    pub files: BTreeMap<usize, Arc<Mutex<File>>>,
+    pub files: BTreeMap<usize, Arc<Mutex<File>>>, // FIXME: => Box<File>
     pub cwd: String,
 }
 
@@ -100,6 +100,11 @@ impl Process {
 
         let kstack = KernelStack::new();
 
+        let mut files = BTreeMap::new();
+        files.insert(0, Arc::new(Mutex::new(File::new(crate::fs::STDIN.clone(), true, false))));
+        files.insert(1, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
+        files.insert(2, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
+
         Box::new(Process {
             arch: unsafe {
                 ArchContext::new_user_thread(
@@ -107,7 +112,7 @@ impl Process {
             },
             memory_set,
             kstack,
-            files: BTreeMap::default(),
+            files,
             cwd: String::new(),
         })
     }
