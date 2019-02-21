@@ -1,16 +1,9 @@
-use crate::syscall::{sys_close, sys_dup, sys_exit, sys_open};
+use crate::syscall::{sys_close, sys_dup2, sys_exit, sys_open};
 use crate::io::{O_RDONLY, O_WRONLY, STDIN, STDOUT};
 use crate::ALLOCATOR;
 
 use core::alloc::Layout;
 use core::panic::PanicInfo;
-
-// used for panic
-macro_rules! print {
-    ($($arg:tt)*) => ({
-        $crate::io::print_putc(format_args!($($arg)*));
-    });
-}
 
 #[linkage = "weak"]
 #[no_mangle]
@@ -27,7 +20,7 @@ fn initfd(fd2: usize, path: &str, open_flags: usize) -> i32 {
     let fd1 = fd1 as usize;
     if fd1 != fd2 {
         sys_close(fd2);
-        ret = sys_dup(fd1, fd2);
+        ret = sys_dup2(fd1, fd2);
         sys_close(fd1);
     }
     return ret;

@@ -17,7 +17,7 @@ fn sys_call(syscall_id: SyscallId, arg0: usize, arg1: usize, arg2: usize, arg3: 
             : "memory"
             : "intel" "volatile");
         #[cfg(target_arch = "x86_64")]
-            asm!("int 0x40"
+            asm!("syscall"
             : "={rax}" (ret)
             : "{rax}" (id), "{rdi}" (arg0), "{rsi}" (arg1), "{rdx}" (arg2), "{rcx}" (arg3), "{r8}" (arg4), "{r9}" (arg5)
             : "memory"
@@ -64,8 +64,8 @@ pub fn sys_close(fd: usize) -> i32 {
     sys_call(SyscallId::Close, fd, 0, 0, 0, 0, 0)
 }
 
-pub fn sys_dup(fd1: usize, fd2: usize) -> i32 {
-    sys_call(SyscallId::Dup, fd1, fd2, 0, 0, 0, 0)
+pub fn sys_dup2(fd1: usize, fd2: usize) -> i32 {
+    sys_call(SyscallId::Dup2, fd1, fd2, 0, 0, 0, 0)
 }
 
 /// Fork the current process. Return the child's PID.
@@ -101,40 +101,33 @@ pub fn sys_get_time() -> i32 {
     sys_call(SyscallId::GetTime, 0, 0, 0, 0, 0, 0)
 }
 
-pub fn sys_lab6_set_priority(priority: usize) -> i32 {
-    sys_call(SyscallId::Lab6SetPriority, priority, 0, 0, 0, 0, 0)
-}
-
-pub fn sys_putc(c: u8) -> i32 {
-    sys_call(SyscallId::Putc, c as usize, 0, 0, 0, 0, 0)
+pub fn sys_set_priority(priority: usize) -> i32 {
+    sys_call(SyscallId::SetPriority, priority, 0, 0, 0, 0, 0)
 }
 
 #[allow(dead_code)]
-enum SyscallId{
-    Exit = 1,
-    Fork = 2,
-    Wait = 3,
-    Exec = 4,
-    Clone = 5,
-    Yield = 10,
-    Sleep = 11,
-    Kill = 12,
-    GetTime = 17,
-    GetPid = 18,
-    Mmap = 20,
-    Munmap = 21,
-    Shmem = 22,
-    Putc = 30,
-    Pgdir = 31,
-    Open = 100,
-    Close = 101,
-    Read = 102,
-    Write = 103,
-    Seek = 104,
-    Fstat = 110,
-    Fsync = 111,
-    GetCwd = 121,
-    GetDirEntry = 128,
-    Dup = 130,
-    Lab6SetPriority = 255,
+enum SyscallId {
+    Exit = 60,
+    Fork = 57,
+    Wait = 61,
+    Exec = 59,
+    Clone = 56,
+    Yield = 24,
+    Sleep = 35,
+    Kill = 62,
+    GetTime = 96,
+    GetPid = 39,
+    Mmap = 9,
+    Munmap = 11,
+    Open = 2,
+    Close = 3,
+    Read = 0,
+    Write = 1,
+    Seek = 8,
+    Fstat = 4,
+    Fsync = 74,
+    GetCwd = 79,
+    GetDirEntry = 78,
+    Dup2 = 33,
+    SetPriority = 141,
 }

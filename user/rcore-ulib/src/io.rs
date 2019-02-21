@@ -2,7 +2,7 @@ use alloc::string::String;
 use core::fmt::{self, Write};
 use core::option::Option;
 
-use crate::syscall::{sys_putc, sys_read, sys_write};
+use crate::syscall::{sys_read, sys_write};
 
 pub const STDIN: usize = 0;
 pub const STDOUT: usize = 1;
@@ -22,10 +22,6 @@ macro_rules! println {
 
 pub fn print(args: fmt::Arguments) {
     StdOut.write_fmt(args).unwrap();
-}
-
-pub fn print_putc(args: fmt::Arguments) {
-    SysPutc.write_fmt(args).unwrap();
 }
 
 pub fn getc() -> Option<u8> {
@@ -68,12 +64,10 @@ pub fn get_line() -> String {
 }
 
 pub fn putc(c: u8) {
-    sys_putc(c);
+    sys_write(STDOUT, &c, 1);
 }
 
 struct StdOut;
-
-struct SysPutc;
 
 impl fmt::Write for StdOut {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -82,15 +76,6 @@ impl fmt::Write for StdOut {
         } else {
             Err(fmt::Error::default())
         }
-    }
-}
-
-impl fmt::Write for SysPutc {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.bytes() {
-            sys_putc(c);
-        }
-        Ok(())
     }
 }
 
