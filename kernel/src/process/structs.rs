@@ -1,12 +1,13 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
 use log::*;
-use simple_filesystem::{file::File, INode};
+use simple_filesystem::INode;
 use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
+use crate::fs::File;
 
 use super::abi::ProcInitInfo;
 
@@ -19,7 +20,7 @@ pub struct Thread {
 
 pub struct Process {
     pub memory_set: MemorySet,
-    pub files: BTreeMap<usize, Arc<Mutex<File>>>, // FIXME: => Box<File>
+    pub files: BTreeMap<usize, File>,
     pub cwd: String,
 }
 
@@ -111,9 +112,9 @@ impl Thread {
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
-        files.insert(0, Arc::new(Mutex::new(File::new(crate::fs::STDIN.clone(), true, false))));
-        files.insert(1, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
-        files.insert(2, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
+        files.insert(0, File::new(crate::fs::STDIN.clone(), true, false));
+        files.insert(1, File::new(crate::fs::STDOUT.clone(), false, true));
+        files.insert(2, File::new(crate::fs::STDOUT.clone(), false, true));
 
         Box::new(Thread {
             context: unsafe {

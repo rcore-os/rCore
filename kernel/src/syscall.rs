@@ -1,6 +1,6 @@
 //! System call
 
-use simple_filesystem::{INode, file::File, FileInfo, FileType, FsError};
+use simple_filesystem::{INode, FileInfo, FileType, FsError};
 use core::{slice, str};
 use alloc::{sync::Arc, vec::Vec, string::String};
 use spin::{Mutex, MutexGuard};
@@ -10,6 +10,7 @@ use crate::arch::interrupt::TrapFrame;
 use crate::process::*;
 use crate::thread;
 use crate::util;
+use crate::fs::File;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
@@ -98,8 +99,8 @@ fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let proc = process();
-    let len = get_file(&proc, fd)?.lock().read(slice)?;
+    let mut proc = process();
+    let len = get_file(&mut proc, fd)?.read(slice)?;
     Ok(len as isize)
 }
 
@@ -107,8 +108,8 @@ fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     // TODO: check ptr
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    let proc = process();
-    let len = get_file(&proc, fd)?.lock().write(slice)?;
+    let mut proc = process();
+    let len = get_file(&mut proc, fd)?.write(slice)?;
     Ok(len as isize)
 }
 
@@ -127,7 +128,7 @@ fn sys_open(path: *const u8, flags: usize) -> SysResult {
         }
     };
     let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
-    process().files.insert(fd, Arc::new(Mutex::new(file)));
+    process().files.insert(fd, file);
     Ok(fd as isize)
 }
 
@@ -142,9 +143,9 @@ fn sys_close(fd: usize) -> SysResult {
 fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     // TODO: check ptr
     info!("fstat: {}", fd);
-    let proc = process();
-    let file = get_file(&proc, fd)?;
-    let stat = Stat::from(file.lock().info()?);
+    let mut proc = process();
+    let file = get_file(&mut proc, fd)?;
+    let stat = Stat::from(file.info()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
 }
@@ -155,25 +156,25 @@ fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     // TODO: check ptr
     info!("getdirentry: {}", fd);
-    let proc = process();
-    let file = get_file(&proc, fd)?;
+    let mut proc = process();
+    let file = get_file(&mut proc, fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
         return Err(SysError::Inval);
     }
-    let info = file.lock().info()?;
+    let info = file.info()?;
     if info.type_ != FileType::Dir || info.size <= dentry.entry_id() {
         return Err(SysError::Inval);
     }
-    let name = file.lock().get_entry(dentry.entry_id())?;
+    let name = file.get_entry(dentry.entry_id())?;
     dentry.set_name(name.as_str());
     Ok(0)
 }
 
 fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     info!("dup2: {} {}", fd1, fd2);
-    let proc = process();
-    let file = get_file(&proc, fd1)?;
+    let mut proc = process();
+    let file = get_file(&mut proc, fd1)?;
     if process().files.contains_key(&fd2) {
         return Err(SysError::Inval);
     }
@@ -320,8 +321,8 @@ fn sys_putc(c: char) -> SysResult {
     Ok(0)
 }
 
-fn get_file<'a>(proc: &'a MutexGuard<'static, Process>, fd: usize) -> Result<&'a Arc<Mutex<File>>, SysError> {
-    proc.files.get(&fd).ok_or(SysError::Inval)
+fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut File, SysError> {
+    proc.files.get_mut(&fd).ok_or(SysError::Inval)
 }
 
 pub type SysResult = Result<isize, SysError>;
