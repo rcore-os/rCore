@@ -13,7 +13,7 @@
 extern crate alloc;
 
 pub use crate::process::{processor, new_kernel_context};
-use rcore_process::thread;
+use rcore_thread::std_thread as thread;
 use linked_list_allocator::LockedHeap;
 
 #[macro_use]    // print!

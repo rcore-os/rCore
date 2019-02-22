@@ -1,7 +1,8 @@
 [package]
-name = "rcore-process"
+name = "rcore-thread"
 version = "0.1.0"
 authors = ["WangRunji <wangrunji0408@163.com>"]
+description = "Bare-metal thread scheduler and executor"
 edition = "2018"
 
 [dependencies]

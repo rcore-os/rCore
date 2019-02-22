@@ -3,56 +3,66 @@ use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::V
 use log::*;
 use simple_filesystem::{file::File, INode};
 use spin::Mutex;
-use rcore_process::Context;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 
-use crate::arch::interrupt::{Context as ArchContext, TrapFrame};
+use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 
 use super::abi::ProcInitInfo;
 
 // TODO: avoid pub
-pub struct Process {
-    pub arch: ArchContext,
-    pub memory_set: MemorySet,
+pub struct Thread {
+    pub context: Context,
     pub kstack: KernelStack,
+    pub proc: Arc<Mutex<Process>>,
+}
+
+pub struct Process {
+    pub memory_set: MemorySet,
     pub files: BTreeMap<usize, Arc<Mutex<File>>>, // FIXME: => Box<File>
     pub cwd: String,
 }
 
-impl Context for Process {
-    unsafe fn switch_to(&mut self, target: &mut Context) {
+/// Let `rcore_thread` can switch between our `Thread`
+impl rcore_thread::Context for Thread {
+    unsafe fn switch_to(&mut self, target: &mut rcore_thread::Context) {
         use core::mem::transmute;
-        let (target, _): (&mut Process, *const ()) = transmute(target);
-        self.arch.switch(&mut target.arch);
+        let (target, _): (&mut Thread, *const ()) = transmute(target);
+        self.context.switch(&mut target.context);
     }
 }
 
-impl Process {
-    pub unsafe fn new_init() -> Box<Context> {
-        Box::new(Process {
-            arch: ArchContext::null(),
-            memory_set: MemorySet::new(),
+impl Thread {
+    /// Make a struct for the init thread
+    pub unsafe fn new_init() -> Box<Thread> {
+        Box::new(Thread {
+            context: Context::null(),
             kstack: KernelStack::new(),
-            files: BTreeMap::default(),
-            cwd: String::new(),
+            proc: Arc::new(Mutex::new(Process {
+                memory_set: MemorySet::new(),
+                files: BTreeMap::default(),
+                cwd: String::new(),
+            })),
         })
     }
 
-    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+    /// Make a new kernel thread starting from `entry` with `arg`
+    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Thread> {
         let memory_set = MemorySet::new();
         let kstack = KernelStack::new();
-        Box::new(Process {
-            arch: unsafe { ArchContext::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
-            memory_set,
+        Box::new(Thread {
+            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
             kstack,
-            files: BTreeMap::default(),
-            cwd: String::new(),
+            proc: Arc::new(Mutex::new(Process {
+                memory_set,
+                files: BTreeMap::default(),
+                cwd: String::new(),
+            })),
         })
     }
 
-    /// Make a new user thread from ELF data
-    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Process>
+    /// Make a new user process from ELF `data`
+    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Thread>
         where Iter: Iterator<Item=&'a str>
     {
         // Parse elf
@@ -105,23 +115,25 @@ impl Process {
         files.insert(1, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
         files.insert(2, Arc::new(Mutex::new(File::new(crate::fs::STDOUT.clone(), false, true))));
 
-        Box::new(Process {
-            arch: unsafe {
-                ArchContext::new_user_thread(
+        Box::new(Thread {
+            context: unsafe {
+                Context::new_user_thread(
                     entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
             },
-            memory_set,
             kstack,
-            files,
-            cwd: String::new(),
+            proc: Arc::new(Mutex::new(Process {
+                memory_set,
+                files,
+                cwd: String::new(),
+            })),
         })
     }
 
-    /// Fork
-    pub fn fork(&self, tf: &TrapFrame) -> Box<Context> {
+    /// Fork a new process from current one
+    pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
         info!("COME into fork!");
         // Clone memory set, make a new page table
-        let memory_set = self.memory_set.clone();
+        let memory_set = self.proc.lock().memory_set.clone();
         info!("finish mmset clone in fork!");
 
         // MMU:   copy data to the new space
@@ -137,12 +149,14 @@ impl Process {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        Box::new(Process {
-            arch: unsafe { ArchContext::new_fork(tf, kstack.top(), memory_set.token()) },
-            memory_set,
+        Box::new(Thread {
+            context: unsafe { Context::new_fork(tf, kstack.top(), memory_set.token()) },
             kstack,
-            files: self.files.clone(),
-            cwd: String::new(),
+            proc: Arc::new(Mutex::new(Process {
+                memory_set,
+                files: self.proc.lock().files.clone(),
+                cwd: String::new(),
+            })),
         })
     }
 }

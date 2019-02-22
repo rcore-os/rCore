@@ -1,4 +1,4 @@
-//! Thread std-like interface
+//! `std::thread`-like interface
 //!
 //! Based on Processor. Used in kernel.
 //!
@@ -11,7 +11,7 @@ use core::marker::PhantomData;
 use core::time::Duration;
 use log::*;
 use crate::processor::*;
-use crate::process_manager::*;
+use crate::thread_pool::*;
 
 #[linkage = "weak"]
 #[no_mangle]
@@ -30,7 +30,7 @@ fn new_kernel_context(_entry: extern fn(usize) -> !, _arg: usize) -> Box<Context
 
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
-    Thread { pid: processor().pid() }
+    Thread { pid: processor().tid() }
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
@@ -160,7 +160,7 @@ impl<T> JoinHandle<T> {
         }
     }
     /// Force construct a JoinHandle struct
-    pub unsafe fn _of(pid: Pid) -> JoinHandle<T> {
+    pub unsafe fn _of(pid: Tid) -> JoinHandle<T> {
         JoinHandle {
             thread: Thread { pid },
             mark: PhantomData,

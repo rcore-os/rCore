@@ -1,0 +1,19 @@
+[package]
+name = "example"
+version = "0.1.0"
+authors = ["WangRunji <wangrunji0408@163.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+linked_list_allocator = "0.6"
+blog_os = { git = "https://github.com/phil-opp/blog_os.git" }
+rcore-thread = { path = ".." }
+
+[package.metadata.bootimage]
+default-target = "x86_64-blog_os.json"
+run-command = ["qemu-system-x86_64",
+    "-drive", "format=raw,file={}",
+    "-serial", "mon:stdio",
+    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04"
+]

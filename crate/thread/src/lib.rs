@@ -9,12 +9,12 @@
 
 extern crate alloc;
 
-mod process_manager;
+mod thread_pool;
 mod processor;
 pub mod scheduler;
-pub mod thread;
-mod event_hub;
+pub mod std_thread;
+mod timer;
 mod interrupt;
 
-pub use crate::process_manager::*;
+pub use crate::thread_pool::*;
 pub use crate::processor::Processor;

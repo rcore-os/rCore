@@ -1,3 +1,5 @@
+//! Enable and disable interrupt for each architecture.
+
 #[inline(always)]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn disable_and_store() -> usize {

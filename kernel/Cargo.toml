@@ -54,7 +54,7 @@ lazy_static = { version = "1.2", features = ["spin_no_std"] }
 smoltcp = { version = "0.5.0", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp"] }
 bit-allocator = { path = "../crate/bit-allocator" }
 rcore-memory = { path = "../crate/memory" }
-rcore-process = { path = "../crate/process" }
+rcore-thread = { path = "../crate/thread" }
 simple-filesystem = { git = "https://github.com/wangrunji0408/SimpleFileSystem-Rust" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

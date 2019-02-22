@@ -2,10 +2,10 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use log::*;
 use core::cell::UnsafeCell;
-use crate::process_manager::*;
+use crate::thread_pool::*;
 use crate::interrupt;
 
-/// Process executor
+/// Thread executor
 ///
 /// Per-CPU struct. Defined at global.
 /// Only accessed by associated CPU with interrupt disabled.
@@ -18,9 +18,9 @@ unsafe impl Sync for Processor {}
 
 struct ProcessorInner {
     id: usize,
-    proc: Option<(Pid, Box<Context>)>,
+    proc: Option<(Tid, Box<Context>)>,
     loop_context: Box<Context>,
-    manager: Arc<ProcessManager>,
+    manager: Arc<ThreadPool>,
 }
 
 impl Processor {
@@ -28,7 +28,7 @@ impl Processor {
         Processor { inner: UnsafeCell::new(None) }
     }
 
-    pub unsafe fn init(&self, id: usize, context: Box<Context>, manager: Arc<ProcessManager>) {
+    pub unsafe fn init(&self, id: usize, context: Box<Context>, manager: Arc<ThreadPool>) {
         *self.inner.get() = Some(ProcessorInner {
             id,
             proc: None,
@@ -76,7 +76,7 @@ impl Processor {
         }
     }
 
-    pub fn pid(&self) -> Pid {
+    pub fn tid(&self) -> Tid {
         self.inner().proc.as_ref().unwrap().0
     }
 
@@ -84,13 +84,13 @@ impl Processor {
         &*self.inner().proc.as_ref().unwrap().1
     }
 
-    pub fn manager(&self) -> &ProcessManager {
+    pub fn manager(&self) -> &ThreadPool {
         &*self.inner().manager
     }
 
     pub fn tick(&self) {
         let flags = unsafe { interrupt::disable_and_store() };
-        let need_reschedule = self.manager().tick(self.pid());
+        let need_reschedule = self.manager().tick(self.tid());
         unsafe { interrupt::restore(flags); }
 
         if need_reschedule {
