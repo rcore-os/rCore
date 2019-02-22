@@ -4,7 +4,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{slice, str};
 
 use bitflags::bitflags;
-use rcore_fs::vfs::{Metadata, FileType, FsError, INode};
+use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
 use spin::{Mutex, MutexGuard};
 
 use crate::arch::interrupt::TrapFrame;
@@ -14,10 +14,12 @@ use crate::thread;
 use crate::util;
 
 use self::fs::*;
+use self::mem::*;
 use self::proc::*;
 use self::time::*;
 
 mod fs;
+mod mem;
 mod proc;
 mod time;
 
@@ -33,9 +35,8 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         005 => sys_fstat(args[0], args[1] as *mut Stat),
 //        007 => sys_poll(),
 //        008 => sys_lseek(),
-//        009 => sys_mmap(),
-//        011 => sys_munmap(),
-//        013 => sys_sigaction(),
+        009 => sys_mmap(args[0], args[1], MmapProt::from_bits_truncate(args[2]), MmapFlags::from_bits_truncate(args[3]), args[4] as i32, args[5]),
+        011 => sys_munmap(args[0], args[1]),
 //        019 => sys_readv(),
 //        020 => sys_writev(),
 //        021 => sys_access(),
@@ -85,6 +86,22 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        293 => sys_pipe(),
 
         // for musl: empty impl
+        012 => {
+            warn!("sys_brk is unimplemented");
+            Ok(0)
+        }
+        013 => {
+            warn!("sys_sigaction is unimplemented");
+            Ok(0)
+        }
+        014 => {
+            warn!("sys_sigprocmask is unimplemented");
+            Ok(0)
+        }
+        131 => {
+            warn!("sys_sigaltstack is unimplemented");
+            Ok(0)
+        }
         158 => {
             warn!("sys_arch_prctl is unimplemented");
             Ok(0)
