@@ -2,7 +2,8 @@ use alloc::{boxed::Box, collections::VecDeque, string::String, sync::Arc, vec::V
 use core::any::Any;
 use core::ops::Deref;
 
-use simple_filesystem::*;
+use rcore_fs::vfs::*;
+use rcore_fs_sfs::SimpleFileSystem;
 
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
@@ -54,7 +55,7 @@ pub trait INodeExt {
 
 impl INodeExt for INode {
     fn read_as_vec(&self) -> Result<Vec<u8>> {
-        let size = self.info()?.size;
+        let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);
         unsafe { buf.set_len(size); }
         self.read_at(0, buf.as_mut_slice())?;

@@ -173,13 +173,16 @@ bitflags! {
     }
 }
 
-impl From<FileInfo> for Stat {
-    fn from(info: FileInfo) -> Self {
+impl From<Metadata> for Stat {
+    fn from(info: Metadata) -> Self {
         Stat {
             mode: match info.type_ {
                 FileType::File => StatMode::FILE,
                 FileType::Dir => StatMode::DIR,
-                // _ => StatMode::NULL,
+                FileType::SymLink => StatMode::LINK,
+                FileType::CharDevice => StatMode::CHAR,
+                FileType::BlockDevice => StatMode::BLOCK,
+                _ => StatMode::NULL,
                 //Note: we should mark FileType as #[non_exhaustive]
                 //      but it is currently not implemented for enum
                 //      see rust-lang/rust#44109

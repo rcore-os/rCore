@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
 use log::*;
-use simple_filesystem::INode;
+use rcore_fs::vfs::INode;
 use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 

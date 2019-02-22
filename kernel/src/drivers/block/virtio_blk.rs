@@ -14,7 +14,7 @@ use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
 use volatile::Volatile;
 
-use simple_filesystem::BlockedDevice;
+use rcore_fs::dev::BlockDevice;
 
 use crate::arch::cpu;
 use crate::memory::active_table;
@@ -115,9 +115,9 @@ impl Driver for VirtIOBlkDriver {
     }
 }
 
-impl BlockedDevice for VirtIOBlkDriver {
+impl BlockDevice for VirtIOBlkDriver {
     const BLOCK_SIZE_LOG2: u8 = 9; // 512
-    fn read_at(&mut self, block_id: usize, buf: &mut [u8]) -> bool {
+    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
         // ensure header page is mapped
         active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
@@ -140,7 +140,7 @@ impl BlockedDevice for VirtIOBlkDriver {
         }
     }
 
-    fn write_at(&mut self, block_id: usize, buf: &[u8]) -> bool {
+    fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {
         unimplemented!()
     }
 }

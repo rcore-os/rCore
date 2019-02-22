@@ -4,8 +4,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{slice, str};
 
 use bitflags::bitflags;
-use log::*;
-use simple_filesystem::{FileInfo, FileType, FsError, INode};
+use rcore_fs::vfs::{Metadata, FileType, FsError, INode};
 use spin::{Mutex, MutexGuard};
 
 use crate::arch::interrupt::TrapFrame;
@@ -110,6 +109,7 @@ pub type SysResult = Result<isize, SysError>;
 #[repr(isize)]
 #[derive(Debug)]
 pub enum SysError {
+    // TODO: Linux Error Code
     // ucore compatible error code
     // note that ucore_plus use another error code table, which is a modified version of the ones used in linux
     // name conversion E_XXXXX -> SysError::Xxxxx
@@ -124,6 +124,7 @@ pub enum SysError {
     Unimp = 20,// Not implemented
     Exists = 23,// File exists
     Notempty = 24,// Directory is not empty
+    Io = 5,// I/O Error
 
     #[allow(dead_code)]
     Unspcified = 1,// A really really unknown error.
@@ -144,6 +145,7 @@ impl From<FsError> for SysError {
             FsError::DirRemoved => SysError::Noent,
             FsError::DirNotEmpty => SysError::Notempty,
             FsError::WrongFs => SysError::Inval,
+            FsError::DeviceError => SysError::Io,
         }
     }
 }

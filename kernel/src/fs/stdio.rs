@@ -3,7 +3,7 @@
 use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc};
 use core::any::Any;
 
-use simple_filesystem::*;
+use rcore_fs::vfs::*;
 
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -49,10 +49,10 @@ lazy_static! {
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
-        fn info(&self) -> Result<FileInfo> { Err(FsError::NotSupported) }
+        fn metadata(&self) -> Result<Metadata> { Err(FsError::NotSupported) }
         fn sync(&self) -> Result<()> { Ok(()) }
         fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
-        fn create(&self, _name: &str, _type_: FileType) -> Result<Arc<INode>> { Err(FsError::NotDir) }
+        fn create(&self, _name: &str, _type_: FileType, _mode: u32) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn unlink(&self, _name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { Err(FsError::NotDir) }
         fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }

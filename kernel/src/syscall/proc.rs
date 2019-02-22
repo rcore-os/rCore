@@ -65,7 +65,7 @@ pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut T
     // Read program file
     let path = args[0].as_str();
     let inode = crate::fs::ROOT_INODE.lookup(path)?;
-    let size = inode.info()?.size;
+    let size = inode.metadata()?.size;
     let mut buf = Vec::with_capacity(size);
     unsafe { buf.set_len(size); }
     inode.read_at(0, buf.as_mut_slice())?;

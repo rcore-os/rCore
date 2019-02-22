@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc};
 
-use simple_filesystem::{FileInfo, INode, Result};
+use rcore_fs::vfs::{Metadata, INode, Result};
 
 #[derive(Clone)]
 pub struct File {
@@ -31,8 +31,8 @@ impl File {
         Ok(len)
     }
 
-    pub fn info(&self) -> Result<FileInfo> {
-        self.inode.info()
+    pub fn info(&self) -> Result<Metadata> {
+        self.inode.metadata()
     }
 
     pub fn get_entry(&self, id: usize) -> Result<String> {
