@@ -1,10 +1,13 @@
 //! memory set, area
 //! and the inactive page table
 
-use alloc::{vec::Vec, boxed::Box};
+use alloc::{boxed::Box, vec::Vec, string::String};
 use core::fmt::{Debug, Error, Formatter};
-use super::*;
+
 use crate::paging::*;
+
+use super::*;
+
 use self::handler::MemoryHandler;
 
 pub mod handler;
@@ -41,6 +44,40 @@ impl MemoryArea {
     */
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
+    }
+    /// Check the pointer is within the readable memory
+    pub fn check_ptr<T>(&self, ptr: *const T) -> bool {
+        self.check_array(ptr, 1)
+    }
+    /// Check the pointer is within the writable memory
+    pub fn check_mut_ptr<T>(&self, ptr: *mut T) -> bool {
+        self.check_mut_array(ptr, 1)
+    }
+    /// Check the array is within the readable memory
+    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> bool {
+        // FIXME: check readable
+        ptr as usize >= self.start_addr &&
+            unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
+    }
+    /// Check the array is within the writable memory
+    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> bool {
+        // FIXME: check writable
+        ptr as usize >= self.start_addr &&
+            unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
+    }
+    /// Check the null-end C string is within the readable memory, and is valid.
+    /// If so, clone it to a String.
+    ///
+    /// Unsafe: the page table must be active.
+    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> Option<String> {
+        if ptr as usize >= self.end_addr {
+            return None;
+        }
+        let max_len = self.end_addr - ptr as usize;
+        (0..max_len)
+            .find(|&i| ptr.offset(i as isize).read() == 0)
+            .and_then(|len| core::str::from_utf8(core::slice::from_raw_parts(ptr, len)).ok())
+            .map(|s| String::from(s))
     }
     /*
     **  @brief  test whether the memory area is overlap with another memory area
@@ -158,13 +195,30 @@ impl<T: InactivePageTable> MemorySet<T> {
             page_table: T::new_bare(),
         }
     }
-    /*
-    **  @brief  find the memory area from virtual address
-    **  @param  addr: VirtAddr       the virtual address to find
-    **  @retval Option<&MemoryArea>  the memory area with the virtual address, if presented
-    */
-    pub fn find_area(&self, addr: VirtAddr) -> Option<&MemoryArea> {
-        self.areas.iter().find(|area| area.contains(addr))
+    /// Check the pointer is within the readable memory
+    pub fn check_ptr<S>(&self, ptr: *const S) -> bool {
+        self.areas.iter().find(|area| area.check_ptr(ptr)).is_some()
+    }
+    /// Check the pointer is within the writable memory
+    pub fn check_mut_ptr<S>(&self, ptr: *mut S) -> bool {
+        self.areas.iter().find(|area| area.check_mut_ptr(ptr)).is_some()
+    }
+    /// Check the array is within the readable memory
+    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> bool {
+        self.areas.iter().find(|area| area.check_array(ptr, count)).is_some()
+    }
+    /// Check the array is within the writable memory
+    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> bool {
+        self.areas.iter().find(|area| area.check_mut_array(ptr, count)).is_some()
+    }
+    /// Check the null-end C string is within the readable memory, and is valid.
+    /// If so, clone it to a String.
+    ///
+    /// Unsafe: the page table must be active.
+    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> Option<String> {
+        self.areas.iter()
+            .filter_map(|area| area.check_and_clone_cstr(ptr))
+            .next()
     }
     /*
     **  @brief  add the memory area to the memory set

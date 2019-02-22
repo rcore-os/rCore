@@ -3,39 +3,44 @@
 use super::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
-    // TODO: check ptr
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
-    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let mut proc = process();
+    if !proc.memory_set.check_mut_array(base, len) {
+        return Err(SysError::Inval);
+    }
+    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = get_file(&mut proc, fd)?.read(slice)?;
     Ok(len as isize)
 }
 
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
-    // TODO: check ptr
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
-    let slice = unsafe { slice::from_raw_parts(base, len) };
     let mut proc = process();
+    if !proc.memory_set.check_array(base, len) {
+        return Err(SysError::Inval);
+    }
+    let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = get_file(&mut proc, fd)?.write(slice)?;
     Ok(len as isize)
 }
 
 pub fn sys_open(path: *const u8, flags: usize) -> SysResult {
-    // TODO: check ptr
-    let path = unsafe { util::from_cstr(path) };
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::Inval)?;
     let flags = VfsFlags::from_ucore_flags(flags);
     info!("open: path: {:?}, flags: {:?}", path, flags);
-    let (fd, inode) = match path {
+    let (fd, inode) = match path.as_str() {
         "stdin:" => (0, crate::fs::STDIN.clone() as Arc<INode>),
         "stdout:" => (1, crate::fs::STDOUT.clone() as Arc<INode>),
         _ => {
-            let fd = (3..).find(|i| !process().files.contains_key(i)).unwrap();
-            let inode = crate::fs::ROOT_INODE.lookup(path)?;
+            let fd = (3..).find(|i| !proc.files.contains_key(i)).unwrap();
+            let inode = crate::fs::ROOT_INODE.lookup(path.as_str())?;
             (fd, inode)
         }
     };
     let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
-    process().files.insert(fd, file);
+    proc.files.insert(fd, file);
     Ok(fd as isize)
 }
 
@@ -48,9 +53,11 @@ pub fn sys_close(fd: usize) -> SysResult {
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
-    // TODO: check ptr
     info!("fstat: {}", fd);
     let mut proc = process();
+    if !proc.memory_set.check_mut_ptr(stat_ptr) {
+        return Err(SysError::Inval);
+    }
     let file = get_file(&mut proc, fd)?;
     let stat = Stat::from(file.info()?);
     unsafe { stat_ptr.write(stat); }
@@ -61,9 +68,11 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 /// dentry.name = entry_name
 /// dentry.offset += 256
 pub fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
-    // TODO: check ptr
     info!("getdirentry: {}", fd);
     let mut proc = process();
+    if !proc.memory_set.check_mut_ptr(dentry_ptr) {
+        return Err(SysError::Inval);
+    }
     let file = get_file(&mut proc, fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
