@@ -11,6 +11,10 @@
 // just keep it ...
 #[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 pub use crate::process::{processor, new_kernel_context};
 use rcore_thread::std_thread as thread;
