@@ -6,18 +6,15 @@ use rcore_fs::dev::*;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
 
-#[cfg(not(target_arch = "x86_64"))]
 pub struct MemBuf(RwLock<&'static mut [u8]>);
 
-#[cfg(not(target_arch = "x86_64"))]
 impl MemBuf {
-    unsafe fn new(begin: unsafe extern fn(), end: unsafe extern fn()) -> Self {
+    pub unsafe fn new(begin: unsafe extern fn(), end: unsafe extern fn()) -> Self {
         use core::slice;
         MemBuf(RwLock::new(slice::from_raw_parts_mut(begin as *mut u8, end as usize - begin as usize)))
     }
 }
 
-#[cfg(not(target_arch = "x86_64"))]
 impl Device for MemBuf {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Option<usize> {
         let slice = self.0.read();

@@ -42,7 +42,7 @@ debug = true
 
 [dependencies]
 log = "0.4"
-spin = "0.4"
+spin = "0.5"
 once = "0.3"
 xmas-elf = "0.6"
 bitflags = "1.0"
@@ -64,7 +64,7 @@ apic = { git = "https://github.com/wangrunji0408/APIC-Rust" }
 x86_64 = "0.4"
 raw-cpuid = "6.0"
 uart_16550 = "0.1"
-pc-keyboard = "0.3"
+pc-keyboard = "0.5"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
 riscv = { git = "https://github.com/riscv-and-rust-and-decaf/riscv" }
