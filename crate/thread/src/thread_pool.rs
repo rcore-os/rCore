@@ -37,15 +37,15 @@ pub trait Context {
 
 pub struct ThreadPool {
     threads: Vec<Mutex<Option<Thread>>>,
-    scheduler: Mutex<Box<Scheduler>>,
+    scheduler: Box<Scheduler>,
     timer: Mutex<Timer<Event>>,
 }
 
 impl ThreadPool {
-    pub fn new(scheduler: Box<Scheduler>, max_proc_num: usize) -> Self {
+    pub fn new(scheduler: impl Scheduler, max_proc_num: usize) -> Self {
         ThreadPool {
             threads: new_vec_default(max_proc_num),
-            scheduler: Mutex::new(scheduler),
+            scheduler: Box::new(scheduler),
             timer: Mutex::new(Timer::new()),
         }
     }
@@ -69,7 +69,7 @@ impl ThreadPool {
             parent,
             children: Vec::new(),
         });
-        self.scheduler.lock().insert(tid);
+        self.scheduler.push(tid);
         self.threads[parent].lock().as_mut().expect("invalid parent proc")
             .children.push(tid);
         tid
@@ -89,24 +89,22 @@ impl ThreadPool {
             }
         }
         match tid {
-            Some(tid) => self.scheduler.lock().tick(tid),
+            Some(tid) => self.scheduler.tick(tid),
             None => false,
         }
     }
 
     /// Set the priority of process `tid`
     pub fn set_priority(&self, tid: Tid, priority: u8) {
-        self.scheduler.lock().set_priority(tid, priority);
+        self.scheduler.set_priority(tid, priority);
     }
 
     /// Called by Processor to get a process to run.
     /// The manager first mark it `Running`,
     /// then take out and return its Context.
     pub(crate) fn run(&self, cpu_id: usize) -> Option<(Tid, Box<Context>)> {
-        let mut scheduler = self.scheduler.lock();
-        scheduler.select()
+        self.scheduler.pop()
             .map(|tid| {
-                scheduler.remove(tid);
                 let mut proc_lock = self.threads[tid].lock();
                 let mut proc = proc_lock.as_mut().expect("process not exist");
                 proc.status = Status::Running(cpu_id);
@@ -123,7 +121,7 @@ impl ThreadPool {
         proc.status_after_stop = Status::Ready;
         proc.context = Some(context);
         match proc.status {
-            Status::Ready => self.scheduler.lock().insert(tid),
+            Status::Ready => self.scheduler.push(tid),
             Status::Exited(_) => self.exit_handler(tid, proc),
             _ => {}
         }
@@ -137,10 +135,10 @@ impl ThreadPool {
         trace!("process {} {:?} -> {:?}", tid, proc.status, status);
         match (&proc.status, &status) {
             (Status::Ready, Status::Ready) => return,
-            (Status::Ready, _) => self.scheduler.lock().remove(tid),
+            (Status::Ready, _) => self.scheduler.remove(tid),
             (Status::Exited(_), _) => panic!("can not set status for a exited process"),
             (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
-            (_, Status::Ready) => self.scheduler.lock().insert(tid),
+            (_, Status::Ready) => self.scheduler.push(tid),
             _ => {}
         }
         match proc.status {

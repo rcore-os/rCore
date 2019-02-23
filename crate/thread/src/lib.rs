@@ -2,7 +2,6 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(linkage)]
-#![feature(nll)]
 #![feature(vec_resize_default)]
 #![feature(asm)]
 #![feature(exact_size_is_empty)]
