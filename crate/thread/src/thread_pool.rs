@@ -78,15 +78,20 @@ impl ThreadPool {
     /// Make process `tid` time slice -= 1.
     /// Return true if time slice == 0.
     /// Called by timer interrupt handler.
-    pub fn tick(&self, tid: Tid) -> bool {
-        let mut timer = self.timer.lock();
-        timer.tick();
-        while let Some(event) = timer.pop() {
-            match event {
-                Event::Wakeup(tid) => self.set_status(tid, Status::Ready),
+    pub(crate) fn tick(&self, cpu_id: usize, tid: Option<Tid>) -> bool {
+        if cpu_id == 0 {
+            let mut timer = self.timer.lock();
+            timer.tick();
+            while let Some(event) = timer.pop() {
+                match event {
+                    Event::Wakeup(tid) => self.set_status(tid, Status::Ready),
+                }
             }
         }
-        self.scheduler.lock().tick(tid)
+        match tid {
+            Some(tid) => self.scheduler.lock().tick(tid),
+            None => false,
+        }
     }
 
     /// Set the priority of process `tid`
@@ -97,20 +102,21 @@ impl ThreadPool {
     /// Called by Processor to get a process to run.
     /// The manager first mark it `Running`,
     /// then take out and return its Context.
-    pub fn run(&self, cpu_id: usize) -> (Tid, Box<Context>) {
+    pub(crate) fn run(&self, cpu_id: usize) -> Option<(Tid, Box<Context>)> {
         let mut scheduler = self.scheduler.lock();
-        let tid = scheduler.select()
-            .expect("failed to select a runnable process");
-        scheduler.remove(tid);
-        let mut proc_lock = self.threads[tid].lock();
-        let mut proc = proc_lock.as_mut().expect("process not exist");
-        proc.status = Status::Running(cpu_id);
-        (tid, proc.context.take().expect("context not exist"))
+        scheduler.select()
+            .map(|tid| {
+                scheduler.remove(tid);
+                let mut proc_lock = self.threads[tid].lock();
+                let mut proc = proc_lock.as_mut().expect("process not exist");
+                proc.status = Status::Running(cpu_id);
+                (tid, proc.context.take().expect("context not exist"))
+            })
     }
 
     /// Called by Processor to finish running a process
     /// and give its context back.
-    pub fn stop(&self, tid: Tid, context: Box<Context>) {
+    pub(crate) fn stop(&self, tid: Tid, context: Box<Context>) {
         let mut proc_lock = self.threads[tid].lock();
         let mut proc = proc_lock.as_mut().expect("process not exist");
         proc.status = proc.status_after_stop.clone();

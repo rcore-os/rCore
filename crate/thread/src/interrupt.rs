@@ -17,6 +17,12 @@ pub unsafe fn restore(flags: usize) {
 }
 
 #[inline(always)]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn enable_and_wfi() {
+    asm!("sti; hlt" :::: "volatile");
+}
+
+#[inline(always)]
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub unsafe fn disable_and_store() -> usize {
     if env!("M_MODE") == "1" {
@@ -41,6 +47,16 @@ pub unsafe fn restore(flags: usize) {
 }
 
 #[inline(always)]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+pub unsafe fn enable_and_wfi() {
+    if env!("M_MODE") == "1" {
+        asm!("csrsi mstatus, 1 << 3; wfi" :::: "volatile");
+    } else {
+        asm!("csrsi sstatus, 1 << 1; wfi" :::: "volatile");
+    }
+}
+
+#[inline(always)]
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn disable_and_store() -> usize {
     let daif: u32;
@@ -52,4 +68,10 @@ pub unsafe fn disable_and_store() -> usize {
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn restore(flags: usize) {
     asm!("msr DAIF, $0" :: "r"(flags as u32) :: "volatile");
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn enable_and_wfi() {
+    asm!("msr daifclr, #2; wfi" :::: "volatile");
 }

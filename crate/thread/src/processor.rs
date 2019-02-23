@@ -53,20 +53,28 @@ impl Processor {
         let inner = self.inner();
         unsafe { interrupt::disable_and_store(); }
         loop {
-            let proc = inner.manager.run(inner.id);
-            trace!("CPU{} begin running process {}", inner.id, proc.0);
-            inner.proc = Some(proc);
-            unsafe {
-                inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
+            if let Some(proc) = inner.manager.run(inner.id) {
+                trace!("CPU{} begin running thread {}", inner.id, proc.0);
+                inner.proc = Some(proc);
+                unsafe {
+                    inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
+                }
+                let (pid, context) = inner.proc.take().unwrap();
+                trace!("CPU{} stop running thread {}", inner.id, pid);
+                inner.manager.stop(pid, context);
+            } else {
+                trace!("CPU{} idle", inner.id);
+                unsafe { interrupt::enable_and_wfi(); }
+                // wait for a timer interrupt
+                unsafe { interrupt::disable_and_store(); }
             }
-            let (pid, context) = inner.proc.take().unwrap();
-            trace!("CPU{} stop running process {}", inner.id, pid);
-            inner.manager.stop(pid, context);
         }
     }
 
     /// Called by process running on this Processor.
     /// Yield and reschedule.
+    ///
+    /// The interrupt may be enabled.
     pub fn yield_now(&self) {
         let inner = self.inner();
         unsafe {
@@ -88,11 +96,14 @@ impl Processor {
         &*self.inner().manager
     }
 
+    /// Called by timer interrupt handler.
+    ///
+    /// The interrupt should be disabled in the handler.
     pub fn tick(&self) {
-        let flags = unsafe { interrupt::disable_and_store() };
-        let need_reschedule = self.manager().tick(self.tid());
-        unsafe { interrupt::restore(flags); }
-
+        // If I'm idle, tid == None, need_reschedule == false.
+        // Will go back to `run()` after interrupt return.
+        let tid = self.inner().proc.as_ref().map(|p| p.0);
+        let need_reschedule = self.manager().tick(self.inner().id, tid);
         if need_reschedule {
             self.yield_now();
         }
