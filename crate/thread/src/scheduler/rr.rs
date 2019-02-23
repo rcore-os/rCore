@@ -21,9 +21,6 @@ impl Scheduler for RRScheduler {
     fn push(&self, pid: usize) {
         self.inner.lock().push(pid);
     }
-    fn remove(&self, pid: usize) {
-        self.inner.lock().remove(pid);
-    }
     fn pop(&self) -> Option<usize> {
         self.inner.lock().pop()
     }
@@ -57,14 +54,6 @@ impl RRSchedulerInner {
         }
         self._list_add_before(pid, 0);
         trace!("rr push {}", pid - 1);
-    }
-
-    fn remove(&mut self, pid: Pid) {
-        let pid = pid + 1;
-        assert!(self.infos[pid].present);
-        self.infos[pid].present = false;
-        self._list_remove(pid);
-        trace!("rr remove {}", pid - 1);
     }
 
     fn pop(&mut self) -> Option<Pid> {

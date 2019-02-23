@@ -135,7 +135,7 @@ impl ThreadPool {
         trace!("process {} {:?} -> {:?}", tid, proc.status, status);
         match (&proc.status, &status) {
             (Status::Ready, Status::Ready) => return,
-            (Status::Ready, _) => self.scheduler.remove(tid),
+            (Status::Ready, _) => panic!("can not remove a process from ready queue"),
             (Status::Exited(_), _) => panic!("can not set status for a exited process"),
             (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
             (_, Status::Ready) => self.scheduler.push(tid),

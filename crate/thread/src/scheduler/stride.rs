@@ -38,9 +38,6 @@ impl Scheduler for StrideScheduler {
     fn push(&self, pid: usize) {
         self.inner.lock().push(pid);
     }
-    fn remove(&self, pid: usize) {
-        self.inner.lock().remove(pid);
-    }
     fn pop(&self) -> Option<usize> {
         self.inner.lock().pop()
     }
@@ -74,24 +71,6 @@ impl StrideSchedulerInner {
         }
         self.queue.push((-info.stride, pid));
         trace!("stride push {}", pid);
-    }
-
-    fn remove(&mut self, pid: Pid) {
-        let info = &mut self.infos[pid];
-        assert!(info.present);
-        info.present = false;
-        if self.queue.peek().is_some() && self.queue.peek().unwrap().1 == pid {
-            self.queue.pop();
-        } else {
-            // BinaryHeap only support pop the top.
-            // So in order to remove an arbitrary element,
-            // we have to take all elements into a Vec,
-            // then push the rest back.
-            let rest: Vec<_> = self.queue.drain().filter(|&p| p.1 != pid).collect();
-            use core::iter::FromIterator;
-            self.queue = BinaryHeap::from_iter(rest.into_iter());
-        }
-        trace!("stride remove {}", pid);
     }
 
     fn pop(&mut self) -> Option<Pid> {

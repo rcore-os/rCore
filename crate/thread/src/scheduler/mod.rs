@@ -15,8 +15,6 @@ type Pid = usize;
 pub trait Scheduler: Sync + 'static {
     /// Push a thread to the back of ready queue.
     fn push(&self, pid: Pid);
-    /// Remove a thread from the ready queue.
-    fn remove(&self, pid: Pid);
     /// Select a thread to run, pop it from the queue.
     fn pop(&self) -> Option<Pid>;
     /// Got a tick from CPU.
