@@ -5,18 +5,20 @@ use spin::Mutex;
 
 pub use self::rr::RRScheduler;
 pub use self::stride::StrideScheduler;
+pub use self::work_stealing::WorkStealingScheduler;
 
 mod rr;
 mod stride;
+mod work_stealing;
 
 type Pid = usize;
 
 /// The scheduler for a ThreadPool
-pub trait Scheduler: Sync + 'static {
+pub trait Scheduler: 'static {
     /// Push a thread to the back of ready queue.
     fn push(&self, pid: Pid);
     /// Select a thread to run, pop it from the queue.
-    fn pop(&self) -> Option<Pid>;
+    fn pop(&self, cpu_id: usize) -> Option<Pid>;
     /// Got a tick from CPU.
     /// Return true if need reschedule.
     fn tick(&self, current_pid: Pid) -> bool;

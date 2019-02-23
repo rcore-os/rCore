@@ -21,7 +21,7 @@ impl Scheduler for RRScheduler {
     fn push(&self, pid: usize) {
         self.inner.lock().push(pid);
     }
-    fn pop(&self) -> Option<usize> {
+    fn pop(&self, _cpu_id: usize) -> Option<usize> {
         self.inner.lock().pop()
     }
     fn tick(&self, current_pid: usize) -> bool {
