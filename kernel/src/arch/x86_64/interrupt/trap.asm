@@ -20,6 +20,14 @@ __alltraps:
     push r14
     push r15
 
+    # push fs.base
+    xor rax, rax
+    mov ecx, 0xC0000100
+    rdmsr # msr[ecx] => edx:eax
+    shl rdx, 32
+    or rdx, rax
+    push rdx
+
     mov rdi, rsp
     call rust_trap
 
@@ -28,6 +36,13 @@ trap_ret:
 
     mov rdi, rsp
     call set_return_rsp
+
+    # pop fs.base
+    pop rax
+    mov rdx, rax
+    shr rdx, 32
+    mov ecx, 0xC0000100
+    wrmsr # msr[ecx] <= edx:eax
 
     pop r15
     pop r14

@@ -2,6 +2,8 @@
 #[repr(C)]
 pub struct TrapFrame {
     // Pushed by __alltraps at 'trap.asm'
+    pub fsbase: usize,
+
     pub r15: usize,
     pub r14: usize,
     pub r13: usize,
