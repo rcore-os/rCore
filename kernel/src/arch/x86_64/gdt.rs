@@ -1,71 +1,67 @@
 use alloc::boxed::Box;
-use crate::consts::MAX_CPU_NUM;
-use spin::{Mutex, MutexGuard, Once};
+
 use x86_64::{PrivilegeLevel, VirtAddr};
 use x86_64::structures::gdt::*;
 use x86_64::structures::tss::TaskStateSegment;
-use log::*;
 
-/// Alloc TSS & GDT at kernel heap, then init and load it.
-/// The double fault stack will be allocated at kernel heap too.
+use crate::consts::MAX_CPU_NUM;
+
+/// Init TSS & GDT.
 pub fn init() {
-    use x86_64::instructions::segmentation::set_cs;
-    use x86_64::instructions::tables::load_tss;
-
-    let double_fault_stack_top = Box::into_raw(Box::new([0u8; 4096])) as usize + 4096;
-    debug!("Double fault stack top @ {:#x}", double_fault_stack_top);
-
-    let tss = Box::new({
-        let mut tss = TaskStateSegment::new();
-
-        // 设置 Double Fault 时，自动切换栈的地址
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX]
-            = VirtAddr::new(double_fault_stack_top as u64);
-
-        tss
-    });
-    let tss = Box::into_raw(tss);
-
-    let gdt = Box::new({
-        let mut gdt = GlobalDescriptorTable::new();
-        gdt.add_entry(KCODE);
-        gdt.add_entry(UCODE);
-        // KDATA use segment 0
-        // gdt.add_entry(KDATA);
-        gdt.add_entry(UDATA);
-        gdt.add_entry(UCODE32);
-        gdt.add_entry(UDATA32);
-        gdt.add_entry(Descriptor::tss_segment(unsafe { &*tss }));
-        gdt
-    });
-    let gdt = unsafe{ &*Box::into_raw(gdt) };
-    gdt.load();
-
     unsafe {
+        CPUS[super::cpu::id()] = Some(Cpu::new());
+        CPUS[super::cpu::id()].as_mut().unwrap().init();
+    }
+}
+
+static mut CPUS: [Option<Cpu>; MAX_CPU_NUM] = [
+    // TODO: More elegant ?
+    None, None, None, None,
+    None, None, None, None,
+];
+
+pub struct Cpu {
+    gdt: GlobalDescriptorTable,
+    tss: TaskStateSegment,
+    double_fault_stack: [u8; 0x100],
+}
+
+impl Cpu {
+    pub fn current() -> &'static mut Self {
+        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
+    }
+
+    fn new() -> Self {
+        Cpu {
+            gdt: GlobalDescriptorTable::new(),
+            tss: TaskStateSegment::new(),
+            double_fault_stack: [0u8; 0x100],
+        }
+    }
+
+    unsafe fn init(&'static mut self) {
+        use x86_64::instructions::segmentation::set_cs;
+        use x86_64::instructions::tables::load_tss;
+
+        // Set the stack when DoubleFault occurs
+        let stack_top = VirtAddr::new(self.double_fault_stack.as_ptr() as u64 + 0x100);
+        self.tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = stack_top;
+
+        // GDT
+        self.gdt.add_entry(KCODE);
+        self.gdt.add_entry(UCODE);
+        // KDATA use segment 0
+        // self.gdt.add_entry(KDATA);
+        self.gdt.add_entry(UDATA);
+        self.gdt.add_entry(UCODE32);
+        self.gdt.add_entry(UDATA32);
+        self.gdt.add_entry(Descriptor::tss_segment(&self.tss));
+        self.gdt.load();
+
         // reload code segment register
         set_cs(KCODE_SELECTOR);
         // load TSS
         load_tss(TSS_SELECTOR);
-    }
-
-    CPUS[super::cpu::id() as usize].call_once(||
-        Mutex::new(Cpu { gdt, tss: unsafe { &mut *tss } }));
-}
-
-static CPUS: [Once<Mutex<Cpu>>; MAX_CPU_NUM] = [
-    // TODO: More elegant ?
-    Once::new(), Once::new(), Once::new(), Once::new(),
-    Once::new(), Once::new(), Once::new(), Once::new(),
-];
-
-pub struct Cpu {
-    gdt: &'static GlobalDescriptorTable,
-    tss: &'static mut TaskStateSegment,
-}
-
-impl Cpu {
-    pub fn current() -> MutexGuard<'static, Cpu> {
-        CPUS[super::cpu::id()].r#try().unwrap().lock()
     }
 
     /// 设置从Ring3跳到Ring0时，自动切换栈的地址
