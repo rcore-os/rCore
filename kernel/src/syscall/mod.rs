@@ -17,11 +17,13 @@ use self::fs::*;
 use self::mem::*;
 use self::proc::*;
 use self::time::*;
+use self::ctrl::*;
 
 mod fs;
 mod mem;
 mod proc;
 mod time;
+mod ctrl;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
@@ -102,10 +104,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
-        158 => {
-            warn!("sys_arch_prctl is unimplemented");
-            Ok(0)
-        }
+        158 => sys_arch_prctl(args[0] as i32, args[1], tf),
         218 => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(0)
