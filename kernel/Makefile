@@ -61,6 +61,8 @@ endif
 ### qemu options ###
 qemu_opts := \
 	-smp cores=$(smp)
+qemu_net_opts := \
+	-netdev type=tap,id=net0,script=no,downscript=no
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -68,6 +70,8 @@ qemu_opts += \
 	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
 	-serial mon:stdio \
 	-device isa-debug-exit
+qemu_net_opts += \
+	-device virtio-net-pci,netdev=net0
 
 else ifeq ($(arch), riscv32)
 qemu_opts += \
@@ -75,6 +79,9 @@ qemu_opts += \
 	-kernel $(bin) \
 	-drive file=$(SFSIMG),format=raw,id=sfs \
 	-device virtio-blk-device,drive=sfs
+qemu_net_opts += \
+	-device virtio-net-device,netdev=net0
+
 ifdef m_mode
 qemu_opts += -cpu rv32imacu-nommu
 endif
@@ -85,6 +92,9 @@ qemu_opts += \
 	-kernel $(bin) \
 	-drive file=$(SFSIMG),format=raw,id=sfs \
 	-device virtio-blk-device,drive=sfs
+qemu_net_opts += \
+	-device virtio-net-device,netdev=net0
+
 ifdef m_mode
 qemu_opts += -cpu rv64imacu-nommu
 endif
@@ -182,9 +192,7 @@ justrun:
 	@qemu-system-$(arch) $(qemu_opts)
 
 justrunnet: build
-	@sudo qemu-system-$(arch) $(qemu_opts) \
-		-netdev type=tap,id=net0,script=no,downscript=no \
-		-device virtio-net-device,netdev=net0 \
+	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
 
 justrunui: build
 	@qemu-system-$(arch) $(qemu_opts) \

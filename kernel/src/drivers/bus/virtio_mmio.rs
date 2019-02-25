@@ -208,7 +208,8 @@ impl VirtIOVirtqueue {
         let mut output = Vec::new();
         loop {
             let flags = VirtIOVirtqueueFlag::from_bits_truncate(desc[cur].flags.read());
-            let buffer = unsafe { slice::from_raw_parts(desc[cur].addr.read() as *const u8, desc[cur].len.read() as usize) };
+            let addr = desc[cur].addr.read() as u64 - MEMORY_OFFSET as u64 + KERNEL_OFFSET as u64;
+            let buffer = unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
             if flags.contains(VirtIOVirtqueueFlag::WRITE) {
                 input.push(buffer);
             } else {

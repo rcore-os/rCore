@@ -168,9 +168,8 @@ impl phy::TxToken for VirtIONetTxToken {
                 unsafe { slice::from_raw_parts_mut(page as *mut u8, PAGE_SIZE) }
             }
         };
-        let output_buffer = &mut output[size_of::<VirtIONetHeader>()..(size_of::<VirtIONetHeader>() +len)];
+        let output_buffer = &mut output[size_of::<VirtIONetHeader>()..(size_of::<VirtIONetHeader>() + len)];
         let result = f(output_buffer);
-        println!("output {:?}", output_buffer);
 
         let mut driver = (self.0).0.lock();
         assert!(driver.queues[VIRTIO_QUEUE_TRANSMIT].add_and_notify(&[], &[output], 0));

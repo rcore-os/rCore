@@ -43,6 +43,8 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     driver::init();
 
+    crate::drivers::init();
+
     crate::process::init();
 
     AP_CAN_INIT.store(true, Ordering::Relaxed);

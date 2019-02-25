@@ -54,6 +54,12 @@ lazy_static! {
     pub static ref NET_DRIVERS: SpinNoIrqLock<Vec<Box<NetDriver>>> = SpinNoIrqLock::new(Vec::new());
 }
 
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn init(dtb: usize) {
     device_tree::init(dtb);
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn init() {
+    bus::pci::init();
 }
