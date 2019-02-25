@@ -165,7 +165,7 @@ impl VirtIOVirtqueue {
         // write barrier
         fence(Ordering::SeqCst);
 
-        self.avail_idx += 1;
+        self.avail_idx = self.avail_idx.wrapping_add(1);
         avail.idx.write(self.avail_idx);
         self.desc_state[head] = user_data;
         return true;
@@ -227,7 +227,7 @@ impl VirtIOVirtqueue {
         }
 
         self.free_head = index;
-        self.last_used_idx += 1;
+        self.last_used_idx = self.last_used_idx.wrapping_add(1);
 
         Some((input, output, len as usize, user_data))
     }
