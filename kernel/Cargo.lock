@@ -104,6 +104,11 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "deque"
+version = "0.3.2"
+source = "git+https://github.com/wangrunji0408/deque.git?branch=no_std#907d03935b9badde1902d9c84d138872f34c6763"
+
+[[package]]
 name = "device_tree"
 version = "1.0.3"
 source = "git+https://github.com/jiegec/device_tree-rs#1bd9b4df529a6ef8cc49006fe0c96c92c17c894d"
@@ -296,8 +301,9 @@ dependencies = [
 name = "rcore-thread"
 version = "0.1.0"
 dependencies = [
+ "deque 0.3.2 (git+https://github.com/wangrunji0408/deque.git?branch=no_std)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -511,6 +517,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a019b10a2a7cdeb292db131fc8113e57ea2a908f6e7894b0c3c671893b65dbeb"
 "checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
+"checksum deque 0.3.2 (git+https://github.com/wangrunji0408/deque.git?branch=no_std)" = "<none>"
 "checksum device_tree 1.0.3 (git+https://github.com/jiegec/device_tree-rs)" = "<none>"
 "checksum fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "7c6c16d316ccdac21a4dd648e314e76facbbaf316e83ca137d0857a9c07419d0"
 "checksum fuchsia-cprng 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "81f7f8eb465745ea9b02e2704612a9946a59fa40572086c6fd49d6ddcf30bf31"

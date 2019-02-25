@@ -7,7 +7,7 @@ use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::fs::File;
+use crate::fs::{FileHandle, OpenOptions};
 
 use super::abi::ProcInitInfo;
 
@@ -20,7 +20,7 @@ pub struct Thread {
 
 pub struct Process {
     pub memory_set: MemorySet,
-    pub files: BTreeMap<usize, File>,
+    pub files: BTreeMap<usize, FileHandle>,
     pub cwd: String,
 }
 
@@ -112,9 +112,9 @@ impl Thread {
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
-        files.insert(0, File::new(crate::fs::STDIN.clone(), true, false));
-        files.insert(1, File::new(crate::fs::STDOUT.clone(), false, true));
-        files.insert(2, File::new(crate::fs::STDOUT.clone(), false, true));
+        files.insert(0, FileHandle::new(crate::fs::STDIN.clone(), OpenOptions { read: true, write: false, append: false }));
+        files.insert(1, FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false }));
+        files.insert(2, FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false }));
 
         Box::new(Thread {
             context: unsafe {

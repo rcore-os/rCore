@@ -10,7 +10,7 @@ use crate::arch::driver::ide;
 use crate::drivers::{self, AsAny};
 use crate::drivers::block::virtio_blk::VirtIOBlkDriver;
 
-pub use self::file::File;
+pub use self::file::*;
 pub use self::stdio::{STDIN, STDOUT};
 
 mod file;

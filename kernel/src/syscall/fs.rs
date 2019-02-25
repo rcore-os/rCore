@@ -2,6 +2,8 @@
 
 use super::*;
 
+use crate::fs::{ROOT_INODE, OpenOptions};
+
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
@@ -24,22 +26,44 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     Ok(len as isize)
 }
 
-pub fn sys_open(path: *const u8, flags: usize) -> SysResult {
+pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
         .ok_or(SysError::Inval)?;
-    let flags = VfsFlags::from_ucore_flags(flags);
-    info!("open: path: {:?}, flags: {:?}", path, flags);
-    let (fd, inode) = match path.as_str() {
-        "stdin:" => (0, crate::fs::STDIN.clone() as Arc<INode>),
-        "stdout:" => (1, crate::fs::STDOUT.clone() as Arc<INode>),
-        _ => {
-            let fd = (3..).find(|i| !proc.files.contains_key(i)).unwrap();
-            let inode = crate::fs::ROOT_INODE.lookup(path.as_str())?;
-            (fd, inode)
+    let flags = OpenFlags::from_bits_truncate(flags);
+    info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
+
+    let inode =
+    if flags.contains(OpenFlags::CREATE) {
+        // FIXME: assume path start from root now
+        let mut split = path.as_str().rsplitn(2, '/');
+        let file_name = split.next().unwrap();
+        let dir_path = split.next().unwrap_or(".");
+        let dir_inode = ROOT_INODE.lookup(dir_path)?;
+        match dir_inode.find(file_name) {
+            Ok(file_inode) => {
+                if flags.contains(OpenFlags::EXCLUSIVE) {
+                    return Err(SysError::Exists);
+                }
+                file_inode
+            },
+            Err(FsError::EntryNotFound) => {
+                dir_inode.create(file_name, FileType::File, mode as u32)?
+            }
+            Err(e) => return Err(SysError::from(e)),
+        }
+    } else {
+        // TODO: remove "stdin:" "stdout:"
+        match path.as_str() {
+            "stdin:" => crate::fs::STDIN.clone() as Arc<INode>,
+            "stdout:" => crate::fs::STDOUT.clone() as Arc<INode>,
+            _ => ROOT_INODE.lookup(path.as_str())?,
         }
     };
-    let file = File::new(inode, flags.contains(VfsFlags::READABLE), flags.contains(VfsFlags::WRITABLE));
+
+    let fd = (3..).find(|i| !proc.files.contains_key(i)).unwrap();
+
+    let file = FileHandle::new(inode, flags.to_options());
     proc.files.insert(fd, file);
     Ok(fd as isize)
 }
@@ -98,30 +122,44 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     Ok(0)
 }
 
-fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut File, SysError> {
+fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut FileHandle, SysError> {
     proc.files.get_mut(&fd).ok_or(SysError::Inval)
 }
 
 bitflags! {
-    struct VfsFlags: usize {
-        // WARNING: different from origin uCore
-        const READABLE = 1 << 0;
-        const WRITABLE = 1 << 1;
+    struct OpenFlags: usize {
+        /// read only
+        const RDONLY = 0;
+        /// write only
+        const WRONLY = 1;
+        /// read write
+        const RDWR = 2;
         /// create file if it does not exist
-        const CREATE = 1 << 2;
-        /// error if O_CREAT and the file exists
-        const EXCLUSIVE = 1 << 3;
+        const CREATE = 1 << 6;
+        /// error if CREATE and the file exists
+        const EXCLUSIVE = 1 << 7;
         /// truncate file upon open
-        const TRUNCATE = 1 << 4;
+        const TRUNCATE = 1 << 9;
         /// append on each write
-        const APPEND = 1 << 5;
+        const APPEND = 1 << 10;
     }
 }
 
-impl VfsFlags {
-    fn from_ucore_flags(f: usize) -> Self {
-        assert_ne!(f & 0b11, 0b11);
-        Self::from_bits_truncate(f + 1)
+impl OpenFlags {
+    fn readable(&self) -> bool {
+        let b = self.bits() & 0b11;
+        b == OpenFlags::RDONLY.bits() || b == OpenFlags::RDWR.bits()
+    }
+    fn writable(&self) -> bool {
+        let b = self.bits() & 0b11;
+        b == OpenFlags::WRONLY.bits() || b == OpenFlags::RDWR.bits()
+    }
+    fn to_options(&self) -> OpenOptions {
+        OpenOptions {
+            read: self.readable(),
+            write: self.writable(),
+            append: self.contains(OpenFlags::APPEND),
+        }
     }
 }
 

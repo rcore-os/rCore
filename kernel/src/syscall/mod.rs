@@ -8,7 +8,7 @@ use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
 use spin::{Mutex, MutexGuard};
 
 use crate::arch::interrupt::TrapFrame;
-use crate::fs::File;
+use crate::fs::FileHandle;
 use crate::process::*;
 use crate::thread;
 use crate::util;
@@ -31,7 +31,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         // file
         000 => sys_read(args[0], args[1] as *mut u8, args[2]),
         001 => sys_write(args[0], args[1] as *const u8, args[2]),
-        002 => sys_open(args[0] as *const u8, args[1]),
+        002 => sys_open(args[0] as *const u8, args[1], args[2]),
         003 => sys_close(args[0]),
 //        004 => sys_stat(),
         005 => sys_fstat(args[0], args[1] as *mut Stat),
@@ -107,7 +107,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         158 => sys_arch_prctl(args[0] as i32, args[1], tf),
         218 => {
             warn!("sys_set_tid_address is unimplemented");
-            Ok(0)
+            Ok(thread::current().id() as isize)
         }
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
