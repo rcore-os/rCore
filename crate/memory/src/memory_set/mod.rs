@@ -79,16 +79,12 @@ impl MemoryArea {
             .and_then(|len| core::str::from_utf8(core::slice::from_raw_parts(ptr, len)).ok())
             .map(|s| String::from(s))
     }
-    /*
-    **  @brief  test whether the memory area is overlap with another memory area
-    **  @param  other: &MemoryArea   another memory area to test
-    **  @retval bool                 whether the memory area is overlap with another memory area
-    */
-    fn is_overlap_with(&self, other: &MemoryArea) -> bool {
+    /// Test whether this area is (page) overlap with area [`start_addr`, `end_addr`]
+    fn is_overlap_with(&self, start_addr: VirtAddr, end_addr: VirtAddr) -> bool {
         let p0 = Page::of_addr(self.start_addr);
         let p1 = Page::of_addr(self.end_addr - 1) + 1;
-        let p2 = Page::of_addr(other.start_addr);
-        let p3 = Page::of_addr(other.end_addr - 1) + 1;
+        let p2 = Page::of_addr(start_addr);
+        let p3 = Page::of_addr(end_addr - 1) + 1;
         !(p1 <= p2 || p0 >= p3)
     }
     /*
@@ -220,6 +216,23 @@ impl<T: InactivePageTable> MemorySet<T> {
             .filter_map(|area| area.check_and_clone_cstr(ptr))
             .next()
     }
+    /// Find a free area with hint address `addr_hint` and length `len`.
+    /// Return the start address of found free area.
+    /// Used for mmap.
+    pub fn find_free_area(&self, addr_hint: usize, len: usize) -> VirtAddr {
+        // brute force:
+        // try each area's end address as the start
+        core::iter::once(addr_hint)
+            .chain(self.areas.iter().map(|area| area.end_addr))
+            .map(|addr| addr + PAGE_SIZE) // move up a page
+            .find(|&addr| self.test_free_area(addr, addr + len))
+            .expect("failed to find free area ???")
+    }
+    fn test_free_area(&self, start_addr: usize, end_addr: usize) -> bool {
+        self.areas.iter()
+            .find(|area| area.is_overlap_with(start_addr, end_addr))
+            .is_none()
+    }
     /*
     **  @brief  add the memory area to the memory set
     **  @param  area: MemoryArea     the memory area to add
@@ -227,10 +240,8 @@ impl<T: InactivePageTable> MemorySet<T> {
     */
     pub fn push(&mut self, start_addr: VirtAddr, end_addr: VirtAddr, handler: impl MemoryHandler, name: &'static str) {
         assert!(start_addr <= end_addr, "invalid memory area");
+        assert!(self.test_free_area(start_addr, end_addr), "memory area overlap");
         let area = MemoryArea { start_addr, end_addr, handler: Box::new(handler), name };
-        assert!(self.areas.iter()
-                    .find(|other| area.is_overlap_with(other))
-                    .is_none(), "memory area overlap");
         self.page_table.edit(|pt| area.map(pt));
         self.areas.push(area);
     }

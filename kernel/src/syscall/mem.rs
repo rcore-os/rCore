@@ -7,15 +7,13 @@ use super::*;
 
 pub fn sys_mmap(mut addr: usize, len: usize, prot: MmapProt, flags: MmapFlags, fd: i32, offset: usize) -> SysResult {
     info!("mmap addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
-    if addr == 0 {
-        // FIXME: choose an address to place
-        addr = 0x1000000;
-    }
+    let mut proc = process();
+    addr = proc.memory_set.find_free_area(addr, len);
+
     if flags.contains(MmapFlags::ANONYMOUS) {
         if flags.contains(MmapFlags::SHARED) {
             return Err(SysError::Inval);
         }
-        let mut proc = process();
         let handler = Delay::new(prot_to_attr(prot), GlobalFrameAlloc);
         proc.memory_set.push(addr, addr + len, handler, "mmap");
         return Ok(addr as isize);
