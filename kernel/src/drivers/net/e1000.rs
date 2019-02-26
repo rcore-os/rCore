@@ -34,8 +34,27 @@ pub struct E1000 {
     send_buffers: Vec<usize>,
     recv_page: usize,
     recv_buffers: Vec<usize>,
-    first_trans: bool
+    first_trans: bool,
 }
+
+const E1000_STATUS: usize = 0x0008 / 4;
+const E1000_IMS: usize = 0x00D0 / 4;
+const E1000_RCTL: usize = 0x0100 / 4;
+const E1000_TCTL: usize = 0x0400 / 4;
+const E1000_TIPG: usize = 0x0410 / 4;
+const E1000_RDBAL: usize = 0x2800 / 4;
+const E1000_RDBAH: usize = 0x2804 / 4;
+const E1000_RDLEN: usize = 0x2808 / 4;
+const E1000_RDH: usize = 0x2810 / 4;
+const E1000_RDT: usize = 0x2818 / 4;
+const E1000_TDBAL: usize = 0x3800 / 4;
+const E1000_TDBAH: usize = 0x3804 / 4;
+const E1000_TDLEN: usize = 0x3808 / 4;
+const E1000_TDH: usize = 0x3810 / 4;
+const E1000_TDT: usize = 0x3818 / 4;
+const E1000_MTA: usize = 0x5200 / 4;
+const E1000_RAL: usize = 0x5400 / 4;
+const E1000_RAH: usize = 0x5404 / 4;
 
 #[derive(Clone)]
 pub struct E1000Driver(Arc<Mutex<E1000>>);
@@ -64,11 +83,13 @@ impl E1000 {
             current_addr = current_addr + PAGE_SIZE;
         }
 
-        let e1000 = unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
+        let e1000 =
+            unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
-        let mut send_queue =
-            unsafe { slice::from_raw_parts_mut(self.send_page as *mut E1000RecvDesc, send_queue_size) };
-        let mut tdt = e1000[0x3818 / 4].read();
+        let mut send_queue = unsafe {
+            slice::from_raw_parts_mut(self.send_page as *mut E1000RecvDesc, send_queue_size)
+        };
+        let mut tdt = e1000[E1000_TDT].read();
         let index = (tdt as usize + 1) % send_queue_size;
         let send_desc = &mut send_queue[index];
 
@@ -84,11 +105,13 @@ impl E1000 {
             current_addr = current_addr + PAGE_SIZE;
         }
 
-        let e1000 = unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
+        let e1000 =
+            unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
         let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
-        let mut recv_queue =
-            unsafe { slice::from_raw_parts_mut(self.recv_page as *mut E1000RecvDesc, recv_queue_size) };
-        let mut rdt = e1000[0x2818 / 4].read();
+        let mut recv_queue = unsafe {
+            slice::from_raw_parts_mut(self.recv_page as *mut E1000RecvDesc, recv_queue_size)
+        };
+        let mut rdt = e1000[E1000_RDT].read();
         let index = (rdt as usize + 1) % recv_queue_size;
         let recv_desc = &mut recv_queue[index];
         return (*recv_desc).status & 1 != 0;
@@ -169,26 +192,28 @@ impl phy::RxToken for E1000RxToken {
     {
         let data = {
             let mut driver = (self.0).0.lock();
-            let e1000 = unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+            let e1000 = unsafe {
+                slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+            };
             let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
-            let mut recv_queue =
-                unsafe { slice::from_raw_parts_mut(driver.recv_page as *mut E1000RecvDesc, recv_queue_size) };
-            let mut rdt = e1000[0x2818 / 4].read();
+            let mut recv_queue = unsafe {
+                slice::from_raw_parts_mut(driver.recv_page as *mut E1000RecvDesc, recv_queue_size)
+            };
+            let mut rdt = e1000[E1000_RDT].read();
             let index = (rdt as usize + 1) % recv_queue_size;
             let recv_desc = &mut recv_queue[index];
             assert!(recv_desc.status & 1 != 0);
-            let buffer = unsafe { slice::from_raw_parts(driver.recv_buffers[index] as *const u8, recv_desc.len as usize) };
-
-            println!("{:?}", recv_desc);
-            for i in 0..recv_desc.len {
-                print!("{:#X} ", buffer[i as usize]);
-            }
-            println!("");
+            let buffer = unsafe {
+                slice::from_raw_parts(
+                    driver.recv_buffers[index] as *const u8,
+                    recv_desc.len as usize,
+                )
+            };
 
             recv_desc.status = recv_desc.status & !1;
 
             rdt = (rdt + 1) % recv_queue_size as u32;
-            e1000[0x2818 / 4].write(rdt);
+            e1000[E1000_RDT].write(rdt);
 
             buffer
         };
@@ -208,11 +233,14 @@ impl phy::TxToken for E1000TxToken {
 
         let mut driver = (self.0).0.lock();
 
-        let e1000 = unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+        let e1000 = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
-        let mut send_queue =
-            unsafe { slice::from_raw_parts_mut(driver.send_page as *mut E1000SendDesc, send_queue_size) };
-        let mut tdt = e1000[0x3818 / 4].read();
+        let mut send_queue = unsafe {
+            slice::from_raw_parts_mut(driver.send_page as *mut E1000SendDesc, send_queue_size)
+        };
+        let mut tdt = e1000[E1000_TDT].read();
 
         let index_next = (tdt as usize + 1) % send_queue_size;
         let send_desc = &mut send_queue[index_next];
@@ -220,26 +248,24 @@ impl phy::TxToken for E1000TxToken {
 
         let index = (tdt as usize) % send_queue_size;
         let send_desc = &mut send_queue[index];
-        let target = unsafe { slice::from_raw_parts_mut(driver.send_buffers[index] as *mut u8, len) };
+        let target =
+            unsafe { slice::from_raw_parts_mut(driver.send_buffers[index] as *mut u8, len) };
         target.copy_from_slice(&buffer[..len]);
 
-        println!("len {:?}", len);
-        let buffer_page_pa = active_table().get_entry(driver.send_buffers[index]).unwrap().target();
+        let buffer_page_pa = active_table()
+            .get_entry(driver.send_buffers[index])
+            .unwrap()
+            .target();
         assert_eq!(buffer_page_pa, send_desc.addr as usize);
         send_desc.len = len as u16 + 4;
+        // RS | EOP
         send_desc.cmd = (1 << 3) | (1 << 0);
         send_desc.status = 0;
-
-        println!("{:?}", &send_queue[index]);
-        for i in 0..len {
-            print!("{:#X} ", target[i]);
-        }
-        println!("tdh {} tdt {}", e1000[0x3810 / 4].read(), e1000[0x3818 / 4].read());
 
         fence(Ordering::SeqCst);
 
         tdt = (tdt + 1) % send_queue_size as u32;
-        e1000[0x3818 / 4].write(tdt);
+        e1000[E1000_TDT].write(tdt);
 
         fence(Ordering::SeqCst);
 
@@ -247,7 +273,7 @@ impl phy::TxToken for E1000TxToken {
         if tdt == 0 {
             driver.first_trans = false;
         }
-        
+
         result
     }
 }
@@ -313,14 +339,14 @@ pub fn e1000_init(header: usize, size: usize) {
     let e1000 = unsafe { slice::from_raw_parts_mut(header as *mut Volatile<u32>, size / 4) };
     debug!(
         "status before setup: {:#?}",
-        E1000Status::from_bits_truncate(e1000[0x8 / 4].read())
+        E1000Status::from_bits_truncate(e1000[E1000_STATUS].read())
     );
 
-    e1000[0x3800 / 4].write(send_page_pa as u32); // TDBAL
-    e1000[0x3804 / 4].write((send_page_pa >> 32) as u32); // TDBAH
-    e1000[0x3808 / 4].write(PAGE_SIZE as u32); // TDLEN
-    e1000[0x3810 / 4].write(0); // TDH
-    e1000[0x3818 / 4].write(0); // TDT
+    e1000[E1000_TDBAL].write(send_page_pa as u32); // TDBAL
+    e1000[E1000_TDBAH].write((send_page_pa >> 32) as u32); // TDBAH
+    e1000[E1000_TDLEN].write(PAGE_SIZE as u32); // TDLEN
+    e1000[E1000_TDH].write(0); // TDH
+    e1000[E1000_TDT].write(0); // TDT
 
     for i in 0..send_queue_size {
         let buffer_page = unsafe {
@@ -331,32 +357,35 @@ pub fn e1000_init(header: usize, size: usize) {
         driver.send_buffers.push(buffer_page);
     }
 
-    e1000[0x400 / 4].write((1 << 1) | (1 << 3) | (0x10 << 4) | (0x40 << 12)); // TCTL
-    e1000[0x410 / 4].write(0xa | (0x8 << 10) | (0xc << 20)); // TIPG
+    // EN | PSP | CT=0x10 | COLD=0x40
+    e1000[E1000_TCTL].write((1 << 1) | (1 << 3) | (0x10 << 4) | (0x40 << 12)); // TCTL
+    // IPGT=0xa | IPGR1=0x8 | IPGR2=0xc
+    e1000[E1000_TIPG].write(0xa | (0x8 << 10) | (0xc << 20)); // TIPG
 
-    let mut RAL: u32 = 0;
-    let mut RAH: u32 = 0;
+    let mut ral: u32 = 0;
+    let mut rah: u32 = 0;
     for i in 0..4 {
-        RAL = RAL | (mac[i] as u32) << (i * 8);
+        ral = ral | (mac[i] as u32) << (i * 8);
     }
     for i in 0..2 {
-        RAH = RAH | (mac[i + 4] as u32) << (i * 8);
+        rah = rah | (mac[i + 4] as u32) << (i * 8);
     }
 
-    e1000[0x5400 / 4].write(RAL); // RAL
-    e1000[0x5404 / 4].write(RAH | (1 << 31)); // RAH
+    e1000[E1000_RAL].write(ral); // RAL
+    // AV | AS=DA
+    e1000[E1000_RAH].write(rah | (1 << 31)); // RAH
 
     // MTA
-    for i in (0x5200 / 4)..(0x5400 / 4) {
+    for i in E1000_MTA..E1000_RAL {
         e1000[i].write(0);
     }
-    e1000[0xd0 / 4].write(0); // IMS
+    e1000[E1000_IMS].write(0); // IMS
 
-    e1000[0x2800 / 4].write(recv_page_pa as u32); // RDBAL
-    e1000[0x2804 / 4].write((recv_page_pa >> 32) as u32); // RDBAH
-    e1000[0x2808 / 4].write(PAGE_SIZE as u32); // RDLEN
-    e1000[0x2810 / 4].write(0); // RDH
-    e1000[0x2818 / 4].write((recv_queue_size - 1) as u32); // RDT
+    e1000[E1000_RDBAL].write(recv_page_pa as u32); // RDBAL
+    e1000[E1000_RDBAH].write((recv_page_pa >> 32) as u32); // RDBAH
+    e1000[E1000_RDLEN].write(PAGE_SIZE as u32); // RDLEN
+    e1000[E1000_RDH].write(0); // RDH
+    e1000[E1000_RDT].write((recv_queue_size - 1) as u32); // RDT
 
     for i in 0..recv_queue_size {
         let buffer_page = unsafe {
@@ -367,11 +396,13 @@ pub fn e1000_init(header: usize, size: usize) {
         driver.recv_buffers.push(buffer_page);
     }
 
-    e1000[0x100 / 4].write((1 << 1) | (1 << 15) | (3 << 16) | (1 << 25) | (1 << 26)); // RCTL
+    // EN | BAM | BSIZE=3 | BSEX | SECRC
+    // BSIZE=3 | BSEX means buffer size = 4096
+    e1000[E1000_RCTL].write((1 << 1) | (1 << 15) | (3 << 16) | (1 << 25) | (1 << 26)); // RCTL
 
     debug!(
         "status after setup: {:#?}",
-        E1000Status::from_bits_truncate(e1000[0x8 / 4].read())
+        E1000Status::from_bits_truncate(e1000[E1000_STATUS].read())
     );
 
     let net_driver = E1000Driver(Arc::new(Mutex::new(driver)));
