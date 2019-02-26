@@ -6,6 +6,7 @@ use smoltcp::socket::*;
 use alloc::collections::BTreeMap;
 use crate::drivers::NetDriver;
 use crate::drivers::net::virtio_net::VirtIONetDriver;
+use crate::drivers::net::e1000::E1000Driver;
 use alloc::vec;
 use smoltcp::time::Instant;
 use core::fmt::Write;
@@ -19,7 +20,8 @@ pub extern fn server(_arg: usize) -> ! {
 
     let driver = {
         let ref_driver = &mut *NET_DRIVERS.lock()[0];
-        ref_driver.as_any().downcast_ref::<VirtIONetDriver>().unwrap().clone()
+        // TODO: support multiple net drivers here
+        ref_driver.as_any().downcast_ref::<E1000Driver>().unwrap().clone()
     };
     let ethernet_addr = driver.get_mac();
     let ip_addrs = [IpCidr::new(IpAddress::v4(10,0,0,2), 24)];
@@ -38,15 +40,24 @@ pub extern fn server(_arg: usize) -> ! {
     let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
     let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
+    let tcp2_rx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
+    let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
+    let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
+
     let mut sockets = SocketSet::new(vec![]);
     let udp_handle = sockets.add(udp_socket);
     let tcp_handle = sockets.add(tcp_socket);
+    let tcp2_handle = sockets.add(tcp2_socket);
 
     loop {
         {
             let timestamp = Instant::from_millis(unsafe { crate::trap::TICK as i64 });
             match iface.poll(&mut sockets, timestamp) {
-                Ok(_) => {},
+                Ok(event) => {
+                    if (!event) {
+                        continue;
+                    }
+                },
                 Err(e) => {
                     println!("poll error: {}", e);
                 }
@@ -81,6 +92,19 @@ pub extern fn server(_arg: usize) -> ! {
                 if socket.can_send() {
                     write!(socket, "HTTP/1.1 200 OK\r\nServer: rCore\r\nContent-Length: 13\r\nContent-Type: text/html\r\nConnection: Closed\r\n\r\nHello, world!\r\n").unwrap();
                     socket.close();
+                }
+            }
+
+            // simple tcp server that just eats everything
+            {
+                let mut socket = sockets.get::<TcpSocket>(tcp2_handle);
+                if !socket.is_open() {
+                    socket.listen(2222).unwrap();
+                }
+
+                if socket.can_recv() {
+                    let mut data = [0u8; 2048];
+                    let size = socket.recv_slice(&mut data).unwrap();
                 }
             }
         }

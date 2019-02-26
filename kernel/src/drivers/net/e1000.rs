@@ -238,7 +238,7 @@ impl phy::TxToken for E1000TxToken {
 
         fence(Ordering::SeqCst);
 
-        tdt = (tdt + 2) % send_queue_size as u32;
+        tdt = (tdt + 1) % send_queue_size as u32;
         e1000[0x3818 / 4].write(tdt);
 
         fence(Ordering::SeqCst);
@@ -318,7 +318,7 @@ pub fn e1000_init(header: usize, size: usize) {
 
     e1000[0x3800 / 4].write(send_page_pa as u32); // TDBAL
     e1000[0x3804 / 4].write((send_page_pa >> 32) as u32); // TDBAH
-    e1000[0x3808 / 8].write(PAGE_SIZE as u32); // TDLEN
+    e1000[0x3808 / 4].write(PAGE_SIZE as u32); // TDLEN
     e1000[0x3810 / 4].write(0); // TDH
     e1000[0x3818 / 4].write(0); // TDT
 

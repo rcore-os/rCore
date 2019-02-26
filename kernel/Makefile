@@ -71,7 +71,7 @@ qemu_opts += \
 	-serial mon:stdio \
 	-device isa-debug-exit
 qemu_net_opts += \
-	-device virtio-net-pci,netdev=net0
+	-device e1000,netdev=net0
 
 else ifeq ($(arch), riscv32)
 qemu_opts += \
