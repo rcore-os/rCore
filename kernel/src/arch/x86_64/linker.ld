@@ -13,7 +13,9 @@ SECTIONS {
 
   .text ALIGN(4K):
   {
+    stext = .;
     *(.text .text.*)
+    etext = .;
   }
 
   .data ALIGN(4K):
