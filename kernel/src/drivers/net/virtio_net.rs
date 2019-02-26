@@ -43,11 +43,6 @@ const VIRTIO_QUEUE_TRANSMIT: usize = 1;
 
 impl Driver for VirtIONetDriver {
     fn try_handle_interrupt(&mut self) -> bool {
-        // for simplicity
-        if cpu::id() > 0 {
-            return false
-        }
-
         let driver = self.0.lock();
 
         // ensure header page is mapped

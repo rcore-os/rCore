@@ -1,9 +1,11 @@
-use x86_64::instructions::port::Port;
+use crate::drivers::net::e1000;
 use crate::logging::*;
 use core::slice;
+use x86_64::instructions::port::Port;
 
 const VENDOR: u32 = 0x00;
 const DEVICE: u32 = 0x02;
+const COMMAND: u32 = 0x04;
 const STATUS: u32 = 0x06;
 const SUBCLASS: u32 = 0x0a;
 const CLASS: u32 = 0x0b;
@@ -24,10 +26,14 @@ const PCI_BASE_ADDRESS_MEM_TYPE_64: u32 = 0x04;
 const PCI_BASE_ADDRESS_MEM_PREFETCH: u32 = 0x08;
 const PCI_BASE_ADDRESS_MEM_MASK: u32 = 0xfffffff0;
 
-struct PciTag(u32);
+#[derive(Copy, Clone)]
+pub struct PciTag(u32);
 
 impl PciTag {
     pub fn new(bus: u32, dev: u32, func: u32) -> PciTag {
+        assert!(bus < 256);
+        assert!(dev < 32);
+        assert!(func < 8);
         PciTag(bus << 16 | dev << 11 | func << 8)
     }
 
@@ -86,7 +92,8 @@ impl PciTag {
 
     // biscuit/src/pci/pci.go Pci_bar_mem
     // linux/drivers/pci/probe.c pci_read_bases
-    pub unsafe fn getBarMem(&self, bar_number: u32) -> Option<&'static mut [u8]> {
+    // return (addr, len)
+    pub unsafe fn get_bar_mem(&self, bar_number: u32) -> Option<(usize, usize)> {
         assert!(bar_number <= 4);
         let bar = BAR0 + 4 * bar_number;
         let mut base = self.read(bar, 4);
@@ -113,23 +120,54 @@ impl PciTag {
         }
         size = (size & !(size - 1)) - 1;
 
-        debug!("device memory address from {:#X} to {:#X}", base, base + size);
-        return Some(slice::from_raw_parts_mut(base as *mut u8, size as usize));
+        debug!(
+            "device memory address from {:#X} to {:#X}",
+            base,
+            base + size
+        );
+        return Some((base as usize, size as usize));
     }
 
-    pub fn describe(&self) -> bool {
+    // returns a tuple of (vid, did, next)
+    pub fn probe(&self) -> Option<(u32, u32, bool)> {
         unsafe {
             let v = self.read(VENDOR, 2);
             if v == 0xffff {
-                return false;
+                return None;
             }
             let d = self.read(DEVICE, 2);
             let mf = self.read(HEADER, 1);
             let cl = self.read(CLASS, 1);
             let scl = self.read(SUBCLASS, 1);
-            info!("{}: {}: {}: {:#X} {:#X} ({} {})", self.bus(), self.dev(), self.func(), v, d, cl, scl);
-            self.getBarMem(0);
-            return mf & 0x80 != 0;
+            info!(
+                "{}: {}: {}: {:#X} {:#X} ({} {})",
+                self.bus(),
+                self.dev(),
+                self.func(),
+                v,
+                d,
+                cl,
+                scl
+            );
+
+            return Some((v, d, mf & 0x80 != 0));
+        }
+    }
+
+    pub unsafe fn enable(&self) {
+        let orig = self.read(COMMAND, 2);
+        // IO_ENABLE | MEM_ENABLE | MASTER_ENABLE
+        self.write(COMMAND, orig | 0xf);
+    }
+}
+
+pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
+    if vid == 0x8086 && (did == 0x100e || did == 0x10d3) {
+        if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
+            unsafe {
+                tag.enable();
+            }
+            e1000::e1000_init(addr, len);
         }
     }
 }
@@ -138,13 +176,17 @@ pub fn init() {
     for bus in 0..256 {
         for dev in 0..32 {
             let tag = PciTag::new(bus, dev, 0);
-            if tag.describe() {
-                for func in 1..8 {
-                    let tag = PciTag::new(bus, dev, func);
-                    tag.describe();
+            if let Some((vid, did, next)) = tag.probe() {
+                init_driver(vid, did, tag);
+                if next {
+                    for func in 1..8 {
+                        let tag = PciTag::new(bus, dev, func);
+                        if let Some((vid, did, _)) = tag.probe() {
+                            init_driver(vid, did, tag);
+                        }
+                    }
                 }
             }
         }
     }
-    info!("Init pci");
 }
