@@ -36,7 +36,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        004 => sys_stat(),
         005 => sys_fstat(args[0], args[1] as *mut Stat),
 //        007 => sys_poll(),
-//        008 => sys_lseek(),
+        008 => sys_lseek(args[0], args[1] as i64, args[2] as u8),
         009 => sys_mmap(args[0], args[1], MmapProt::from_bits_truncate(args[2]), MmapFlags::from_bits_truncate(args[3]), args[4] as i32, args[5]),
         011 => sys_munmap(args[0], args[1]),
 //        019 => sys_readv(),

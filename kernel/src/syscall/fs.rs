@@ -2,7 +2,7 @@
 
 use super::*;
 
-use crate::fs::{ROOT_INODE, OpenOptions};
+use crate::fs::*;
 use rcore_fs::vfs::Timespec;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -87,6 +87,21 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     let stat = Stat::from(file.info()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
+}
+
+pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
+    let pos = match whence {
+        SEEK_SET => SeekFrom::Start(offset as u64),
+        SEEK_END => SeekFrom::End(offset),
+        SEEK_CUR => SeekFrom::Current(offset),
+        _ => return Err(SysError::Inval),
+    };
+    info!("lseek: fd: {}, pos: {:?}", fd, pos);
+
+    let mut proc = process();
+    let file = get_file(&mut proc, fd)?;
+    let offset = file.seek(pos)?;
+    Ok(offset as isize)
 }
 
 /// entry_id = dentry.offset / 256
@@ -309,3 +324,7 @@ impl From<Metadata> for Stat {
         }
     }
 }
+
+const SEEK_SET: u8 = 1;
+const SEEK_CUR: u8 = 2;
+const SEEK_END: u8 = 4;

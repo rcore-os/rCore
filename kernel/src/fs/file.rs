@@ -7,7 +7,7 @@ use rcore_fs::vfs::{Metadata, INode, Result, FsError};
 #[derive(Clone)]
 pub struct FileHandle {
     inode: Arc<INode>,
-    offset: usize,
+    offset: u64,
     options: OpenOptions,
 }
 
@@ -17,6 +17,13 @@ pub struct OpenOptions {
     pub write: bool,
     /// Before each write, the file offset is positioned at the end of the file.
     pub append: bool,
+}
+
+#[derive(Debug)]
+pub enum SeekFrom {
+    Start(u64),
+    End(i64),
+    Current(i64),
 }
 
 impl FileHandle {
@@ -32,8 +39,8 @@ impl FileHandle {
         if !self.options.read {
             return Err(FsError::InvalidParam);  // FIXME: => EBADF
         }
-        let len = self.inode.read_at(self.offset, buf)?;
-        self.offset += len;
+        let len = self.inode.read_at(self.offset as usize, buf)?;
+        self.offset += len as u64;
         Ok(len)
     }
 
@@ -43,11 +50,20 @@ impl FileHandle {
         }
         if self.options.append {
             let info = self.inode.metadata()?;
-            self.offset = info.size;
+            self.offset = info.size as u64;
         }
-        let len = self.inode.write_at(self.offset, buf)?;
-        self.offset += len;
+        let len = self.inode.write_at(self.offset as usize, buf)?;
+        self.offset += len as u64;
         Ok(len)
+    }
+
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+        self.offset = match pos {
+            SeekFrom::Start(offset) => offset,
+            SeekFrom::End(offset) => (self.inode.metadata()?.size as i64 + offset) as u64,
+            SeekFrom::Current(offset) => (self.offset as i64 + offset) as u64,
+        };
+        Ok(self.offset)
     }
 
     pub fn info(&self) -> Result<Metadata> {
