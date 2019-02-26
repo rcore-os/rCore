@@ -1,9 +1,11 @@
 //! Syscalls for file system
 
-use super::*;
+use rcore_fs::vfs::Timespec;
 
 use crate::fs::*;
-use rcore_fs::vfs::Timespec;
+use crate::memory::MemorySet;
+
+use super::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
@@ -24,6 +26,31 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     }
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = get_file(&mut proc, fd)?.write(slice)?;
+    Ok(len as isize)
+}
+
+pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    let mut proc = process();
+    let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set, true)?;
+    info!("readv: fd: {}, iov: {:#x?}", fd, iovs);
+
+    // read all data to a buf
+    let file = get_file(&mut proc, fd)?;
+    let mut buf = iovs.new_buf(true);
+    let len = file.read(buf.as_mut_slice())?;
+    // copy data to user
+    iovs.write_all_from_slice(&buf[..len]);
+    Ok(len as isize)
+}
+
+pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    let mut proc = process();
+    let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set,  false)?;
+    info!("writev: fd: {}, iovs: {:#x?}", fd, iovs);
+
+    let file = get_file(&mut proc, fd)?;
+    let buf = iovs.read_all_to_vec();
+    let len = file.write(buf.as_slice())?;
     Ok(len as isize)
 }
 
@@ -77,8 +104,23 @@ pub fn sys_close(fd: usize) -> SysResult {
     }
 }
 
+pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::Inval)?;
+    if !proc.memory_set.check_mut_ptr(stat_ptr) {
+        return Err(SysError::Inval);
+    }
+    info!("stat: path: {}", path);
+
+    let inode = ROOT_INODE.lookup(path.as_str())?;
+    let stat = Stat::from(inode.metadata()?);
+    unsafe { stat_ptr.write(stat); }
+    Ok(0)
+}
+
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
-    info!("fstat: {}", fd);
+    info!("fstat: fd: {}", fd);
     let mut proc = process();
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
         return Err(SysError::Inval);
@@ -328,3 +370,62 @@ impl From<Metadata> for Stat {
 const SEEK_SET: u8 = 1;
 const SEEK_CUR: u8 = 2;
 const SEEK_END: u8 = 4;
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct IoVec {
+    /// Starting address
+    base: *mut u8,
+    /// Number of bytes to transfer
+    len: u64,
+}
+
+/// A valid IoVecs request from user
+#[derive(Debug)]
+struct IoVecs(Vec<&'static mut [u8]>);
+
+impl IoVecs {
+    fn check_and_new(iov_ptr: *const IoVec, iov_count: usize, vm: &MemorySet, readv: bool) -> Result<Self, SysError> {
+        if !vm.check_array(iov_ptr, iov_count) {
+            return Err(SysError::Inval);
+        }
+        let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
+        // check all bufs in iov
+        for iov in iovs.iter() {
+            if readv && !vm.check_mut_array(iov.base, iov.len as usize)
+                || !readv && !vm.check_array(iov.base, iov.len as usize) {
+                return Err(SysError::Inval);
+            }
+        }
+        let slices = iovs.iter().map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) }).collect();
+        Ok(IoVecs(slices))
+    }
+
+    fn read_all_to_vec(&self) -> Vec<u8> {
+        let mut buf = self.new_buf(false);
+        for slice in self.0.iter() {
+            buf.extend(slice.iter());
+        }
+        buf
+    }
+
+    fn write_all_from_slice(&mut self, buf: &[u8]) {
+        let mut copied_len = 0;
+        for slice in self.0.iter_mut() {
+            slice.copy_from_slice(&buf[copied_len..copied_len + slice.len()]);
+            copied_len += slice.len();
+        }
+    }
+
+    /// Create a new Vec buffer from IoVecs
+    /// For readv:  `set_len` is true,  Vec.len = total_len.
+    /// For writev: `set_len` is false, Vec.cap = total_len.
+    fn new_buf(&self, set_len: bool) -> Vec<u8> {
+        let total_len = self.0.iter().map(|slice| slice.len()).sum::<usize>();
+        let mut buf = Vec::with_capacity(total_len);
+        if set_len {
+            unsafe { buf.set_len(total_len); }
+        }
+        buf
+    }
+}
