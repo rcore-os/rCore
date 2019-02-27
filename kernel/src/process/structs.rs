@@ -104,11 +104,10 @@ impl Thread {
             envs: BTreeMap::new(),
             auxv: {
                 let mut map = BTreeMap::new();
-                let phdr = elf.program_iter()
-                    .find(|ph| ph.get_type() == Ok(Type::Phdr))
-                    .expect("PHDR section not found")
-                    .virtual_addr();
-                map.insert(abi::AT_PHDR, phdr as usize);
+                if let Some(phdr) = elf.program_iter()
+                    .find(|ph| ph.get_type() == Ok(Type::Phdr)) {
+                    map.insert(abi::AT_PHDR, phdr.virtual_addr() as usize);
+                }
                 map.insert(abi::AT_PHENT, elf.header.pt2.ph_entry_size() as usize);
                 map.insert(abi::AT_PHNUM, elf.header.pt2.ph_count() as usize);
                 map

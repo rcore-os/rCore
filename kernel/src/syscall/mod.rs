@@ -100,6 +100,22 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigprocmask is unimplemented");
             Ok(0)
         }
+        016 => {
+            warn!("sys_ioctl is unimplemented");
+            Ok(0)
+        }
+        102 => {
+            warn!("sys_getuid is unimplemented");
+            Ok(0)
+        }
+        107 => {
+            warn!("sys_geteuid is unimplemented");
+            Ok(0)
+        }
+        108 => {
+            warn!("sys_getegid is unimplemented");
+            Ok(0)
+        }
         131 => {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
