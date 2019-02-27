@@ -163,7 +163,7 @@ fn to_kernel(tf: &mut TrapFrame) {
 
 fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.rcx, tf.r8, tf.r9], tf);
+    let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
     tf.rax = ret as usize;
 }
 
