@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use aarch64::barrier;
 use aarch64::addr::PhysAddr;
 use aarch64::paging::PhysFrame;
-use aarch64::asm::{tlb_invalidate_all, ttbr_el1_write_asid};
+use aarch64::asm::{tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write_asid};
 
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
@@ -127,6 +127,7 @@ impl Context {
     }
 
     pub unsafe fn switch(&mut self, target: &mut Self) {
+        self.ttbr = ttbr_el1_read(1);
         target.asid = ASID_ALLOCATOR.lock().alloc(target.asid);
 
         // with ASID we needn't flush TLB frequently
