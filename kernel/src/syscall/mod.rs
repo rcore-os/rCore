@@ -37,7 +37,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         005 => sys_fstat(args[0], args[1] as *mut Stat),
 //        007 => sys_poll(),
         008 => sys_lseek(args[0], args[1] as i64, args[2] as u8),
-        009 => sys_mmap(args[0], args[1], MmapProt::from_bits_truncate(args[2]), MmapFlags::from_bits_truncate(args[3]), args[4] as i32, args[5]),
+        009 => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
         011 => sys_munmap(args[0], args[1]),
         019 => sys_readv(args[0], args[1] as *const IoVec, args[2]),
         020 => sys_writev(args[0], args[1] as *const IoVec, args[2]),
@@ -109,6 +109,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id() as isize)
         }
+        231 => {
+            warn!("sys_exit_group is unimplemented");
+            sys_exit(args[0] as isize);
+        }
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
             crate::trap::error(tf);
@@ -144,24 +148,4 @@ pub enum SysError {
 
     #[allow(dead_code)]
     Unspcified = 1,// A really really unknown error.
-}
-
-impl From<FsError> for SysError {
-    fn from(error: FsError) -> Self {
-        match error {
-            FsError::NotSupported => SysError::Unimp,
-            FsError::NotFile => SysError::Isdir,
-            FsError::IsDir => SysError::Isdir,
-            FsError::NotDir => SysError::Notdir,
-            FsError::EntryNotFound => SysError::Noent,
-            FsError::EntryExist => SysError::Exists,
-            FsError::NotSameFs => SysError::Xdev,
-            FsError::InvalidParam => SysError::Inval,
-            FsError::NoDeviceSpace => SysError::Nomem,
-            FsError::DirRemoved => SysError::Noent,
-            FsError::DirNotEmpty => SysError::Notempty,
-            FsError::WrongFs => SysError::Inval,
-            FsError::DeviceError => SysError::Io,
-        }
-    }
 }

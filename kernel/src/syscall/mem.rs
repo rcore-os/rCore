@@ -5,8 +5,11 @@ use crate::memory::GlobalFrameAlloc;
 
 use super::*;
 
-pub fn sys_mmap(mut addr: usize, len: usize, prot: MmapProt, flags: MmapFlags, fd: i32, offset: usize) -> SysResult {
+pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32, offset: usize) -> SysResult {
+    let prot = MmapProt::from_bits_truncate(prot);
+    let flags = MmapFlags::from_bits_truncate(flags);
     info!("mmap addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
+
     let mut proc = process();
     addr = proc.memory_set.find_free_area(addr, len);
 

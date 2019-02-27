@@ -108,7 +108,7 @@ pub fn sys_getpid() -> SysResult {
 }
 
 /// Exit the current process
-pub fn sys_exit(exit_code: isize) -> SysResult {
+pub fn sys_exit(exit_code: isize) -> ! {
     let pid = thread::current().id();
     info!("exit: {}, code: {}", pid, exit_code);
     processor().manager().exit(pid, exit_code as usize);

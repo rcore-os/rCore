@@ -184,6 +184,26 @@ fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result
     proc.files.get_mut(&fd).ok_or(SysError::Inval)
 }
 
+impl From<FsError> for SysError {
+    fn from(error: FsError) -> Self {
+        match error {
+            FsError::NotSupported => SysError::Unimp,
+            FsError::NotFile => SysError::Isdir,
+            FsError::IsDir => SysError::Isdir,
+            FsError::NotDir => SysError::Notdir,
+            FsError::EntryNotFound => SysError::Noent,
+            FsError::EntryExist => SysError::Exists,
+            FsError::NotSameFs => SysError::Xdev,
+            FsError::InvalidParam => SysError::Inval,
+            FsError::NoDeviceSpace => SysError::Nomem,
+            FsError::DirRemoved => SysError::Noent,
+            FsError::DirNotEmpty => SysError::Notempty,
+            FsError::WrongFs => SysError::Inval,
+            FsError::DeviceError => SysError::Io,
+        }
+    }
+}
+
 bitflags! {
     struct OpenFlags: usize {
         /// read only

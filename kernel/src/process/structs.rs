@@ -9,7 +9,7 @@ use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::fs::{FileHandle, OpenOptions};
 
-use super::abi::ProcInitInfo;
+use super::abi::{self, ProcInitInfo};
 
 // TODO: avoid pub
 pub struct Thread {
@@ -102,6 +102,17 @@ impl Thread {
         let init_info = ProcInitInfo {
             args: args.map(|s| String::from(s)).collect(),
             envs: BTreeMap::new(),
+            auxv: {
+                let mut map = BTreeMap::new();
+                let phdr = elf.program_iter()
+                    .find(|ph| ph.get_type() == Ok(Type::Phdr))
+                    .expect("PHDR section not found")
+                    .virtual_addr();
+                map.insert(abi::AT_PHDR, phdr as usize);
+                map.insert(abi::AT_PHENT, elf.header.pt2.ph_entry_size() as usize);
+                map.insert(abi::AT_PHNUM, elf.header.pt2.ph_count() as usize);
+                map
+            },
         };
         unsafe {
             memory_set.with(|| { ustack_top = init_info.push_at(ustack_top) });

@@ -6,7 +6,7 @@ use core::ptr::null;
 pub struct ProcInitInfo {
     pub args: Vec<String>,
     pub envs: BTreeMap<String, String>,
-//    pub auxv: Vec<String>,
+    pub auxv: BTreeMap<u8, usize>,
 }
 
 impl ProcInitInfo {
@@ -27,8 +27,11 @@ impl ProcInitInfo {
             writer.push_str(arg.as_str());
             writer.sp
         }).collect();
-        // TODO: auxiliary vector entries
-        writer.push_slice(&[null::<u8>()]);
+        // auxiliary vector entries
+        writer.push_slice(&[null::<u8>(), null::<u8>()]);
+        for (&type_, &value) in self.auxv.iter() {
+            writer.push_slice(&[type_ as usize, value]);
+        }
         // envionment pointers
         writer.push_slice(&[null::<u8>()]);
         writer.push_slice(envs.as_slice());
@@ -59,4 +62,6 @@ impl StackWriter {
     }
 }
 
-
+pub const AT_PHDR: u8 = 3;
+pub const AT_PHENT: u8 = 4;
+pub const AT_PHNUM: u8 = 5;
