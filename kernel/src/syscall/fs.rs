@@ -11,7 +11,7 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     if !proc.memory_set.check_mut_array(base, len) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = get_file(&mut proc, fd)?.read(slice)?;
@@ -22,7 +22,7 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     if !proc.memory_set.check_array(base, len) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = get_file(&mut proc, fd)?.write(slice)?;
@@ -57,7 +57,7 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::Inval)?;
+        .ok_or(SysError::EINVAL)?;
     let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
@@ -71,7 +71,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
         match dir_inode.find(file_name) {
             Ok(file_inode) => {
                 if flags.contains(OpenFlags::EXCLUSIVE) {
-                    return Err(SysError::Exists);
+                    return Err(SysError::EEXIST);
                 }
                 file_inode
             },
@@ -100,16 +100,16 @@ pub fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     match process().files.remove(&fd) {
         Some(_) => Ok(0),
-        None => Err(SysError::Inval),
+        None => Err(SysError::EINVAL),
     }
 }
 
 pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::Inval)?;
+        .ok_or(SysError::EINVAL)?;
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     info!("stat: path: {}", path);
 
@@ -123,7 +123,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     info!("fstat: fd: {}", fd);
     let mut proc = process();
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let file = get_file(&mut proc, fd)?;
     let stat = Stat::from(file.info()?);
@@ -136,7 +136,7 @@ pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
         SEEK_SET => SeekFrom::Start(offset as u64),
         SEEK_END => SeekFrom::End(offset),
         SEEK_CUR => SeekFrom::Current(offset),
-        _ => return Err(SysError::Inval),
+        _ => return Err(SysError::EINVAL),
     };
     info!("lseek: fd: {}, pos: {:?}", fd, pos);
 
@@ -153,16 +153,16 @@ pub fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     info!("getdirentry: {}", fd);
     let mut proc = process();
     if !proc.memory_set.check_mut_ptr(dentry_ptr) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let file = get_file(&mut proc, fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let info = file.info()?;
     if info.type_ != FileType::Dir || info.size <= dentry.entry_id() {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let name = file.get_entry(dentry.entry_id())?;
     dentry.set_name(name.as_str());
@@ -173,7 +173,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     info!("dup2: {} {}", fd1, fd2);
     let mut proc = process();
     if proc.files.contains_key(&fd2) {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     let file = get_file(&mut proc, fd1)?.clone();
     proc.files.insert(fd2, file);
@@ -181,25 +181,25 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 }
 
 fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut FileHandle, SysError> {
-    proc.files.get_mut(&fd).ok_or(SysError::Inval)
+    proc.files.get_mut(&fd).ok_or(SysError::EINVAL)
 }
 
 impl From<FsError> for SysError {
     fn from(error: FsError) -> Self {
         match error {
-            FsError::NotSupported => SysError::Unimp,
-            FsError::NotFile => SysError::Isdir,
-            FsError::IsDir => SysError::Isdir,
-            FsError::NotDir => SysError::Notdir,
-            FsError::EntryNotFound => SysError::Noent,
-            FsError::EntryExist => SysError::Exists,
-            FsError::NotSameFs => SysError::Xdev,
-            FsError::InvalidParam => SysError::Inval,
-            FsError::NoDeviceSpace => SysError::Nomem,
-            FsError::DirRemoved => SysError::Noent,
-            FsError::DirNotEmpty => SysError::Notempty,
-            FsError::WrongFs => SysError::Inval,
-            FsError::DeviceError => SysError::Io,
+            FsError::NotSupported => SysError::ENOSYS,
+            FsError::NotFile => SysError::EISDIR,
+            FsError::IsDir => SysError::EISDIR,
+            FsError::NotDir => SysError::ENOTDIR,
+            FsError::EntryNotFound => SysError::ENOENT,
+            FsError::EntryExist => SysError::EEXIST,
+            FsError::NotSameFs => SysError::EXDEV,
+            FsError::InvalidParam => SysError::EINVAL,
+            FsError::NoDeviceSpace => SysError::ENOMEM,
+            FsError::DirRemoved => SysError::ENOENT,
+            FsError::DirNotEmpty => SysError::ENOTEMPTY,
+            FsError::WrongFs => SysError::EINVAL,
+            FsError::DeviceError => SysError::EIO,
         }
     }
 }
@@ -407,14 +407,14 @@ struct IoVecs(Vec<&'static mut [u8]>);
 impl IoVecs {
     fn check_and_new(iov_ptr: *const IoVec, iov_count: usize, vm: &MemorySet, readv: bool) -> Result<Self, SysError> {
         if !vm.check_array(iov_ptr, iov_count) {
-            return Err(SysError::Inval);
+            return Err(SysError::EINVAL);
         }
         let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
         // check all bufs in iov
         for iov in iovs.iter() {
             if readv && !vm.check_mut_array(iov.base, iov.len as usize)
                 || !readv && !vm.check_array(iov.base, iov.len as usize) {
-                return Err(SysError::Inval);
+                return Err(SysError::EINVAL);
             }
         }
         let slices = iovs.iter().map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) }).collect();

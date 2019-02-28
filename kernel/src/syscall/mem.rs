@@ -15,7 +15,7 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
 
     if flags.contains(MmapFlags::ANONYMOUS) {
         if flags.contains(MmapFlags::SHARED) {
-            return Err(SysError::Inval);
+            return Err(SysError::EINVAL);
         }
         let handler = Delay::new(prot_to_attr(prot), GlobalFrameAlloc);
         proc.memory_set.push(addr, addr + len, handler, "mmap");

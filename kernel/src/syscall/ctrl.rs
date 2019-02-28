@@ -9,6 +9,6 @@ pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
             tf.fsbase = addr;
             Ok(0)
         }
-        _ => Err(SysError::Inval),
+        _ => Err(SysError::EINVAL),
     }
 }
