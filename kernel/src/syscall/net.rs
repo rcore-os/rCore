@@ -82,6 +82,18 @@ struct SockaddrIn {
     sin_zero: [u8; 8],
 }
 
+fn get_handle(proc: &mut MutexGuard<'static, Process>, fd: usize) -> Result<SocketHandle, SysError> {
+    if let Some(file) = proc.files.get(&fd) {
+        if let FileLike::Socket(handle) = file {
+            return Ok((*handle).clone());
+        } else {
+            Err(SysError::ENOTSOCK)
+        }
+    } else {
+        Err(SysError::EBADF)
+    }
+}
+
 pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     info!(
         "sys_connect: fd: {}, addr: {:?}, addrlen: {}",
@@ -110,28 +122,24 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     let iface = &mut *NET_DRIVERS.lock()[0];
     iface.poll(&mut proc.sockets);
 
-    if let Some(FileLike::Socket(handle)) = proc.files.get(&fd) {
-        // TODO: check its type
-        let tcp_handle = (*handle).clone();
-        let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
+    // TODO: check its type
+    let tcp_handle = get_handle(&mut proc, fd)?;
+    let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
 
-        // TODO selects non-conflict high port
-        static mut ephermeral_port: u16 = 49152;
-        let temp_port = unsafe {
-            if ephermeral_port == 65535 {
-                ephermeral_port = 49152;
-            } else {
-                ephermeral_port = ephermeral_port + 1;
-            }
-            ephermeral_port
-        };
-
-        match socket.connect((dest.unwrap(), port), temp_port) {
-            Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EISCONN),
+    // TODO selects non-conflict high port
+    static mut ephermeral_port: u16 = 49152;
+    let temp_port = unsafe {
+        if ephermeral_port == 65535 {
+            ephermeral_port = 49152;
+        } else {
+            ephermeral_port = ephermeral_port + 1;
         }
-    } else {
-        Err(SysError::ENOTSOCK)
+        ephermeral_port
+    };
+
+    match socket.connect((dest.unwrap(), port), temp_port) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SysError::EISCONN),
     }
 }
 
@@ -145,25 +153,21 @@ pub fn sys_write_socket(
     let iface = &mut *NET_DRIVERS.lock()[0];
     iface.poll(&mut proc.sockets);
 
-    if let Some(FileLike::Socket(handle)) = proc.files.get(&fd) {
-        // TODO: check its type
-        let tcp_handle = (*handle).clone();
-        let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
-        let slice = unsafe { slice::from_raw_parts(base, len) };
-        if socket.is_open() {
-            if socket.can_send() {
-                match socket.send_slice(&slice) {
-                    Ok(size) => Ok(size as isize),
-                    Err(err) =>  Err(SysError::ENOBUFS)
-                }
-            } else {
-                Err(SysError::ENOBUFS)
+    // TODO: check its type
+    let tcp_handle = get_handle(proc, fd)?;
+    let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    if socket.is_open() {
+        if socket.can_send() {
+            match socket.send_slice(&slice) {
+                Ok(size) => Ok(size as isize),
+                Err(err) =>  Err(SysError::ENOBUFS)
             }
         } else {
-            Err(SysError::ECONNREFUSED)
+            Err(SysError::ENOBUFS)
         }
     } else {
-        Err(SysError::ENOTSOCK)
+        Err(SysError::ECONNREFUSED)
     }
 }
 
