@@ -4,6 +4,7 @@ use log::*;
 use rcore_fs::vfs::INode;
 use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
+use smoltcp::socket::{SocketSet, SocketHandle};
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
@@ -18,10 +19,18 @@ pub struct Thread {
     pub proc: Arc<Mutex<Process>>,
 }
 
+#[derive(Clone)]
+pub enum FileLike {
+    File(FileHandle),
+    Socket(SocketHandle)
+}
+
 pub struct Process {
     pub memory_set: MemorySet,
-    pub files: BTreeMap<usize, FileHandle>,
+    pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
+    // TODO: discuss: move it to interface or leave it here
+    pub sockets: SocketSet<'static, 'static, 'static>,
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -43,6 +52,7 @@ impl Thread {
                 memory_set: MemorySet::new(),
                 files: BTreeMap::default(),
                 cwd: String::new(),
+                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -58,6 +68,7 @@ impl Thread {
                 memory_set,
                 files: BTreeMap::default(),
                 cwd: String::new(),
+                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -122,9 +133,9 @@ impl Thread {
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
-        files.insert(0, FileHandle::new(crate::fs::STDIN.clone(), OpenOptions { read: true, write: false, append: false }));
-        files.insert(1, FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false }));
-        files.insert(2, FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false }));
+        files.insert(0, FileLike::File(FileHandle::new(crate::fs::STDIN.clone(), OpenOptions { read: true, write: false, append: false })));
+        files.insert(1, FileLike::File(FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false })));
+        files.insert(2, FileLike::File(FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false })));
 
         Box::new(Thread {
             context: unsafe {
@@ -136,6 +147,7 @@ impl Thread {
                 memory_set,
                 files,
                 cwd: String::new(),
+                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -167,6 +179,8 @@ impl Thread {
                 memory_set,
                 files: self.proc.lock().files.clone(),
                 cwd: String::new(),
+                // TODO: duplicate sockets for child process
+                sockets: SocketSet::new(vec![])
             })),
         })
     }

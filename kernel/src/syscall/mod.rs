@@ -51,16 +51,16 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         039 => sys_getpid(),
 //        040 => sys_getppid(),
         041 => sys_socket(args[0], args[1], args[2]),
-//        042 => sys_connect(),
+        042 => sys_connect(args[0], args[1] as *const u8, args[2]),
 //        043 => sys_accept(),
-//        044 => sys_sendto(),
-//        045 => sys_recvfrom(),
+        044 => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const u8, args[5]),
+        045 => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *const u8, args[5]),
 //        046 => sys_sendmsg(),
 //        047 => sys_recvmsg(),
 //        048 => sys_shutdown(),
 //        049 => sys_bind(),
 //        050 => sys_listen(),
-//        054 => sys_setsockopt(),
+        054 => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
 //        055 => sys_getsockopt(),
 //        056 => sys_clone(),
         057 => sys_fork(tf),
@@ -106,8 +106,20 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_ioctl is unimplemented");
             Ok(0)
         }
+        037 => {
+            warn!("sys_alarm is unimplemented");
+            Ok(0)
+        }
+        072 => {
+            warn!("sys_fcntl is unimplemented");
+            Ok(0)
+        }
         102 => {
             warn!("sys_getuid is unimplemented");
+            Ok(0)
+        }
+        105 => {
+            warn!("sys_setuid is unimplemented");
             Ok(0)
         }
         107 => {
@@ -136,6 +148,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             crate::trap::error(tf);
         }
     };
+    debug!("syscall id {} ret with {:?}", id, ret);
     match ret {
         Ok(code) => code,
         Err(err) => -(err as isize),
@@ -188,6 +201,13 @@ pub enum SysError {
     ENOLCK = 37,
     ENOSYS = 38,
     ENOTEMPTY = 39,
+    ENOTSOCK = 80,
+    EPFNOSUPPORT = 96,
+    EAFNOSUPPORT = 97,
+    ENOBUFS = 105,
+    EISCONN = 106,
+    ENOTCONN = 107,
+    ECONNREFUSED = 111,
 }
 
 #[allow(non_snake_case)]

@@ -6,6 +6,7 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 
 use super::*;
+use super::net::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
@@ -24,8 +25,16 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     if !proc.memory_set.check_array(base, len) {
         return Err(SysError::EINVAL);
     }
+    match proc.files.get(&fd) {
+        Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
+        Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, base, len),
+        None => Err(SysError::EINVAL)
+    }
+}
+
+pub fn sys_write_file(proc: &mut MutexGuard<'static, Process>, fd: usize, base: *const u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    let len = get_file(&mut proc, fd)?.write(slice)?;
+    let len = get_file(proc, fd)?.write(slice)?;
     Ok(len as isize)
 }
 
@@ -92,7 +101,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let fd = proc.get_free_inode();
 
     let file = FileHandle::new(inode, flags.to_options());
-    proc.files.insert(fd, file);
+    proc.files.insert(fd, FileLike::File(file));
     Ok(fd as isize)
 }
 
@@ -176,12 +185,17 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
         return Err(SysError::EINVAL);
     }
     let file = get_file(&mut proc, fd1)?.clone();
-    proc.files.insert(fd2, file);
+    proc.files.insert(fd2, FileLike::File(file));
     Ok(0)
 }
 
 fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut FileHandle, SysError> {
-    proc.files.get_mut(&fd).ok_or(SysError::EINVAL)
+    proc.files.get_mut(&fd).ok_or(SysError::EINVAL).and_then(|f| {
+        match f {
+            FileLike::File(file) => Ok(file),
+            _ => Err(SysError::EINVAL)
+        }
+    })
 }
 
 impl From<FsError> for SysError {
