@@ -159,7 +159,9 @@ fn get_line(history: &mut Vec<Vec<u8>>) -> String {
                 }
                 cursor += 1;
                 for _i in cursor..line_vec.len() {
-                    put_char(BS);
+                    put_char(ESC);
+                    put_char(b'[');
+                    put_char(b'D');
                 }
             }
             _ => {
