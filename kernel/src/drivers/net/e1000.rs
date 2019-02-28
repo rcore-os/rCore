@@ -6,10 +6,7 @@ use core::mem::size_of;
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
 
-use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use bitflags::*;
-use device_tree::util::SliceRead;
-use device_tree::Node;
 use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
@@ -17,14 +14,17 @@ use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
 use smoltcp::Result;
-use volatile::{ReadOnly, Volatile};
+use smoltcp::wire::*;
+use smoltcp::iface::*;
+use smoltcp::socket::*;
+use alloc::collections::BTreeMap;
+use volatile::{Volatile};
 
-use crate::arch::cpu;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS};
+use super::super::{DeviceType, Driver, NetDriver, NET_DRIVERS};
 
 pub struct E1000 {
     header: usize,
@@ -55,6 +55,10 @@ const E1000_TDT: usize = 0x3818 / 4;
 const E1000_MTA: usize = 0x5200 / 4;
 const E1000_RAL: usize = 0x5400 / 4;
 const E1000_RAH: usize = 0x5404 / 4;
+
+pub struct E1000Interface {
+    iface: EthernetInterface<'static, 'static, 'static, E1000Driver>
+}
 
 #[derive(Clone)]
 pub struct E1000Driver(Arc<Mutex<E1000>>);
@@ -118,13 +122,26 @@ impl E1000 {
     }
 }
 
-impl NetDriver for E1000Driver {
+impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
-        self.0.lock().mac
+        self.iface.ethernet_addr()
     }
 
     fn get_ifname(&self) -> String {
         format!("e1000")
+    }
+
+    fn poll(&mut self, sockets: &mut SocketSet) -> Option<bool> {
+        let timestamp = Instant::from_millis(unsafe { crate::trap::TICK as i64 });
+        match self.iface.poll(sockets, timestamp) {
+            Ok(update) => {
+                Some(update)
+            }
+            Err(err) => {
+                debug!("poll got err {}", err);
+                None
+            }
+        }
     }
 }
 
@@ -407,6 +424,19 @@ pub fn e1000_init(header: usize, size: usize) {
 
     let net_driver = E1000Driver(Arc::new(Mutex::new(driver)));
 
-    DRIVERS.lock().push(Box::new(net_driver.clone()));
-    NET_DRIVERS.lock().push(Box::new(net_driver));
+    let ethernet_addr = EthernetAddress::from_bytes(&mac);
+    let ip_addrs = [IpCidr::new(IpAddress::v4(10,0,0,2), 24)];
+    let neighbor_cache = NeighborCache::new(BTreeMap::new());
+    let iface = EthernetInterfaceBuilder::new(net_driver)
+        .ethernet_addr(ethernet_addr)
+        .ip_addrs(ip_addrs)
+        .neighbor_cache(neighbor_cache)
+        .finalize();
+
+    let e1000_iface = E1000Interface {
+        iface,
+    };
+
+    //DRIVERS.lock().push(Box::new(net_driver.clone()));
+    NET_DRIVERS.lock().push(Box::new(e1000_iface));
 }

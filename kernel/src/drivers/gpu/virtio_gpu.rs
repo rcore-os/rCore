@@ -1,6 +1,5 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::prelude::*;
-use core::mem::size_of;
 use core::slice;
 
 use bitflags::*;

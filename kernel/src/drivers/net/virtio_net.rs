@@ -4,7 +4,6 @@ use alloc::prelude::*;
 use alloc::sync::Arc;
 use core::mem::size_of;
 use core::slice;
-use core::sync::atomic::{fence, Ordering};
 
 use bitflags::*;
 use device_tree::Node;
@@ -16,9 +15,9 @@ use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::Result;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
+use smoltcp::socket::SocketSet;
 use volatile::{ReadOnly, Volatile};
 
-use crate::arch::cpu;
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -86,6 +85,9 @@ impl NetDriver for VirtIONetDriver {
         format!("virtio{}", self.0.lock().interrupt)
     }
 
+    fn poll(&mut self, sockets: &mut SocketSet) -> Option<bool> {
+        unimplemented!()
+    }
 }
 
 pub struct VirtIONetRxToken(VirtIONetDriver);

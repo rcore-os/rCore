@@ -1,14 +1,8 @@
 use crate::thread;
 use crate::drivers::NET_DRIVERS;
-use smoltcp::wire::*;
-use smoltcp::iface::*;
 use smoltcp::socket::*;
-use alloc::collections::BTreeMap;
 use crate::drivers::NetDriver;
-use crate::drivers::net::virtio_net::VirtIONetDriver;
-use crate::drivers::net::e1000::E1000Driver;
 use alloc::vec;
-use smoltcp::time::Instant;
 use core::fmt::Write;
 
 pub extern fn server(_arg: usize) -> ! {
@@ -17,20 +11,6 @@ pub extern fn server(_arg: usize) -> ! {
             thread::yield_now();
         }
     }
-
-    let driver = {
-        let ref_driver = &mut *NET_DRIVERS.lock()[0];
-        // TODO: support multiple net drivers here
-        ref_driver.as_any().downcast_ref::<E1000Driver>().unwrap().clone()
-    };
-    let ethernet_addr = driver.get_mac();
-    let ip_addrs = [IpCidr::new(IpAddress::v4(10,0,0,2), 24)];
-    let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let mut iface = EthernetInterfaceBuilder::new(driver.clone())
-        .ethernet_addr(ethernet_addr)
-        .ip_addrs(ip_addrs)
-        .neighbor_cache(neighbor_cache)
-        .finalize();
 
     let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 64]);
     let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 128]);
@@ -51,15 +31,15 @@ pub extern fn server(_arg: usize) -> ! {
 
     loop {
         {
-            let timestamp = Instant::from_millis(unsafe { crate::trap::TICK as i64 });
-            match iface.poll(&mut sockets, timestamp) {
-                Ok(event) => {
-                    if (!event) {
+            let iface = &mut *NET_DRIVERS.lock()[0];
+            match iface.poll(&mut sockets) {
+                Some(event) => {
+                    if !event {
                         continue;
                     }
                 },
-                Err(e) => {
-                    println!("poll error: {}", e);
+                None => {
+                    continue
                 }
             }
 

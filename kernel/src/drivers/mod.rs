@@ -3,6 +3,7 @@ use core::any::Any;
 
 use lazy_static::lazy_static;
 use smoltcp::wire::EthernetAddress;
+use smoltcp::socket::SocketSet;
 
 use crate::sync::SpinNoIrqLock;
 
@@ -29,12 +30,14 @@ pub trait Driver : Send + AsAny {
     fn device_type(&self) -> DeviceType;
 }
 
-pub trait NetDriver: Driver {
+pub trait NetDriver : Send {
     // get mac address for this device
     fn get_mac(&self) -> EthernetAddress;
 
     // get interface name for this device
     fn get_ifname(&self) -> String;
+
+    fn poll(&mut self, socket: &mut SocketSet) -> Option<bool>;
 }
 
 // little hack, see https://users.rust-lang.org/t/how-to-downcast-from-a-trait-any-to-a-struct/11219/3

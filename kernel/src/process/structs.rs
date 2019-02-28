@@ -172,6 +172,12 @@ impl Thread {
     }
 }
 
+impl Process {
+    pub fn get_free_inode(&self) -> usize {
+        (0..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
+}
+
 
 /// Generate a MemorySet according to the ELF file.
 /// Also return the real entry point address.

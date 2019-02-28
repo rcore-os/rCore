@@ -1,9 +1,7 @@
 use alloc::prelude::*;
 use alloc::sync::Arc;
-use alloc::vec;
 use core::cmp::min;
-use core::fmt;
-use core::mem::{size_of, zeroed};
+use core::mem::{size_of};
 use core::slice;
 
 use bitflags::*;
@@ -16,7 +14,6 @@ use volatile::Volatile;
 
 use rcore_fs::dev::BlockDevice;
 
-use crate::arch::cpu;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 

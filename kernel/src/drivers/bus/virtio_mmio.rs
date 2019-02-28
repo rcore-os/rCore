@@ -12,7 +12,6 @@ use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::arch::memory;
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};

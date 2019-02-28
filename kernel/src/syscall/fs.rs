@@ -89,7 +89,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
         }
     };
 
-    let fd = (3..).find(|i| !proc.files.contains_key(i)).unwrap();
+    let fd = proc.get_free_inode();
 
     let file = FileHandle::new(inode, flags.to_options());
     proc.files.insert(fd, file);

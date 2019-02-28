@@ -18,12 +18,14 @@ use self::mem::*;
 use self::proc::*;
 use self::time::*;
 use self::ctrl::*;
+use self::net::*;
 
 mod fs;
 mod mem;
 mod proc;
 mod time;
 mod ctrl;
+mod net;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
@@ -48,7 +50,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         035 => sys_sleep(args[0]), // TODO: nanosleep
         039 => sys_getpid(),
 //        040 => sys_getppid(),
-//        041 => sys_socket(),
+        041 => sys_socket(args[0], args[1], args[2]),
 //        042 => sys_connect(),
 //        043 => sys_accept(),
 //        044 => sys_sendto(),

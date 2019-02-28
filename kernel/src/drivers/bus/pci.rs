@@ -1,6 +1,4 @@
 use crate::drivers::net::e1000;
-use crate::logging::*;
-use core::slice;
 use x86_64::instructions::port::Port;
 
 const VENDOR: u32 = 0x00;
@@ -67,7 +65,7 @@ impl PciTag {
         pci_addr.write(0);
 
         let ret = d >> (rsh * 8);
-        let m = if (width < 4) {
+        let m = if width < 4 {
             (1 << (8 * width)) - 1
         } else {
             0xffffffff
@@ -109,13 +107,13 @@ impl PciTag {
         base = base & PCI_BASE_ADDRESS_MEM_MASK;
         max_base = max_base & PCI_BASE_ADDRESS_MEM_MASK;
 
-        if (max_base == 0) {
+        if max_base == 0 {
             return None;
         }
 
         // linux/drivers/pci/probe.c pci_size
         let mut size = PCI_BASE_ADDRESS_MEM_MASK & max_base;
-        if (size == 0) {
+        if size == 0 {
             return None;
         }
         size = (size & !(size - 1)) - 1;
