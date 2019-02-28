@@ -82,15 +82,13 @@ struct SockaddrIn {
     sin_zero: [u8; 8],
 }
 
-fn get_handle(proc: &mut MutexGuard<'static, Process>, fd: usize) -> Result<SocketHandle, SysError> {
-    if let Some(file) = proc.files.get(&fd) {
-        if let FileLike::Socket(handle) = file {
-            return Ok((*handle).clone());
-        } else {
-            Err(SysError::ENOTSOCK)
+impl Process {
+    fn get_handle(&mut self, fd: usize) -> Result<SocketHandle, SysError> {
+        let file = self.files.get_mut(&fd).ok_or(SysError::EBADF)?;
+        match file {
+            FileLike::Socket(handle) => Ok(handle.clone()),
+            _ => Err(SysError::ENOTSOCK),
         }
-    } else {
-        Err(SysError::EBADF)
     }
 }
 
@@ -123,7 +121,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     iface.poll(&mut proc.sockets);
 
     // TODO: check its type
-    let tcp_handle = get_handle(&mut proc, fd)?;
+    let tcp_handle = proc.get_handle(fd)?;
     let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
 
     // TODO selects non-conflict high port
@@ -144,7 +142,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 }
 
 pub fn sys_write_socket(
-    proc: &mut MutexGuard<'static, Process>,
+    proc: &mut Process,
     fd: usize,
     base: *const u8,
     len: usize,
@@ -154,7 +152,7 @@ pub fn sys_write_socket(
     iface.poll(&mut proc.sockets);
 
     // TODO: check its type
-    let tcp_handle = get_handle(proc, fd)?;
+    let tcp_handle = proc.get_handle(fd)?;
     let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
     let slice = unsafe { slice::from_raw_parts(base, len) };
     if socket.is_open() {

@@ -15,7 +15,7 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
         return Err(SysError::EINVAL);
     }
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let len = get_file(&mut proc, fd)?.read(slice)?;
+    let len = proc.get_file(fd)?.read(slice)?;
     Ok(len as isize)
 }
 
@@ -32,9 +32,9 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     }
 }
 
-pub fn sys_write_file(proc: &mut MutexGuard<'static, Process>, fd: usize, base: *const u8, len: usize) -> SysResult {
+pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    let len = get_file(proc, fd)?.write(slice)?;
+    let len = proc.get_file(fd)?.write(slice)?;
     Ok(len as isize)
 }
 
@@ -44,7 +44,7 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
     info!("readv: fd: {}, iov: {:#x?}", fd, iovs);
 
     // read all data to a buf
-    let file = get_file(&mut proc, fd)?;
+    let file = proc.get_file(fd)?;
     let mut buf = iovs.new_buf(true);
     let len = file.read(buf.as_mut_slice())?;
     // copy data to user
@@ -57,7 +57,7 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
     let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set,  false)?;
     info!("writev: fd: {}, iovs: {:#x?}", fd, iovs);
 
-    let file = get_file(&mut proc, fd)?;
+    let file = proc.get_file(fd)?;
     let buf = iovs.read_all_to_vec();
     let len = file.write(buf.as_slice())?;
     Ok(len as isize)
@@ -134,7 +134,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
         return Err(SysError::EINVAL);
     }
-    let file = get_file(&mut proc, fd)?;
+    let file = proc.get_file(fd)?;
     let stat = Stat::from(file.info()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
@@ -150,7 +150,7 @@ pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
     info!("lseek: fd: {}, pos: {:?}", fd, pos);
 
     let mut proc = process();
-    let file = get_file(&mut proc, fd)?;
+    let file = proc.get_file(fd)?;
     let offset = file.seek(pos)?;
     Ok(offset as isize)
 }
@@ -164,7 +164,7 @@ pub fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
     if !proc.memory_set.check_mut_ptr(dentry_ptr) {
         return Err(SysError::EINVAL);
     }
-    let file = get_file(&mut proc, fd)?;
+    let file = proc.get_file(fd)?;
     let dentry = unsafe { &mut *dentry_ptr };
     if !dentry.check() {
         return Err(SysError::EINVAL);
@@ -184,18 +184,21 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     if proc.files.contains_key(&fd2) {
         return Err(SysError::EINVAL);
     }
-    let file = get_file(&mut proc, fd1)?.clone();
+    let file = proc.get_file(fd1)?.clone();
     proc.files.insert(fd2, FileLike::File(file));
     Ok(0)
 }
 
-fn get_file<'a>(proc: &'a mut MutexGuard<'static, Process>, fd: usize) -> Result<&'a mut FileHandle, SysError> {
-    proc.files.get_mut(&fd).ok_or(SysError::EINVAL).and_then(|f| {
-        match f {
-            FileLike::File(file) => Ok(file),
-            _ => Err(SysError::EINVAL)
-        }
-    })
+
+impl Process {
+    fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
+        self.files.get_mut(&fd).ok_or(SysError::EBADF).and_then(|f| {
+            match f {
+                FileLike::File(file) => Ok(file),
+                _ => Err(SysError::EBADF)
+            }
+        })
+    }
 }
 
 impl From<FsError> for SysError {
