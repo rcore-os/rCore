@@ -1,7 +1,7 @@
 //! System call
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{slice, str};
+use core::{slice, str, fmt};
 
 use bitflags::bitflags;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
@@ -144,26 +144,98 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 
 pub type SysResult = Result<isize, SysError>;
 
+#[allow(dead_code)]
 #[repr(isize)]
 #[derive(Debug)]
 pub enum SysError {
-    // TODO: Linux Error Code
-    // ucore compatible error code
-    // note that ucore_plus use another error code table, which is a modified version of the ones used in linux
-    // name conversion E_XXXXX -> SysError::Xxxxx
-    // see https://github.com/oscourse-tsinghua/ucore_os_lab/blob/master/labcodes/lab8/libs/error.h
-    // we only add current used errors here
-    Inval = 3,// Invalid argument, also Invaild fd number.
-    Nomem = 4,// Out of memory, also used as no device space in ucore
-    Noent = 16,// No such file or directory
-    Isdir = 17,// Fd is a directory
-    Notdir = 18,// Fd is not a directory
-    Xdev = 19,// Cross-device link
-    Unimp = 20,// Not implemented
-    Exists = 23,// File exists
-    Notempty = 24,// Directory is not empty
-    Io = 5,// I/O Error
+    EUNDEF = 0,
+    EPERM = 1,
+    ENOENT = 2,
+    ESRCH = 3,
+    EINTR = 4,
+    EIO = 5,
+    ENXIO = 6,
+    E2BIG = 7,
+    ENOEXEC = 8,
+    EBADF = 9,
+    ECHILD = 10,
+    EAGAIN = 11,
+    ENOMEM = 12,
+    EACCES = 13,
+    EFAULT = 14,
+    ENOTBLK = 15,
+    EBUSY = 16,
+    EEXIST = 17,
+    EXDEV = 18,
+    ENODEV = 19,
+    ENOTDIR = 20,
+    EISDIR = 21,
+    EINVAL = 22,
+    ENFILE = 23,
+    EMFILE = 24,
+    ENOTTY = 25,
+    ETXTBSY = 26,
+    EFBIG = 27,
+    ENOSPC = 28,
+    ESPIPE = 29,
+    EROFS = 30,
+    EMLINK = 31,
+    EPIPE = 32,
+    EDOM = 33,
+    ERANGE = 34,
+    EDEADLK = 35,
+    ENAMETOOLONG = 36,
+    ENOLCK = 37,
+    ENOSYS = 38,
+    ENOTEMPTY = 39,
+}
 
-    #[allow(dead_code)]
-    Unspcified = 1,// A really really unknown error.
+#[allow(non_snake_case)]
+impl fmt::Display for SysError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}",
+            match self {
+                EPERM => "Operation not permitted",
+                ENOENT => "No such file or directory",
+                ESRCH => "No such process",
+                EINTR => "Interrupted system call",
+                EIO => "I/O error",
+                ENXIO => "No such device or address",
+                E2BIG => "Argument list too long",
+                ENOEXEC => "Exec format error",
+                EBADF => "Bad file number",
+                ECHILD => "No child processes",
+                EAGAIN => "Try again",
+                ENOMEM => "Out of memory",
+                EACCES => "Permission denied",
+                EFAULT => "Bad address",
+                ENOTBLK => "Block device required",
+                EBUSY => "Device or resource busy",
+                EEXIST => "File exists",
+                EXDEV => "Cross-device link",
+                ENODEV => "No such device",
+                ENOTDIR => "Not a directory",
+                EISDIR => "Is a directory",
+                EINVAL => "Invalid argument",
+                ENFILE => "File table overflow",
+                EMFILE => "Too many open files",
+                ENOTTY => "Not a typewriter",
+                ETXTBSY => "Text file busy",
+                EFBIG => "File too large",
+                ENOSPC => "No space left on device",
+                ESPIPE => "Illegal seek",
+                EROFS => "Read-only file system",
+                EMLINK => "Too many links",
+                EPIPE => "Broken pipe",
+                EDOM => "Math argument out of domain of func",
+                ERANGE => "Math result not representable",
+                EDEADLK => "Resource deadlock would occur",
+                ENAMETOOLONG => "File name too long",
+                ENOLCK => "No record locks available",
+                ENOSYS => "Function not implemented",
+                ENOTEMPTY => "Directory not empty",
+                _ => "Unknown error",
+            },
+        )
+    }
 }

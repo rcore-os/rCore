@@ -60,7 +60,7 @@ pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut T
     };
 
     if args.len() <= 0 {
-        return Err(SysError::Inval);
+        return Err(SysError::EINVAL);
     }
     // Read program file
     let path = args[0].as_str();

@@ -18,12 +18,12 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     Ok(fd as isize)
                 }
                 _ => {
-                    Err(SysError::Inval)
+                    Err(SysError::EINVAL)
                 }
             }
         }
         _ => {
-            return Err(SysError::Inval);
+            return Err(SysError::EINVAL);
         }
     }
 }
