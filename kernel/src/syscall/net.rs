@@ -125,14 +125,14 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     let mut socket = proc.sockets.get::<TcpSocket>(tcp_handle);
 
     // TODO selects non-conflict high port
-    static mut ephermeral_port: u16 = 49152;
+    static mut EPHEMERAL_PORT: u16 = 49152;
     let temp_port = unsafe {
-        if ephermeral_port == 65535 {
-            ephermeral_port = 49152;
+        if EPHEMERAL_PORT == 65535 {
+            EPHEMERAL_PORT = 49152;
         } else {
-            ephermeral_port = ephermeral_port + 1;
+            EPHEMERAL_PORT = EPHEMERAL_PORT + 1;
         }
-        ephermeral_port
+        EPHEMERAL_PORT
     };
 
     match socket.connect((dest.unwrap(), port), temp_port) {
