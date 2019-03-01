@@ -206,3 +206,15 @@ pub fn sys_recvfrom(
     warn!("sys_recvfrom is unimplemented");
     Err(SysError::EINVAL)
 }
+
+pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> SysResult {
+    let mut socket = proc.sockets.remove(handle);
+    match socket {
+        Socket::Tcp(ref mut tcp_socket) => {
+            tcp_socket.close();
+        }
+        _ => {}
+    }
+
+    Ok(0)
+}

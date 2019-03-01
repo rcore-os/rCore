@@ -107,8 +107,10 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
 
 pub fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
-    match process().files.remove(&fd) {
-        Some(_) => Ok(0),
+    let mut proc = process();
+    match proc.files.remove(&fd) {
+        Some(FileLike::File(_)) => Ok(0),
+        Some(FileLike::Socket(handle)) => sys_close_socket(&mut proc, fd, handle),
         None => Err(SysError::EINVAL),
     }
 }
