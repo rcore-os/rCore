@@ -139,7 +139,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
         return Err(SysError::EFAULT);
     }
     let file = proc.get_file(fd)?;
-    let stat = Stat::from(file.info()?);
+    let stat = Stat::from(file.metadata()?);
     // TODO: handle symlink
     unsafe { stat_ptr.write(stat); }
     Ok(0)
@@ -175,6 +175,33 @@ pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
     Ok(offset as isize)
 }
 
+pub fn sys_fsync(fd: usize) -> SysResult {
+    info!("fsync: fd: {}", fd);
+    process().get_file(fd)?.sync_all()?;
+    Ok(0)
+}
+
+pub fn sys_fdatasync(fd: usize) -> SysResult {
+    info!("fdatasync: fd: {}", fd);
+    process().get_file(fd)?.sync_data()?;
+    Ok(0)
+}
+
+pub fn sys_truncate(path: *const u8, len: usize) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::EFAULT)?;
+    info!("truncate: path: {:?}, len: {}", path, len);
+    proc.lookup_inode(&path)?.resize(len)?;
+    Ok(0)
+}
+
+pub fn sys_ftruncate(fd: usize, len: usize) -> SysResult {
+    info!("ftruncate: fd: {}, len: {}", fd, len);
+    process().get_file(fd)?.set_len(len as u64)?;
+    Ok(0)
+}
+
 pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> SysResult {
     info!("getdents64: fd: {}, ptr: {:?}, buf_size: {}", fd, buf, buf_size);
     let mut proc = process();
@@ -182,7 +209,7 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
         return Err(SysError::EFAULT);
     }
     let file = proc.get_file(fd)?;
-    let info = file.info()?;
+    let info = file.metadata()?;
     if info.type_ != FileType::Dir {
         return Err(SysError::ENOTDIR);
     }
@@ -263,6 +290,32 @@ pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
     Ok(0)
 }
 
+pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
+    let mut proc = process();
+    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath) }
+        .ok_or(SysError::EFAULT)?;
+    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath) }
+        .ok_or(SysError::EFAULT)?;
+    info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+
+    let (new_dir_path, new_file_name) = split_path(&newpath);
+    let inode = proc.lookup_inode(&oldpath)?;
+    let new_dir_inode = proc.lookup_inode(new_dir_path)?;
+    new_dir_inode.link(new_file_name, &inode)?;
+    Ok(0)
+}
+
+pub fn sys_unlink(path: *const u8) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::EFAULT)?;
+    info!("unlink: path: {:?}", path);
+
+    let (dir_path, file_name) = split_path(&path);
+    let dir_inode = proc.lookup_inode(dir_path)?;
+    dir_inode.unlink(file_name)?;
+    Ok(0)
+}
 
 impl Process {
     fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
