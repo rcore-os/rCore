@@ -110,7 +110,7 @@ pub fn sys_close(fd: usize) -> SysResult {
     let mut proc = process();
     match proc.files.remove(&fd) {
         Some(FileLike::File(_)) => Ok(0),
-        Some(FileLike::Socket(handle)) => sys_close_socket(&mut proc, fd, handle),
+        Some(FileLike::Socket(wrapper)) => sys_close_socket(&mut proc, fd, wrapper.handle),
         None => Err(SysError::EINVAL),
     }
 }

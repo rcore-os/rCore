@@ -20,9 +20,23 @@ pub struct Thread {
 }
 
 #[derive(Clone)]
+pub enum SocketType {
+    Raw,
+    Tcp,
+    Udp,
+    Icmp
+}
+
+#[derive(Clone)]
+pub struct SocketWrapper {
+    pub handle: SocketHandle,
+    pub socket_type: SocketType,
+}
+
+#[derive(Clone)]
 pub enum FileLike {
     File(FileHandle),
-    Socket(SocketHandle)
+    Socket(SocketWrapper)
 }
 
 pub struct Process {

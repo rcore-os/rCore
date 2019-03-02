@@ -14,7 +14,7 @@ use rcore_memory::paging::PageTable;
 use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::Result;
 use smoltcp::time::Instant;
-use smoltcp::wire::EthernetAddress;
+use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
 use volatile::{ReadOnly, Volatile};
 
@@ -86,6 +86,10 @@ impl NetDriver for VirtIONetDriver {
     }
 
     fn poll(&mut self, sockets: &mut SocketSet) -> Option<bool> {
+        unimplemented!()
+    }
+
+    fn ipv4_address(&self) -> Option<Ipv4Address> {
         unimplemented!()
     }
 }

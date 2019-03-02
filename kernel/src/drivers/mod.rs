@@ -2,7 +2,7 @@ use alloc::prelude::*;
 use core::any::Any;
 
 use lazy_static::lazy_static;
-use smoltcp::wire::EthernetAddress;
+use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
 
 use crate::sync::SpinNoIrqLock;
@@ -37,6 +37,10 @@ pub trait NetDriver : Send {
     // get interface name for this device
     fn get_ifname(&self) -> String;
 
+    // get ipv4 address
+    fn ipv4_address(&self) -> Option<Ipv4Address>;
+
+    // poll for sockets
     fn poll(&mut self, socket: &mut SocketSet) -> Option<bool>;
 }
 

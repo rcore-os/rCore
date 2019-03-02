@@ -143,6 +143,10 @@ impl NetDriver for E1000Interface {
             }
         }
     }
+
+    fn ipv4_address(&self) -> Option<Ipv4Address> {
+        self.iface.ipv4_address()
+    }
 }
 
 #[repr(C)]
