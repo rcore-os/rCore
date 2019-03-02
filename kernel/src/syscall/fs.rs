@@ -39,9 +39,9 @@ pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize
 }
 
 pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    info!("readv: fd: {}, iov: {:?}, count: {}", fd, iov_ptr, iov_count);
     let mut proc = process();
     let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set, true)?;
-    info!("readv: fd: {}, iov: {:#x?}", fd, iovs);
 
     // read all data to a buf
     let file = proc.get_file(fd)?;
@@ -53,9 +53,9 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
 }
 
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    info!("writev: fd: {}, iov: {:?}, count: {}", fd, iov_ptr, iov_count);
     let mut proc = process();
     let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set,  false)?;
-    info!("writev: fd: {}, iovs: {:#x?}", fd, iovs);
 
     let file = proc.get_file(fd)?;
     let buf = iovs.read_all_to_vec();
@@ -116,18 +116,8 @@ pub fn sys_close(fd: usize) -> SysResult {
 }
 
 pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EINVAL)?;
-    if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::EINVAL);
-    }
-    info!("stat: path: {}", path);
-
-    let inode = ROOT_INODE.lookup(path.as_str())?;
-    let stat = Stat::from(inode.metadata()?);
-    unsafe { stat_ptr.write(stat); }
-    Ok(0)
+    warn!("stat is partial implemented as lstat");
+    sys_lstat(path, stat_ptr)
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
@@ -138,6 +128,22 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     }
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.info()?);
+    // TODO: handle symlink
+    unsafe { stat_ptr.write(stat); }
+    Ok(0)
+}
+
+pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::EINVAL)?;
+    if !proc.memory_set.check_mut_ptr(stat_ptr) {
+        return Err(SysError::EINVAL);
+    }
+    info!("lstat: path: {}", path);
+
+    let inode = ROOT_INODE.lookup(path.as_str())?;
+    let stat = Stat::from(inode.metadata()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
 }
@@ -157,27 +163,27 @@ pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
     Ok(offset as isize)
 }
 
-/// entry_id = dentry.offset / 256
-/// dentry.name = entry_name
-/// dentry.offset += 256
-pub fn sys_getdirentry(fd: usize, dentry_ptr: *mut DirEntry) -> SysResult {
-    info!("getdirentry: {}", fd);
+pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> SysResult {
+    info!("getdents64: fd: {}, ptr: {:?}, buf_size: {}", fd, buf, buf_size);
     let mut proc = process();
-    if !proc.memory_set.check_mut_ptr(dentry_ptr) {
+    if !proc.memory_set.check_mut_array(buf as *mut u8, buf_size) {
         return Err(SysError::EINVAL);
     }
     let file = proc.get_file(fd)?;
-    let dentry = unsafe { &mut *dentry_ptr };
-    if !dentry.check() {
-        return Err(SysError::EINVAL);
-    }
     let info = file.info()?;
-    if info.type_ != FileType::Dir || info.size <= dentry.entry_id() {
-        return Err(SysError::EINVAL);
+    if info.type_ != FileType::Dir {
+        return Err(SysError::ENOTDIR);
     }
-    let name = file.get_entry(dentry.entry_id())?;
-    dentry.set_name(name.as_str());
-    Ok(0)
+    let mut writer = unsafe { DirentBufWriter::new(buf, buf_size) };
+    loop {
+        let name = match file.read_entry() {
+            Err(FsError::EntryNotFound) => break,
+            r => r,
+        }?;
+        let ok = writer.try_write(0, 0, name.as_str());
+        if !ok { break; }
+    }
+    Ok(writer.written_size as isize)
 }
 
 pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
@@ -260,23 +266,57 @@ impl OpenFlags {
     }
 }
 
-#[repr(C)]
-pub struct DirEntry {
-    offset: u32,
-    name: [u8; 256],
+#[derive(Debug)]
+#[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
+pub struct LinuxDirent64 {
+    /// Inode number
+    ino: u64,
+    /// Offset to next structure
+    offset: u64,
+    /// Size of this dirent
+    reclen: u16,
+    /// File type
+    type_: u8,
+    /// Filename (null-terminated)
+    name: [u8; 0],
 }
 
-impl DirEntry {
-    fn check(&self) -> bool {
-        self.offset % 256 == 0
+struct DirentBufWriter {
+    ptr: *mut LinuxDirent64,
+    rest_size: usize,
+    written_size: usize,
+}
+
+impl DirentBufWriter {
+    unsafe fn new(buf: *mut LinuxDirent64, size: usize) -> Self {
+        DirentBufWriter {
+            ptr: buf,
+            rest_size: size,
+            written_size: 0,
+        }
     }
-    fn entry_id(&self) -> usize {
-        (self.offset / 256) as usize
-    }
-    fn set_name(&mut self, name: &str) {
-        self.name[..name.len()].copy_from_slice(name.as_bytes());
-        self.name[name.len()] = 0;
-        self.offset += 256;
+    fn try_write(&mut self, inode: u64, type_: u8, name: &str) -> bool {
+        let len = ::core::mem::size_of::<LinuxDirent64>() + name.len() + 1;
+        let len = (len + 7) / 8 * 8; // align up
+        if self.rest_size < len {
+            return false;
+        }
+        let dent = LinuxDirent64 {
+            ino: inode,
+            offset: 0,
+            reclen: len as u16,
+            type_,
+            name: [],
+        };
+        unsafe {
+            self.ptr.write(dent);
+            let name_ptr = self.ptr.add(1) as _;
+            util::write_cstr(name_ptr, name);
+            self.ptr = (self.ptr as *const u8).add(len) as _;
+        }
+        self.rest_size -= len;
+        self.written_size += len;
+        true
     }
 }
 

@@ -37,6 +37,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         003 => sys_close(args[0]),
         004 => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
         005 => sys_fstat(args[0], args[1] as *mut Stat),
+        006 => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
 //        007 => sys_poll(),
         008 => sys_lseek(args[0], args[1] as i64, args[2] as u8),
         009 => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
@@ -72,7 +73,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        074 => sys_fsync(),
 //        076 => sys_trunc(),
 //        077 => sys_ftrunc(),
-        078 => sys_getdirentry(args[0], args[1] as *mut DirEntry),
 //        079 => sys_getcwd(),
 //        080 => sys_chdir(),
 //        082 => sys_rename(),
@@ -87,6 +87,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        160 => sys_setrlimit(),
 //        162 => sys_sync(),
 //        169 => sys_reboot(),
+        217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
 //        293 => sys_pipe(),
 
         // for musl: empty impl
@@ -138,6 +139,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         218 => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id() as isize)
+        }
+        228 => {
+            warn!("sys_clock_gettime is unimplemented");
+            Ok(0)
         }
         231 => {
             warn!("sys_exit_group is unimplemented");

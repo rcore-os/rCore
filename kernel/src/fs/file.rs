@@ -70,7 +70,12 @@ impl FileHandle {
         self.inode.metadata()
     }
 
-    pub fn get_entry(&self, id: usize) -> Result<String> {
-        self.inode.get_entry(id)
+    pub fn read_entry(&mut self) -> Result<String> {
+        if !self.options.read {
+            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+        }
+        let name = self.inode.get_entry(self.offset as usize)?;
+        self.offset += 1;
+        Ok(name)
     }
 }
