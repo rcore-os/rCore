@@ -72,11 +72,8 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
 
     let inode =
     if flags.contains(OpenFlags::CREATE) {
-        // FIXME: assume path start from root now
-        let mut split = path.as_str().rsplitn(2, '/');
-        let file_name = split.next().unwrap();
-        let dir_path = split.next().unwrap_or(".");
-        let dir_inode = ROOT_INODE.lookup(dir_path)?;
+        let (dir_path, file_name) = split_path(&path);
+        let dir_inode = proc.lookup_inode(dir_path)?;
         match dir_inode.find(file_name) {
             Ok(file_inode) => {
                 if flags.contains(OpenFlags::EXCLUSIVE) {
@@ -94,7 +91,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
         match path.as_str() {
             "stdin:" => crate::fs::STDIN.clone() as Arc<INode>,
             "stdout:" => crate::fs::STDOUT.clone() as Arc<INode>,
-            _ => ROOT_INODE.lookup(path.as_str())?,
+            _ => proc.lookup_inode(&path)?,
         }
     };
 
@@ -157,7 +154,7 @@ pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     }
     info!("lstat: path: {}", path);
 
-    let inode = ROOT_INODE.lookup(path.as_str())?;
+    let inode = proc.lookup_inode(&path)?;
     let stat = Stat::from(inode.metadata()?);
     unsafe { stat_ptr.write(stat); }
     Ok(0)
@@ -195,7 +192,8 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
             Err(FsError::EntryNotFound) => break,
             r => r,
         }?;
-        let ok = writer.try_write(0, 0, name.as_str());
+        // TODO: get ino from dirent
+        let ok = writer.try_write(0, 0, &name);
         if !ok { break; }
     }
     Ok(writer.written_size as isize)
@@ -212,6 +210,59 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     Ok(0)
 }
 
+pub fn sys_chdir(path: *const u8) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::EFAULT)?;
+    info!("chdir: path: {:?}", path);
+
+    let inode = proc.lookup_inode(&path)?;
+    let info = inode.metadata()?;
+    if info.type_ != FileType::Dir {
+        return Err(SysError::ENOTDIR);
+    }
+    // FIXME: calculate absolute path of new cwd
+    proc.cwd += &path;
+    Ok(0)
+}
+
+pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
+    let mut proc = process();
+    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath) }
+        .ok_or(SysError::EFAULT)?;
+    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath) }
+        .ok_or(SysError::EFAULT)?;
+    info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+
+    let (old_dir_path, old_file_name) = split_path(&oldpath);
+    let (new_dir_path, new_file_name) = split_path(&newpath);
+    let old_dir_inode = proc.lookup_inode(old_dir_path)?;
+    let new_dir_inode = proc.lookup_inode(new_dir_path)?;
+    // TODO: merge `rename` and `move` in VFS
+    if Arc::ptr_eq(&old_dir_inode, &new_dir_inode) {
+        old_dir_inode.rename(old_file_name, new_file_name)?;
+    } else {
+        old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
+    }
+    Ok(0)
+}
+
+pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
+    let mut proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
+        .ok_or(SysError::EFAULT)?;
+    // TODO: check pathname
+    info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
+
+    let (dir_path, file_name) = split_path(&path);
+    let inode = proc.lookup_inode(dir_path)?;
+    if inode.find(file_name).is_ok() {
+        return Err(SysError::EEXIST);
+    }
+    inode.create(file_name, FileType::Dir, mode as u32)?;
+    Ok(0)
+}
+
 
 impl Process {
     fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
@@ -222,6 +273,19 @@ impl Process {
             }
         })
     }
+    fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
+        let cwd = self.cwd.split_at(1).1; // skip start '/'
+        let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+        Ok(inode)
+    }
+}
+
+/// Split a `path` str to `(base_path, file_name)`
+fn split_path(path: &str) -> (&str, &str) {
+    let mut split = path.trim_end_matches('/').rsplitn(2, '/');
+    let file_name = split.next().unwrap();
+    let dir_path = split.next().unwrap_or(".");
+    (dir_path, file_name)
 }
 
 impl From<FsError> for SysError {

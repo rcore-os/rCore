@@ -73,9 +73,9 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        076 => sys_trunc(),
 //        077 => sys_ftrunc(),
         079 => sys_getcwd(args[0] as *mut u8, args[1]),
-//        080 => sys_chdir(),
-//        082 => sys_rename(),
-//        083 => sys_mkdir(),
+        080 => sys_chdir(args[0] as *const u8),
+        082 => sys_rename(args[0] as *const u8, args[1] as *const u8),
+        083 => sys_mkdir(args[0] as *const u8, args[1]),
 //        086 => sys_link(),
 //        087 => sys_unlink(),
         096 => sys_get_time(), // TODO: sys_gettimeofday
@@ -116,6 +116,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         072 => {
             warn!("sys_fcntl is unimplemented");
             Ok(0)
+        }
+        095 => {
+            warn!("sys_umask is unimplemented");
+            Ok(0o777)
         }
         102 => {
             warn!("sys_getuid is unimplemented");
