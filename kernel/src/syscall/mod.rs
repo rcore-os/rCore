@@ -50,7 +50,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        034 => sys_pause(),
         035 => sys_sleep(args[0]), // TODO: nanosleep
         039 => sys_getpid(),
-//        040 => sys_getppid(),
         041 => sys_socket(args[0], args[1], args[2]),
         042 => sys_connect(args[0], args[1] as *const u8, args[2]),
 //        043 => sys_accept(),
@@ -70,18 +69,20 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         061 => sys_wait(args[0], args[1] as *mut i32), // TODO: wait4
         062 => sys_kill(args[0]),
 //        072 => sys_fcntl(),
-//        074 => sys_fsync(),
-//        076 => sys_trunc(),
-//        077 => sys_ftrunc(),
+        074 => sys_fsync(args[0]),
+        075 => sys_fdatasync(args[0]),
+        076 => sys_truncate(args[0] as *const u8, args[1]),
+        077 => sys_ftruncate(args[0], args[1]),
         079 => sys_getcwd(args[0] as *mut u8, args[1]),
-//        080 => sys_chdir(),
-//        082 => sys_rename(),
-//        083 => sys_mkdir(),
-//        086 => sys_link(),
-//        087 => sys_unlink(),
+        080 => sys_chdir(args[0] as *const u8),
+        082 => sys_rename(args[0] as *const u8, args[1] as *const u8),
+        083 => sys_mkdir(args[0] as *const u8, args[1]),
+        086 => sys_link(args[0] as *const u8, args[1] as *const u8),
+        087 => sys_unlink(args[0] as *const u8),
         096 => sys_get_time(), // TODO: sys_gettimeofday
 //        097 => sys_getrlimit(),
 //        098 => sys_getrusage(),
+        110 => sys_getppid(),
 //        133 => sys_mknod(),
         141 => sys_set_priority(args[0]),
         158 => sys_arch_prctl(args[0] as i32, args[1], tf),
@@ -116,6 +117,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         072 => {
             warn!("sys_fcntl is unimplemented");
             Ok(0)
+        }
+        095 => {
+            warn!("sys_umask is unimplemented");
+            Ok(0o777)
         }
         102 => {
             warn!("sys_getuid is unimplemented");

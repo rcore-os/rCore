@@ -66,7 +66,24 @@ impl FileHandle {
         Ok(self.offset)
     }
 
-    pub fn info(&self) -> Result<Metadata> {
+    pub fn set_len(&mut self, len: u64) -> Result<()> {
+        if !self.options.write {
+            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+        }
+        self.inode.resize(len as usize)?;
+        Ok(())
+    }
+
+    pub fn sync_all(&mut self) -> Result<()> {
+        self.inode.sync()
+    }
+
+    pub fn sync_data(&mut self) -> Result<()> {
+        // TODO: add sync_data to VFS
+        self.inode.sync()
+    }
+
+    pub fn metadata(&self) -> Result<Metadata> {
         self.inode.metadata()
     }
 
