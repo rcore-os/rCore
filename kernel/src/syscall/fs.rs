@@ -12,7 +12,7 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     if !proc.memory_set.check_mut_array(base, len) {
-        return Err(SysError::EINVAL);
+        return Err(SysError::EFAULT);
     }
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read(slice)?;
@@ -23,7 +23,7 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     if !proc.memory_set.check_array(base, len) {
-        return Err(SysError::EINVAL);
+        return Err(SysError::EFAULT);
     }
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
@@ -66,7 +66,7 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EINVAL)?;
+        .ok_or(SysError::EFAULT)?;
     let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
@@ -124,7 +124,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     info!("fstat: fd: {}", fd);
     let mut proc = process();
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::EINVAL);
+        return Err(SysError::EFAULT);
     }
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.info()?);
@@ -136,9 +136,9 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EINVAL)?;
+        .ok_or(SysError::EFAULT)?;
     if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::EINVAL);
+        return Err(SysError::EFAULT);
     }
     info!("lstat: path: {}", path);
 
@@ -167,7 +167,7 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
     info!("getdents64: fd: {}, ptr: {:?}, buf_size: {}", fd, buf, buf_size);
     let mut proc = process();
     if !proc.memory_set.check_mut_array(buf as *mut u8, buf_size) {
-        return Err(SysError::EINVAL);
+        return Err(SysError::EFAULT);
     }
     let file = proc.get_file(fd)?;
     let info = file.info()?;
@@ -466,14 +466,14 @@ struct IoVecs(Vec<&'static mut [u8]>);
 impl IoVecs {
     fn check_and_new(iov_ptr: *const IoVec, iov_count: usize, vm: &MemorySet, readv: bool) -> Result<Self, SysError> {
         if !vm.check_array(iov_ptr, iov_count) {
-            return Err(SysError::EINVAL);
+            return Err(SysError::EFAULT);
         }
         let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
         // check all bufs in iov
         for iov in iovs.iter() {
             if readv && !vm.check_mut_array(iov.base, iov.len as usize)
                 || !readv && !vm.check_array(iov.base, iov.len as usize) {
-                return Err(SysError::EINVAL);
+                return Err(SysError::EFAULT);
             }
         }
         let slices = iovs.iter().map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) }).collect();
