@@ -198,6 +198,9 @@ impl ThreadPool {
     pub fn get_children(&self, tid: Tid) -> Vec<Tid> {
         self.threads[tid].lock().as_ref().expect("process not exist").children.clone()
     }
+    pub fn get_parent(&self, tid: Tid) -> Tid {
+        self.threads[tid].lock().as_ref().expect("process not exist").parent
+    }
 
     pub fn exit(&self, tid: Tid, code: ExitCode) {
         // NOTE: if `tid` is running, status change will be deferred.

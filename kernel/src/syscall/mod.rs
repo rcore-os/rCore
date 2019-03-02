@@ -50,7 +50,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        034 => sys_pause(),
         035 => sys_sleep(args[0]), // TODO: nanosleep
         039 => sys_getpid(),
-//        040 => sys_getppid(),
         041 => sys_socket(args[0], args[1], args[2]),
         042 => sys_connect(args[0], args[1] as *const u8, args[2]),
 //        043 => sys_accept(),
@@ -82,6 +81,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         096 => sys_get_time(), // TODO: sys_gettimeofday
 //        097 => sys_getrlimit(),
 //        098 => sys_getrusage(),
+        110 => sys_getppid(),
 //        133 => sys_mknod(),
         141 => sys_set_priority(args[0]),
 //        160 => sys_setrlimit(),

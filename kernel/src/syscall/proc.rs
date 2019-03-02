@@ -13,7 +13,9 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
-    // TODO: check ptr
+    if !process().memory_set.check_mut_ptr(code) {
+        return Err(SysError::EFAULT);
+    }
     loop {
         use alloc::vec;
         let wait_procs = match pid {
@@ -49,19 +51,25 @@ pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
 }
 
 pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapFrame) -> SysResult {
-    // TODO: check ptr
-    let name = if name.is_null() { "" } else { unsafe { util::from_cstr(name) } };
-    info!("exec: {:?}, argc: {}, argv: {:?}", name, argc, argv);
-    // Copy args to kernel
-    let args: Vec<String> = unsafe {
-        slice::from_raw_parts(argv, argc).iter()
-            .map(|&arg| String::from(util::from_cstr(arg)))
-            .collect()
+    let proc = process();
+    let name = if name.is_null() { String::from("") } else {
+        unsafe { proc.memory_set.check_and_clone_cstr(name) }
+            .ok_or(SysError::EFAULT)?
     };
-
-    if args.len() <= 0 {
+    if argc <= 0 {
         return Err(SysError::EINVAL);
     }
+    // Check and copy args to kernel
+    let mut args = Vec::new();
+    unsafe {
+        for &ptr in slice::from_raw_parts(argv, argc) {
+            let arg = proc.memory_set.check_and_clone_cstr(ptr)
+                .ok_or(SysError::EFAULT)?;
+            args.push(arg);
+        }
+    }
+    info!("exec: name: {:?}, args: {:?}", name, args);
+
     // Read program file
     let path = args[0].as_str();
     let inode = crate::fs::ROOT_INODE.lookup(path)?;
@@ -105,6 +113,13 @@ pub fn sys_kill(pid: usize) -> SysResult {
 /// Get the current process id
 pub fn sys_getpid() -> SysResult {
     Ok(thread::current().id() as isize)
+}
+
+/// Get the parent process id
+pub fn sys_getppid() -> SysResult {
+    let pid = thread::current().id();
+    let ppid = processor().manager().get_parent(pid);
+    Ok(ppid as isize)
 }
 
 /// Exit the current process
