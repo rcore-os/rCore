@@ -51,7 +51,7 @@ impl Thread {
             proc: Arc::new(Mutex::new(Process {
                 memory_set: MemorySet::new(),
                 files: BTreeMap::default(),
-                cwd: String::new(),
+                cwd: String::from("/"),
                 sockets: SocketSet::new(vec![])
             })),
         })
@@ -67,7 +67,7 @@ impl Thread {
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files: BTreeMap::default(),
-                cwd: String::new(),
+                cwd: String::from("/"),
                 sockets: SocketSet::new(vec![])
             })),
         })
@@ -146,7 +146,7 @@ impl Thread {
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files,
-                cwd: String::new(),
+                cwd: String::from("/"),
                 sockets: SocketSet::new(vec![])
             })),
         })
@@ -178,7 +178,7 @@ impl Thread {
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files: self.proc.lock().files.clone(),
-                cwd: String::new(),
+                cwd: self.proc.lock().cwd.clone(),
                 // TODO: duplicate sockets for child process
                 sockets: SocketSet::new(vec![])
             })),

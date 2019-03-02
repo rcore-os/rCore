@@ -115,6 +115,21 @@ pub fn sys_close(fd: usize) -> SysResult {
     }
 }
 
+pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
+    info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
+    let mut proc = process();
+    if !proc.memory_set.check_mut_array(buf, len) {
+        return Err(SysError::EFAULT);
+    }
+    if proc.cwd.len() + 1 > len {
+        return Err(SysError::ERANGE);
+    }
+    unsafe {
+        util::write_cstr(buf, &proc.cwd)
+    }
+    Ok(0)
+}
+
 pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     warn!("stat is partial implemented as lstat");
     sys_lstat(path, stat_ptr)

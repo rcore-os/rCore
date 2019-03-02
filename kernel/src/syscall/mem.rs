@@ -25,7 +25,10 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
 }
 
 pub fn sys_munmap(addr: usize, len: usize) -> SysResult {
-    unimplemented!()
+    info!("munmap addr={:#x}, size={:#x}", addr, len);
+    let mut proc = process();
+    proc.memory_set.pop(addr, addr + len);
+    Ok(0)
 }
 
 bitflags! {

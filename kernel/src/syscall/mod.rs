@@ -72,7 +72,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        074 => sys_fsync(),
 //        076 => sys_trunc(),
 //        077 => sys_ftrunc(),
-//        079 => sys_getcwd(),
+        079 => sys_getcwd(args[0] as *mut u8, args[1]),
 //        080 => sys_chdir(),
 //        082 => sys_rename(),
 //        083 => sys_mkdir(),
@@ -84,9 +84,11 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         110 => sys_getppid(),
 //        133 => sys_mknod(),
         141 => sys_set_priority(args[0]),
+        158 => sys_arch_prctl(args[0] as i32, args[1], tf),
 //        160 => sys_setrlimit(),
 //        162 => sys_sync(),
 //        169 => sys_reboot(),
+        201 => sys_time(args[0] as *mut u64),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
 //        293 => sys_pipe(),
 
@@ -135,7 +137,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
-        158 => sys_arch_prctl(args[0] as i32, args[1], tf),
         218 => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id() as isize)
