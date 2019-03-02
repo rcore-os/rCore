@@ -73,7 +73,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        074 => sys_fsync(),
 //        076 => sys_trunc(),
 //        077 => sys_ftrunc(),
-//        079 => sys_getcwd(),
+        079 => sys_getcwd(args[0] as *mut u8, args[1]),
 //        080 => sys_chdir(),
 //        082 => sys_rename(),
 //        083 => sys_mkdir(),
