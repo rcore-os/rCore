@@ -4,6 +4,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{slice, str, fmt};
 
 use bitflags::bitflags;
+use rcore_memory::VMError;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
 use spin::{Mutex, MutexGuard};
 
@@ -268,5 +269,11 @@ impl fmt::Display for SysError {
                 _ => "Unknown error",
             },
         )
+    }
+}
+
+impl From<VMError> for SysError {
+    fn from(_: VMError) -> Self {
+        SysError::EFAULT
     }
 }

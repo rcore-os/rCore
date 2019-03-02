@@ -192,29 +192,37 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     /// Check the pointer is within the readable memory
-    pub fn check_ptr<S>(&self, ptr: *const S) -> bool {
-        self.areas.iter().find(|area| area.check_ptr(ptr)).is_some()
+    pub fn check_ptr<S>(&self, ptr: *const S) -> VMResult<()> {
+        self.areas.iter()
+            .find(|area| area.check_ptr(ptr))
+            .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the pointer is within the writable memory
-    pub fn check_mut_ptr<S>(&self, ptr: *mut S) -> bool {
-        self.areas.iter().find(|area| area.check_mut_ptr(ptr)).is_some()
+    pub fn check_mut_ptr<S>(&self, ptr: *mut S) -> VMResult<()> {
+        self.areas.iter()
+            .find(|area| area.check_mut_ptr(ptr))
+            .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the array is within the readable memory
-    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> bool {
-        self.areas.iter().find(|area| area.check_array(ptr, count)).is_some()
+    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> VMResult<()> {
+        self.areas.iter()
+            .find(|area| area.check_array(ptr, count))
+            .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the array is within the writable memory
-    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> bool {
-        self.areas.iter().find(|area| area.check_mut_array(ptr, count)).is_some()
+    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> VMResult<()> {
+        self.areas.iter()
+            .find(|area| area.check_mut_array(ptr, count))
+            .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.
     ///
     /// Unsafe: the page table must be active.
-    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> Option<String> {
+    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> VMResult<String> {
         self.areas.iter()
             .filter_map(|area| area.check_and_clone_cstr(ptr))
-            .next()
+            .next().ok_or(VMError::InvalidPtr)
     }
     /// Find a free area with hint address `addr_hint` and length `len`.
     /// Return the start address of found free area.

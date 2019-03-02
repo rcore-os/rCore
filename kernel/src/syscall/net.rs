@@ -139,9 +139,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     );
 
     let mut proc = process();
-    if !proc.memory_set.check_ptr(addr) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_ptr(addr)?;
 
     let mut dest = None;
     let mut port = 0;
@@ -234,13 +232,8 @@ pub fn sys_sendto(
         fd, buffer, len, addr, addr_len
     );
     let mut proc = process();
-    if !proc.memory_set.check_ptr(addr) {
-        return Err(SysError::EFAULT);
-    }
-
-    if !proc.memory_set.check_array(buffer, len) {
-        return Err(SysError::EINVAL);
-    }
+    proc.memory_set.check_ptr(addr)?;
+    proc.memory_set.check_array(buffer, len)?;
 
     // little hack: kick it forward
     let iface = &mut *NET_DRIVERS.lock()[0];

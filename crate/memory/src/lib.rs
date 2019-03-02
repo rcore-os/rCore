@@ -14,3 +14,9 @@ mod addr;
 pub mod no_mmu;
 
 pub use crate::addr::*;
+
+pub enum VMError {
+    InvalidPtr
+}
+
+pub type VMResult<T> = Result<T, VMError>;

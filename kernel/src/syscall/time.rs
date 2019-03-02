@@ -10,9 +10,7 @@ pub fn sys_time(time: *mut u64) -> SysResult {
     let t = unsafe { crate::trap::TICK };
     if time as usize != 0 {
         let mut proc = process();
-        if !proc.memory_set.check_mut_ptr(time) {
-            return Err(SysError::EFAULT);
-        }
+        proc.memory_set.check_mut_ptr(time)?;
         unsafe {
             time.write(t as u64);
         }

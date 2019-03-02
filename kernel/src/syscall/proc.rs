@@ -13,9 +13,7 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
-    if !process().memory_set.check_mut_ptr(code) {
-        return Err(SysError::EFAULT);
-    }
+    process().memory_set.check_mut_ptr(code)?;
     loop {
         use alloc::vec;
         let wait_procs = match pid {
@@ -53,8 +51,7 @@ pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
 pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapFrame) -> SysResult {
     let proc = process();
     let name = if name.is_null() { String::from("") } else {
-        unsafe { proc.memory_set.check_and_clone_cstr(name) }
-            .ok_or(SysError::EFAULT)?
+        unsafe { proc.memory_set.check_and_clone_cstr(name)? }
     };
     if argc <= 0 {
         return Err(SysError::EINVAL);
@@ -63,8 +60,7 @@ pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut T
     let mut args = Vec::new();
     unsafe {
         for &ptr in slice::from_raw_parts(argv, argc) {
-            let arg = proc.memory_set.check_and_clone_cstr(ptr)
-                .ok_or(SysError::EFAULT)?;
+            let arg = proc.memory_set.check_and_clone_cstr(ptr)?;
             args.push(arg);
         }
     }

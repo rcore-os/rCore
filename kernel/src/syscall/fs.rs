@@ -11,9 +11,7 @@ use super::net::*;
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
-    if !proc.memory_set.check_mut_array(base, len) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_mut_array(base, len)?;
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read(slice)?;
     Ok(len as isize)
@@ -22,9 +20,7 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
-    if !proc.memory_set.check_array(base, len) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_array(base, len)?;
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
         Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, base, len),
@@ -65,8 +61,7 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
 
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
@@ -115,9 +110,7 @@ pub fn sys_close(fd: usize) -> SysResult {
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
     let mut proc = process();
-    if !proc.memory_set.check_mut_array(buf, len) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_mut_array(buf, len)?;
     if proc.cwd.len() + 1 > len {
         return Err(SysError::ERANGE);
     }
@@ -135,9 +128,7 @@ pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     info!("fstat: fd: {}", fd);
     let mut proc = process();
-    if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_mut_ptr(stat_ptr)?;
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.metadata()?);
     // TODO: handle symlink
@@ -147,11 +138,8 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
-    if !proc.memory_set.check_mut_ptr(stat_ptr) {
-        return Err(SysError::EFAULT);
-    }
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    proc.memory_set.check_mut_ptr(stat_ptr)?;
     info!("lstat: path: {}", path);
 
     let inode = proc.lookup_inode(&path)?;
@@ -189,8 +177,7 @@ pub fn sys_fdatasync(fd: usize) -> SysResult {
 
 pub fn sys_truncate(path: *const u8, len: usize) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     info!("truncate: path: {:?}, len: {}", path, len);
     proc.lookup_inode(&path)?.resize(len)?;
     Ok(0)
@@ -205,9 +192,7 @@ pub fn sys_ftruncate(fd: usize, len: usize) -> SysResult {
 pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> SysResult {
     info!("getdents64: fd: {}, ptr: {:?}, buf_size: {}", fd, buf, buf_size);
     let mut proc = process();
-    if !proc.memory_set.check_mut_array(buf as *mut u8, buf_size) {
-        return Err(SysError::EFAULT);
-    }
+    proc.memory_set.check_mut_array(buf as *mut u8, buf_size)?;
     let file = proc.get_file(fd)?;
     let info = file.metadata()?;
     if info.type_ != FileType::Dir {
@@ -239,8 +224,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 
 pub fn sys_chdir(path: *const u8) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     info!("chdir: path: {:?}", path);
 
     let inode = proc.lookup_inode(&path)?;
@@ -255,10 +239,8 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
 
 pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
     let mut proc = process();
-    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath) }
-        .ok_or(SysError::EFAULT)?;
-    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath) }
-        .ok_or(SysError::EFAULT)?;
+    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
+    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
     info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
@@ -276,8 +258,7 @@ pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
 
 pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     // TODO: check pathname
     info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
 
@@ -292,10 +273,8 @@ pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
 
 pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
     let mut proc = process();
-    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath) }
-        .ok_or(SysError::EFAULT)?;
-    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath) }
-        .ok_or(SysError::EFAULT)?;
+    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
+    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
     info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
@@ -307,8 +286,7 @@ pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
 
 pub fn sys_unlink(path: *const u8) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path) }
-        .ok_or(SysError::EFAULT)?;
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     info!("unlink: path: {:?}", path);
 
     let (dir_path, file_name) = split_path(&path);
@@ -597,15 +575,14 @@ struct IoVecs(Vec<&'static mut [u8]>);
 
 impl IoVecs {
     fn check_and_new(iov_ptr: *const IoVec, iov_count: usize, vm: &MemorySet, readv: bool) -> Result<Self, SysError> {
-        if !vm.check_array(iov_ptr, iov_count) {
-            return Err(SysError::EFAULT);
-        }
+        vm.check_array(iov_ptr, iov_count)?;
         let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
         // check all bufs in iov
         for iov in iovs.iter() {
-            if readv && !vm.check_mut_array(iov.base, iov.len as usize)
-                || !readv && !vm.check_array(iov.base, iov.len as usize) {
-                return Err(SysError::EFAULT);
+            if readv {
+                vm.check_mut_array(iov.base, iov.len as usize)?;
+            } else {
+                vm.check_array(iov.base, iov.len as usize)?;
             }
         }
         let slices = iovs.iter().map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) }).collect();
