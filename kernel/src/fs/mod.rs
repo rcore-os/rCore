@@ -23,7 +23,7 @@ lazy_static! {
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
             {
-                Box::new(drivers::DRIVERS.lock().iter()
+                Box::new(crate::drivers::DRIVERS.lock().iter()
                     .map(|device| device.deref().as_any().downcast_ref::<VirtIOBlkDriver>())
                     .find(|maybe_blk| maybe_blk.is_some())
                     .expect("VirtIOBlk not found")

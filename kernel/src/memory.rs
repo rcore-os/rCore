@@ -33,15 +33,22 @@ lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
 }
 
-lazy_static! {
-    static ref ACTIVE_TABLE: SpinNoIrqLock<CowExt<ActivePageTable>> = SpinNoIrqLock::new(unsafe {
-        CowExt::new(ActivePageTable::new())
-    });
-}
-
 /// The only way to get active page table
-pub fn active_table() -> MutexGuard<'static, CowExt<ActivePageTable>, SpinNoIrq> {
-    ACTIVE_TABLE.lock()
+///
+/// ## CHANGE LOG
+///
+/// In the past, this function returns a `MutexGuard` of a global
+/// `Mutex<ActiveTable>` object, which means only one CPU core
+/// can access its active table at a time.
+///
+/// But given that a page table is ** process local **, and being active
+/// when and only when a thread of the process is running.
+/// The ownership of this page table is in the `MemorySet` object.
+/// So it's safe to access the active table inside `MemorySet`.
+/// But the shared parts is readonly, e.g. all pages mapped in
+/// `InactivePageTable::map_kernel()`.
+pub fn active_table() -> ActivePageTable {
+    unsafe { ActivePageTable::new() }
 }
 
 
@@ -123,12 +130,3 @@ impl rcore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
 pub fn page_fault_handler(_addr: usize) -> bool {
     unreachable!()
 }
-
-
-//pub mod test {
-//    pub fn cow() {
-//        use super::*;
-//        use rcore_memory::cow::test::test_with;
-//        test_with(&mut active_table());
-//    }
-//}
