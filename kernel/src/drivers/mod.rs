@@ -21,7 +21,7 @@ pub enum DeviceType {
     Block
 }
 
-pub trait Driver : Send + AsAny {
+pub trait Driver : Send {
     // if interrupt belongs to this driver, handle it and return true
     // return false otherwise
     fn try_handle_interrupt(&mut self) -> bool;
@@ -40,14 +40,6 @@ pub trait NetDriver : Send {
     fn poll(&mut self, socket: &mut SocketSet) -> Option<bool>;
 }
 
-// little hack, see https://users.rust-lang.org/t/how-to-downcast-from-a-trait-any-to-a-struct/11219/3
-pub trait AsAny {
-    fn as_any(&self) -> &Any;
-}
-
-impl<T: Any> AsAny for T {
-    fn as_any(&self) -> &Any { self }
-}
 
 lazy_static! {
     pub static ref DRIVERS: SpinNoIrqLock<Vec<Box<Driver>>> = SpinNoIrqLock::new(Vec::new());

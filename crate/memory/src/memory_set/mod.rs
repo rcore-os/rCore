@@ -224,7 +224,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         // try each area's end address as the start
         core::iter::once(addr_hint)
             .chain(self.areas.iter().map(|area| area.end_addr))
-            .map(|addr| addr + PAGE_SIZE) // move up a page
+            .map(|addr| (addr + PAGE_SIZE) & ! PAGE_SIZE) // round up a page
             .find(|&addr| self.test_free_area(addr, addr + len))
             .expect("failed to find free area ???")
     }
@@ -245,6 +245,24 @@ impl<T: InactivePageTable> MemorySet<T> {
         self.page_table.edit(|pt| area.map(pt));
         self.areas.push(area);
     }
+
+    /*
+    **  @brief  remove the memory area to the memory set
+    **  @param  area: MemoryArea     the memory area to remove
+    **  @retval none
+    */
+    pub fn pop(&mut self, start_addr: VirtAddr, end_addr: VirtAddr) {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        for i in 0..self.areas.len() {
+            if self.areas[i].start_addr == start_addr && self.areas[i].end_addr == end_addr {
+                let area = self.areas.remove(i);
+                self.page_table.edit(|pt| area.unmap(pt));
+                return;
+            }
+        }
+        panic!("no memory area found");
+    }
+
     /*
     **  @brief  get iterator of the memory area
     **  @retval impl Iterator<Item=&MemoryArea>
