@@ -6,6 +6,7 @@ pub mod pic;
 pub mod keyboard;
 pub mod pit;
 pub mod ide;
+pub mod rtc_cmos;
 
 pub fn init() {
     assert_has_not_been_called!();

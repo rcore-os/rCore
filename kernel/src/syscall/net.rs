@@ -172,6 +172,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 
         match socket.connect((dest.unwrap(), port), temp_port) {
             Ok(()) => {
+                // avoid deadlock
                 drop(socket);
                 drop(sockets);
 
@@ -185,12 +186,12 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
                         // still connecting
                         SOCKET_ACTIVITY._wait()
                     } else if socket.state() == TcpState::Established {
-                        break Ok(0)
+                        break Ok(0);
                     } else if socket.state() == TcpState::Closed {
-                        break Err(SysError::ECONNREFUSED)
+                        break Err(SysError::ECONNREFUSED);
                     }
                 }
-            },
+            }
             Err(_) => Err(SysError::ENOBUFS),
         }
     } else {
@@ -210,18 +211,20 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
             if socket.can_send() {
                 match socket.send_slice(&slice) {
                     Ok(size) => {
+                        // avoid deadlock
                         drop(socket);
                         drop(sockets);
+
                         iface.poll();
                         Ok(size as isize)
-                    },
+                    }
                     Err(err) => Err(SysError::ENOBUFS),
                 }
             } else {
                 Err(SysError::ENOBUFS)
             }
         } else {
-            Err(SysError::ECONNREFUSED)
+            Err(SysError::ENOTCONN)
         }
     } else {
         unimplemented!("socket type")
@@ -291,6 +294,7 @@ pub fn sys_sendto(
 
             socket.send_slice(&buffer).unwrap();
 
+            // avoid deadlock
             drop(socket);
             drop(sockets);
             iface.poll();
@@ -338,6 +342,7 @@ pub fn sys_recvfrom(
                 return Ok(size as isize);
             }
 
+            // avoid deadlock
             drop(socket);
             SOCKET_ACTIVITY._wait()
         }

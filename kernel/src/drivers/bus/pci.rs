@@ -178,9 +178,7 @@ impl PciTag {
                 self.write(cap_ptr + PCI_MSI_DATA, 55 | 0 << 12);
 
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
-                debug!("orig ctrl {:b}", orig_ctrl);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
-                debug!("new ctrl {:b}", self.read(cap_ptr + PCI_MSI_CTRL_CAP, 2));
                 break;
             }
             info!("cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);

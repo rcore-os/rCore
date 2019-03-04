@@ -6,19 +6,19 @@ use core::mem::{size_of, transmute};
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
 
+use alloc::collections::BTreeMap;
 use bitflags::*;
 use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
+use smoltcp::iface::*;
 use smoltcp::phy::{self, DeviceCapabilities};
+use smoltcp::socket::*;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
-use smoltcp::Result;
 use smoltcp::wire::*;
-use smoltcp::iface::*;
-use smoltcp::socket::*;
-use alloc::collections::BTreeMap;
-use volatile::{Volatile};
+use smoltcp::Result;
+use volatile::Volatile;
 
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -79,8 +79,9 @@ impl Driver for E1000Interface {
                 current_addr = current_addr + PAGE_SIZE;
             }
 
-            let e1000 =
-                unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+            let e1000 = unsafe {
+                slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+            };
 
             let icr = e1000[E1000_ICR].read();
             if icr != 0 {
@@ -416,7 +417,7 @@ pub fn e1000_init(header: usize, size: usize) {
 
     // EN | PSP | CT=0x10 | COLD=0x40
     e1000[E1000_TCTL].write((1 << 1) | (1 << 3) | (0x10 << 4) | (0x40 << 12)); // TCTL
-    // IPGT=0xa | IPGR1=0x8 | IPGR2=0xc
+                                                                               // IPGT=0xa | IPGR1=0x8 | IPGR2=0xc
     e1000[E1000_TIPG].write(0xa | (0x8 << 10) | (0xc << 20)); // TIPG
 
     let mut ral: u32 = 0;
@@ -429,7 +430,7 @@ pub fn e1000_init(header: usize, size: usize) {
     }
 
     e1000[E1000_RAL].write(ral); // RAL
-    // AV | AS=DA
+                                 // AV | AS=DA
     e1000[E1000_RAH].write(rah | (1 << 31)); // RAH
 
     // MTA
@@ -471,7 +472,7 @@ pub fn e1000_init(header: usize, size: usize) {
     let net_driver = E1000Driver(Arc::new(Mutex::new(driver)));
 
     let ethernet_addr = EthernetAddress::from_bytes(&mac);
-    let ip_addrs = [IpCidr::new(IpAddress::v4(10,0,0,2), 24)];
+    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     let iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
