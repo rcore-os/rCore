@@ -171,7 +171,9 @@ fn get_line(history: &mut Vec<Vec<u8>>) -> String {
         }
     }
 
-    history.push(line_vec.clone());
+    if line_vec.len() > 0 {
+        history.push(line_vec.clone());
+    }
     String::from_utf8(line_vec).unwrap_or_default()
 }
 

@@ -173,10 +173,13 @@ impl PciTag {
         while cap_ptr > 0 {
             let cap_id = self.read(cap_ptr, 1);
             if cap_id == PCI_CAP_ID_MSI {
-                self.write(cap_ptr + PCI_MSI_ADDR, 0xfee << 20);
-                // irq 23 temporarily
+                self.write(cap_ptr + PCI_MSI_ADDR, 0xfee00000);
+                // irq 23 means no 23, should be allocated from a pool
+                // 23 + 32 = 55
+                // 0 is (usually) the apic id of the bsp.
                 self.write(cap_ptr + PCI_MSI_DATA, 55 | 0 << 12);
 
+                // enable MSI interrupt
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
                 break;
@@ -184,7 +187,6 @@ impl PciTag {
             info!("cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
             cap_ptr = self.read(cap_ptr + 1, 1);
         }
-
     }
 }
 

@@ -80,7 +80,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         083 => sys_mkdir(args[0] as *const u8, args[1]),
         086 => sys_link(args[0] as *const u8, args[1] as *const u8),
         087 => sys_unlink(args[0] as *const u8),
-        096 => sys_gettimeofday(args[0] as *mut u64, args[1] as *const u8),
+        096 => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
 //        097 => sys_getrlimit(),
 //        098 => sys_getrusage(),
         110 => sys_getppid(),
