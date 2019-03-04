@@ -67,6 +67,7 @@
 use super::consts::*;
 use super::TrapFrame;
 use log::*;
+use crate::drivers::DRIVERS;
 
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
@@ -89,7 +90,16 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 COM1 => com1(),
                 COM2 => com2(),
                 IDE => ide(),
-                _ => panic!("Invalid IRQ number: {}", irq),
+                _ => {
+                    let mut drivers = DRIVERS.lock();
+                    for driver in drivers.iter_mut() {
+                        if driver.try_handle_interrupt() == true {
+                            debug!("driver processed interrupt");
+                            return;
+                        }
+                    }
+                    warn!("unhandled external IRQ number: {}", irq);
+                },
             }
         }
         SwitchToKernel => to_kernel(tf),

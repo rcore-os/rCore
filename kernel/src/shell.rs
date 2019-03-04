@@ -7,8 +7,8 @@ use crate::process::*;
 use crate::thread;
 
 pub fn run_user_shell() {
-    use crate::net::server;
-    processor().manager().add(Thread::new_kernel(server, 0), 0);
+    //use crate::net::server;
+    //processor().manager().add(Thread::new_kernel(server, 0), 0);
     if let Ok(inode) = ROOT_INODE.lookup("sh") {
         println!("Going to user mode shell.");
         println!("Use 'ls' to list available programs.");

@@ -9,6 +9,8 @@ use smoltcp::socket::{SocketSet, SocketHandle};
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::fs::{FileHandle, OpenOptions};
+use crate::sync::Condvar;
+use crate::drivers::NET_DRIVERS;
 
 use super::abi::{self, ProcInitInfo};
 
@@ -43,8 +45,6 @@ pub struct Process {
     pub memory_set: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
-    // TODO: discuss: move it to interface or leave it here
-    pub sockets: SocketSet<'static, 'static, 'static>,
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -66,7 +66,6 @@ impl Thread {
                 memory_set: MemorySet::new(),
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
-                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -82,7 +81,6 @@ impl Thread {
                 memory_set,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
-                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -161,7 +159,6 @@ impl Thread {
                 memory_set,
                 files,
                 cwd: String::from("/"),
-                sockets: SocketSet::new(vec![])
             })),
         })
     }
@@ -193,8 +190,6 @@ impl Thread {
                 memory_set,
                 files: self.proc.lock().files.clone(),
                 cwd: self.proc.lock().cwd.clone(),
-                // TODO: duplicate sockets for child process
-                sockets: SocketSet::new(vec![])
             })),
         })
     }

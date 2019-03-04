@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
 
-use crate::sync::SpinNoIrqLock;
+use crate::sync::{SpinNoIrqLock, Condvar, MutexGuard, SpinNoIrq};
 
 mod device_tree;
 pub mod bus;
@@ -40,8 +40,11 @@ pub trait NetDriver : Send {
     // get ipv4 address
     fn ipv4_address(&self) -> Option<Ipv4Address>;
 
-    // poll for sockets
-    fn poll(&mut self, socket: &mut SocketSet) -> Option<bool>;
+    // get sockets
+    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq>;
+
+    // manually trigger a poll, use it after sending packets
+    fn poll(&mut self);
 }
 
 
@@ -51,6 +54,10 @@ lazy_static! {
 
 lazy_static! {
     pub static ref NET_DRIVERS: SpinNoIrqLock<Vec<Box<NetDriver>>> = SpinNoIrqLock::new(Vec::new());
+}
+
+lazy_static! {
+    pub static ref SOCKET_ACTIVITY: Condvar = Condvar::new();
 }
 
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]

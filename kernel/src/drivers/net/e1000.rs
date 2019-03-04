@@ -2,7 +2,7 @@ use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::format;
 use alloc::prelude::*;
 use alloc::sync::Arc;
-use core::mem::size_of;
+use core::mem::{size_of, transmute};
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
 
@@ -22,9 +22,10 @@ use volatile::{Volatile};
 
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, NetDriver, NET_DRIVERS};
+use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
 pub struct E1000 {
     header: usize,
@@ -37,8 +38,13 @@ pub struct E1000 {
     first_trans: bool,
 }
 
+#[derive(Clone)]
+pub struct E1000Driver(Arc<Mutex<E1000>>);
+
 const E1000_STATUS: usize = 0x0008 / 4;
+const E1000_ICR: usize = 0x00C0 / 4;
 const E1000_IMS: usize = 0x00D0 / 4;
+const E1000_IMC: usize = 0x00D8 / 4;
 const E1000_RCTL: usize = 0x0100 / 4;
 const E1000_TCTL: usize = 0x0400 / 4;
 const E1000_TIPG: usize = 0x0410 / 4;
@@ -56,21 +62,50 @@ const E1000_MTA: usize = 0x5200 / 4;
 const E1000_RAL: usize = 0x5400 / 4;
 const E1000_RAH: usize = 0x5404 / 4;
 
+#[derive(Clone)]
 pub struct E1000Interface {
-    iface: EthernetInterface<'static, 'static, 'static, E1000Driver>
+    iface: Arc<Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>>,
+    driver: E1000Driver,
+    sockets: Arc<Mutex<SocketSet<'static, 'static, 'static>>>,
 }
 
-#[derive(Clone)]
-pub struct E1000Driver(Arc<Mutex<E1000>>);
-
-impl Driver for E1000Driver {
+impl Driver for E1000Interface {
     fn try_handle_interrupt(&mut self) -> bool {
-        let driver = self.0.lock();
+        let irq = {
+            let driver = self.driver.0.lock();
+            let mut current_addr = driver.header;
+            while current_addr < driver.header + driver.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
 
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header, driver.size);
+            let e1000 =
+                unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
 
-        return false;
+            let icr = e1000[E1000_ICR].read();
+            if icr != 0 {
+                // clear it
+                e1000[E1000_ICR].write(icr);
+                true
+            } else {
+                false
+            }
+        };
+
+        if irq {
+            let timestamp = Instant::from_millis(unsafe { crate::trap::TICK as i64 });
+            let mut sockets = self.sockets.lock();
+            match self.iface.lock().poll(&mut sockets, timestamp) {
+                Ok(_) => {
+                    SOCKET_ACTIVITY.notify_all();
+                }
+                Err(err) => {
+                    debug!("poll got err {}", err);
+                }
+            }
+        }
+
+        return irq;
     }
 
     fn device_type(&self) -> DeviceType {
@@ -90,14 +125,13 @@ impl E1000 {
         let e1000 =
             unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
-        let mut send_queue = unsafe {
+        let send_queue = unsafe {
             slice::from_raw_parts_mut(self.send_page as *mut E1000RecvDesc, send_queue_size)
         };
-        let mut tdt = e1000[E1000_TDT].read();
-        let index = (tdt as usize + 1) % send_queue_size;
+        let tdt = e1000[E1000_TDT].read();
+        let index = (tdt as usize) % send_queue_size;
         let send_desc = &mut send_queue[index];
 
-        // TODO: fix it
         return self.first_trans || (*send_desc).status & 1 != 0;
     }
 
@@ -124,28 +158,32 @@ impl E1000 {
 
 impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
-        self.iface.ethernet_addr()
+        self.iface.lock().ethernet_addr()
     }
 
     fn get_ifname(&self) -> String {
         format!("e1000")
     }
 
-    fn poll(&mut self, sockets: &mut SocketSet) -> Option<bool> {
+    fn ipv4_address(&self) -> Option<Ipv4Address> {
+        self.iface.lock().ipv4_address()
+    }
+
+    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
+        self.sockets.lock()
+    }
+
+    fn poll(&mut self) {
         let timestamp = Instant::from_millis(unsafe { crate::trap::TICK as i64 });
-        match self.iface.poll(sockets, timestamp) {
-            Ok(update) => {
-                Some(update)
+        let mut sockets = self.sockets.lock();
+        match self.iface.lock().poll(&mut sockets, timestamp) {
+            Ok(_) => {
+                SOCKET_ACTIVITY.notify_all();
             }
             Err(err) => {
                 debug!("poll got err {}", err);
-                None
             }
         }
-    }
-
-    fn ipv4_address(&self) -> Option<Ipv4Address> {
-        self.iface.ipv4_address()
     }
 }
 
@@ -201,7 +239,7 @@ impl<'a> phy::Device<'a> for E1000Driver {
     fn capabilities(&self) -> DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = 1536;
-        caps.max_burst_size = Some(1);
+        caps.max_burst_size = Some(32);
         caps
     }
 }
@@ -263,12 +301,10 @@ impl phy::TxToken for E1000TxToken {
         };
         let mut tdt = e1000[E1000_TDT].read();
 
-        let index_next = (tdt as usize + 1) % send_queue_size;
-        let send_desc = &mut send_queue[index_next];
-        assert!(driver.first_trans || send_desc.status & 1 != 0);
-
         let index = (tdt as usize) % send_queue_size;
         let send_desc = &mut send_queue[index];
+        assert!(driver.first_trans || send_desc.status & 1 != 0);
+
         let target =
             unsafe { slice::from_raw_parts_mut(driver.send_buffers[index] as *mut u8, len) };
         target.copy_from_slice(&buffer[..len]);
@@ -400,7 +436,13 @@ pub fn e1000_init(header: usize, size: usize) {
     for i in E1000_MTA..E1000_RAL {
         e1000[i].write(0);
     }
-    e1000[E1000_IMS].write(0); // IMS
+
+    // enable interrupt
+    // RXT0
+    e1000[E1000_IMS].write(1 << 7); // IMS
+
+    // clear interrupt
+    e1000[E1000_ICR].write(e1000[E1000_ICR].read());
 
     e1000[E1000_RDBAL].write(recv_page_pa as u32); // RDBAL
     e1000[E1000_RDBAH].write((recv_page_pa >> 32) as u32); // RDBAH
@@ -431,16 +473,18 @@ pub fn e1000_init(header: usize, size: usize) {
     let ethernet_addr = EthernetAddress::from_bytes(&mac);
     let ip_addrs = [IpCidr::new(IpAddress::v4(10,0,0,2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let iface = EthernetInterfaceBuilder::new(net_driver)
+    let iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
         .ip_addrs(ip_addrs)
         .neighbor_cache(neighbor_cache)
         .finalize();
 
     let e1000_iface = E1000Interface {
-        iface,
+        iface: Arc::new(Mutex::new(iface)),
+        sockets: Arc::new(Mutex::new(SocketSet::new(vec![]))),
+        driver: net_driver.clone(),
     };
 
-    //DRIVERS.lock().push(Box::new(net_driver.clone()));
+    DRIVERS.lock().push(Box::new(e1000_iface.clone()));
     NET_DRIVERS.lock().push(Box::new(e1000_iface));
 }

@@ -21,6 +21,7 @@ use volatile::{ReadOnly, Volatile};
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::sync::{MutexGuard, SpinNoIrq};
 
 use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, NetDriver};
 use super::super::bus::virtio_mmio::*;
@@ -85,11 +86,15 @@ impl NetDriver for VirtIONetDriver {
         format!("virtio{}", self.0.lock().interrupt)
     }
 
-    fn poll(&mut self, sockets: &mut SocketSet) -> Option<bool> {
+    fn ipv4_address(&self) -> Option<Ipv4Address> {
         unimplemented!()
     }
 
-    fn ipv4_address(&self) -> Option<Ipv4Address> {
+    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
+        unimplemented!()
+    }
+
+    fn poll(&mut self) {
         unimplemented!()
     }
 }

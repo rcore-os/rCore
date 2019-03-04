@@ -1,7 +1,7 @@
 //! Syscalls for networking
 
 use super::*;
-use crate::drivers::NET_DRIVERS;
+use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use core::mem::size_of;
 use smoltcp::socket::*;
 use smoltcp::wire::*;
@@ -49,6 +49,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
         domain, socket_type, protocol
     );
     let mut proc = process();
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
     match domain {
         AF_INET => match socket_type {
             SOCK_STREAM => {
@@ -58,7 +59,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                 let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
                 let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
-                let tcp_handle = proc.sockets.add(tcp_socket);
+                let tcp_handle = iface.sockets().add(tcp_socket);
                 proc.files.insert(
                     fd,
                     FileLike::Socket(SocketWrapper {
@@ -83,7 +84,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     raw_tx_buffer,
                 );
 
-                let raw_handle = proc.sockets.add(raw_socket);
+                let raw_handle = iface.sockets().add(raw_socket);
                 proc.files.insert(
                     fd,
                     FileLike::Socket(SocketWrapper {
@@ -140,6 +141,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 
     let mut proc = process();
     proc.memory_set.check_ptr(addr)?;
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
 
     let mut dest = None;
     let mut port = 0;
@@ -152,14 +154,10 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
         return Err(SysError::EINVAL);
     }
 
-    let mut proc = process();
-    // little hack: kick it forward
-    let iface = &mut *NET_DRIVERS.lock()[0];
-    iface.poll(&mut proc.sockets);
-
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp = wrapper.socket_type {
-        let mut socket = proc.sockets.get::<TcpSocket>(wrapper.handle);
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         // TODO selects non-conflict high port
         static mut EPHEMERAL_PORT: u16 = 49152;
@@ -173,8 +171,27 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
         };
 
         match socket.connect((dest.unwrap(), port), temp_port) {
-            Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EISCONN),
+            Ok(()) => {
+                drop(socket);
+                drop(sockets);
+
+                // wait for connection result
+                loop {
+                    iface.poll();
+
+                    let mut sockets = iface.sockets();
+                    let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+                    if socket.state() == TcpState::SynSent {
+                        // still connecting
+                        SOCKET_ACTIVITY._wait()
+                    } else if socket.state() == TcpState::Established {
+                        break Ok(0)
+                    } else if socket.state() == TcpState::Closed {
+                        break Err(SysError::ECONNREFUSED)
+                    }
+                }
+            },
+            Err(_) => Err(SysError::ENOBUFS),
         }
     } else {
         unimplemented!("socket type")
@@ -182,18 +199,22 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 }
 
 pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
-    // little hack: kick it forward
-    let iface = &mut *NET_DRIVERS.lock()[0];
-    iface.poll(&mut proc.sockets);
-
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp = wrapper.socket_type {
-        let mut socket = proc.sockets.get::<TcpSocket>(wrapper.handle);
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
         let slice = unsafe { slice::from_raw_parts(base, len) };
         if socket.is_open() {
             if socket.can_send() {
                 match socket.send_slice(&slice) {
-                    Ok(size) => Ok(size as isize),
+                    Ok(size) => {
+                        drop(socket);
+                        drop(sockets);
+                        iface.poll();
+                        Ok(size as isize)
+                    },
                     Err(err) => Err(SysError::ENOBUFS),
                 }
             } else {
@@ -231,17 +252,18 @@ pub fn sys_sendto(
         "sys_sendto: fd: {} buffer: {:?} len: {} addr: {:?} addr_len: {}",
         fd, buffer, len, addr, addr_len
     );
+
     let mut proc = process();
     proc.memory_set.check_ptr(addr)?;
     proc.memory_set.check_array(buffer, len)?;
 
-    // little hack: kick it forward
-    let iface = &mut *NET_DRIVERS.lock()[0];
-    iface.poll(&mut proc.sockets);
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Raw = wrapper.socket_type {
-        let mut socket = proc.sockets.get::<RawSocket>(wrapper.handle);
+        let v4_src = iface.ipv4_address().unwrap();
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<RawSocket>(wrapper.handle);
 
         let mut dest = None;
         let mut port = 0;
@@ -252,7 +274,7 @@ pub fn sys_sendto(
 
         if dest == None {
             return Err(SysError::EINVAL);
-        } else if let Some(IpAddress::Ipv4(v4_dest)) = dest {
+        } else if let Some(IpAddress::Ipv4(v4_dst)) = dest {
             let slice = unsafe { slice::from_raw_parts(buffer, len) };
             // using 20-byte IPv4 header
             let mut buffer = vec![0u8; len + 20];
@@ -261,13 +283,17 @@ pub fn sys_sendto(
             packet.set_header_len(20);
             packet.set_total_len((20 + len) as u16);
             packet.set_protocol(socket.ip_protocol().into());
-            packet.set_src_addr(iface.ipv4_address().unwrap());
-            packet.set_dst_addr(v4_dest);
+            packet.set_src_addr(v4_src);
+            packet.set_dst_addr(v4_dst);
             let payload = packet.payload_mut();
             payload.copy_from_slice(slice);
             packet.fill_checksum();
 
             socket.send_slice(&buffer).unwrap();
+
+            drop(socket);
+            drop(sockets);
+            iface.poll();
 
             Ok(len as isize)
         } else {
@@ -292,18 +318,16 @@ pub fn sys_recvfrom(
     );
     let mut proc = process();
 
-    // little hack: kick it forward
-    let iface = &mut *NET_DRIVERS.lock()[0];
-    iface.poll(&mut proc.sockets);
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Raw = wrapper.socket_type {
-        let mut socket = proc.sockets.get::<RawSocket>(wrapper.handle);
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<RawSocket>(wrapper.handle);
 
-
-        let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
-        match socket.recv_slice(&mut slice) {
-            Ok(size) => {
+            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
+            if let Ok(size) = socket.recv_slice(&mut slice) {
                 let mut packet = Ipv4Packet::new_unchecked(&slice);
 
                 // FIXME: check size as per sin_family
@@ -311,12 +335,11 @@ pub fn sys_recvfrom(
                 fill_addr(&mut sockaddr_in, IpAddress::Ipv4(packet.src_addr()), 0);
                 unsafe { *addr_len = size_of::<SockaddrIn>() };
 
-                Ok(size as isize)
+                return Ok(size as isize);
             }
-            Err(err) => {
-                warn!("err {:?}", err);
-                Err(SysError::ENOBUFS)
-            }
+
+            drop(socket);
+            SOCKET_ACTIVITY._wait()
         }
     } else {
         unimplemented!("socket type")
@@ -324,7 +347,8 @@ pub fn sys_recvfrom(
 }
 
 pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> SysResult {
-    let mut socket = proc.sockets.remove(handle);
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let mut socket = iface.sockets().remove(handle);
     match socket {
         Socket::Tcp(ref mut tcp_socket) => {
             tcp_socket.close();

@@ -1,14 +1,25 @@
 use crate::drivers::net::e1000;
 use x86_64::instructions::port::Port;
 
-const VENDOR: u32 = 0x00;
-const DEVICE: u32 = 0x02;
-const COMMAND: u32 = 0x04;
-const STATUS: u32 = 0x06;
-const SUBCLASS: u32 = 0x0a;
-const CLASS: u32 = 0x0b;
-const HEADER: u32 = 0x0e;
-const BAR0: u32 = 0x10;
+const PCI_VENDOR: u32 = 0x00;
+const PCI_DEVICE: u32 = 0x02;
+const PCI_COMMAND: u32 = 0x04;
+const PCI_STATUS: u32 = 0x06;
+const PCI_SUBCLASS: u32 = 0x0a;
+const PCI_CLASS: u32 = 0x0b;
+const PCI_HEADER: u32 = 0x0e;
+const PCI_BAR0: u32 = 0x10; // first
+const PCI_BAR5: u32 = 0x24; // last
+const PCI_CAP_PTR: u32 = 0x34;
+const PCI_INTERRUPT_LINE: u32 = 0x3c;
+const PCI_INTERRUPT_PIN: u32 = 0x3d;
+
+const PCI_MSI_CTRL_CAP: u32 = 0x00;
+const PCI_MSI_ADDR: u32 = 0x04;
+const PCI_MSI_UPPER_ADDR: u32 = 0x08;
+const PCI_MSI_DATA: u32 = 0x0C;
+
+const PCI_CAP_ID_MSI: u32 = 0x05;
 
 const PCI_ADDR_PORT: u16 = 0xcf8;
 const PCI_DATA_PORT: u16 = 0xcfc;
@@ -93,7 +104,7 @@ impl PciTag {
     // return (addr, len)
     pub unsafe fn get_bar_mem(&self, bar_number: u32) -> Option<(usize, usize)> {
         assert!(bar_number <= 4);
-        let bar = BAR0 + 4 * bar_number;
+        let bar = PCI_BAR0 + 4 * bar_number;
         let mut base = self.read(bar, 4);
         self.write(bar, 0xffffffff);
         let mut max_base = self.read(bar, 4);
@@ -129,14 +140,14 @@ impl PciTag {
     // returns a tuple of (vid, did, next)
     pub fn probe(&self) -> Option<(u32, u32, bool)> {
         unsafe {
-            let v = self.read(VENDOR, 2);
+            let v = self.read(PCI_VENDOR, 2);
             if v == 0xffff {
                 return None;
             }
-            let d = self.read(DEVICE, 2);
-            let mf = self.read(HEADER, 1);
-            let cl = self.read(CLASS, 1);
-            let scl = self.read(SUBCLASS, 1);
+            let d = self.read(PCI_DEVICE, 2);
+            let mf = self.read(PCI_HEADER, 1);
+            let cl = self.read(PCI_CLASS, 1);
+            let scl = self.read(PCI_SUBCLASS, 1);
             info!(
                 "{}: {}: {}: {:#X} {:#X} ({} {})",
                 self.bus(),
@@ -153,9 +164,29 @@ impl PciTag {
     }
 
     pub unsafe fn enable(&self) {
-        let orig = self.read(COMMAND, 2);
-        // IO_ENABLE | MEM_ENABLE | MASTER_ENABLE
-        self.write(COMMAND, orig | 0xf);
+        let orig = self.read(PCI_COMMAND, 2);
+        // IO Space | MEM Space | Bus Mastering | Special Cycles | PCI Interrupt Disable
+        self.write(PCI_COMMAND, orig | 0x40f);
+
+        // find MSI cap
+        let mut cap_ptr = self.read(PCI_CAP_PTR, 1);
+        while cap_ptr > 0 {
+            let cap_id = self.read(cap_ptr, 1);
+            if cap_id == PCI_CAP_ID_MSI {
+                self.write(cap_ptr + PCI_MSI_ADDR, 0xfee << 20);
+                // irq 23 temporarily
+                self.write(cap_ptr + PCI_MSI_DATA, 55 | 0 << 12);
+
+                let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
+                debug!("orig ctrl {:b}", orig_ctrl);
+                self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
+                debug!("new ctrl {:b}", self.read(cap_ptr + PCI_MSI_CTRL_CAP, 2));
+                break;
+            }
+            info!("cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
+            cap_ptr = self.read(cap_ptr + 1, 1);
+        }
+
     }
 }
 

@@ -24,24 +24,18 @@ pub extern fn server(_arg: usize) -> ! {
     let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
     let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
 
-    let mut sockets = SocketSet::new(vec![]);
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let mut sockets = iface.sockets();
     let udp_handle = sockets.add(udp_socket);
     let tcp_handle = sockets.add(tcp_socket);
     let tcp2_handle = sockets.add(tcp2_socket);
+    drop(sockets);
+    drop(iface);
 
     loop {
         {
-            let iface = &mut *NET_DRIVERS.lock()[0];
-            match iface.poll(&mut sockets) {
-                Some(event) => {
-                    if !event {
-                        continue;
-                    }
-                },
-                None => {
-                    continue
-                }
-            }
+            let iface = &mut *(NET_DRIVERS.lock()[0]);
+            let mut sockets = iface.sockets();
 
             // udp server
             {
