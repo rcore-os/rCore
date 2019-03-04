@@ -12,9 +12,11 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     proc.memory_set.check_mut_array(base, len)?;
-    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let len = proc.get_file(fd)?.read(slice)?;
-    Ok(len as isize)
+    match proc.files.get(&fd) {
+        Some(FileLike::File(_)) => sys_read_file(&mut proc, fd, base, len),
+        Some(FileLike::Socket(_)) => sys_read_socket(&mut proc, fd, base, len),
+        None => Err(SysError::EINVAL)
+    }
 }
 
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
@@ -28,10 +30,35 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     }
 }
 
+pub fn sys_read_file(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
+    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
+    let len = proc.get_file(fd)?.read(slice)?;
+    Ok(len as isize)
+}
+
 pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = proc.get_file(fd)?.write(slice)?;
     Ok(len as isize)
+}
+
+#[repr(C)]
+pub struct PollFd {
+    fd: u32,
+    events: u16,
+    revents: u16
+}
+
+pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
+    info!("poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}", ufds, nfds, timeout_msecs);
+    let mut proc = process();
+    proc.memory_set.check_mut_array(ufds, nfds)?;
+    let slice = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
+
+    // emulate it for now
+    use core::time::Duration;
+    thread::sleep(Duration::from_millis(timeout_msecs as u64));
+    Ok(nfds as isize)
 }
 
 pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {

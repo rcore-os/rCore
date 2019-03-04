@@ -15,6 +15,19 @@ const SOCK_RAW: usize = 3;
 const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
 
+fn get_ephemeral_port() -> u16 {
+    // TODO selects non-conflict high port
+    static mut EPHEMERAL_PORT: u16 = 49152;
+    unsafe {
+        if EPHEMERAL_PORT == 65535 {
+            EPHEMERAL_PORT = 49152;
+        } else {
+            EPHEMERAL_PORT = EPHEMERAL_PORT + 1;
+        }
+        EPHEMERAL_PORT
+    }
+}
+
 fn parse_addr(sockaddr_in: &SockaddrIn, dest: &mut Option<IpAddress>, port: &mut u16) {
     if sockaddr_in.sin_family == AF_INET as u16 {
         *port = u16::from_be(sockaddr_in.sin_port);
@@ -65,6 +78,26 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     FileLike::Socket(SocketWrapper {
                         handle: tcp_handle,
                         socket_type: SocketType::Tcp,
+                    }),
+                );
+
+                Ok(fd as isize)
+            }
+            SOCK_DGRAM => {
+                let fd = proc.get_free_inode();
+
+                let udp_rx_buffer =
+                    UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
+                let udp_tx_buffer =
+                    UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
+                let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
+
+                let udp_handle = iface.sockets().add(udp_socket);
+                proc.files.insert(
+                    fd,
+                    FileLike::Socket(SocketWrapper {
+                        handle: udp_handle,
+                        socket_type: SocketType::Udp,
                     }),
                 );
 
@@ -159,16 +192,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
-        // TODO selects non-conflict high port
-        static mut EPHEMERAL_PORT: u16 = 49152;
-        let temp_port = unsafe {
-            if EPHEMERAL_PORT == 65535 {
-                EPHEMERAL_PORT = 49152;
-            } else {
-                EPHEMERAL_PORT = EPHEMERAL_PORT + 1;
-            }
-            EPHEMERAL_PORT
-        };
+        let temp_port = get_ephemeral_port();
 
         match socket.connect((dest.unwrap(), port), temp_port) {
             Ok(()) => {
@@ -194,6 +218,9 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
             }
             Err(_) => Err(SysError::ENOBUFS),
         }
+    } else if let SocketType::Udp = wrapper.socket_type {
+        // do nothing when only sendto() is used
+        Ok(0)
     } else {
         unimplemented!("socket type")
     }
@@ -211,6 +238,38 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
             if socket.can_send() {
                 match socket.send_slice(&slice) {
                     Ok(size) => {
+                        // avoid deadlock
+                        drop(socket);
+                        drop(sockets);
+
+                        iface.poll();
+                        Ok(size as isize)
+                    }
+                    Err(err) => Err(SysError::ENOBUFS),
+                }
+            } else {
+                Err(SysError::ENOBUFS)
+            }
+        } else {
+            Err(SysError::ENOTCONN)
+        }
+    } else {
+        unimplemented!("socket type")
+    }
+}
+
+pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let wrapper = proc.get_socket(fd)?;
+    if let SocketType::Udp = wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+        let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+        if socket.is_open() {
+            if socket.can_recv() {
+                match socket.recv_slice(&mut slice) {
+                    Ok((size, _)) => {
                         // avoid deadlock
                         drop(socket);
                         drop(sockets);
@@ -303,6 +362,43 @@ pub fn sys_sendto(
         } else {
             unimplemented!("ip type")
         }
+    } else if let SocketType::Udp = wrapper.socket_type {
+        let v4_src = iface.ipv4_address().unwrap();
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+        let mut dest = None;
+        let mut port = 0;
+
+        // FIXME: check size as per sin_family
+        let sockaddr_in = unsafe { &*(addr as *const SockaddrIn) };
+        parse_addr(&sockaddr_in, &mut dest, &mut port);
+
+        if dest == None {
+            return Err(SysError::EINVAL);
+        } else if let Some(dst_addr) = dest {
+            if !socket.endpoint().is_specified() {
+                let temp_port = get_ephemeral_port();
+                socket
+                    .bind(IpEndpoint::new(IpAddress::Ipv4(v4_src), temp_port))
+                    .unwrap();
+            }
+
+            let slice = unsafe { slice::from_raw_parts(buffer, len) };
+
+            socket
+                .send_slice(&slice, IpEndpoint::new(dst_addr, port))
+                .unwrap();
+
+            // avoid deadlock
+            drop(socket);
+            drop(sockets);
+            iface.poll();
+
+            Ok(len as isize)
+        } else {
+            unimplemented!("ip type")
+        }
     } else {
         unimplemented!("socket type")
     }
@@ -314,17 +410,31 @@ pub fn sys_recvfrom(
     len: usize,
     flags: usize,
     addr: *mut u8,
-    addr_len: *mut usize,
+    addr_len: *mut u32,
 ) -> SysResult {
     info!(
         "sys_recvfrom: fd: {} buffer: {:?} len: {} flags: {} addr: {:?} addr_len: {:?}",
         fd, buffer, len, flags, addr, addr_len
     );
+
     let mut proc = process();
+    proc.memory_set.check_mut_array(buffer, len)?;
+
+    if addr as usize != 0 {
+        proc.memory_set.check_mut_ptr(addr_len)?;
+
+        let max_addr_len = unsafe { *addr_len } as usize;
+        if max_addr_len < size_of::<SockaddrIn>() {
+            return Err(SysError::EINVAL);
+        }
+
+        proc.memory_set.check_mut_array(addr, max_addr_len)?;
+    }
 
     let iface = &mut *(NET_DRIVERS.lock()[0]);
 
     let wrapper = proc.get_socket(fd)?;
+    // TODO: move some part of these into one generic function
     if let SocketType::Raw = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
@@ -334,10 +444,32 @@ pub fn sys_recvfrom(
             if let Ok(size) = socket.recv_slice(&mut slice) {
                 let mut packet = Ipv4Packet::new_unchecked(&slice);
 
-                // FIXME: check size as per sin_family
-                let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
-                fill_addr(&mut sockaddr_in, IpAddress::Ipv4(packet.src_addr()), 0);
-                unsafe { *addr_len = size_of::<SockaddrIn>() };
+                if addr as usize != 0 {
+                    // FIXME: check size as per sin_family
+                    let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
+                    fill_addr(&mut sockaddr_in, IpAddress::Ipv4(packet.src_addr()), 0);
+                    unsafe { *addr_len = size_of::<SockaddrIn>() as u32 };
+                }
+
+                return Ok(size as isize);
+            }
+
+            // avoid deadlock
+            drop(socket);
+            SOCKET_ACTIVITY._wait()
+        }
+    } else if let SocketType::Udp = wrapper.socket_type {
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
+            if let Ok((size, endpoint)) = socket.recv_slice(&mut slice) {
+                if addr as usize != 0 {
+                    let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
+                    fill_addr(&mut sockaddr_in, endpoint.addr, endpoint.port);
+                    unsafe { *addr_len = size_of::<SockaddrIn>() as u32 };
+                }
 
                 return Ok(size as isize);
             }
