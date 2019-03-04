@@ -4,6 +4,7 @@ target
 
 Cargo.lock
 !kernel/Cargo.lock
+!bootloader/Cargo.lock
 !user/Cargo.lock
 
 .DS_Store

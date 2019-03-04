@@ -1,8 +1,9 @@
 # TODO rewrite in Rust, use crate cortex-a
 
 .section .text.boot
+.globl _start
 
-boot:
+_start:
     # read cpu affinity, start core 0, halt rest
     mrs     x1, mpidr_el1
     and     x1, x1, #3
@@ -104,11 +105,7 @@ zero_bss_loop:
     cbnz    x2, zero_bss_loop
 
 zero_bss_loop_end:
-    b       _start
-
-.section .text.entry
-.globl _start
-_start:
     # jump to rust_main, which shouldn't return. halt if it does
-    bl      rust_main
+    mov     x9, #0x100000
+    blr     x9
     b       halt

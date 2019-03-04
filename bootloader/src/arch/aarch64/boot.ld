@@ -3,16 +3,9 @@ ENTRY(_start)
 SECTIONS {
   . = 0x80000; /* Raspbery Pi 3 AArch64 (kernel8.img) load address */
 
-  .boot : {
-    KEEP(*(.text.boot)) /* from boot.S */
-  }
-
-  . = 0x100000; /* Load the kernel at this address. It's also kernel stack top address */
-  bootstacktop = .;
-
   .text : {
     stext = .;
-    *(.text.entry)
+    KEEP(*(.text.boot)) /* from boot.S */
     *(.text .text.* .gnu.linkonce.t*)
     . = ALIGN(4K);
     etext = .;
