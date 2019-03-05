@@ -112,6 +112,7 @@ fn remap_the_kernel() {
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
     ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
 
+    info!("{:#x?}", ms);
     unsafe { ms.get_page_table_mut().activate_as_kernel() }
     unsafe { KERNEL_MEMORY_SET = Some(ms) }
     info!("kernel remap end");

@@ -32,8 +32,6 @@ m_mode ?=
 
 target := $(arch)
 kernel := target/$(target)/$(mode)/rcore
-boot_bin := target/$(target)/$(mode)/boot.bin
-kernel_bin := target/$(target)/$(mode)/kernel.bin
 kernel_img := target/$(target)/$(mode)/kernel.img
 bootimage := target/$(target)/bootimage.bin
 bootloader_dir = ../bootloader
@@ -173,7 +171,8 @@ objcopy := $(prefix)objcopy
 cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
-export CC=$(cc)
+strip := $(prefix)strip
+export CC = $(cc)
 
 .PHONY: all clean run build asm doc justrun debug kernel sfsimg install runnet
 
@@ -218,13 +217,15 @@ header:
 sym:
 	@$(objdump) -t $(kernel) | less
 
-$(bootloader):
+$(bootloader): $(kernel)
 ifeq ($(arch), aarch64)
 	@echo Building $(arch) bootloader
-	cd $(bootloader_dir) && make arch=$(arch) mode=$(mode)
+	@$(strip) $(kernel) -o $(kernel)_stripped
+	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
+	@rm $(kernel)_stripped
 endif
 
-$(kernel_img): $(bootloader) kernel
+$(kernel_img): kernel $(bootloader)
 ifeq ($(arch), riscv32)
 	@mkdir -p target/$(target)/bbl && \
 	cd target/$(target)/bbl && \
@@ -252,10 +253,7 @@ else
 	cp bbl $(abspath $@)
 endif
 else ifeq ($(arch), aarch64)
-	@$(objcopy) $(bootloader) --strip-all -O binary $(boot_bin)
-	@$(objcopy) $(kernel) --strip-all -O binary $(kernel_bin)
-	dd if=$(boot_bin) of=$@ conv=notrunc
-	dd if=$(kernel_bin) of=$@ seek=1024 conv=notrunc
+	@$(objcopy) $(bootloader) --strip-all -O binary $@
 endif
 
 kernel:

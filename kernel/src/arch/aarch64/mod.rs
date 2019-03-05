@@ -12,7 +12,7 @@ pub mod driver;
 #[path = "board/raspi3/mod.rs"]
 pub mod board;
 
-global_asm!(include_str!("entry.S"));
+global_asm!(include_str!("boot/entry.S"));
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function

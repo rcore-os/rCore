@@ -1,5 +1,3 @@
-# TODO rewrite in Rust, use crate cortex-a
-
 .section .text.boot
 .globl _start
 
@@ -92,20 +90,6 @@ set_stack:
     # set the current stack pointer
     mov     sp, x1
 
-zero_bss:
-    # load the start address and number of bytes in BSS section
-    ldr     x1, =sbss
-    ldr     x2, =__bss_length
-
-zero_bss_loop:
-    # zero out the BSS section, 64-bits at a time
-    cbz     x2, zero_bss_loop_end
-    str     xzr, [x1], #8
-    sub     x2, x2, #8
-    cbnz    x2, zero_bss_loop
-
-zero_bss_loop_end:
-    # jump to rust_main, which shouldn't return. halt if it does
-    mov     x9, #0x100000
-    blr     x9
+goto_main:
+    bl      boot_main
     b       halt

@@ -1,7 +1,7 @@
 ENTRY(_start)
 
 SECTIONS {
-  . = 0x100000; /* Load the kernel at this address. It's also kernel stack top address */
+  . = 0x2000000; /* Load the kernel at this address. It's also kernel stack top address */
   bootstacktop = .;
 
   .text : {

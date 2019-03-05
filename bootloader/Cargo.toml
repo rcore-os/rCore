@@ -5,3 +5,11 @@ authors = ["equation314 <equation618@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+xmas-elf = "0.6.2"
+fixedvec = "0.2.3"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+aarch64 = { git = "https://github.com/equation314/aarch64" }
+
+[build-dependencies]
+cc = "1.0"
