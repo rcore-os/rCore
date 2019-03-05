@@ -261,29 +261,51 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
 pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
     let iface = &mut *(NET_DRIVERS.lock()[0]);
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Udp = wrapper.socket_type {
-        let mut sockets = iface.sockets();
-        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+    if let SocketType::Tcp = wrapper.socket_type {
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
-        let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
-        if socket.is_open() {
-            if socket.can_recv() {
-                match socket.recv_slice(&mut slice) {
-                    Ok((size, _)) => {
-                        // avoid deadlock
-                        drop(socket);
-                        drop(sockets);
+            if socket.is_open() {
+                let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+                if let Ok(size) = socket.recv_slice(&mut slice) {
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
 
-                        iface.poll();
-                        Ok(size as isize)
-                    }
-                    Err(err) => Err(SysError::ENOBUFS),
+                    iface.poll();
+                    return Ok(size as isize);
                 }
             } else {
-                Err(SysError::ENOBUFS)
+                return Err(SysError::ENOTCONN);
             }
-        } else {
-            Err(SysError::ENOTCONN)
+
+            // avoid deadlock
+            drop(socket);
+            SOCKET_ACTIVITY._wait()
+        }
+    }  else if let SocketType::Udp = wrapper.socket_type {
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+            if socket.is_open() {
+                let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+                if let Ok((size, _)) = socket.recv_slice(&mut slice) {
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
+
+                    iface.poll();
+                    return Ok(size as isize);
+                }
+            } else {
+                return Err(SysError::ENOTCONN);
+            }
+
+            // avoid deadlock
+            drop(socket);
+            SOCKET_ACTIVITY._wait()
         }
     } else {
         unimplemented!("socket type")
