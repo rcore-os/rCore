@@ -187,7 +187,7 @@ impl Thread {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
-        let iface = &mut *(NET_DRIVERS.lock()[0]);
+        let iface = &*(NET_DRIVERS.read()[0]);
         let mut sockets = iface.sockets();
         for (_fd, file) in files.iter() {
             if let FileLike::Socket(wrapper) = file {

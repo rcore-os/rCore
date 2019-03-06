@@ -6,7 +6,7 @@ use alloc::vec;
 use core::fmt::Write;
 
 pub extern fn server(_arg: usize) -> ! {
-    if NET_DRIVERS.lock().len() < 1 {
+    if NET_DRIVERS.read().len() < 1 {
         loop {
             thread::yield_now();
         }
@@ -24,7 +24,7 @@ pub extern fn server(_arg: usize) -> ! {
     let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
     let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let mut sockets = iface.sockets();
     let udp_handle = sockets.add(udp_socket);
     let tcp_handle = sockets.add(tcp_socket);
@@ -34,7 +34,7 @@ pub extern fn server(_arg: usize) -> ! {
 
     loop {
         {
-            let iface = &mut *(NET_DRIVERS.lock()[0]);
+            let iface = &*(NET_DRIVERS.read()[0]);
             let mut sockets = iface.sockets();
 
             // udp server

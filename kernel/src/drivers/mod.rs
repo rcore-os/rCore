@@ -1,11 +1,12 @@
 use alloc::prelude::*;
-use core::any::Any;
+use alloc::sync::Arc;
 
 use lazy_static::lazy_static;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
+use spin::RwLock;
 
-use crate::sync::{ThreadLock, SpinLock, Condvar, MutexGuard, SpinNoIrq};
+use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 
 mod device_tree;
 pub mod bus;
@@ -21,16 +22,16 @@ pub enum DeviceType {
     Block
 }
 
-pub trait Driver : Send {
+pub trait Driver : Send + Sync {
     // if interrupt belongs to this driver, handle it and return true
     // return false otherwise
-    fn try_handle_interrupt(&mut self) -> bool;
+    fn try_handle_interrupt(&self) -> bool;
 
     // return the correspondent device type, see DeviceType
     fn device_type(&self) -> DeviceType;
 }
 
-pub trait NetDriver : Send {
+pub trait NetDriver : Driver {
     // get mac address for this device
     fn get_mac(&self) -> EthernetAddress;
 
@@ -41,19 +42,21 @@ pub trait NetDriver : Send {
     fn ipv4_address(&self) -> Option<Ipv4Address>;
 
     // get sockets
-    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq>;
+    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq>;
 
     // manually trigger a poll, use it after sending packets
-    fn poll(&mut self);
+    fn poll(&self);
 }
 
 
 lazy_static! {
-    pub static ref DRIVERS: SpinLock<Vec<Box<Driver>>> = SpinLock::new(Vec::new());
+    // NOTE: RwLock only write when initializing drivers
+    pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
 }
 
 lazy_static! {
-    pub static ref NET_DRIVERS: ThreadLock<Vec<Box<NetDriver>>> = ThreadLock::new(Vec::new());
+    // NOTE: RwLock only write when initializing drivers
+    pub static ref NET_DRIVERS: RwLock<Vec<Arc<NetDriver>>> = RwLock::new(Vec::new());
 }
 
 lazy_static!{

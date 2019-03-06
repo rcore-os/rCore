@@ -42,7 +42,7 @@ const VIRTIO_QUEUE_RECEIVE: usize = 0;
 const VIRTIO_QUEUE_TRANSMIT: usize = 1;
 
 impl Driver for VirtIONetDriver {
-    fn try_handle_interrupt(&mut self) -> bool {
+    fn try_handle_interrupt(&self) -> bool {
         let driver = self.0.lock();
 
         // ensure header page is mapped
@@ -90,11 +90,11 @@ impl NetDriver for VirtIONetDriver {
         unimplemented!()
     }
 
-    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
+    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
         unimplemented!()
     }
 
-    fn poll(&mut self) {
+    fn poll(&self) {
         unimplemented!()
     }
 }
@@ -296,8 +296,8 @@ pub fn virtio_net_init(node: &Node) {
 
     header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
-    let net_driver = VirtIONetDriver(Arc::new(Mutex::new(driver)));
+    let net_driver = Arc::new(VirtIONetDriver(Arc::new(Mutex::new(driver))));
 
-    DRIVERS.lock().push(Box::new(net_driver.clone()));
-    NET_DRIVERS.lock().push(Box::new(net_driver));
+    DRIVERS.write().push(net_driver.clone());
+    NET_DRIVERS.write().push(net_driver);
 }

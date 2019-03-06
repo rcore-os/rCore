@@ -62,7 +62,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
         domain, socket_type, protocol
     );
     let mut proc = process();
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     match domain {
         AF_INET => match socket_type {
             SOCK_STREAM => {
@@ -196,8 +196,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut drivers = NET_DRIVERS.lock();
-        let iface = &mut *(drivers[0]);
+        let iface = &*(NET_DRIVERS.read()[0]);
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -208,13 +207,10 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
                 // avoid deadlock
                 drop(socket);
                 drop(sockets);
-                drop(iface);
-                drop(drivers);
 
                 // wait for connection result
                 loop {
-                    let mut drivers = NET_DRIVERS.lock();
-                    let iface = &mut *(drivers[0]);
+                    let iface = &*(NET_DRIVERS.read()[0]);
                     iface.poll();
 
                     let mut sockets = iface.sockets();
@@ -223,8 +219,6 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
                         // still connecting
                         drop(socket);
                         drop(sockets);
-                        drop(iface);
-                        drop(drivers);
                         debug!("poll for connection wait");
                         SOCKET_ACTIVITY._wait();
                     } else if socket.state() == TcpState::Established {
@@ -245,7 +239,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 }
 
 pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         let mut sockets = iface.sockets();
@@ -277,7 +271,7 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
 }
 
 pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         loop {
@@ -359,7 +353,7 @@ pub fn sys_sendto(
     proc.memory_set.check_ptr(addr)?;
     proc.memory_set.check_array(buffer, len)?;
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Raw = wrapper.socket_type {
@@ -471,7 +465,7 @@ pub fn sys_recvfrom(
         proc.memory_set.check_mut_array(addr, max_addr_len)?;
     }
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
 
     let wrapper = proc.get_socket(fd)?;
     // TODO: move some part of these into one generic function
@@ -524,7 +518,7 @@ pub fn sys_recvfrom(
 }
 
 pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> SysResult {
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let mut sockets = iface.sockets();
     sockets.release(handle);
     sockets.prune();
@@ -553,7 +547,7 @@ pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
         return Err(SysError::EINVAL);
     }
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = &mut proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         wrapper.socket_type = SocketType::Tcp(Some(IpEndpoint::new(host.unwrap(), port)));
@@ -572,7 +566,7 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
     // open multiple sockets for each connection
     let mut proc = process();
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
         let mut sockets = iface.sockets();
@@ -611,7 +605,7 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
         loop {
-            let iface = &mut *(NET_DRIVERS.lock()[0]);
+            let iface = &*(NET_DRIVERS.read()[0]);
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -652,7 +646,6 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
             // avoid deadlock
             drop(socket);
             drop(sockets);
-            drop(iface);
             SOCKET_ACTIVITY._wait()
         }
     } else {
@@ -684,7 +677,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResul
 
     proc.memory_set.check_mut_array(addr, max_addr_len)?;
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
         let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };

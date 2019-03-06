@@ -91,8 +91,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 COM2 => com2(),
                 IDE => ide(),
                 _ => {
-                    let mut drivers = DRIVERS.lock();
-                    for driver in drivers.iter_mut() {
+                    for driver in DRIVERS.read().iter() {
                         if driver.try_handle_interrupt() == true {
                             debug!("driver processed interrupt");
                             return;

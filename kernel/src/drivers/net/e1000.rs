@@ -62,15 +62,14 @@ const E1000_MTA: usize = 0x5200 / 4;
 const E1000_RAL: usize = 0x5400 / 4;
 const E1000_RAH: usize = 0x5404 / 4;
 
-#[derive(Clone)]
 pub struct E1000Interface {
-    iface: Arc<Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>>,
+    iface: Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>,
     driver: E1000Driver,
-    sockets: Arc<Mutex<SocketSet<'static, 'static, 'static>>>,
+    sockets: Mutex<SocketSet<'static, 'static, 'static>>,
 }
 
 impl Driver for E1000Interface {
-    fn try_handle_interrupt(&mut self) -> bool {
+    fn try_handle_interrupt(&self) -> bool {
         let irq = {
             let driver = self.driver.0.lock();
             let mut current_addr = driver.header;
@@ -172,11 +171,11 @@ impl NetDriver for E1000Interface {
         self.iface.lock().ipv4_address()
     }
 
-    fn sockets(&mut self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
+    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
         self.sockets.lock()
     }
 
-    fn poll(&mut self) {
+    fn poll(&self) {
         let timestamp = Instant::from_millis(unsafe {
             (crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000) as i64
         });
@@ -485,11 +484,12 @@ pub fn e1000_init(header: usize, size: usize) {
         .finalize();
 
     let e1000_iface = E1000Interface {
-        iface: Arc::new(Mutex::new(iface)),
-        sockets: Arc::new(Mutex::new(SocketSet::new(vec![]))),
+        iface: Mutex::new(iface),
+        sockets: Mutex::new(SocketSet::new(vec![])),
         driver: net_driver.clone(),
     };
 
-    DRIVERS.lock().push(Box::new(e1000_iface.clone()));
-    NET_DRIVERS.lock().push(Box::new(e1000_iface));
+    let driver = Arc::new(e1000_iface);
+    DRIVERS.write().push(driver.clone());
+    NET_DRIVERS.write().push(driver);
 }

@@ -1,5 +1,6 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::prelude::*;
+use alloc::sync::Arc;
 use core::slice;
 
 use bitflags::*;
@@ -14,6 +15,7 @@ use crate::arch::cpu;
 use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
@@ -24,7 +26,7 @@ const VIRTIO_GPU_EVENT_DISPLAY : u32 = 1 << 0;
 struct VirtIOGpu {
     interrupt_parent: u32,
     interrupt: u32,
-    header: usize,
+    header: &'static mut VirtIOHeader,
     queue_buffer: [usize; 2],
     frame_buffer: usize,
     rect: VirtIOGpuRect,
@@ -185,20 +187,25 @@ const VIRTIO_BUFFER_RECEIVE: usize = 1;
 
 const VIRTIO_GPU_RESOURCE_ID: u32 = 0xbabe;
 
-impl Driver for VirtIOGpu {
-    fn try_handle_interrupt(&mut self) -> bool {
+pub struct VirtIOGpuDriver(Mutex<VirtIOGpu>);
+
+impl Driver for VirtIOGpuDriver {
+    fn try_handle_interrupt(&self) -> bool {
         // for simplicity
         if cpu::id() > 0 {
             return false
         }
 
-        // ensure header page is mapped
-        active_table().map_if_not_exists(self.header as usize, self.header as usize);
+        let mut driver = self.0.lock();
 
-        let header = unsafe { &mut *(self.header as *mut VirtIOHeader) };
-        let interrupt = header.interrupt_status.read();
+        // ensure header page is mapped
+        // TODO: this should be mapped in all page table by default
+        let header_addr = &mut driver.header as *mut _ as usize;
+        active_table().map_if_not_exists(header_addr, header_addr);
+
+        let interrupt = driver.header.interrupt_status.read();
         if interrupt != 0 {
-            header.interrupt_ack.write(interrupt);
+            driver.header.interrupt_ack.write(interrupt);
             debug!("Got interrupt {:?}", interrupt);
             return true;
         }
@@ -331,15 +338,18 @@ pub fn virtio_gpu_init(node: &Node) {
     header.guest_page_size.write(PAGE_SIZE as u32); // one page
 
     let queue_num = 2;
+    let queues = [
+        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num),
+        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_CURSOR, queue_num)
+    ];
     let mut driver = VirtIOGpu {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
-        header: from as usize,
+        header,
         queue_buffer: [0, 0],
         frame_buffer: 0,
         rect: VirtIOGpuRect::default(),
-        queues: [VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num),
-                    VirtIOVirtqueue::new(header, VIRTIO_QUEUE_CURSOR, queue_num)]
+        queues,
     };
 
     for buffer in 0..2 {
@@ -351,9 +361,10 @@ pub fn virtio_gpu_init(node: &Node) {
         debug!("buffer {} using page address {:#X}", buffer, page as usize);
     }
 
-    header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
+    driver.header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
     setup_framebuffer(&mut driver);
 
-    DRIVERS.lock().push(Box::new(driver));
+    let driver = Arc::new(VirtIOGpuDriver(Mutex::new(driver)));
+    DRIVERS.write().push(driver);
 }

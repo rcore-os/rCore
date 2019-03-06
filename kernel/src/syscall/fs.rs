@@ -73,7 +73,7 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                 },
                 Some(FileLike::Socket(wrapper)) => {
                     if let SocketType::Tcp(_) = wrapper.socket_type {
-                        let iface = &mut *(NET_DRIVERS.lock()[0]);
+                        let iface = &*(NET_DRIVERS.read()[0]);
                         let mut sockets = iface.sockets();
                         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 

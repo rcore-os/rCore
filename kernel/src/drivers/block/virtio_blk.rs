@@ -28,8 +28,7 @@ pub struct VirtIOBlk {
     capacity: usize
 }
 
-#[derive(Clone)]
-pub struct VirtIOBlkDriver(Arc<Mutex<VirtIOBlk>>);
+pub struct VirtIOBlkDriver(Mutex<VirtIOBlk>);
 
 
 #[repr(C)]
@@ -92,7 +91,7 @@ bitflags! {
 }
 
 impl Driver for VirtIOBlkDriver {
-    fn try_handle_interrupt(&mut self) -> bool {
+    fn try_handle_interrupt(&self) -> bool {
         let mut driver = self.0.lock();
 
         // ensure header page is mapped
@@ -167,15 +166,15 @@ pub fn virtio_blk_init(node: &Node) {
     // configure two virtqueues: ingress and egress
     header.guest_page_size.write(PAGE_SIZE as u32); // one page
 
-    let mut driver = VirtIOBlkDriver(Arc::new(Mutex::new(VirtIOBlk {
+    let mut driver = VirtIOBlkDriver(Mutex::new(VirtIOBlk {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
         header: from as usize,
         queue: VirtIOVirtqueue::new(header, 0, 16),
         capacity: config.capacity.read() as usize,
-    })));
+    }));
 
     header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
-    DRIVERS.lock().push(Box::new(driver));
+    DRIVERS.write().push(Arc::new(driver));
 }

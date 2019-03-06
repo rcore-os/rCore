@@ -1,5 +1,6 @@
 use alloc::prelude::*;
 use alloc::vec;
+use alloc::sync::Arc;
 use core::fmt;
 use core::mem::size_of;
 use core::mem::transmute_copy;
@@ -15,6 +16,7 @@ use volatile::Volatile;
 
 use crate::arch::cpu;
 use crate::memory::active_table;
+use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
@@ -22,7 +24,7 @@ use super::super::bus::virtio_mmio::*;
 struct VirtIOInput {
     interrupt_parent: u32,
     interrupt: u32,
-    header: usize,
+    header: &'static mut VirtIOHeader,
     // 0 for event, 1 for status
     queues: [VirtIOVirtqueue; 2],
     x: isize,
@@ -121,7 +123,9 @@ bitflags! {
 const VIRTIO_QUEUE_EVENT: usize = 0;
 const VIRTIO_QUEUE_STATUS: usize = 1;
 
-impl Driver for VirtIOInput {
+pub struct VirtIOInputDriver(Mutex<VirtIOInput>);
+
+impl VirtIOInput {
     fn try_handle_interrupt(&mut self) -> bool {
         // for simplicity
         if cpu::id() > 0 {
@@ -129,14 +133,16 @@ impl Driver for VirtIOInput {
         }
 
         // ensure header page is mapped
-        active_table().map_if_not_exists(self.header as usize, self.header as usize);
-        let header = unsafe { &mut *(self.header as *mut VirtIOHeader) };
-        let interrupt = header.interrupt_status.read();
+        // TODO: this should be mapped in all page table by default
+        let header_addr = self.header as *mut _ as usize;
+        active_table().map_if_not_exists(header_addr, header_addr);
+
+        let interrupt = self.header.interrupt_status.read();
         if interrupt != 0 {
-            header.interrupt_ack.write(interrupt);
+            self.header.interrupt_ack.write(interrupt);
             debug!("Got interrupt {:?}", interrupt);
             loop {
-                if let Some((input, output, _,  _)) = self.queues[VIRTIO_QUEUE_EVENT].get() {
+                if let Some((input, output, _, _)) = self.queues[VIRTIO_QUEUE_EVENT].get() {
                     let event: VirtIOInputEvent = unsafe { transmute_copy(&input[0][0]) };
                     if event.event_type == 2 && event.code == 0 {
                         // X
@@ -155,6 +161,12 @@ impl Driver for VirtIOInput {
             return true;
         }
         return false;
+    }
+}
+
+impl Driver for VirtIOInputDriver {
+    fn try_handle_interrupt(&self) -> bool {
+        self.0.lock().try_handle_interrupt()
     }
 
     fn device_type(&self) -> DeviceType {
@@ -187,12 +199,15 @@ pub fn virtio_input_init(node: &Node) {
     header.guest_page_size.write(PAGE_SIZE as u32); // one page
 
     let queue_num = 32;
+    let queues = [
+        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_EVENT, queue_num),
+        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_STATUS, queue_num),
+    ];
     let mut driver = VirtIOInput {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
-        header: from as usize,
-        queues: [VirtIOVirtqueue::new(header, VIRTIO_QUEUE_EVENT, queue_num),
-                    VirtIOVirtqueue::new(header, VIRTIO_QUEUE_STATUS, queue_num)],
+        header,
+        queues,
         x: 0,
         y: 0
     };
@@ -204,7 +219,8 @@ pub fn virtio_input_init(node: &Node) {
         driver.queues[VIRTIO_QUEUE_EVENT].add(&[buffer], &[], 0);
     }
 
-    header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
+    driver.header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
-    DRIVERS.lock().push(Box::new(driver));
+    let driver = Arc::new(VirtIOInputDriver(Mutex::new(driver)));
+    DRIVERS.write().push(driver);
 }
