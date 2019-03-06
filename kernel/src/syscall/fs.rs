@@ -45,43 +45,29 @@ pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize
     Ok(len as isize)
 }
 
-#[repr(C)]
-pub struct PollFd {
-    fd: u32,
-    events: u16,
-    revents: u16
-}
-
-const POLLIN: u16 = 0x0001;
-const POLPRI: u16 = 0x0002;
-const POLLOUT: u16 = 0x0004;
-const POLLERR: u16 = 0x0008;
-const POLLHUP: u16 = 0x0010;
-const POLLNVAL: u16 = 0x0020;
-
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
     info!("poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}", ufds, nfds, timeout_msecs);
     let mut proc = process();
     proc.memory_set.check_mut_array(ufds, nfds)?;
 
-    let slice = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
-    for i in 0..nfds {
-        if proc.files.get(&(slice[i].fd as usize)).is_none() {
+    let polls = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
+    for poll in polls.iter() {
+        if proc.files.get(&(poll.fd as usize)).is_none() {
             return Err(SysError::EINVAL);
         }
     }
     drop(proc);
 
-
     let begin_time_ms = unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000};
     loop {
+        use PollEvents as PE;
         let mut proc = process();
-        for i in 0..nfds {
-            match proc.files.get(&(slice[i].fd as usize)) {
+        for poll in polls.iter_mut() {
+            match proc.files.get(&(poll.fd as usize)) {
                 Some(FileLike::File(_)) => {
-                    // assume it is stdin for now
-                    if (slice[i].events & POLLIN) != 0 && STDIN.can_read() {
-                        slice[i].revents = POLLIN;
+                    // FIXME: assume it is stdin for now
+                    if poll.events.contains(PE::IN) && STDIN.can_read() {
+                        poll.revents = PE::IN;
                         return Ok(0);
                     }
                 },
@@ -92,13 +78,13 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
                         if !socket.is_open() {
-                            slice[i].revents = POLLHUP;
+                            poll.revents = PE::HUP;
                             return Ok(0);
-                        } else if socket.can_recv() && (slice[i].events & POLLIN) != 0 {
-                            slice[i].revents = POLLIN;
+                        } else if socket.can_recv() && poll.events.contains(PE::IN) {
+                            poll.revents = PE::IN;
                             return Ok(0);
-                        } else if socket.can_send() && (slice[i].events & POLLOUT) != 0 {
-                            slice[i].revents = POLLIN;
+                        } else if socket.can_send() && poll.events.contains(PE::OUT) {
+                            poll.revents = PE::OUT;
                             return Ok(0);
                         }
                     } else {
@@ -106,14 +92,14 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                     }
                 }
                 None => {
-                    slice[i].revents = POLLERR;
+                    poll.revents = PE::ERR;
                     return Ok(0);
                 }
             }
         }
+        drop(proc);
         Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
     }
-
     Ok(nfds as isize)
 }
 
@@ -706,5 +692,27 @@ impl IoVecs {
             unsafe { buf.set_len(total_len); }
         }
         buf
+    }
+}
+
+#[repr(C)]
+pub struct PollFd {
+    fd: u32,
+    events: PollEvents,
+    revents: PollEvents,
+}
+
+bitflags! {
+    pub struct PollEvents: u16 {
+        /// There is data to read.
+        const IN = 0x0001;
+        /// Writing is now possible.
+        const OUT = 0x0004;
+        /// Error condition (return only)
+        const ERR = 0x0008;
+        /// Hang up (return only)
+        const HUP = 0x0010;
+        /// Invalid request: fd not open (return only)
+        const INVAL = 0x0020;
     }
 }
