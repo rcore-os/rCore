@@ -72,7 +72,8 @@ pub fn backtrace() {
                 // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
                 // size = 512 pages
                 current_fp = *(current_fp as *const usize).offset(0);
-                if current_fp >= 0x0000_57ac_0000_0000 + 512 * PAGE_SIZE - size_of::<usize>() {
+                if current_fp >= 0x0000_57ac_0000_0000 + 512 * PAGE_SIZE - size_of::<usize>() &&
+                    current_fp <= 0xffff_ff00_0000_0000 {
                     break;
                 }
                 current_pc = *(current_fp as *const usize).offset(1);

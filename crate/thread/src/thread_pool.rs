@@ -131,24 +131,25 @@ impl ThreadPool {
     /// Insert/Remove it to/from scheduler if necessary.
     fn set_status(&self, tid: Tid, status: Status) {
         let mut proc_lock = self.threads[tid].lock();
-        let mut proc = proc_lock.as_mut().expect("process not exist");
-        trace!("process {} {:?} -> {:?}", tid, proc.status, status);
-        match (&proc.status, &status) {
-            (Status::Ready, Status::Ready) => return,
-            (Status::Ready, _) => panic!("can not remove a process from ready queue"),
-            (Status::Exited(_), _) => panic!("can not set status for a exited process"),
-            (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
-            (Status::Running(_), Status::Ready) => {} // to stop a thread, use stop() intead
-            (_, Status::Ready) => self.scheduler.push(tid),
-            _ => {}
-        }
-        match proc.status {
-            Status::Running(_) => proc.status_after_stop = status,
-            _ => proc.status = status,
-        }
-        match proc.status {
-            Status::Exited(_) => self.exit_handler(tid, proc),
-            _ => {}
+        if let Some(mut proc) = proc_lock.as_mut() {
+            trace!("process {} {:?} -> {:?}", tid, proc.status, status);
+            match (&proc.status, &status) {
+                (Status::Ready, Status::Ready) => return,
+                (Status::Ready, _) => panic!("can not remove a process from ready queue"),
+                (Status::Exited(_), _) => panic!("can not set status for a exited process"),
+                (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
+                (Status::Running(_), Status::Ready) => {} // process will be added to scheduler in stop() 
+                (_, Status::Ready) => self.scheduler.push(tid),
+                _ => {}
+            }
+            match proc.status {
+                Status::Running(_) => proc.status_after_stop = status,
+                _ => proc.status = status,
+            }
+            match proc.status {
+                Status::Exited(_) => self.exit_handler(tid, proc),
+                _ => {}
+            }
         }
     }
 

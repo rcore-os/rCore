@@ -62,13 +62,15 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
     loop {
         use PollEvents as PE;
         let mut proc = process();
+        let mut events = 0;
         for poll in polls.iter_mut() {
+            poll.revents = PE::NONE;
             match proc.files.get(&(poll.fd as usize)) {
                 Some(FileLike::File(_)) => {
                     // FIXME: assume it is stdin for now
                     if poll.events.contains(PE::IN) && STDIN.can_read() {
-                        poll.revents = PE::IN;
-                        return Ok(0);
+                        poll.revents = poll.revents | PE::IN;
+                        events = events + 1;
                     }
                 },
                 Some(FileLike::Socket(wrapper)) => {
@@ -78,29 +80,42 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
                         if !socket.is_open() {
-                            poll.revents = PE::HUP;
-                            return Ok(0);
-                        } else if socket.can_recv() && poll.events.contains(PE::IN) {
-                            poll.revents = PE::IN;
-                            return Ok(0);
-                        } else if socket.can_send() && poll.events.contains(PE::OUT) {
-                            poll.revents = PE::OUT;
-                            return Ok(0);
-                        }
+                            poll.revents = poll.revents | PE::HUP;
+                            events = events + 1;
+                        } else {
+                            if socket.can_recv() && poll.events.contains(PE::IN) {
+                                poll.revents = poll.revents | PE::IN;
+                                events = events + 1;
+                            }
+
+                            if socket.can_send() && poll.events.contains(PE::OUT) {
+                                poll.revents = poll.revents | PE::OUT;
+                                events = events + 1;
+                            }
+                        }                    
                     } else {
                         unimplemented!()
                     }
                 }
                 None => {
-                    poll.revents = PE::ERR;
-                    return Ok(0);
+                    poll.revents = poll.revents | PE::ERR;
+                    events = events + 1;
                 }
             }
         }
         drop(proc);
+
+        if events > 0 {
+            return Ok(events as isize);
+        }
+
+        let current_time_ms = unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000};
+        if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
+            return Ok(0);
+        }
+
         Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
     }
-    Ok(nfds as isize)
 }
 
 pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
@@ -704,6 +719,8 @@ pub struct PollFd {
 
 bitflags! {
     pub struct PollEvents: u16 {
+        /// Nothing Happens
+        const NONE = 0x0000;
         /// There is data to read.
         const IN = 0x0001;
         /// Writing is now possible.

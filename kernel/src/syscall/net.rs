@@ -294,6 +294,7 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
 
             // avoid deadlock
             drop(socket);
+            drop(sockets);
             SOCKET_ACTIVITY._wait()
         }
     } else if let SocketType::Udp = wrapper.socket_type {
