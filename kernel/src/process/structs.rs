@@ -23,7 +23,7 @@ pub struct Thread {
     pub proc: Arc<Mutex<Process>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SocketType {
     Raw,
     Tcp(Option<IpEndpoint>), // save local endpoint for bind()
@@ -31,7 +31,7 @@ pub enum SocketType {
     Icmp
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SocketWrapper {
     pub handle: SocketHandle,
     pub socket_type: SocketType,
@@ -186,6 +186,14 @@ impl Thread {
 
         info!("temporary copy data!");
         let kstack = KernelStack::new();
+
+        let iface = &mut *(NET_DRIVERS.lock()[0]);
+        let mut sockets = iface.sockets();
+        for (_fd, file) in files.iter() {
+            if let FileLike::Socket(wrapper) = file {
+                sockets.retain(wrapper.handle);
+            }
+        }
 
 
         Box::new(Thread {

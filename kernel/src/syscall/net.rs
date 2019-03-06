@@ -182,7 +182,6 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 
     let mut proc = process();
     proc.memory_set.check_ptr(addr)?;
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
 
     let mut dest = None;
     let mut port = 0;
@@ -197,6 +196,8 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
+        let mut drivers = NET_DRIVERS.lock();
+        let iface = &mut *(drivers[0]);
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -207,19 +208,28 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
                 // avoid deadlock
                 drop(socket);
                 drop(sockets);
+                drop(iface);
+                drop(drivers);
 
                 // wait for connection result
                 loop {
+                    let mut drivers = NET_DRIVERS.lock();
+                    let iface = &mut *(drivers[0]);
                     iface.poll();
 
                     let mut sockets = iface.sockets();
                     let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
                     if socket.state() == TcpState::SynSent {
                         // still connecting
-                        SOCKET_ACTIVITY._wait()
+                        drop(socket);
+                        drop(sockets);
+                        drop(iface);
+                        drop(drivers);
+                        debug!("poll for connection wait");
+                        SOCKET_ACTIVITY._wait();
                     } else if socket.state() == TcpState::Established {
                         break Ok(0);
-                    } else if socket.state() == TcpState::Closed {
+                    } else {
                         break Err(SysError::ECONNREFUSED);
                     }
                 }
@@ -515,18 +525,17 @@ pub fn sys_recvfrom(
 
 pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> SysResult {
     let iface = &mut *(NET_DRIVERS.lock()[0]);
-    let mut socket = iface.sockets().remove(handle);
-    match socket {
-        Socket::Tcp(ref mut tcp_socket) => {
-            tcp_socket.close();
-        }
-        _ => {}
-    }
-
+    let mut sockets = iface.sockets();
+    sockets.release(handle);
+    sockets.prune();
     Ok(0)
 }
 
 pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
+    info!(
+        "sys_bind: fd: {} addr: {:?} len: {}",
+        fd, addr, len
+    );
     let mut proc = process();
     proc.memory_set.check_array(addr, len)?;
 
@@ -545,7 +554,7 @@ pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
     }
 
     let iface = &mut *(NET_DRIVERS.lock()[0]);
-    let wrapper = proc.get_socket_mut(fd)?;
+    let wrapper = &mut proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         wrapper.socket_type = SocketType::Tcp(Some(IpEndpoint::new(host.unwrap(), port)));
         Ok(0)
@@ -555,6 +564,10 @@ pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
 }
 
 pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
+    info!(
+        "sys_listen: fd: {} backlog: {}",
+        fd, backlog
+    );
     // smoltcp tcp sockets do not support backlog
     // open multiple sockets for each connection
     let mut proc = process();
@@ -575,6 +588,10 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
 }
 
 pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
+    info!(
+        "sys_accept: fd: {} addr: {:?} addr_len: {:?}",
+        fd, addr, addr_len
+    );
     // smoltcp tcp sockets do not support backlog
     // open multiple sockets for each connection
     let mut proc = process();
@@ -584,16 +601,17 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
 
         let max_addr_len = unsafe { *addr_len } as usize;
         if max_addr_len < size_of::<SockaddrIn>() {
+            debug!("length too short {}", max_addr_len);
             return Err(SysError::EINVAL);
         }
 
         proc.memory_set.check_mut_array(addr, max_addr_len)?;
     }
 
-    let iface = &mut *(NET_DRIVERS.lock()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
         loop {
+            let iface = &mut *(NET_DRIVERS.lock()[0]);
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -617,7 +635,7 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
                         fd,
                         FileLike::Socket(SocketWrapper {
                             handle: tcp_handle,
-                            socket_type: SocketType::Tcp(None),
+                            socket_type: SocketType::Tcp(Some(endpoint)),
                         }),
                     )
                     .unwrap();
@@ -634,14 +652,21 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
             // avoid deadlock
             drop(socket);
             drop(sockets);
+            drop(iface);
             SOCKET_ACTIVITY._wait()
         }
     } else {
+        debug!("bad socket type {:?}", wrapper);
         Err(SysError::EINVAL)
     }
 }
 
 pub fn sys_getsockname(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
+    info!(
+        "sys_getsockname: fd: {} addr: {:?} addr_len: {:?}",
+        fd, addr, addr_len
+    );
+
     // smoltcp tcp sockets do not support backlog
     // open multiple sockets for each connection
     let mut proc = process();

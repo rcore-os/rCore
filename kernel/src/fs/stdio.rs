@@ -11,7 +11,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 #[derive(Default)]
 pub struct Stdin {
     buf: Mutex<VecDeque<char>>,
-    pushed: Condvar,
+    pub pushed: Condvar,
 }
 
 impl Stdin {
@@ -35,6 +35,9 @@ impl Stdin {
                 None => self.pushed._wait(),
             }
         }
+    }
+    pub fn can_read(&self) -> bool {
+        self.buf.lock().len() > 0
     }
 }
 

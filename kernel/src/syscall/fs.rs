@@ -1,9 +1,12 @@
 //! Syscalls for file system
 
 use rcore_fs::vfs::Timespec;
+use smoltcp::socket::*;
 
 use crate::fs::*;
 use crate::memory::MemorySet;
+use crate::sync::Condvar;
+use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 
 use super::*;
 use super::net::*;
@@ -49,15 +52,68 @@ pub struct PollFd {
     revents: u16
 }
 
+const POLLIN: u16 = 0x0001;
+const POLPRI: u16 = 0x0002;
+const POLLOUT: u16 = 0x0004;
+const POLLERR: u16 = 0x0008;
+const POLLHUP: u16 = 0x0010;
+const POLLNVAL: u16 = 0x0020;
+
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
     info!("poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}", ufds, nfds, timeout_msecs);
     let mut proc = process();
     proc.memory_set.check_mut_array(ufds, nfds)?;
-    let slice = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
 
-    // emulate it for now
-    use core::time::Duration;
-    thread::sleep(Duration::from_millis(timeout_msecs as u64));
+    let slice = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
+    for i in 0..nfds {
+        if proc.files.get(&(slice[i].fd as usize)).is_none() {
+            return Err(SysError::EINVAL);
+        }
+    }
+    drop(proc);
+
+
+    let begin_time_ms = unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000};
+    loop {
+        let mut proc = process();
+        for i in 0..nfds {
+            match proc.files.get(&(slice[i].fd as usize)) {
+                Some(FileLike::File(_)) => {
+                    // assume it is stdin for now
+                    if (slice[i].events & POLLIN) != 0 && STDIN.can_read() {
+                        slice[i].revents = POLLIN;
+                        return Ok(0);
+                    }
+                },
+                Some(FileLike::Socket(wrapper)) => {
+                    if let SocketType::Tcp(_) = wrapper.socket_type {
+                        let iface = &mut *(NET_DRIVERS.lock()[0]);
+                        let mut sockets = iface.sockets();
+                        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+                        if !socket.is_open() {
+                            slice[i].revents = POLLHUP;
+                            return Ok(0);
+                        } else if socket.can_recv() && (slice[i].events & POLLIN) != 0 {
+                            slice[i].revents = POLLIN;
+                            return Ok(0);
+                        } else if socket.can_send() && (slice[i].events & POLLOUT) != 0 {
+                            slice[i].revents = POLLIN;
+                            return Ok(0);
+                        }
+                    } else {
+                        unimplemented!()
+                    }
+                }
+                None => {
+                    slice[i].revents = POLLERR;
+                    return Ok(0);
+                }
+            }
+        }
+        Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
+    }
+
     Ok(nfds as isize)
 }
 

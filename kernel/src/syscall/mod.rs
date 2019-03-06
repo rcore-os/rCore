@@ -13,6 +13,7 @@ use crate::fs::FileHandle;
 use crate::process::*;
 use crate::thread;
 use crate::util;
+use crate::arch::cpu;
 
 use self::fs::*;
 use self::mem::*;
@@ -30,6 +31,9 @@ mod net;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
+    let pid = cpu::id();
+    let tid = processor().tid();
+    debug!("{}:{} syscall id {} begin", pid, tid, id);
     let ret = match id {
         // file
         000 => sys_read(args[0], args[1] as *mut u8, args[2]),
@@ -163,7 +167,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             crate::trap::error(tf);
         }
     };
-    debug!("syscall id {} ret with {:?}", id, ret);
+    debug!("{}:{} syscall id {} ret with {:?}", pid, tid, id, ret);
     match ret {
         Ok(code) => code,
         Err(err) => -(err as isize),

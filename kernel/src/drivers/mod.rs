@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
 
-use crate::sync::{SpinNoIrqLock, Condvar, MutexGuard, SpinNoIrq};
+use crate::sync::{ThreadLock, SpinLock, Condvar, MutexGuard, SpinNoIrq};
 
 mod device_tree;
 pub mod bus;
@@ -49,14 +49,14 @@ pub trait NetDriver : Send {
 
 
 lazy_static! {
-    pub static ref DRIVERS: SpinNoIrqLock<Vec<Box<Driver>>> = SpinNoIrqLock::new(Vec::new());
+    pub static ref DRIVERS: SpinLock<Vec<Box<Driver>>> = SpinLock::new(Vec::new());
 }
 
 lazy_static! {
-    pub static ref NET_DRIVERS: SpinNoIrqLock<Vec<Box<NetDriver>>> = SpinNoIrqLock::new(Vec::new());
+    pub static ref NET_DRIVERS: ThreadLock<Vec<Box<NetDriver>>> = ThreadLock::new(Vec::new());
 }
 
-lazy_static! {
+lazy_static!{
     pub static ref SOCKET_ACTIVITY: Condvar = Condvar::new();
 }
 

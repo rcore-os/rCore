@@ -138,6 +138,7 @@ impl ThreadPool {
             (Status::Ready, _) => panic!("can not remove a process from ready queue"),
             (Status::Exited(_), _) => panic!("can not set status for a exited process"),
             (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
+            (Status::Running(_), Status::Ready) => {} // to stop a thread, use stop() intead
             (_, Status::Ready) => self.scheduler.push(tid),
             _ => {}
         }
