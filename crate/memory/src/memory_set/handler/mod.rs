@@ -4,6 +4,10 @@ use super::*;
 pub trait MemoryHandler: Debug + 'static {
     fn box_clone(&self) -> Box<MemoryHandler>;
     fn map(&self, pt: &mut PageTable, addr: VirtAddr);
+    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr) {
+        // override this when pages are allocated lazily
+        self.map(pt, addr);
+    }
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr);
     fn page_fault_handler(&self, pt: &mut PageTable, addr: VirtAddr) -> bool;
 }

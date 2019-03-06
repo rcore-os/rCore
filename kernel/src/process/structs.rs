@@ -170,6 +170,8 @@ impl Thread {
         info!("COME into fork!");
         // Clone memory set, make a new page table
         let memory_set = self.proc.lock().memory_set.clone();
+        let files = self.proc.lock().files.clone();
+        let cwd = self.proc.lock().cwd.clone();
         info!("finish mmset clone in fork!");
 
         // MMU:   copy data to the new space
@@ -185,13 +187,14 @@ impl Thread {
         info!("temporary copy data!");
         let kstack = KernelStack::new();
 
+
         Box::new(Thread {
             context: unsafe { Context::new_fork(tf, kstack.top(), memory_set.token()) },
             kstack,
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
-                files: self.proc.lock().files.clone(),
-                cwd: self.proc.lock().cwd.clone(),
+                files,
+                cwd,
             })),
         })
     }
@@ -236,9 +239,12 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
         let offset = ph.offset() as usize;
         let file_size = ph.file_size() as usize;
         let mem_size = ph.mem_size() as usize;
+        let mut name = "load";
 
         if ph.get_type() == Ok(Type::Tls) {
             virt_addr = USER_TLS_OFFSET;
+            name = "tls";
+            debug!("copying tls addr to {:X}", virt_addr);
         }
 
         #[cfg(target_arch = "aarch64")]
@@ -251,7 +257,7 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
         info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
-            ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()), GlobalFrameAlloc), "");
+            ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()), GlobalFrameAlloc), &name);
             unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
         };
         // Copy data
@@ -267,7 +273,7 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
         if ph.get_type() == Ok(Type::Tls) {
             virt_addr = USER_TMP_TLS_OFFSET;
             tls = virt_addr + ph.mem_size() as usize;
-            debug!("tls addr {:X}", tls);
+            debug!("copying tls addr to {:X}", virt_addr);
 
             // TODO: put this in a function
             // Get target slice
@@ -277,7 +283,7 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
             info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
             #[cfg(not(feature = "no_mmu"))]
             let target = {
-                ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()).writable(), GlobalFrameAlloc), "");
+                ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()).writable(), GlobalFrameAlloc), "tmptls");
                 unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
             };
             // Copy data

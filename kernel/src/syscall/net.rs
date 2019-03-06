@@ -640,3 +640,33 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
         Err(SysError::EINVAL)
     }
 }
+
+pub fn sys_getsockname(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
+    // smoltcp tcp sockets do not support backlog
+    // open multiple sockets for each connection
+    let mut proc = process();
+
+    if addr as usize == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    proc.memory_set.check_mut_ptr(addr_len)?;
+
+    let max_addr_len = unsafe { *addr_len } as usize;
+    if max_addr_len < size_of::<SockaddrIn>() {
+        return Err(SysError::EINVAL);
+    }
+
+    proc.memory_set.check_mut_array(addr, max_addr_len)?;
+
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
+        let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
+        fill_addr(&mut sockaddr_in, endpoint.addr, endpoint.port);
+        unsafe { *addr_len = size_of::<SockaddrIn>() as u32 };
+        return Ok(0);
+    } else {
+        Err(SysError::EINVAL)
+    }
+}

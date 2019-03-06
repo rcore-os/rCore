@@ -98,6 +98,16 @@ impl MemoryArea {
         }
     }
     /*
+    **  @brief  map the memory area to the physice address in a page table eagerly
+    **  @param  pt: &mut T::Active   the page table to use
+    **  @retval none
+    */
+    fn map_eager(&self, pt: &mut PageTable) {
+        for page in Page::range_of(self.start_addr, self.end_addr) {
+            self.handler.map_eager(pt, page.start_address());
+        }
+    }
+    /*
     **  @brief  unmap the memory area from the physice address in a page table
     **  @param  pt: &mut T::Active   the page table to use
     **  @retval none
@@ -240,7 +250,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         // try each area's end address as the start
         core::iter::once(addr_hint)
             .chain(self.areas.iter().map(|area| area.end_addr))
-            .map(|addr| (addr + PAGE_SIZE) & ! PAGE_SIZE) // round up a page
+            .map(|addr| (addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1)) // round up a page
             .find(|&addr| self.test_free_area(addr, addr + len))
             .expect("failed to find free area ???")
     }
@@ -347,8 +357,9 @@ impl<T: InactivePageTable> Clone for MemorySet<T> {
     fn clone(&self) -> Self {
         let mut page_table = T::new();
         page_table.edit(|pt| {
+            // without CoW, we should allocate the pages eagerly
             for area in self.areas.iter() {
-                area.map(pt);
+                area.map_eager(pt);
             }
         });
         MemorySet {

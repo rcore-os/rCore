@@ -61,10 +61,13 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        048 => sys_shutdown(),
         049 => sys_bind(args[0], args[1] as *const u8, args[2]),
         050 => sys_listen(args[0], args[1]),
+        051 => sys_getsockname(args[0], args[1] as *mut u8, args[2] as *mut u32),
         054 => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
 //        055 => sys_getsockopt(),
 //        056 => sys_clone(),
         057 => sys_fork(tf),
+        // use fork for vfork
+        058 => sys_fork(tf),
         059 => sys_exec(args[0] as *const u8, args[1] as usize, args[2] as *const *const u8, tf),
         060 => sys_exit(args[0] as isize),
         061 => sys_wait(args[0], args[1] as *mut i32), // TODO: wait4
