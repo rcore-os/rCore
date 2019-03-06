@@ -332,9 +332,17 @@ impl Process {
         })
     }
     fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
-        let cwd = self.cwd.split_at(1).1; // skip start '/'
-        let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
-        Ok(inode)
+        if path.len() > 0 && path.as_bytes()[0] == b'/' {
+            // absolute path
+            let abs_path = path.split_at(1).1; // skip start '/'
+            let inode = ROOT_INODE.lookup(abs_path)?;
+            Ok(inode)
+        } else {
+            // relative path
+            let cwd = self.cwd.split_at(1).1; // skip start '/'
+            let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+            Ok(inode)
+        }
     }
 }
 

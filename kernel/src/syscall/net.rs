@@ -292,7 +292,7 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
             drop(socket);
             SOCKET_ACTIVITY._wait()
         }
-    }  else if let SocketType::Udp = wrapper.socket_type {
+    } else if let SocketType::Udp = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
@@ -565,21 +565,70 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
-        if let Err(_) = socket.listen(endpoint) {
+        match socket.listen(endpoint) {
+            Ok(()) => Ok(0),
+            Err(_) => Err(SysError::EINVAL),
+        }
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
+pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
+    // smoltcp tcp sockets do not support backlog
+    // open multiple sockets for each connection
+    let mut proc = process();
+
+    if addr as usize != 0 {
+        proc.memory_set.check_mut_ptr(addr_len)?;
+
+        let max_addr_len = unsafe { *addr_len } as usize;
+        if max_addr_len < size_of::<SockaddrIn>() {
             return Err(SysError::EINVAL);
         }
 
-        // avoid deadlock
-        drop(socket);
-        drop(sockets);
+        proc.memory_set.check_mut_array(addr, max_addr_len)?;
+    }
 
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
             if socket.is_active() {
-                // use the same one for now, but we should create a new one instead
-                return Ok(fd as isize);
+                let endpoint = socket.remote_endpoint();
+                drop(socket);
+
+                // move the current one to new_fd
+                // create a new one in fd
+                let new_fd = proc.get_free_inode();
+
+                let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
+                let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
+                let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
+                tcp_socket.listen(endpoint).unwrap();
+
+                let tcp_handle = sockets.add(tcp_socket);
+                let orig_handle = proc
+                    .files
+                    .insert(
+                        fd,
+                        FileLike::Socket(SocketWrapper {
+                            handle: tcp_handle,
+                            socket_type: SocketType::Tcp(None),
+                        }),
+                    )
+                    .unwrap();
+                proc.files.insert(new_fd, orig_handle);
+
+                if addr as usize != 0 {
+                    let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
+                    fill_addr(&mut sockaddr_in, endpoint.addr, endpoint.port);
+                    unsafe { *addr_len = size_of::<SockaddrIn>() as u32 };
+                }
+                return Ok(new_fd as isize);
             }
 
             // avoid deadlock

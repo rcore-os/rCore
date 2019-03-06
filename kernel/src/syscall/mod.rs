@@ -53,7 +53,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         039 => sys_getpid(),
         041 => sys_socket(args[0], args[1], args[2]),
         042 => sys_connect(args[0], args[1] as *const u8, args[2]),
-//        043 => sys_accept(),
+        043 => sys_accept(args[0], args[1] as *mut u8, args[2] as *mut u32),
         044 => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const u8, args[5]),
         045 => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut u8, args[5] as *mut u32),
 //        046 => sys_sendmsg(),
