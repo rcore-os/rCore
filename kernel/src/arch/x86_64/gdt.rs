@@ -40,7 +40,7 @@ impl Cpu {
     }
 
     unsafe fn init(&'static mut self) {
-        use x86_64::instructions::segmentation::set_cs;
+        use x86_64::instructions::segmentation::{set_cs, load_fs};
         use x86_64::instructions::tables::load_tss;
 
         // Set the stack when DoubleFault occurs

@@ -48,7 +48,7 @@ impl TrapFrame {
         tf.rflags = 0x282;
         tf
     }
-    fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
+    fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool, tls: usize) -> Self {
         use crate::arch::gdt;
         let mut tf = TrapFrame::default();
         tf.cs = if is32 { gdt::UCODE32_SELECTOR.0 } else { gdt::UCODE_SELECTOR.0 } as usize;
@@ -56,6 +56,7 @@ impl TrapFrame {
         tf.ss = if is32 { gdt::UDATA32_SELECTOR.0 } else { gdt::UDATA_SELECTOR.0 } as usize;
         tf.rsp = rsp;
         tf.rflags = 0x282;
+        tf.fsbase = tls;
         tf
     }
     pub fn is_user(&self) -> bool {
@@ -166,11 +167,11 @@ impl Context {
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize, tls: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             trapret: trap_ret as usize,
-            tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
+            tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32, tls),
         }.push_at(kstack_top)
     }
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {

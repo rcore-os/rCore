@@ -5,12 +5,14 @@ use rcore_fs::vfs::INode;
 use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use smoltcp::socket::{SocketSet, SocketHandle};
+use smoltcp::wire::IpEndpoint;
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::fs::{FileHandle, OpenOptions};
 use crate::sync::Condvar;
 use crate::drivers::NET_DRIVERS;
+use crate::consts::{USER_TLS_OFFSET, USER_TMP_TLS_OFFSET};
 
 use super::abi::{self, ProcInitInfo};
 
@@ -24,7 +26,7 @@ pub struct Thread {
 #[derive(Clone)]
 pub enum SocketType {
     Raw,
-    Tcp,
+    Tcp(Option<IpEndpoint>), // save local endpoint for bind()
     Udp,
     Icmp
 }
@@ -106,7 +108,7 @@ impl Thread {
         }
 
         // Make page table
-        let (mut memory_set, entry_addr) = memory_set_from(&elf);
+        let (mut memory_set, entry_addr, tls) = memory_set_from(&elf);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
@@ -152,7 +154,7 @@ impl Thread {
         Box::new(Thread {
             context: unsafe {
                 Context::new_user_thread(
-                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
+                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token(), tls)
             },
             kstack,
             proc: Arc::new(Mutex::new(Process {
@@ -203,11 +205,12 @@ impl Process {
 
 
 /// Generate a MemorySet according to the ELF file.
-/// Also return the real entry point address.
-fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
+/// Also return the real entry point address and tls top addr.
+fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
     debug!("come in to memory_set_from");
     let mut ms = MemorySet::new();
     let mut entry = elf.header.pt2.entry_point() as usize;
+    let mut tls = 0;
 
     // [NoMMU] Get total memory size and alloc space
     let va_begin = elf.program_iter()
@@ -225,13 +228,18 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
     { entry += 0x40000000; }
 
     for ph in elf.program_iter() {
-        if ph.get_type() != Ok(Type::Load) {
+        if ph.get_type() != Ok(Type::Load) && ph.get_type() != Ok(Type::Tls) {
             continue;
         }
-        let virt_addr = ph.virtual_addr() as usize;
+
+        let mut virt_addr = ph.virtual_addr() as usize;
         let offset = ph.offset() as usize;
         let file_size = ph.file_size() as usize;
         let mem_size = ph.mem_size() as usize;
+
+        if ph.get_type() == Ok(Type::Tls) {
+            virt_addr = USER_TLS_OFFSET;
+        }
 
         #[cfg(target_arch = "aarch64")]
         assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
@@ -255,8 +263,35 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
                 target[file_size..].iter_mut().for_each(|x| *x = 0);
             });
         }
+
+        if ph.get_type() == Ok(Type::Tls) {
+            virt_addr = USER_TMP_TLS_OFFSET;
+            tls = virt_addr + ph.mem_size() as usize;
+            debug!("tls addr {:X}", tls);
+
+            // TODO: put this in a function
+            // Get target slice
+            #[cfg(feature = "no_mmu")]
+            let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];
+            #[cfg(feature = "no_mmu")]
+            info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
+            #[cfg(not(feature = "no_mmu"))]
+            let target = {
+                ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()).writable(), GlobalFrameAlloc), "");
+                unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
+            };
+            // Copy data
+            unsafe {
+                ms.with(|| {
+                    if file_size != 0 {
+                        target[..file_size].copy_from_slice(&elf.input[offset..offset + file_size]);
+                    }
+                    target[file_size..].iter_mut().for_each(|x| *x = 0);
+                });
+            }
+        }
     }
-    (ms, entry)
+    (ms, entry, tls)
 }
 
 fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {

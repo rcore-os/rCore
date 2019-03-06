@@ -136,6 +136,14 @@ impl MemoryAttr {
         self
     }
     /*
+    **  @brief  unset the memory attribute's readonly bit
+    **  @retval MemoryAttr           the memory attribute itself
+    */
+    pub fn writable(mut self) -> Self {
+        self.readonly = false;
+        self
+    }
+    /*
     **  @brief  set the memory attribute's execute bit
     **  @retval MemoryAttr           the memory attribute itself
     */

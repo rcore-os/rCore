@@ -77,7 +77,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     fd,
                     FileLike::Socket(SocketWrapper {
                         handle: tcp_handle,
-                        socket_type: SocketType::Tcp,
+                        socket_type: SocketType::Tcp(None),
                     }),
                 );
 
@@ -164,6 +164,14 @@ impl Process {
             _ => Err(SysError::ENOTSOCK),
         }
     }
+
+    fn get_socket_mut(&mut self, fd: usize) -> Result<&mut SocketWrapper, SysError> {
+        let file = self.files.get_mut(&fd).ok_or(SysError::EBADF)?;
+        match file {
+            FileLike::Socket(ref mut wrapper) => Ok(wrapper),
+            _ => Err(SysError::ENOTSOCK),
+        }
+    }
 }
 
 pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
@@ -188,7 +196,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
     }
 
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Tcp = wrapper.socket_type {
+    if let SocketType::Tcp(_) = wrapper.socket_type {
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -229,7 +237,7 @@ pub fn sys_connect(fd: usize, addr: *const u8, addrlen: usize) -> SysResult {
 pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
     let iface = &mut *(NET_DRIVERS.lock()[0]);
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Tcp = wrapper.socket_type {
+    if let SocketType::Tcp(_) = wrapper.socket_type {
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -261,7 +269,7 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
 pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
     let iface = &mut *(NET_DRIVERS.lock()[0]);
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Tcp = wrapper.socket_type {
+    if let SocketType::Tcp(_) = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
@@ -516,4 +524,70 @@ pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> 
     }
 
     Ok(0)
+}
+
+pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
+    let mut proc = process();
+    proc.memory_set.check_array(addr, len)?;
+
+    if len < size_of::<SockaddrIn>() {
+        return Err(SysError::EINVAL);
+    }
+
+    let mut host = None;
+    let mut port = 0;
+
+    let sockaddr_in = unsafe { &*(addr as *const SockaddrIn) };
+    parse_addr(&sockaddr_in, &mut host, &mut port);
+
+    if host == None {
+        return Err(SysError::EINVAL);
+    }
+
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(_) = wrapper.socket_type {
+        wrapper.socket_type = SocketType::Tcp(Some(IpEndpoint::new(host.unwrap(), port)));
+        Ok(0)
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
+pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
+    // smoltcp tcp sockets do not support backlog
+    // open multiple sockets for each connection
+    let mut proc = process();
+
+    let iface = &mut *(NET_DRIVERS.lock()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+        if let Err(_) = socket.listen(endpoint) {
+            return Err(SysError::EINVAL);
+        }
+
+        // avoid deadlock
+        drop(socket);
+        drop(sockets);
+
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+            if socket.is_active() {
+                // use the same one for now, but we should create a new one instead
+                return Ok(fd as isize);
+            }
+
+            // avoid deadlock
+            drop(socket);
+            drop(sockets);
+            SOCKET_ACTIVITY._wait()
+        }
+    } else {
+        Err(SysError::EINVAL)
+    }
 }
