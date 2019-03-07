@@ -454,8 +454,14 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
     if info.type_ != FileType::Dir {
         return Err(SysError::ENOTDIR);
     }
-    // FIXME: calculate absolute path of new cwd
-    proc.cwd += &path;
+
+    if path.len() > 0 && path.as_bytes()[0] == b'/' {
+        // absolute
+        proc.cwd = path;
+    } else {
+        // relative
+        proc.cwd += &path;
+    }
     Ok(0)
 }
 
@@ -514,6 +520,23 @@ pub fn sys_unlink(path: *const u8) -> SysResult {
     let (dir_path, file_name) = split_path(&path);
     let dir_inode = proc.lookup_inode(dir_path)?;
     dir_inode.unlink(file_name)?;
+    Ok(0)
+}
+
+pub fn sys_pipe(fds: *mut u32) -> SysResult {
+    info!("pipe: fds: {:?}", fds);
+
+    let mut proc = process();
+    proc.memory_set.check_mut_array(fds, 2);
+    let (read, write) = Pipe::create_pair();
+    let read_fd = proc.get_free_inode();
+
+    let read_fd = proc.get_free_inode();
+    proc.files.insert(read_fd, FileLike::File(FileHandle::new(Arc::new(read), OpenOptions { read: true, write: false, append: false })));
+
+    let write_fd = proc.get_free_inode();
+    proc.files.insert(write_fd, FileLike::File(FileHandle::new(Arc::new(write), OpenOptions { read: false, write: true, append: false })));
+
     Ok(0)
 }
 

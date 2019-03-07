@@ -482,7 +482,10 @@ pub fn sys_bind(fd: usize, addr: *const SockaddrIn, len: usize) -> SysResult {
     }
 
     let sockaddr_in = unsafe { &*(addr) };
-    let endpoint = sockaddr_in.to_endpoint()?;
+    let mut endpoint = sockaddr_in.to_endpoint()?;
+    if endpoint.port == 0 {
+        endpoint.port = get_ephemeral_port();
+    }
 
     let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = &mut proc.get_socket_mut(fd)?;
@@ -508,7 +511,9 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
 
         match socket.listen(endpoint) {
             Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EINVAL),
+            Err(err) => {
+                Err(SysError::EINVAL)
+            },
         }
     } else {
         Err(SysError::EINVAL)

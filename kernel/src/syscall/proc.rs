@@ -134,7 +134,7 @@ pub fn sys_exit(exit_code: isize) -> ! {
     let mut proc = process();
     let fds: Vec<usize> = proc.files.keys().cloned().collect();
     for fd in fds.into_iter() {
-        sys_close_internal(&mut proc, fd);
+        sys_close_internal(&mut proc, fd).unwrap();
     }
     drop(proc);
 

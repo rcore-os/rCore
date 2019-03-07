@@ -50,6 +50,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         019 => sys_readv(args[0], args[1] as *const IoVec, args[2]),
         020 => sys_writev(args[0], args[1] as *const IoVec, args[2]),
         021 => sys_access(args[0] as *const u8, args[1]),
+        022 => sys_pipe(args[0] as *mut u32),
         023 => sys_select(args[0], args[1] as *mut u32, args[2] as *mut u32, args[3] as *mut u32, args[4] as *const TimeVal),
         024 => sys_yield(),
         033 => sys_dup2(args[0], args[1]),
@@ -146,6 +147,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         108 => {
             warn!("sys_getegid is unimplemented");
+            Ok(0)
+        }
+        112 => {
+            warn!("sys_setsid is unimplemented");
             Ok(0)
         }
         131 => {

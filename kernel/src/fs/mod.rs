@@ -11,10 +11,12 @@ use crate::drivers::block::virtio_blk::VirtIOBlkDriver;
 
 pub use self::file::*;
 pub use self::stdio::{STDIN, STDOUT};
+pub use self::pipe::Pipe;
 
 mod file;
 mod stdio;
 mod device;
+mod pipe;
 
 lazy_static! {
     /// The root of file system
