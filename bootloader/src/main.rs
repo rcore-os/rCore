@@ -46,11 +46,10 @@ pub extern "C" fn boot_main() -> ! {
         }
     }
 
-    arch::map_kernel(_kernel_payload_start as u64, &segments);
-
     let entry = kernel_elf.header.pt2.entry_point();
     let kernel_main: extern "C" fn() = unsafe { transmute(entry) };
 
+    arch::map_kernel(_kernel_payload_start as usize, &segments);
     kernel_main();
 
     loop {}

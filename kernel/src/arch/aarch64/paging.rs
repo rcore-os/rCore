@@ -3,44 +3,12 @@ use rcore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::{PhysAddr, VirtAddr};
 use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB, Size2MiB, Size1GiB};
+use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB};
 use aarch64::paging::memory_attribute::*;
 use log::*;
 // Depends on kernel
 use crate::consts::{KERNEL_PML4, RECURSIVE_INDEX};
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
-
-// need 3 page
-pub fn setup_temp_page_table(frame_lvl4: Frame, frame_lvl3: Frame, frame_lvl2: Frame) {
-    let p4 = unsafe { &mut *(frame_lvl4.start_address().as_u64() as *mut Aarch64PageTable) };
-    let p3 = unsafe { &mut *(frame_lvl3.start_address().as_u64() as *mut Aarch64PageTable) };
-    let p2 = unsafe { &mut *(frame_lvl2.start_address().as_u64() as *mut Aarch64PageTable) };
-    p4.zero();
-    p3.zero();
-    p2.zero();
-
-    let (start_addr, end_addr) = (0, 0x40000000);
-    let block_flags = EF::VALID | EF::AF | EF::WRITE | EF::UXN;
-    for page in Page::<Size2MiB>::range_of(start_addr, end_addr) {
-        let paddr = PhysAddr::new(page.start_address().as_u64());
-
-        use super::board::IO_REMAP_BASE;
-        if paddr.as_u64() >= IO_REMAP_BASE as u64 {
-            p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
-        } else {
-            p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
-        }
-    }
-
-    p3[0].set_frame(frame_lvl2, EF::default(), MairNormal::attr_value());
-    p3[1].set_block::<Size1GiB>(PhysAddr::new(0x40000000), block_flags | EF::PXN, MairDevice::attr_value());
-
-    p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
-    p4[RECURSIVE_INDEX].set_frame(frame_lvl4, EF::default(), MairNormal::attr_value());
-
-    ttbr_el1_write(0, frame_lvl4);
-    tlb_invalidate_all();
-}
 
 pub struct ActivePageTable(RecursivePageTable<'static>);
 
@@ -50,13 +18,13 @@ impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
-        self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, attr, &mut FrameAllocatorForAarch64)
+        self.0.map_to(Page::of_addr(addr as u64), Frame::of_addr(target as u64), flags, attr, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
         self.get_entry(addr).expect("fail to get entry")
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (_frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
+        let (_frame, flush) = self.0.unmap(Page::of_addr(addr as u64)).unwrap();
         flush.flush();
     }
 
@@ -191,7 +159,7 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
-        let frame = Frame::of_addr(target);
+        let frame = Frame::of_addr(target as u64);
         active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
@@ -274,7 +242,7 @@ struct FrameAllocatorForAarch64;
 
 impl FrameAllocator<Size4KiB> for FrameAllocatorForAarch64 {
     fn alloc(&mut self) -> Option<Frame> {
-        alloc_frame().map(|addr| Frame::of_addr(addr))
+        alloc_frame().map(|addr| Frame::of_addr(addr as u64))
     }
 }
 

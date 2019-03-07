@@ -90,6 +90,18 @@ set_stack:
     # set the current stack pointer
     mov     sp, x1
 
-goto_main:
+zero_bss:
+    # load the start address and number of bytes in BSS section
+    ldr     x1, =_sbss
+    ldr     x2, =_ebss
+
+zero_bss_loop:
+    # zero out the BSS section, 64-bits at a time
+    cmp     x1, x2
+    b.ge    zero_bss_loop_end
+    str     xzr, [x1], #8
+    b       zero_bss_loop
+
+zero_bss_loop_end:
     bl      boot_main
     b       halt

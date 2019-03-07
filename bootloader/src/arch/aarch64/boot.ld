@@ -14,9 +14,17 @@ SECTIONS {
     . = ALIGN(4K);
   }
 
-  .data : {=
+  .data : {
     *(.data .data.* .gnu.linkonce.d*)
     . = ALIGN(4K);
+  }
+
+  .bss : {
+    _sbss = .;
+    *(.bss .bss.*)
+    *(COMMON)
+    . = ALIGN(4K);
+    _ebss = .;
   }
 
   /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }

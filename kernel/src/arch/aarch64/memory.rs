@@ -2,8 +2,7 @@
 
 use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use super::paging::MMIOType;
-use aarch64::paging::{memory_attribute::*, PhysFrame as Frame};
-use aarch64::{addr::*, barrier, regs::*};
+use aarch64::regs::*;
 use atags::atags::Atags;
 use log::*;
 use rcore_memory::PAGE_SIZE;
@@ -14,62 +13,6 @@ pub fn init() {
     init_heap();
     remap_the_kernel();
     info!("memory: init end");
-}
-
-/// initialize temporary paging and enable mmu immediately after boot. Serial port is disabled at this time.
-pub fn init_mmu_early() {
-    #[repr(align(4096))]
-    struct PageData([u8; PAGE_SIZE]);
-    static PAGE_TABLE_LVL4: PageData = PageData([0; PAGE_SIZE]);
-    static PAGE_TABLE_LVL3: PageData = PageData([0; PAGE_SIZE]);
-    static PAGE_TABLE_LVL2: PageData = PageData([0; PAGE_SIZE]);
-
-    let frame_lvl4 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL4 as *const _ as u64));
-    let frame_lvl3 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL3 as *const _ as u64));
-    let frame_lvl2 = Frame::containing_address(PhysAddr::new(&PAGE_TABLE_LVL2 as *const _ as u64));
-    super::paging::setup_temp_page_table(frame_lvl4, frame_lvl3, frame_lvl2);
-
-    // device.
-    MAIR_EL1.write(
-        MAIR_EL1::Attr0.val(MairNormal::config_value()) +
-        MAIR_EL1::Attr1.val(MairDevice::config_value()) +
-        MAIR_EL1::Attr2.val(MairNormalNonCacheable::config_value()),
-    );
-
-    // Configure various settings of stage 1 of the EL1 translation regime.
-    let ips = ID_AA64MMFR0_EL1.read(ID_AA64MMFR0_EL1::PARange);
-    TCR_EL1.write(
-        TCR_EL1::TBI1::Ignored +
-        TCR_EL1::TBI0::Ignored +
-        TCR_EL1::AS::Bits_16 +
-        TCR_EL1::IPS.val(ips) +
-
-        TCR_EL1::TG1::KiB_4 +
-        TCR_EL1::SH1::Inner +
-        TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
-        TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
-        TCR_EL1::EPD1::EnableTTBR1Walks +
-        TCR_EL1::A1::UseTTBR1ASID +
-        TCR_EL1::T1SZ.val(16) +
-
-        TCR_EL1::TG0::KiB_4 +
-        TCR_EL1::SH0::Inner +
-        TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
-        TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
-        TCR_EL1::EPD0::EnableTTBR0Walks +
-        TCR_EL1::T0SZ.val(16),
-    );
-
-    // Switch the MMU on.
-    //
-    // First, force all previous changes to be seen before the MMU is enabled.
-    unsafe { barrier::isb(barrier::SY) }
-
-    // Enable the MMU and turn on data and instruction caching.
-    SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
-
-    // Force MMU init to complete before next instruction
-    unsafe { barrier::isb(barrier::SY) }
 }
 
 fn init_frame_allocator() {
