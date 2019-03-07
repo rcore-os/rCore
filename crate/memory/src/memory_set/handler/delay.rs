@@ -13,6 +13,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
 
     fn map(&self, pt: &mut PageTable, addr: VirtAddr) {
         let entry = pt.map(addr, 0);
+        self.flags.apply(entry);
         entry.set_present(false);
         entry.update();
     }
@@ -38,7 +39,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         }
         let frame = self.allocator.alloc().expect("failed to alloc frame");
         entry.set_target(frame);
-        self.flags.apply(entry);
+        entry.set_present(true);
         true
     }
 }

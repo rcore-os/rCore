@@ -46,6 +46,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         007 => sys_poll(args[0] as *mut PollFd, args[1], args[2]),
         008 => sys_lseek(args[0], args[1] as i64, args[2] as u8),
         009 => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
+        010 => sys_mprotect(args[0], args[1], args[2]),
         011 => sys_munmap(args[0], args[1]),
         019 => sys_readv(args[0], args[1] as *const IoVec, args[2]),
         020 => sys_writev(args[0], args[1] as *const IoVec, args[2]),

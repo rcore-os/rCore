@@ -1,5 +1,7 @@
 use rcore_memory::memory_set::handler::Delay;
 use rcore_memory::memory_set::MemoryAttr;
+use rcore_memory::paging::PageTable;
+use rcore_memory::Page;
 use rcore_memory::PAGE_SIZE;
 
 use crate::memory::GlobalFrameAlloc;
@@ -9,7 +11,7 @@ use super::*;
 pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32, offset: usize) -> SysResult {
     let prot = MmapProt::from_bits_truncate(prot);
     let flags = MmapFlags::from_bits_truncate(flags);
-    info!("mmap addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
+    info!("mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
 
     let mut proc = process();
     if addr == 0 {
@@ -29,6 +31,32 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
         return Ok(addr as isize);
     }
     unimplemented!()
+}
+
+pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
+    let prot = MmapProt::from_bits_truncate(prot);
+    info!("mprotect: addr={:#x}, size={:#x}, prot={:?}", addr, len, prot);
+
+    let mut proc = process();
+    let attr = prot_to_attr(prot);
+
+    let memory_area = proc.memory_set.iter().find(|area| area.contains(addr));
+    if memory_area.is_some() {
+        proc.memory_set.edit(|pt| {
+            for page in Page::range_of(addr, addr + len) {
+                let entry = pt.get_entry(page.start_address()).expect("failed to get entry");
+
+                // keep original presence
+                let orig_present = entry.present();
+                attr.apply(entry);
+                entry.set_present(orig_present);
+                entry.update();
+            }
+        });
+        Ok(0)
+    } else {
+        Err(SysError::ENOMEM)
+    }
 }
 
 pub fn sys_munmap(addr: usize, len: usize) -> SysResult {
