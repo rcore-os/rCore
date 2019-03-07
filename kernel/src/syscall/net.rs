@@ -621,6 +621,48 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     }
 }
 
+pub fn sys_getpeername(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysResult {
+    info!(
+        "sys_getpeername: fd: {} addr: {:?} addr_len: {:?}",
+        fd, addr, addr_len
+    );
+
+    // smoltcp tcp sockets do not support backlog
+    // open multiple sockets for each connection
+    let mut proc = process();
+
+    if addr as usize == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    proc.memory_set.check_mut_ptr(addr_len)?;
+
+    let max_addr_len = unsafe { *addr_len } as usize;
+    if max_addr_len < size_of::<SockaddrIn>() {
+        return Err(SysError::EINVAL);
+    }
+
+    proc.memory_set.check_mut_array(addr, max_addr_len)?;
+
+    let iface = &*(NET_DRIVERS.read()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+        if socket.is_open() {
+            let remote_endpoint = socket.remote_endpoint();
+            let sockaddr_in = SockaddrIn::from(remote_endpoint);
+            unsafe { sockaddr_in.write_to(addr, addr_len); }
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
+        }
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
 /// Check socket state
 /// return (in, out, err)
 pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {

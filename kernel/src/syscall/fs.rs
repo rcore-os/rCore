@@ -85,8 +85,8 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                         poll.revents = poll.revents | PE::IN;
                         events = events + 1;
                     }
-                    if output && poll.events.contains(PE::IN) {
-                        poll.revents = poll.revents | PE::IN;
+                    if output && poll.events.contains(PE::OUT) {
+                        poll.revents = poll.revents | PE::OUT;
                         events = events + 1;
                     }
                 }
@@ -310,6 +310,12 @@ pub fn sys_close_internal(proc: &mut Process, fd: usize) -> SysResult {
         Some(FileLike::Socket(wrapper)) => sys_close_socket(proc, fd, wrapper.handle),
         None => Err(SysError::EINVAL),
     }
+}
+
+pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
+    info!("access: path: {:?}, mode: {}", path, mode);
+    // TODO: check permissions based on uid/git
+    Ok(0)
 }
 
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
