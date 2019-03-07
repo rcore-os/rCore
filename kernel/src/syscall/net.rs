@@ -526,6 +526,10 @@ pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> 
     let mut sockets = iface.sockets();
     sockets.release(handle);
     sockets.prune();
+    
+    // send FIN immediately when applicable
+    drop(sockets);
+    iface.poll();
     Ok(0)
 }
 
@@ -608,7 +612,7 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
             if socket.is_active() {
-                let endpoint = socket.remote_endpoint();
+                let remote_endpoint = socket.remote_endpoint();
                 drop(socket);
 
                 // move the current one to new_fd
@@ -635,7 +639,7 @@ pub fn sys_accept(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResult {
 
                 if addr as usize != 0 {
                     let mut sockaddr_in = unsafe { &mut *(addr as *mut SockaddrIn) };
-                    fill_addr(&mut sockaddr_in, endpoint.addr, endpoint.port);
+                    fill_addr(&mut sockaddr_in, remote_endpoint.addr, remote_endpoint.port);
                     unsafe { *addr_len = size_of::<SockaddrIn>() as u32 };
                 }
                 return Ok(new_fd as isize);
@@ -717,6 +721,9 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
 }
 
 pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) -> SysResult {
+    let iface = &*(NET_DRIVERS.read()[0]);
+    let mut sockets = iface.sockets();
+    sockets.retain(wrapper.handle);
     proc.files.insert(
         fd,
         FileLike::Socket(wrapper),

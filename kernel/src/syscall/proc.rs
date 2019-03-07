@@ -69,7 +69,6 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
         }
     }
     info!("exec: args {:?}", args);
-    info!("exec {:?}", proc.files);
 
     // Read program file
     let path = args[0].as_str();
@@ -129,6 +128,16 @@ pub fn sys_getppid() -> SysResult {
 pub fn sys_exit(exit_code: isize) -> ! {
     let pid = thread::current().id();
     info!("exit: {}, code: {}", pid, exit_code);
+
+    // close all files.
+    // TODO: close them in all possible ways a process can exit
+    let mut proc = process();
+    let fds: Vec<usize> = proc.files.keys().cloned().collect();
+    for fd in fds.into_iter() {
+        sys_close_internal(&mut proc, fd);
+    }
+    drop(proc);
+
     processor().manager().exit(pid, exit_code as usize);
     processor().yield_now();
     unreachable!();

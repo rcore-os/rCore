@@ -304,7 +304,7 @@ pub fn sys_close(fd: usize) -> SysResult {
     sys_close_internal(&mut proc, fd)
 }
 
-fn sys_close_internal(proc: &mut Process, fd: usize) -> SysResult {
+pub fn sys_close_internal(proc: &mut Process, fd: usize) -> SysResult {
     match proc.files.remove(&fd) {
         Some(FileLike::File(_)) => Ok(0),
         Some(FileLike::Socket(wrapper)) => sys_close_socket(proc, fd, wrapper.handle),
@@ -417,7 +417,7 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
 }
 
 pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
-    info!("dup2: {} {}", fd1, fd2);
+    info!("dup2: from {} to {}", fd1, fd2);
     let mut proc = process();
     if proc.files.contains_key(&fd2) {
         // close fd2 first if it is opened
