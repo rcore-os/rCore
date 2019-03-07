@@ -48,23 +48,28 @@ pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
     }
 }
 
-pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut TrapFrame) -> SysResult {
+pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8, tf: &mut TrapFrame) -> SysResult {
+    info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
     let proc = process();
     let name = if name.is_null() { String::from("") } else {
         unsafe { proc.memory_set.check_and_clone_cstr(name)? }
     };
-    if argc <= 0 {
+
+    if argv.is_null() {
         return Err(SysError::EINVAL);
     }
     // Check and copy args to kernel
     let mut args = Vec::new();
     unsafe {
-        for &ptr in slice::from_raw_parts(argv, argc) {
-            let arg = proc.memory_set.check_and_clone_cstr(ptr)?;
+        let mut current_argv = argv as *const *const u8;
+        while !(*current_argv).is_null() {
+            let arg = proc.memory_set.check_and_clone_cstr(*current_argv)?;
             args.push(arg);
+            current_argv = current_argv.add(1);
         }
     }
-    info!("exec: name: {:?}, args: {:?}", name, args);
+    info!("exec: args {:?}", args);
+    info!("exec {:?}", proc.files);
 
     // Read program file
     let path = args[0].as_str();
@@ -77,6 +82,8 @@ pub fn sys_exec(name: *const u8, argc: usize, argv: *const *const u8, tf: &mut T
     // Make new Thread
     let iter = args.iter().map(|s| s.as_str());
     let mut thread = Thread::new_user(buf.as_slice(), iter);
+    thread.proc.lock().files = proc.files.clone();
+    thread.proc.lock().cwd = proc.cwd.clone();
 
     // Activate new page table
     unsafe { thread.proc.lock().memory_set.activate(); }

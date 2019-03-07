@@ -148,6 +148,21 @@ pub fn sys_setsockopt(
     Ok(0)
 }
 
+pub fn sys_getsockopt(
+    fd: usize,
+    level: usize,
+    optname: usize,
+    optval: *mut u8,
+    optlen: *mut u32,
+) -> SysResult {
+    info!(
+        "getsockopt: fd: {}, level: {}, optname: {} optval: {:?} optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+    warn!("sys_getsockopt is unimplemented");
+    Err(SysError::ENOPROTOOPT)
+}
+
 #[repr(C)]
 struct SockaddrIn {
     sin_family: u16,
@@ -699,4 +714,12 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
     }
 
     (input, output, err)
+}
+
+pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) -> SysResult {
+    proc.files.insert(
+        fd,
+        FileLike::Socket(wrapper),
+    );
+    Ok(fd as isize)
 }

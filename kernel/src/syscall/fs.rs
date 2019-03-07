@@ -27,6 +27,7 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
     proc.memory_set.check_array(base, len)?;
+
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
         Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, base, len),
@@ -300,9 +301,13 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
 pub fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     let mut proc = process();
+    sys_close_internal(&mut proc, fd)
+}
+
+fn sys_close_internal(proc: &mut Process, fd: usize) -> SysResult {
     match proc.files.remove(&fd) {
         Some(FileLike::File(_)) => Ok(0),
-        Some(FileLike::Socket(wrapper)) => sys_close_socket(&mut proc, fd, wrapper.handle),
+        Some(FileLike::Socket(wrapper)) => sys_close_socket(proc, fd, wrapper.handle),
         None => Err(SysError::EINVAL),
     }
 }
@@ -415,11 +420,22 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     info!("dup2: {} {}", fd1, fd2);
     let mut proc = process();
     if proc.files.contains_key(&fd2) {
-        return Err(SysError::EINVAL);
+        // close fd2 first if it is opened
+        sys_close_internal(&mut proc, fd2)?;
     }
-    let file = proc.get_file(fd1)?.clone();
-    proc.files.insert(fd2, FileLike::File(file));
-    Ok(0)
+
+    match proc.files.get(&fd1) {
+        Some(FileLike::File(file)) => {
+            let new_file = FileLike::File(file.clone());
+            proc.files.insert(fd2, new_file);
+            Ok(fd2 as isize)
+        },
+        Some(FileLike::Socket(wrapper)) => {
+            let new_wrapper = wrapper.clone();
+            sys_dup2_socket(&mut proc, new_wrapper, fd2)
+        },
+        None => Err(SysError::EINVAL)
+    }
 }
 
 pub fn sys_chdir(path: *const u8) -> SysResult {

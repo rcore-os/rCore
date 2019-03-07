@@ -181,6 +181,8 @@ impl Context {
             tf: {
                 let mut tf = tf.clone();
                 tf.rax = 0;
+                // skip syscall inst;
+                tf.rip = tf.rip + 2;
                 tf
             },
         }.push_at(kstack_top)

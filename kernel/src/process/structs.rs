@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use core::fmt;
 
 use log::*;
 use rcore_fs::vfs::INode;
@@ -41,6 +42,15 @@ pub struct SocketWrapper {
 pub enum FileLike {
     File(FileHandle),
     Socket(SocketWrapper)
+}
+
+impl fmt::Debug for FileLike {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FileLike::File(_) => write!(f, "File"),
+            FileLike::Socket(_) => write!(f, "Socket"),
+        }
+    }
 }
 
 pub struct Process {
