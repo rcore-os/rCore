@@ -325,18 +325,6 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
     }
 }
 
-pub fn sys_select(
-    fd: usize,
-    inp: *const u8,
-    outp: *const u8,
-    exp: *const u8,
-    tvp: *const u8,
-) -> SysResult {
-    info!("sys_select: fd: {}", fd);
-    warn!("sys_select is unimplemented");
-    Err(SysError::EINVAL)
-}
-
 pub fn sys_sendto(
     fd: usize,
     buffer: *const u8,
@@ -527,10 +515,7 @@ pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> 
 }
 
 pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
-    info!(
-        "sys_bind: fd: {} addr: {:?} len: {}",
-        fd, addr, len
-    );
+    info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, len);
     let mut proc = process();
     proc.memory_set.check_array(addr, len)?;
 
@@ -559,10 +544,7 @@ pub fn sys_bind(fd: usize, addr: *const u8, len: usize) -> SysResult {
 }
 
 pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
-    info!(
-        "sys_listen: fd: {} backlog: {}",
-        fd, backlog
-    );
+    info!("sys_listen: fd: {} backlog: {}", fd, backlog);
     // smoltcp tcp sockets do not support backlog
     // open multiple sockets for each connection
     let mut proc = process();
@@ -688,4 +670,33 @@ pub fn sys_getsockname(fd: usize, addr: *mut u8, addr_len: *mut u32) -> SysResul
     } else {
         Err(SysError::EINVAL)
     }
+}
+
+/// Check socket state
+/// return (in, out, err)
+pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
+    let mut input = false;
+    let mut output = false;
+    let mut err = false;
+    if let SocketType::Tcp(_) = wrapper.socket_type {
+        let iface = &*(NET_DRIVERS.read()[0]);
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+        if !socket.is_open() {
+            err = true;
+        } else {
+            if socket.can_recv() {
+                input = true;
+            }
+
+            if socket.can_send() {
+                output = true;
+            }
+        }
+    } else {
+        unimplemented!()
+    }
+
+    (input, output, err)
 }

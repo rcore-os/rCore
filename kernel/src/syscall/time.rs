@@ -17,6 +17,16 @@ pub struct TimeVal {
     usec: u64,
 }
 
+impl TimeVal {
+    pub fn to_msec(&self) -> u64 {
+        self.sec * 1000 + self.usec / 1000
+    }
+
+    pub fn to_usec(&self) -> u64 {
+        self.sec * 1000_000 + self.usec
+    }
+}
+
 pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
     if tz as usize != 0 {
         return Err(SysError::EINVAL);

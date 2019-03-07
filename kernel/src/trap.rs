@@ -5,6 +5,10 @@ use log::*;
 
 pub static mut TICK: usize = 0;
 
+pub fn uptime_msec() -> usize {
+    unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000}
+}
+
 pub fn timer() {
     if cpu::id() == 0 {
         unsafe { TICK += 1; }

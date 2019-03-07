@@ -1,5 +1,6 @@
 //! Syscalls for file system
 
+use core::mem::size_of;
 use rcore_fs::vfs::Timespec;
 use smoltcp::socket::*;
 
@@ -58,7 +59,7 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
     }
     drop(proc);
 
-    let begin_time_ms = unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000};
+    let begin_time_ms = crate::trap::uptime_msec();
     loop {
         use PollEvents as PE;
         let mut proc = process();
@@ -74,27 +75,18 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                     }
                 },
                 Some(FileLike::Socket(wrapper)) => {
-                    if let SocketType::Tcp(_) = wrapper.socket_type {
-                        let iface = &*(NET_DRIVERS.read()[0]);
-                        let mut sockets = iface.sockets();
-                        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-                        if !socket.is_open() {
-                            poll.revents = poll.revents | PE::HUP;
-                            events = events + 1;
-                        } else {
-                            if socket.can_recv() && poll.events.contains(PE::IN) {
-                                poll.revents = poll.revents | PE::IN;
-                                events = events + 1;
-                            }
-
-                            if socket.can_send() && poll.events.contains(PE::OUT) {
-                                poll.revents = poll.revents | PE::OUT;
-                                events = events + 1;
-                            }
-                        }                    
-                    } else {
-                        unimplemented!()
+                    let (input, output, err) = poll_socket(&wrapper);
+                    if err {
+                        poll.revents = poll.revents | PE::HUP;
+                        events = events + 1;
+                    }
+                    if input && poll.events.contains(PE::IN) {
+                        poll.revents = poll.revents | PE::IN;
+                        events = events + 1;
+                    }
+                    if output && poll.events.contains(PE::IN) {
+                        poll.revents = poll.revents | PE::IN;
+                        events = events + 1;
                     }
                 }
                 None => {
@@ -109,8 +101,132 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
             return Ok(events as isize);
         }
 
-        let current_time_ms = unsafe {crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000};
+        let current_time_ms = crate::trap::uptime_msec();
         if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
+            return Ok(0);
+        }
+
+        Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
+    }
+}
+
+const FD_PER_ITEM: usize = 8 * size_of::<u32>();
+const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
+
+struct FdSet {
+    addr: *mut u32,
+    nfds: usize,
+    saved: [u32; MAX_FDSET_SIZE]
+}
+
+impl FdSet {
+    /// Initialize a `FdSet` from pointer and number of fds
+    /// Check if the array is large enough
+    fn new(proc: &Process, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
+        let mut saved = [0u32; MAX_FDSET_SIZE];
+        if addr as usize != 0 {
+            let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
+            proc.memory_set.check_mut_array(addr, len)?;
+            if len > MAX_FDSET_SIZE {
+                return Err(SysError::EINVAL);
+            }
+            let slice = unsafe {slice::from_raw_parts_mut(addr, len)};
+
+            // save the fdset, and clear it
+            for i in 0..len {
+                saved[i] = slice[i];
+                slice[i] = 0;
+            }
+        }
+
+        Ok(FdSet {
+            addr,
+            nfds,
+            saved
+        })
+    }
+
+    /// Try to set fd in `FdSet`
+    /// Return true when `FdSet` is valid, and false when `FdSet` is bad (i.e. null pointer)
+    /// Fd should be less than nfds
+    fn set(&mut self, fd: usize) -> bool {
+        if self.addr as usize != 0 {
+            assert!(fd < self.nfds);
+            unsafe {
+                *self.addr.add(fd / 8 / size_of::<u32>()) |= 1 << (fd % (8 * size_of::<u32>()));
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check to see fd is see in original `FdSet`
+    /// Fd should be less than nfds
+    fn is_set(&mut self, fd: usize) -> bool {
+        assert!(fd < self.nfds);
+        self.saved[fd / 8 / size_of::<u32>()] & (1 << (fd % (8 * size_of::<u32>()))) != 0
+    }
+}
+
+pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, timeout: *const TimeVal) -> SysResult {
+    info!("select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}", nfds, read, write, err, timeout);
+
+    let mut proc = process();
+    let mut read_fds = FdSet::new(&proc, read, nfds)?;
+    let mut write_fds = FdSet::new(&proc, write, nfds)?;
+    let mut err_fds = FdSet::new(&proc, err, nfds)?;
+    let timeout_msecs = if timeout as usize != 0 {
+        proc.memory_set.check_ptr(timeout)?;
+        unsafe { *timeout }.to_msec()
+    } else {
+        // infinity
+        1 << 31
+    };
+    drop(proc);
+
+    let begin_time_ms = crate::trap::uptime_msec();
+    loop {
+        let mut proc = process();
+        let mut events = 0;
+        for (fd, file) in proc.files.iter() {
+            if *fd < nfds {
+                match file {
+                    FileLike::File(_) => {
+                        // FIXME: assume it is stdin for now
+                        if STDIN.can_read() {
+                            if read_fds.is_set(*fd){
+                                read_fds.set(*fd);
+                                events = events + 1;
+                            }
+                        }
+                    },
+                    FileLike::Socket(wrapper) => {
+                        let (input, output, err) = poll_socket(&wrapper);
+                        if err && err_fds.is_set(*fd){
+                            err_fds.set(*fd);
+                            events = events + 1;
+                        }
+                        if input && read_fds.is_set(*fd){
+                            read_fds.set(*fd);
+                            events = events + 1;
+                        }
+                        if output && write_fds.is_set(*fd){
+                            write_fds.set(*fd);
+                            events = events + 1;
+                        }
+                    }
+                }
+            }
+        }
+        drop(proc);
+
+        if events > 0 {
+            return Ok(events as isize);
+        }
+
+        let current_time_ms = crate::trap::uptime_msec();
+        if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs as usize {
             return Ok(0);
         }
 

@@ -93,9 +93,7 @@ impl Driver for E1000Interface {
         };
 
         if irq {
-            let timestamp = Instant::from_millis(unsafe {
-                (crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000) as i64
-            });
+            let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
             let mut sockets = self.sockets.lock();
             match self.iface.lock().poll(&mut sockets, timestamp) {
                 Ok(_) => {
@@ -176,9 +174,7 @@ impl NetDriver for E1000Interface {
     }
 
     fn poll(&self) {
-        let timestamp = Instant::from_millis(unsafe {
-            (crate::trap::TICK / crate::consts::USEC_PER_TICK / 1000) as i64
-        });
+        let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
         let mut sockets = self.sockets.lock();
         match self.iface.lock().poll(&mut sockets, timestamp) {
             Ok(_) => {
