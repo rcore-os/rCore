@@ -1,5 +1,6 @@
 use rcore_memory::memory_set::handler::Delay;
 use rcore_memory::memory_set::MemoryAttr;
+use rcore_memory::PAGE_SIZE;
 
 use crate::memory::GlobalFrameAlloc;
 
@@ -11,6 +12,12 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
     info!("mmap addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
 
     let mut proc = process();
+    if addr == 0 {
+        // although NULL can be a valid address
+        // but in C, NULL is regarded as allocation failure
+        // so just skip it
+        addr = PAGE_SIZE;
+    }
     addr = proc.memory_set.find_free_area(addr, len);
 
     if flags.contains(MmapFlags::ANONYMOUS) {

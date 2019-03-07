@@ -141,7 +141,13 @@ impl Thread {
                 let mut map = BTreeMap::new();
                 if let Some(phdr) = elf.program_iter()
                     .find(|ph| ph.get_type() == Ok(Type::Phdr)) {
+                    // if phdr exists in program header, use it
                     map.insert(abi::AT_PHDR, phdr.virtual_addr() as usize);
+                } else if let Some(elf_addr) = elf.program_iter().find(|ph| ph.get_type() == Ok(Type::Load) && ph.offset() == 0) {
+                    // otherwise, check if elf is loaded from the beginning, then phdr can be inferred.
+                    map.insert(abi::AT_PHDR, elf_addr.virtual_addr() as usize + elf.header.pt2.ph_offset() as usize);
+                } else {
+                    debug!("new_user: no phdr found, tls might not work");
                 }
                 map.insert(abi::AT_PHENT, elf.header.pt2.ph_entry_size() as usize);
                 map.insert(abi::AT_PHNUM, elf.header.pt2.ph_count() as usize);
