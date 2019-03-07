@@ -515,6 +515,22 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
     }
 }
 
+pub fn sys_shutdown(fd: usize, how: usize) -> SysResult {
+    info!("sys_shutdown: fd: {} how: {}", fd, how);
+    let mut proc = process();
+
+    let iface = &*(NET_DRIVERS.read()[0]);
+    let wrapper = proc.get_socket_mut(fd)?;
+    if let SocketType::Tcp(Some(endpoint)) = wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+        socket.close();
+        Ok(0)
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
 pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysResult {
     info!(
         "sys_accept: fd: {} addr: {:?} addr_len: {:?}",

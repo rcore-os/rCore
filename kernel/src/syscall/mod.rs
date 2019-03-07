@@ -63,7 +63,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         045 => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut SockaddrIn, args[5] as *mut u32),
 //        046 => sys_sendmsg(),
 //        047 => sys_recvmsg(),
-//        048 => sys_shutdown(),
+        048 => sys_shutdown(args[0], args[1]),
         049 => sys_bind(args[0], args[1] as *const SockaddrIn, args[2]),
         050 => sys_listen(args[0], args[1]),
         051 => sys_getsockname(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
