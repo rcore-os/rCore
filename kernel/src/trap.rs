@@ -27,5 +27,10 @@ pub fn error(tf: &TrapFrame) -> ! {
 }
 
 pub fn serial(c: char) {
-    crate::fs::STDIN.push(c);
+    if c == '\r' {
+        // in linux, we use '\n' instead
+        crate::fs::STDIN.push('\n');
+    } else {
+        crate::fs::STDIN.push(c);
+    }
 }

@@ -13,16 +13,28 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
 pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
-    process().memory_set.check_mut_ptr(code)?;
+    info!("wait: pid {} code {:?}", pid, code);
+    if !code.is_null() {
+        process().memory_set.check_mut_ptr(code)?;
+    }
     loop {
         use alloc::vec;
         let wait_procs = match pid {
             0 => processor().manager().get_children(thread::current().id()),
-            _ => vec![pid],
+            // check if pid is a child
+            _ => {
+                if processor().manager().get_children(thread::current().id()).iter()
+                    .find(|p| **p == pid).is_some() {
+                    vec![pid]
+                } else {
+                    vec![]
+                }
+            }
         };
         if wait_procs.is_empty() {
-            return Ok(-1);
+            return Err(SysError::ECHILD);
         }
+
         for pid in wait_procs {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
@@ -31,7 +43,7 @@ pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
                     }
                     processor().manager().remove(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
-                    return Ok(0);
+                    return Ok(pid as isize);
                 }
                 None => return Ok(-1),
                 _ => {}
