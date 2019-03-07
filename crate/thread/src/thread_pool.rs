@@ -154,7 +154,11 @@ impl ThreadPool {
     }
 
     pub fn get_status(&self, tid: Tid) -> Option<Status> {
-        self.threads[tid].lock().as_ref().map(|p| p.status.clone())
+        if tid < self.threads.len() {
+            self.threads[tid].lock().as_ref().map(|p| p.status.clone())
+        } else {
+            None
+        }
     }
 
     /// Remove an exited proc `tid`.

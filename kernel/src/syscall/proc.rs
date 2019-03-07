@@ -117,6 +117,12 @@ pub fn sys_getpid() -> SysResult {
     Ok(thread::current().id() as isize)
 }
 
+/// Get the current thread id
+pub fn sys_gettid() -> SysResult {
+    // use pid as tid for now
+    Ok(thread::current().id() as isize)
+}
+
 /// Get the parent process id
 pub fn sys_getppid() -> SysResult {
     let pid = thread::current().id();

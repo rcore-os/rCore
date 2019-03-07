@@ -100,6 +100,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        160 => sys_setrlimit(),
 //        162 => sys_sync(),
 //        169 => sys_reboot(),
+        186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
 //        293 => sys_pipe(),

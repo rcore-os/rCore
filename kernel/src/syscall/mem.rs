@@ -66,6 +66,5 @@ fn prot_to_attr(prot: MmapProt) -> MemoryAttr {
     let mut attr = MemoryAttr::default().user();
     if prot.contains(MmapProt::EXEC) { attr = attr.execute(); }
     if !prot.contains(MmapProt::WRITE) { attr = attr.readonly(); }
-    assert!(prot.contains(MmapProt::READ));
     attr
 }

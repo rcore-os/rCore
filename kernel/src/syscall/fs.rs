@@ -1,6 +1,7 @@
 //! Syscalls for file system
 
 use core::mem::size_of;
+use core::cmp::min;
 use rcore_fs::vfs::Timespec;
 use smoltcp::socket::*;
 
@@ -252,12 +253,16 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
     info!("writev: fd: {}, iov: {:?}, count: {}", fd, iov_ptr, iov_count);
     let mut proc = process();
-    let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set,  false)?;
+    let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set, false)?;
 
-    let file = proc.get_file(fd)?;
     let buf = iovs.read_all_to_vec();
-    let len = file.write(buf.as_slice())?;
-    Ok(len as isize)
+    let len = buf.len();
+
+    match proc.files.get(&fd) {
+        Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, buf.as_ptr(), len),
+        Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, buf.as_ptr(), len),
+        None => Err(SysError::EINVAL)
+    }
 }
 
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
@@ -527,7 +532,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     info!("pipe: fds: {:?}", fds);
 
     let mut proc = process();
-    proc.memory_set.check_mut_array(fds, 2);
+    proc.memory_set.check_mut_array(fds, 2)?;
     let (read, write) = Pipe::create_pair();
     let read_fd = proc.get_free_inode();
 
@@ -550,6 +555,7 @@ impl Process {
         })
     }
     fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
+        debug!("lookup_inode: cwd {} path {}", self.cwd, path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path
             let abs_path = path.split_at(1).1; // skip start '/'
@@ -832,10 +838,13 @@ impl IoVecs {
         let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
         // check all bufs in iov
         for iov in iovs.iter() {
-            if readv {
-                vm.check_mut_array(iov.base, iov.len as usize)?;
-            } else {
-                vm.check_array(iov.base, iov.len as usize)?;
+            if iov.len > 0 {
+                // skip empty iov
+                if readv {
+                    vm.check_mut_array(iov.base, iov.len as usize)?;
+                } else {
+                    vm.check_array(iov.base, iov.len as usize)?;
+                }
             }
         }
         let slices = iovs.iter().map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) }).collect();
@@ -852,9 +861,16 @@ impl IoVecs {
 
     fn write_all_from_slice(&mut self, buf: &[u8]) {
         let mut copied_len = 0;
+        debug!("copy {:?}", buf);
         for slice in self.0.iter_mut() {
-            slice.copy_from_slice(&buf[copied_len..copied_len + slice.len()]);
-            copied_len += slice.len();
+            let copy_len = min(slice.len(), buf.len() - copied_len);
+            if copy_len == 0 {
+                continue;
+            }
+
+            slice[..copy_len].copy_from_slice(&buf[copied_len..copied_len + copy_len]);
+            debug!("copy to {:?}", slice);
+            copied_len += copy_len;
         }
     }
 
