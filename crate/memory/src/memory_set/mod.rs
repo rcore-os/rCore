@@ -269,7 +269,7 @@ impl<T: InactivePageTable> MemorySet<T> {
     }
 
     /*
-    **  @brief  remove the memory area to the memory set
+    **  @brief  remove the memory area from the memory set
     **  @param  area: MemoryArea     the memory area to remove
     **  @retval none
     */
@@ -283,6 +283,41 @@ impl<T: InactivePageTable> MemorySet<T> {
             }
         }
         panic!("no memory area found");
+    }
+
+    /*
+    **  @brief  remove the memory area from the memory set and split existed ones when necessary
+    **  @param  area: MemoryArea     the memory area to remove
+    **  @retval none
+    */
+    pub fn pop_with_split(&mut self, start_addr: VirtAddr, end_addr: VirtAddr) {
+        assert!(start_addr <= end_addr, "invalid memory area");
+        for i in 0..self.areas.len() {
+            if self.areas[i].is_overlap_with(start_addr, end_addr) {
+                if self.areas[i].start_addr >= start_addr && self.areas[i].end_addr <= end_addr {
+                    // subset
+                    let area = self.areas.remove(i);
+                    self.page_table.edit(|pt| area.unmap(pt));
+                } else if self.areas[i].start_addr >= start_addr && self.areas[i].start_addr < end_addr {
+                    // prefix
+                    let area = self.areas.remove(i);
+                    let dead_area = MemoryArea { start_addr: area.start_addr, end_addr, attr: area.attr, handler: area.handler.box_clone(), name: area.name };
+                    self.page_table.edit(|pt| dead_area.unmap(pt));
+                    let new_area = MemoryArea { start_addr: end_addr, end_addr: area.end_addr, attr: area.attr, handler: area.handler, name: area.name };
+                    self.areas.insert(i, new_area);
+                } else if self.areas[i].end_addr <= end_addr && self.areas[i].end_addr > start_addr {
+                    // postfix
+                    let area = self.areas.remove(i);
+                    let dead_area = MemoryArea { start_addr: start_addr, end_addr: area.end_addr, attr: area.attr, handler: area.handler.box_clone(), name: area.name };
+                    self.page_table.edit(|pt| dead_area.unmap(pt));
+                    let new_area = MemoryArea { start_addr: area.start_addr, end_addr: start_addr, attr: area.attr, handler: area.handler, name: area.name };
+                    self.areas.insert(i, new_area);
+                } else {
+                    unimplemented!("");
+                }
+                return;
+            }
+        }
     }
 
     /*

@@ -23,7 +23,7 @@ pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: 
 
     if flags.contains(MmapFlags::FIXED) {
         // we have to map it to addr, so remove the old mapping first
-        proc.memory_set.pop(addr, addr + len);
+        proc.memory_set.pop_with_split(addr, addr + len);
     } else {
         addr = proc.memory_set.find_free_area(addr, len);
     }
@@ -63,7 +63,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
 pub fn sys_munmap(addr: usize, len: usize) -> SysResult {
     info!("munmap addr={:#x}, size={:#x}", addr, len);
     let mut proc = process();
-    proc.memory_set.pop(addr, addr + len);
+    proc.memory_set.pop_with_split(addr, addr + len);
     Ok(0)
 }
 

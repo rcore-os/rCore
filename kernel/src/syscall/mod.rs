@@ -99,6 +99,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         096 => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
 //        097 => sys_getrlimit(),
 //        098 => sys_getrusage(),
+        099 => sys_sysinfo(args[0] as *mut SysInfo),
         110 => sys_getppid(),
 //        133 => sys_mknod(),
         141 => sys_set_priority(args[0]),
@@ -131,6 +132,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_ioctl is unimplemented");
             Ok(0)
         }
+        028 => {
+            warn!("sys_madvise is unimplemented");
+            Ok(0)
+        }
         037 => {
             warn!("sys_alarm is unimplemented");
             Ok(0)
@@ -138,6 +143,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         072 => {
             warn!("sys_fcntl is unimplemented");
             Ok(0)
+        }
+        089 => {
+            warn!("sys_readlink is unimplemented");
+            Err(SysError::ENOENT)
         }
         092 => {
             warn!("sys_chown is unimplemented");
@@ -171,6 +180,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
+        213 => {
+            warn!("sys_epoll_create is unimplemented");
+            Err(SysError::ENOSYS)
+        }
         218 => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id())
@@ -185,7 +198,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         291 => {
             warn!("sys_epoll_create1 is unimplemented");
-            Err(SysError::EINVAL)
+            Err(SysError::ENOSYS)
         }
         302 => {
             warn!("sys_prlimit64 is unimplemented");
