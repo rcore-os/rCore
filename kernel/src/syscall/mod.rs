@@ -51,6 +51,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         010 => sys_mprotect(args[0], args[1], args[2]),
         011 => sys_munmap(args[0], args[1]),
         017 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
+        018 => sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
         019 => sys_readv(args[0], args[1] as *const IoVec, args[2]),
         020 => sys_writev(args[0], args[1] as *const IoVec, args[2]),
         021 => sys_access(args[0] as *const u8, args[1]),
@@ -108,8 +109,9 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
         204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
-        228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
+        228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+        288 => sys_accept(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32), // use accept for accept4
 //        293 => sys_pipe(),
 
         // for musl: empty impl
@@ -135,6 +137,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         072 => {
             warn!("sys_fcntl is unimplemented");
+            Ok(0)
+        }
+        092 => {
+            warn!("sys_chown is unimplemented");
             Ok(0)
         }
         095 => {
@@ -176,6 +182,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         280 => {
             warn!("sys_utimensat is unimplemented");
             Ok(0)
+        }
+        291 => {
+            warn!("sys_epoll_create1 is unimplemented");
+            Err(SysError::EINVAL)
         }
         302 => {
             warn!("sys_prlimit64 is unimplemented");

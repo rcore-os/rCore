@@ -6,11 +6,13 @@ use core::mem::size_of;
 use smoltcp::socket::*;
 use smoltcp::wire::*;
 
+const AF_UNIX: usize = 1;
 const AF_INET: usize = 2;
 
 const SOCK_STREAM: usize = 1;
 const SOCK_DGRAM: usize = 2;
 const SOCK_RAW: usize = 3;
+const SOCK_TYPE_MASK: usize = 0xf;
 
 const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
@@ -36,7 +38,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
     let mut proc = process();
     let iface = &*(NET_DRIVERS.read()[0]);
     match domain {
-        AF_INET => match socket_type {
+        AF_INET | AF_UNIX => match socket_type & SOCK_TYPE_MASK {
             SOCK_STREAM => {
                 let fd = proc.get_free_inode();
 
@@ -434,6 +436,7 @@ pub fn sys_recvfrom(
 
             // avoid deadlock
             drop(socket);
+            drop(sockets);
             SOCKET_ACTIVITY._wait()
         }
     } else if let SocketType::Udp = wrapper.socket_type {
@@ -453,6 +456,27 @@ pub fn sys_recvfrom(
 
             // avoid deadlock
             drop(socket);
+            drop(sockets);
+            SOCKET_ACTIVITY._wait()
+        }
+    } else if let SocketType::Tcp(_) = wrapper.socket_type {
+        loop {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+
+            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
+            if let Ok(size) = socket.recv_slice(&mut slice) {
+                if !addr.is_null() {
+                    let sockaddr_in = SockaddrIn::from(socket.remote_endpoint());
+                    unsafe { sockaddr_in.write_to(addr, addr_len); }
+                }
+
+                return Ok(size as isize);
+            }
+
+            // avoid deadlock
+            drop(socket);
+            drop(sockets);
             SOCKET_ACTIVITY._wait()
         }
     } else {
@@ -509,11 +533,15 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         info!("socket {} listening on {:?}", fd, endpoint);
-        match socket.listen(endpoint) {
-            Ok(()) => Ok(0),
-            Err(err) => {
-                Err(SysError::EINVAL)
-            },
+        if !socket.is_listening() {
+            match socket.listen(endpoint) {
+                Ok(()) => Ok(0),
+                Err(err) => {
+                    Err(SysError::EINVAL)
+                },
+            }
+        } else {
+            Ok(0)
         }
     } else {
         Err(SysError::EINVAL)
@@ -757,6 +785,9 @@ impl SockaddrIn {
                 &u32::from_be(self.sin_addr).to_be_bytes()[..]
             ));
             Ok((addr, port).into())
+        } else if self.sin_family == AF_UNIX as u16 {
+            debug!("unix socket path {}", unsafe {util::from_cstr((self as *const SockaddrIn as *const u8).add(2)) });
+            Err(SysError::EINVAL)
         } else {
             Err(SysError::EINVAL)
         }

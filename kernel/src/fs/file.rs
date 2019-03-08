@@ -65,6 +65,14 @@ impl FileHandle {
         Ok(len)
     }
 
+    pub fn write_at(&mut self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if !self.options.write {
+            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+        }
+        let len = self.inode.write_at(offset, buf)?;
+        Ok(len)
+    }
+
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         self.offset = match pos {
             SeekFrom::Start(offset) => offset,
