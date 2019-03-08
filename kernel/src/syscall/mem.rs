@@ -26,8 +26,7 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
         if flags.contains(MmapFlags::SHARED) {
             return Err(SysError::EINVAL);
         }
-        let handler = Delay::new(prot_to_attr(prot), GlobalFrameAlloc);
-        proc.memory_set.push(addr, addr + len, handler, "mmap");
+        proc.memory_set.push(addr, addr + len, prot.to_attr(), Delay::new(GlobalFrameAlloc), "mmap");
         return Ok(addr as isize);
     }
     unimplemented!()
@@ -38,19 +37,14 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
     info!("mprotect: addr={:#x}, size={:#x}, prot={:?}", addr, len, prot);
 
     let mut proc = process();
-    let attr = prot_to_attr(prot);
+    let attr = prot.to_attr();
 
     let memory_area = proc.memory_set.iter().find(|area| area.contains(addr));
     if memory_area.is_some() {
         proc.memory_set.edit(|pt| {
             for page in Page::range_of(addr, addr + len) {
                 let entry = pt.get_entry(page.start_address()).expect("failed to get entry");
-
-                // keep original presence
-                let orig_present = entry.present();
                 attr.apply(entry);
-                entry.set_present(orig_present);
-                entry.update();
             }
         });
         Ok(0)
@@ -90,9 +84,11 @@ bitflags! {
     }
 }
 
-fn prot_to_attr(prot: MmapProt) -> MemoryAttr {
-    let mut attr = MemoryAttr::default().user();
-    if prot.contains(MmapProt::EXEC) { attr = attr.execute(); }
-    if !prot.contains(MmapProt::WRITE) { attr = attr.readonly(); }
-    attr
+impl MmapProt {
+    fn to_attr(self) -> MemoryAttr {
+        let mut attr = MemoryAttr::default().user();
+        if self.contains(MmapProt::EXEC) { attr = attr.execute(); }
+        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
+        attr
+    }
 }

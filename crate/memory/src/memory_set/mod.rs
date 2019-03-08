@@ -18,6 +18,7 @@ pub mod handler;
 pub struct MemoryArea {
     start_addr: VirtAddr,
     end_addr: VirtAddr,
+    attr: MemoryAttr,
     handler: Box<MemoryHandler>,
     name: &'static str,
 }
@@ -55,14 +56,13 @@ impl MemoryArea {
     }
     /// Check the array is within the readable memory
     pub fn check_array<S>(&self, ptr: *const S, count: usize) -> bool {
-        // FIXME: check readable
         ptr as usize >= self.start_addr &&
             unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
     }
     /// Check the array is within the writable memory
     pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> bool {
-        // FIXME: check writable
-        ptr as usize >= self.start_addr &&
+        !self.attr.readonly &&
+            ptr as usize >= self.start_addr &&
             unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
     }
     /// Check the null-end C string is within the readable memory, and is valid.
@@ -94,7 +94,7 @@ impl MemoryArea {
     */
     fn map(&self, pt: &mut PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            self.handler.map(pt, page.start_address());
+            self.handler.map(pt, page.start_address(), &self.attr);
         }
     }
     /*
@@ -104,7 +104,7 @@ impl MemoryArea {
     */
     fn map_eager(&self, pt: &mut PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
-            self.handler.map_eager(pt, page.start_address());
+            self.handler.map_eager(pt, page.start_address(), &self.attr);
         }
     }
     /*
@@ -169,14 +169,9 @@ impl MemoryAttr {
         self.mmio = value;
         self
     }
-    /*
-    **  @brief  apply the memory attribute to a page table entry
-    **  @param  entry: &mut impl Entry
-    **                               the page table entry to apply the attribute
-    **  @retval none
-    */
+    /// Apply the attributes to page table entry, then update it.
+    /// NOTE: You may need to set present manually.
     pub fn apply(&self, entry: &mut Entry) {
-        entry.set_present(true);
         entry.set_user(self.user);
         entry.set_writable(!self.readonly);
         entry.set_execute(self.execute);
@@ -254,6 +249,7 @@ impl<T: InactivePageTable> MemorySet<T> {
             .find(|&addr| self.test_free_area(addr, addr + len))
             .expect("failed to find free area ???")
     }
+    /// Test if [`start_addr`, `end_addr`) is a free area
     fn test_free_area(&self, start_addr: usize, end_addr: usize) -> bool {
         self.areas.iter()
             .find(|area| area.is_overlap_with(start_addr, end_addr))
@@ -264,10 +260,10 @@ impl<T: InactivePageTable> MemorySet<T> {
     **  @param  area: MemoryArea     the memory area to add
     **  @retval none
     */
-    pub fn push(&mut self, start_addr: VirtAddr, end_addr: VirtAddr, handler: impl MemoryHandler, name: &'static str) {
+    pub fn push(&mut self, start_addr: VirtAddr, end_addr: VirtAddr, attr: MemoryAttr, handler: impl MemoryHandler, name: &'static str) {
         assert!(start_addr <= end_addr, "invalid memory area");
         assert!(self.test_free_area(start_addr, end_addr), "memory area overlap");
-        let area = MemoryArea { start_addr, end_addr, handler: Box::new(handler), name };
+        let area = MemoryArea { start_addr, end_addr, attr, handler: Box::new(handler), name };
         self.page_table.edit(|pt| area.map(pt));
         self.areas.push(area);
     }

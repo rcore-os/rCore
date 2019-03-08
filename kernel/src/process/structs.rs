@@ -118,7 +118,7 @@ impl Thread {
         }
 
         // Make page table
-        let (mut memory_set, entry_addr, tls) = memory_set_from(&elf);
+        let (mut memory_set, entry_addr) = memory_set_from(&elf);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
@@ -128,7 +128,7 @@ impl Thread {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
                 false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
             };
-            memory_set.push(ustack_buttom, ustack_top,  ByFrame::new(MemoryAttr::default().user(), GlobalFrameAlloc), "user_stack");
+            memory_set.push(ustack_buttom, ustack_top,  MemoryAttr::default().user(), ByFrame::new(GlobalFrameAlloc), "user_stack");
             ustack_top
         };
         #[cfg(feature = "no_mmu")]
@@ -147,7 +147,7 @@ impl Thread {
                     // otherwise, check if elf is loaded from the beginning, then phdr can be inferred.
                     map.insert(abi::AT_PHDR, elf_addr.virtual_addr() as usize + elf.header.pt2.ph_offset() as usize);
                 } else {
-                    debug!("new_user: no phdr found, tls might not work");
+                    warn!("new_user: no phdr found, tls might not work");
                 }
                 map.insert(abi::AT_PHENT, elf.header.pt2.ph_entry_size() as usize);
                 map.insert(abi::AT_PHNUM, elf.header.pt2.ph_count() as usize);
@@ -170,7 +170,7 @@ impl Thread {
         Box::new(Thread {
             context: unsafe {
                 Context::new_user_thread(
-                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token(), tls)
+                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
             },
             kstack,
             proc: Arc::new(Mutex::new(Process {
@@ -232,12 +232,11 @@ impl Process {
 
 
 /// Generate a MemorySet according to the ELF file.
-/// Also return the real entry point address and tls top addr.
-fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
+/// Also return the real entry point address.
+fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
     debug!("come in to memory_set_from");
     let mut ms = MemorySet::new();
     let mut entry = elf.header.pt2.entry_point() as usize;
-    let mut tls = 0;
 
     // [NoMMU] Get total memory size and alloc space
     let va_begin = elf.program_iter()
@@ -255,21 +254,13 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
     { entry += 0x40000000; }
 
     for ph in elf.program_iter() {
-        if ph.get_type() != Ok(Type::Load) && ph.get_type() != Ok(Type::Tls) {
+        if ph.get_type() != Ok(Type::Load) {
             continue;
         }
-
-        let mut virt_addr = ph.virtual_addr() as usize;
+        let virt_addr = ph.virtual_addr() as usize;
         let offset = ph.offset() as usize;
         let file_size = ph.file_size() as usize;
         let mem_size = ph.mem_size() as usize;
-        let mut name = "load";
-
-        if ph.get_type() == Ok(Type::Tls) {
-            virt_addr = USER_TLS_OFFSET;
-            name = "tls";
-            debug!("copying tls addr to {:X}", virt_addr);
-        }
 
         #[cfg(target_arch = "aarch64")]
         assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
@@ -281,7 +272,7 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
         info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
-            ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()), GlobalFrameAlloc), &name);
+            ms.push(virt_addr, virt_addr + mem_size, ph.flags().to_attr(), ByFrame::new(GlobalFrameAlloc), "");
             unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
         };
         // Copy data
@@ -293,40 +284,19 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize, usize) {
                 target[file_size..].iter_mut().for_each(|x| *x = 0);
             });
         }
-
-        if ph.get_type() == Ok(Type::Tls) {
-            virt_addr = USER_TMP_TLS_OFFSET;
-            tls = virt_addr + ph.mem_size() as usize;
-            debug!("copying tls addr to {:X}", virt_addr);
-
-            // TODO: put this in a function
-            // Get target slice
-            #[cfg(feature = "no_mmu")]
-            let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];
-            #[cfg(feature = "no_mmu")]
-            info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
-            #[cfg(not(feature = "no_mmu"))]
-            let target = {
-                ms.push(virt_addr, virt_addr + mem_size, ByFrame::new(memory_attr_from(ph.flags()).writable(), GlobalFrameAlloc), "tmptls");
-                unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
-            };
-            // Copy data
-            unsafe {
-                ms.with(|| {
-                    if file_size != 0 {
-                        target[..file_size].copy_from_slice(&elf.input[offset..offset + file_size]);
-                    }
-                    target[file_size..].iter_mut().for_each(|x| *x = 0);
-                });
-            }
-        }
     }
-    (ms, entry, tls)
+    (ms, entry)
 }
 
-fn memory_attr_from(elf_flags: Flags) -> MemoryAttr {
-    let mut flags = MemoryAttr::default().user();
-    // TODO: handle readonly
-    if elf_flags.is_execute() { flags = flags.execute(); }
-    flags
+trait ToMemoryAttr {
+    fn to_attr(&self) -> MemoryAttr;
+}
+
+impl ToMemoryAttr for Flags {
+    fn to_attr(&self) -> MemoryAttr {
+        let mut flags = MemoryAttr::default().user();
+        // FIXME: handle readonly
+        if self.is_execute() { flags = flags.execute(); }
+        flags
+    }
 }

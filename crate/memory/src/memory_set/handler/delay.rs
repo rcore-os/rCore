@@ -2,7 +2,6 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct Delay<T: FrameAllocator> {
-    flags: MemoryAttr,
     allocator: T,
 }
 
@@ -11,16 +10,17 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let entry = pt.map(addr, 0);
-        self.flags.apply(entry);
         entry.set_present(false);
-        entry.update();
+        attr.apply(entry);
     }
 
-    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = self.allocator.alloc().expect("failed to alloc frame");
-        self.flags.apply(pt.map(addr, target));
+        let entry = pt.map(addr, target);
+        entry.set_present(true);
+        attr.apply(entry);
     }
 
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
@@ -45,7 +45,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
 }
 
 impl<T: FrameAllocator> Delay<T> {
-    pub fn new(flags: MemoryAttr, allocator: T) -> Self {
-        Delay { flags, allocator }
+    pub fn new(allocator: T) -> Self {
+        Delay { allocator }
     }
 }

@@ -4,17 +4,22 @@ use super::*;
 pub trait MemoryHandler: Debug + 'static {
     fn box_clone(&self) -> Box<MemoryHandler>;
 
-    /// Map addr in the page table
+    /// Map `addr` in the page table
     /// Should set page flags here instead of in page_fault_handler
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr);
+    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr);
     
-    /// Map addr in the page table eagerly (i.e. no delay allocation)
+    /// Map `addr` in the page table eagerly (i.e. no delay allocation)
     /// Should set page flags here instead of in page_fault_handler
-    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         // override this when pages are allocated lazily
-        self.map(pt, addr);
+        self.map(pt, addr, attr);
     }
+
+    /// Unmap `addr` in the page table
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr);
+
+    /// Handle page fault on `addr`
+    /// Return true if success, false if error
     fn page_fault_handler(&self, pt: &mut PageTable, addr: VirtAddr) -> bool;
 }
 

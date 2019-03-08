@@ -3,7 +3,6 @@ use super::*;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Linear {
     offset: isize,
-    flags: MemoryAttr,
 }
 
 impl MemoryHandler for Linear {
@@ -11,9 +10,11 @@ impl MemoryHandler for Linear {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = (addr as isize + self.offset) as PhysAddr;
-        self.flags.apply(pt.map(addr, target));
+        let entry = pt.map(addr, target);
+        entry.set_present(true);
+        attr.apply(entry);
     }
 
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
@@ -26,7 +27,7 @@ impl MemoryHandler for Linear {
 }
 
 impl Linear {
-    pub fn new(offset: isize, flags: MemoryAttr) -> Self {
-        Linear { offset, flags }
+    pub fn new(offset: isize) -> Self {
+        Linear { offset }
     }
 }

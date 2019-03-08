@@ -74,12 +74,12 @@ fn init_frame_allocator() {
 fn remap_the_kernel(dtb: usize) {
     let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
     let mut ms = MemorySet::new_bare();
-    ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
-    ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");
-    ms.push(srodata as usize, erodata as usize, Linear::new(offset, MemoryAttr::default().readonly()), "rodata");
-    ms.push(bootstack as usize, bootstacktop as usize, Linear::new(offset, MemoryAttr::default()), "stack");
-    ms.push(sbss as usize, ebss as usize, Linear::new(offset, MemoryAttr::default()), "bss");
-    ms.push(dtb, dtb + super::consts::MAX_DTB_SIZE, Linear::new(offset, MemoryAttr::default()), "dts");
+    ms.push(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), Linear::new(offset), "text");
+    ms.push(sdata as usize, edata as usize, MemoryAttr::default(), Linear::new(offset), "data");
+    ms.push(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), Linear::new(offset), "rodata");
+    ms.push(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), Linear::new(offset), "stack");
+    ms.push(sbss as usize, ebss as usize, MemoryAttr::default(), Linear::new(offset), "bss");
+    ms.push(dtb, dtb + super::consts::MAX_DTB_SIZE, MemoryAttr::default().readonly(), Linear::new(offset), "dts");
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);

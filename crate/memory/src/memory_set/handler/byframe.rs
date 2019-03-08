@@ -2,7 +2,6 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct ByFrame<T: FrameAllocator> {
-    flags: MemoryAttr,
     allocator: T,
 }
 
@@ -11,9 +10,11 @@ impl<T: FrameAllocator> MemoryHandler for ByFrame<T> {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = self.allocator.alloc().expect("failed to allocate frame");
-        self.flags.apply(pt.map(addr, target));
+        let entry = pt.map(addr, target);
+        entry.set_present(true);
+        attr.apply(entry);
     }
 
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
@@ -28,7 +29,7 @@ impl<T: FrameAllocator> MemoryHandler for ByFrame<T> {
 }
 
 impl<T: FrameAllocator> ByFrame<T> {
-    pub fn new(flags: MemoryAttr, allocator: T) -> Self {
-        ByFrame { flags, allocator }
+    pub fn new(allocator: T) -> Self {
+        ByFrame { allocator }
     }
 }

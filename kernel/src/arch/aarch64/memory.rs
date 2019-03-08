@@ -103,14 +103,14 @@ static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
     let mut ms = MemorySet::new_bare();
-    ms.push(0, bootstacktop as usize, Linear::new(0, MemoryAttr::default()), "kstack");
-    ms.push(stext as usize, etext as usize, Linear::new(0, MemoryAttr::default().execute().readonly()), "text");
-    ms.push(sdata as usize, edata as usize, Linear::new(0, MemoryAttr::default()), "data");
-    ms.push(srodata as usize, erodata as usize, Linear::new(0, MemoryAttr::default().readonly()), "rodata");
-    ms.push(sbss as usize, ebss as usize, Linear::new(0, MemoryAttr::default()), "bss");
+    ms.push(0, bootstacktop as usize, MemoryAttr::default(), Linear::new(0), "kstack");
+    ms.push(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), Linear::new(0), "text");
+    ms.push(sdata as usize, edata as usize, MemoryAttr::default(), Linear::new(0), "data");
+    ms.push(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), Linear::new(0), "rodata");
+    ms.push(sbss as usize, ebss as usize, MemoryAttr::default(), Linear::new(0), "bss");
 
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
-    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
+    ms.push(IO_REMAP_BASE, IO_REMAP_END, MemoryAttr::default().mmio(MMIOType::Device as u8), Linear::new(0), "io_remap");
 
     unsafe { ms.get_page_table_mut().activate_as_kernel() }
     unsafe { KERNEL_MEMORY_SET = Some(ms) }
@@ -119,7 +119,7 @@ fn remap_the_kernel() {
 
 pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
     if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
-        ms.push(start, start + len, Linear::new(0, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8)), name);
+        ms.push(start, start + len, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8), Linear::new(0), name);
         return start;
     }
     0
