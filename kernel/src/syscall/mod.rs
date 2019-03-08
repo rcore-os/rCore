@@ -81,7 +81,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         058 => sys_fork(tf),
         059 => sys_exec(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8, tf),
         060 => sys_exit(args[0] as isize),
-        061 => sys_wait(args[0], args[1] as *mut i32), // TODO: wait4
+        061 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
         062 => sys_kill(args[0]),
         063 => sys_uname(args[0] as *mut u8),
 //        072 => sys_fcntl(),
@@ -172,6 +172,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         231 => {
             warn!("sys_exit_group is unimplemented");
             sys_exit(args[0] as isize);
+        }
+        280 => {
+            warn!("sys_utimensat is unimplemented");
+            Ok(0)
         }
         302 => {
             warn!("sys_prlimit64 is unimplemented");

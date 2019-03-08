@@ -12,19 +12,29 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
-pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
-    info!("wait: pid {} code {:?}", pid, code);
+pub fn sys_wait4(pid: isize, code: *mut i32) -> SysResult {
+    info!("wait4: pid: {}, code: {:?}", pid, code);
     if !code.is_null() {
         process().memory_set.check_mut_ptr(code)?;
     }
+    #[derive(Debug)]
+    enum WaitFor {
+        AnyChild,
+        Pid(usize),
+    }
+    let target = match pid {
+        -1 => WaitFor::AnyChild,
+        p if p > 0 => WaitFor::Pid(p as usize),
+        _ => unimplemented!(),
+    };
     loop {
         use alloc::vec;
-        let wait_procs = match pid {
-            0 => processor().manager().get_children(thread::current().id()),
-            // check if pid is a child
-            _ => {
+        let wait_procs = match target {
+            WaitFor::AnyChild => processor().manager().get_children(thread::current().id()),
+            WaitFor::Pid(pid) => {
+                // check if pid is a child
                 if processor().manager().get_children(thread::current().id()).iter()
-                    .find(|p| **p == pid).is_some() {
+                    .find(|&&p| p == pid).is_some() {
                     vec![pid]
                 } else {
                     vec![]
@@ -49,14 +59,12 @@ pub fn sys_wait(pid: usize, code: *mut i32) -> SysResult {
                 _ => {}
             }
         }
-        info!("wait: {} -> {}, sleep", thread::current().id(), pid);
-        if pid == 0 {
-            processor().manager().wait_child(thread::current().id());
-            processor().yield_now();
-        } else {
-            processor().manager().wait(thread::current().id(), pid);
-            processor().yield_now();
+        info!("wait: {} -> {:?}, sleep", thread::current().id(), target);
+        match target {
+            WaitFor::AnyChild => processor().manager().wait_child(thread::current().id()),
+            WaitFor::Pid(pid) => processor().manager().wait(thread::current().id(), pid),
         }
+        processor().yield_now();
     }
 }
 
