@@ -214,7 +214,7 @@ impl Thread {
 
 
         Box::new(Thread {
-            context: unsafe { Context::new_fork(tf, None, kstack.top(), memory_set.token()) },
+            context: unsafe { Context::new_fork(tf, kstack.top(), memory_set.token()) },
             kstack,
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
@@ -225,11 +225,11 @@ impl Thread {
     }
 
     /// Create a new thread in the same process.
-    pub fn clone(&self, tf: &TrapFrame, stack_top: usize) -> Box<Thread> {
+    pub fn clone(&self, tf: &TrapFrame, stack_top: usize, tls: usize) -> Box<Thread> {
         let kstack = KernelStack::new();
         let token = self.proc.lock().memory_set.token();
         Box::new(Thread {
-            context: unsafe { Context::new_fork(tf, Some(stack_top), kstack.top(), token) },
+            context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), token, tls) },
             kstack,
             proc: self.proc.clone(),
         })

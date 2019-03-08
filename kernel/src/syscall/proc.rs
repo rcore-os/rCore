@@ -14,9 +14,9 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 /// The new thread's stack pointer will be set to `newsp`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
-pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut usize, child_tid: *mut usize, tf: &TrapFrame) -> SysResult {
-    info!("clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}",
-        flags, newsp, parent_tid, child_tid);
+pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut usize, child_tid: *mut usize, newtls: usize, tf: &TrapFrame) -> SysResult {
+    info!("clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        flags, newsp, parent_tid, child_tid, newtls);
     if flags != 0x7d0f00 {
         warn!("sys_clone only support musl pthread_create");
         return Err(SysError::ENOSYS);
@@ -28,7 +28,7 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut usize, child_tid: 
 //        proc.memory_set.check_mut_ptr(child_tid)?;
     }
     // FIXME: tf.rip => tf.ip() for all arch
-    let new_thread = current_thread().clone(tf, newsp);
+    let new_thread = current_thread().clone(tf, newsp, newtls);
     // FIXME: parent pid
     let tid = processor().manager().add(new_thread, thread::current().id());
     info!("clone: {} -> {}", thread::current().id(), tid);

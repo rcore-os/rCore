@@ -192,17 +192,28 @@ impl Context {
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
         }.push_at(kstack_top)
     }
-    pub unsafe fn new_fork(tf: &TrapFrame, ustack_top: Option<usize>, kstack_top: usize, cr3: usize) -> Self {
+    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: {
                 let mut tf = tf.clone();
-                if let Some(sp) = ustack_top {
-                    tf.rsp = sp;
-                }
                 tf.rax = 0;
                 // skip syscall inst;
-                tf.rip = tf.rip + 2;
+                tf.rip += 2;
+                tf
+            },
+        }.push_at(kstack_top)
+    }
+    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, cr3: usize, tls: usize) -> Self {
+        InitStack {
+            context: ContextData::new(cr3),
+            tf: {
+                let mut tf = tf.clone();
+                tf.rsp = ustack_top;
+                tf.fsbase = tls;
+                tf.rax = 0;
+                // skip syscall inst;
+                tf.rip += 2;
                 tf
             },
         }.push_at(kstack_top)
