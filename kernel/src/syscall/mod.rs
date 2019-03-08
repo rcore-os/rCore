@@ -108,6 +108,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
         204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
+        228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
 //        293 => sys_pipe(),
 
@@ -167,10 +168,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         218 => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id() as isize)
-        }
-        228 => {
-            warn!("sys_clock_gettime is unimplemented");
-            Ok(0)
         }
         231 => {
             warn!("sys_exit_group is unimplemented");

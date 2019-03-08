@@ -27,7 +27,25 @@ impl TimeVal {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct TimeSpec {
+    sec: u64,
+    nsec: u64,
+}
+
+impl TimeSpec {
+    pub fn to_msec(&self) -> u64 {
+        self.sec * 1000 + self.nsec / 1000_000
+    }
+
+    pub fn to_usec(&self) -> u64 {
+        self.sec * 1000_000 + self.nsec / 1000
+    }
+}
+
 pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
+    info!("gettimeofday: tv: {:?}, tz: {:?}", tv, tz);
     if tz as usize != 0 {
         return Err(SysError::EINVAL);
     }
@@ -47,6 +65,28 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
     };
     unsafe {
         *tv = timeval;
+    }
+    Ok(0)
+}
+
+pub fn sys_clock_gettime(clock: usize, ts: *mut TimeSpec) -> SysResult {
+    info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
+
+    let mut proc = process();
+    proc.memory_set.check_mut_ptr(ts)?;
+
+    let tick_base = *TICK_BASE;
+    let epoch_base = *EPOCH_BASE;
+    let tick = unsafe { crate::trap::TICK as u64 };
+
+    let usec = (tick - tick_base) * USEC_PER_TICK as u64;
+    let sec = epoch_base + usec / 1_000_000;
+    let timespec = TimeSpec {
+        sec,
+        nsec: (usec % 1_000_000) * 1000,
+    };
+    unsafe {
+        *ts = timespec;
     }
     Ok(0)
 }
