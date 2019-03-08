@@ -7,15 +7,15 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     let context = current_thread().fork(tf);
     let pid = processor().manager().add(context, thread::current().id());
     info!("fork: {} -> {}", thread::current().id(), pid);
-    Ok(pid as isize)
+    Ok(pid)
 }
 
 /// Wait the process exit.
 /// Return the PID. Store exit code to `code` if it's not null.
-pub fn sys_wait4(pid: isize, code: *mut i32) -> SysResult {
-    info!("wait4: pid: {}, code: {:?}", pid, code);
-    if !code.is_null() {
-        process().memory_set.check_mut_ptr(code)?;
+pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
+    info!("wait4: pid: {}, code: {:?}", pid, wstatus);
+    if !wstatus.is_null() {
+        process().memory_set.check_mut_ptr(wstatus)?;
     }
     #[derive(Debug)]
     enum WaitFor {
@@ -48,14 +48,14 @@ pub fn sys_wait4(pid: isize, code: *mut i32) -> SysResult {
         for pid in wait_procs {
             match processor().manager().get_status(pid) {
                 Some(Status::Exited(exit_code)) => {
-                    if !code.is_null() {
-                        unsafe { code.write(exit_code as i32); }
+                    if !wstatus.is_null() {
+                        unsafe { wstatus.write(exit_code as i32); }
                     }
                     processor().manager().remove(pid);
                     info!("wait: {} -> {}", thread::current().id(), pid);
-                    return Ok(pid as isize);
+                    return Ok(pid);
                 }
-                None => return Ok(-1),
+                None => return Err(SysError::ECHILD),
                 _ => {}
             }
         }
@@ -134,20 +134,20 @@ pub fn sys_kill(pid: usize) -> SysResult {
 
 /// Get the current process id
 pub fn sys_getpid() -> SysResult {
-    Ok(thread::current().id() as isize)
+    Ok(thread::current().id())
 }
 
 /// Get the current thread id
 pub fn sys_gettid() -> SysResult {
     // use pid as tid for now
-    Ok(thread::current().id() as isize)
+    Ok(thread::current().id())
 }
 
 /// Get the parent process id
 pub fn sys_getppid() -> SysResult {
     let pid = thread::current().id();
     let ppid = processor().manager().get_parent(pid);
-    Ok(ppid as isize)
+    Ok(ppid)
 }
 
 /// Exit the current process

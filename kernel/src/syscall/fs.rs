@@ -43,7 +43,7 @@ pub fn sys_pread(fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResu
 
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read_at(offset, slice)?;
-    Ok(len as isize)
+    Ok(len)
 }
 
 pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysResult {
@@ -53,19 +53,19 @@ pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysR
 
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = proc.get_file(fd)?.write_at(offset, slice)?;
-    Ok(len as isize)
+    Ok(len)
 }
 
 pub fn sys_read_file(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read(slice)?;
-    Ok(len as isize)
+    Ok(len)
 }
 
 pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = proc.get_file(fd)?.write(slice)?;
-    Ok(len as isize)
+    Ok(len)
 }
 
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
@@ -120,7 +120,7 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
         drop(proc);
 
         if events > 0 {
-            return Ok(events as isize);
+            return Ok(events);
         }
 
         let current_time_ms = crate::trap::uptime_msec();
@@ -244,7 +244,7 @@ pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, t
         drop(proc);
 
         if events > 0 {
-            return Ok(events as isize);
+            return Ok(events);
         }
 
         let current_time_ms = crate::trap::uptime_msec();
@@ -267,7 +267,7 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
     let len = file.read(buf.as_mut_slice())?;
     // copy data to user
     iovs.write_all_from_slice(&buf[..len]);
-    Ok(len as isize)
+    Ok(len)
 }
 
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
@@ -320,7 +320,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
 
     let file = FileHandle::new(inode, flags.to_options());
     proc.files.insert(fd, FileLike::File(file));
-    Ok(fd as isize)
+    Ok(fd)
 }
 
 pub fn sys_close(fd: usize) -> SysResult {
@@ -396,7 +396,7 @@ pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
     let mut proc = process();
     let file = proc.get_file(fd)?;
     let offset = file.seek(pos)?;
-    Ok(offset as isize)
+    Ok(offset as usize)
 }
 
 pub fn sys_fsync(fd: usize) -> SysResult {
@@ -444,7 +444,7 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
         let ok = writer.try_write(0, 0, &name);
         if !ok { break; }
     }
-    Ok(writer.written_size as isize)
+    Ok(writer.written_size)
 }
 
 pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
@@ -459,7 +459,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
         Some(FileLike::File(file)) => {
             let new_file = FileLike::File(file.clone());
             proc.files.insert(fd2, new_file);
-            Ok(fd2 as isize)
+            Ok(fd2)
         },
         Some(FileLike::Socket(wrapper)) => {
             let new_wrapper = wrapper.clone();

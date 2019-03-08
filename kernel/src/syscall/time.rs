@@ -105,5 +105,5 @@ pub fn sys_time(time: *mut u64) -> SysResult {
             time.write(sec as u64);
         }
     }
-    Ok(sec as isize)
+    Ok(sec as usize)
 }

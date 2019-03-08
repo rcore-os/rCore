@@ -33,7 +33,7 @@ pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: 
             return Err(SysError::EINVAL);
         }
         proc.memory_set.push(addr, addr + len, prot.to_attr(), Delay::new(GlobalFrameAlloc), "mmap");
-        return Ok(addr as isize);
+        return Ok(addr);
     }
     unimplemented!()
 }

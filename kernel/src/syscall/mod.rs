@@ -173,7 +173,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         218 => {
             warn!("sys_set_tid_address is unimplemented");
-            Ok(thread::current().id() as isize)
+            Ok(thread::current().id())
         }
         231 => {
             warn!("sys_exit_group is unimplemented");
@@ -198,12 +198,12 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     };
     debug!("{}:{} syscall id {} ret with {:x?}", pid, tid, id, ret);
     match ret {
-        Ok(code) => code,
+        Ok(code) => code as isize,
         Err(err) => -(err as isize),
     }
 }
 
-pub type SysResult = Result<isize, SysError>;
+pub type SysResult = Result<usize, SysError>;
 
 #[allow(dead_code)]
 #[repr(isize)]

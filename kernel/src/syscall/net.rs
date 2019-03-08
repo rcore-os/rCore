@@ -55,7 +55,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     }),
                 );
 
-                Ok(fd as isize)
+                Ok(fd)
             }
             SOCK_DGRAM => {
                 let fd = proc.get_free_inode();
@@ -75,7 +75,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     }),
                 );
 
-                Ok(fd as isize)
+                Ok(fd)
             }
             SOCK_RAW => {
                 let fd = proc.get_free_inode();
@@ -99,7 +99,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                         socket_type: SocketType::Raw,
                     }),
                 );
-                Ok(fd as isize)
+                Ok(fd)
             }
             _ => Err(SysError::EINVAL),
         },
@@ -229,7 +229,7 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
                         drop(sockets);
 
                         iface.poll();
-                        Ok(size as isize)
+                        Ok(size)
                     }
                     Err(err) => Err(SysError::ENOBUFS),
                 }
@@ -260,7 +260,7 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
                     drop(sockets);
 
                     iface.poll();
-                    return Ok(size as isize);
+                    return Ok(size);
                 }
             } else {
                 return Err(SysError::ENOTCONN);
@@ -284,7 +284,7 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
                     drop(sockets);
 
                     iface.poll();
-                    return Ok(size as isize);
+                    return Ok(size);
                 }
             } else {
                 return Err(SysError::ENOTCONN);
@@ -349,7 +349,7 @@ pub fn sys_sendto(
             drop(sockets);
             iface.poll();
 
-            Ok(len as isize)
+            Ok(len)
         } else {
             unimplemented!("ip type")
         }
@@ -376,7 +376,7 @@ pub fn sys_sendto(
         drop(sockets);
         iface.poll();
 
-        Ok(len as isize)
+        Ok(len)
     } else {
         unimplemented!("socket type")
     }
@@ -431,7 +431,7 @@ pub fn sys_recvfrom(
                     unsafe { sockaddr_in.write_to(addr, addr_len); }
                 }
 
-                return Ok(size as isize);
+                return Ok(size);
             }
 
             // avoid deadlock
@@ -451,7 +451,7 @@ pub fn sys_recvfrom(
                     unsafe { sockaddr_in.write_to(addr, addr_len); }
                 }
 
-                return Ok(size as isize);
+                return Ok(size);
             }
 
             // avoid deadlock
@@ -471,7 +471,7 @@ pub fn sys_recvfrom(
                     unsafe { sockaddr_in.write_to(addr, addr_len); }
                 }
 
-                return Ok(size as isize);
+                return Ok(size);
             }
 
             // avoid deadlock
@@ -622,7 +622,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
                     let sockaddr_in = SockaddrIn::from(remote_endpoint);
                     unsafe { sockaddr_in.write_to(addr, addr_len); }
                 }
-                return Ok(new_fd as isize);
+                return Ok(new_fd);
             }
 
             // avoid deadlock
@@ -749,7 +749,7 @@ pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) ->
         fd,
         FileLike::Socket(wrapper),
     );
-    Ok(fd as isize)
+    Ok(fd)
 }
 
 #[repr(C)]
