@@ -475,7 +475,6 @@ pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> 
 pub fn sys_bind(fd: usize, addr: *const SockaddrIn, len: usize) -> SysResult {
     info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, len);
     let mut proc = process();
-    proc.memory_set.check_array(addr, len)?;
 
     if len < size_of::<SockaddrIn>() {
         return Err(SysError::EINVAL);
@@ -509,6 +508,7 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
+        info!("socket {} listening on {:?}", fd, endpoint);
         match socket.listen(endpoint) {
             Ok(()) => Ok(0),
             Err(err) => {
@@ -554,7 +554,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
             return Err(SysError::EINVAL);
         }
 
-        proc.memory_set.check_mut_array(addr, max_addr_len)?;
+        proc.memory_set.check_mut_ptr(addr)?;
     }
 
     let wrapper = proc.get_socket_mut(fd)?;

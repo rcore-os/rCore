@@ -21,6 +21,7 @@ use self::proc::*;
 use self::time::*;
 use self::ctrl::*;
 use self::net::*;
+use self::misc::*;
 
 mod fs;
 mod mem;
@@ -28,6 +29,7 @@ mod proc;
 mod time;
 mod ctrl;
 mod net;
+mod misc;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
@@ -48,6 +50,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         009 => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
         010 => sys_mprotect(args[0], args[1], args[2]),
         011 => sys_munmap(args[0], args[1]),
+        017 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
         019 => sys_readv(args[0], args[1] as *const IoVec, args[2]),
         020 => sys_writev(args[0], args[1] as *const IoVec, args[2]),
         021 => sys_access(args[0] as *const u8, args[1]),
@@ -80,6 +83,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         060 => sys_exit(args[0] as isize),
         061 => sys_wait(args[0], args[1] as *mut i32), // TODO: wait4
         062 => sys_kill(args[0]),
+        063 => sys_uname(args[0] as *mut u8),
 //        072 => sys_fcntl(),
         074 => sys_fsync(args[0]),
         075 => sys_fdatasync(args[0]),
@@ -103,6 +107,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        169 => sys_reboot(),
         186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
+        204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
 //        293 => sys_pipe(),
 
@@ -171,12 +176,16 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_exit_group is unimplemented");
             sys_exit(args[0] as isize);
         }
+        302 => {
+            warn!("sys_prlimit64 is unimplemented");
+            Ok(0)
+        }
         _ => {
             error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
             crate::trap::error(tf);
         }
     };
-    debug!("{}:{} syscall id {} ret with {:?}", pid, tid, id, ret);
+    debug!("{}:{} syscall id {} ret with {:x?}", pid, tid, id, ret);
     match ret {
         Ok(code) => code,
         Err(err) => -(err as isize),

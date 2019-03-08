@@ -41,15 +41,18 @@ impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         unsafe {
-            self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86)
-                .unwrap().flush();
+            if let Ok(flush) = self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, &mut FrameAllocatorForX86) {
+                flush.flush();
+            }
         }
         unsafe { &mut *(get_entry_ptr(addr, 1)) }
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (_, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
-        flush.flush();
+        // unmap and flush if it is mapped
+        if let Ok((_, flush)) = self.0.unmap(Page::of_addr(addr)) {
+            flush.flush();
+        }
     }
 
     fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {

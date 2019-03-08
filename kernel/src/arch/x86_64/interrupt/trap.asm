@@ -28,6 +28,21 @@ __alltraps:
     or rdx, rax
     push rdx
 
+    # save fp registers
+    # align to 16 byte boundary
+    sub rsp, 512
+    mov rax, rsp
+    and rax, 0xFFFFFFFFFFFFFFF0
+    # fxsave (rax)
+    .byte 0x0f
+    .byte 0xae
+    .byte 0x00
+    mov rbx, rsp
+    sub rbx, rax
+    # push fp state offset
+    sub rsp, 16
+    push rbx
+
     mov rdi, rsp
     call rust_trap
 
@@ -36,6 +51,20 @@ trap_ret:
 
     mov rdi, rsp
     call set_return_rsp
+
+    # pop fp state offset
+    pop rbx
+    cmp rbx, 16 # only 0-15 are valid
+    jge skip_fxrstor
+    mov rax, rsp
+    add rax, 16
+    sub rax, rbx
+    # fxrstor (rax)
+    .byte 0x0f
+    .byte 0xae
+    .byte 0x08
+skip_fxrstor:
+    add rsp, 16+512
 
     # pop fs.base
     pop rax

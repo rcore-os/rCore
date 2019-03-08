@@ -36,6 +36,16 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
     }
 }
 
+pub fn sys_pread(fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResult {
+    info!("pread: fd: {}, base: {:?}, len: {}, offset: {}", fd, base, len, offset);
+    let mut proc = process();
+    proc.memory_set.check_mut_array(base, len)?;
+
+    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
+    let len = proc.get_file(fd)?.read_at(offset, slice)?;
+    Ok(len as isize)
+}
+
 pub fn sys_read_file(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read(slice)?;

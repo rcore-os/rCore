@@ -8,7 +8,7 @@ use crate::memory::GlobalFrameAlloc;
 
 use super::*;
 
-pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32, offset: usize) -> SysResult {
+pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: i32, offset: usize) -> SysResult {
     let prot = MmapProt::from_bits_truncate(prot);
     let flags = MmapFlags::from_bits_truncate(flags);
     info!("mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
@@ -20,7 +20,13 @@ pub fn sys_mmap(mut addr: usize, len: usize, prot: usize, flags: usize, fd: i32,
         // so just skip it
         addr = PAGE_SIZE;
     }
-    addr = proc.memory_set.find_free_area(addr, len);
+
+    if flags.contains(MmapFlags::FIXED) {
+        // we have to map it to addr, so remove the old mapping first
+        proc.memory_set.pop(addr, addr + len);
+    } else {
+        addr = proc.memory_set.find_free_area(addr, len);
+    }
 
     if flags.contains(MmapFlags::ANONYMOUS) {
         if flags.contains(MmapFlags::SHARED) {
@@ -79,6 +85,8 @@ bitflags! {
         const SHARED = 1 << 0;
         /// Changes are private.
         const PRIVATE = 1 << 1;
+        /// Place the mapping at the exact address
+        const FIXED = 1 << 4;
         /// The mapping is not backed by any file. (non-POSIX)
         const ANONYMOUS = 1 << 5;
     }

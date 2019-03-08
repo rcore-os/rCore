@@ -1,6 +1,31 @@
+use core::fmt;
+use core::default::Default;
+
+#[derive(Clone)]
+#[repr(C)]
+pub struct FpState([u8; 16+512]);
+
+impl fmt::Debug for FpState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "fpstate")
+    }
+}
+
+impl Default for FpState {
+    fn default() -> Self {
+        FpState([0u8; 16+512])
+    }
+}
+
+
 #[derive(Debug, Clone, Default)]
 #[repr(C)]
 pub struct TrapFrame {
+    // fpstate needs to be 16-byte aligned
+    // so we reserve some space here and save the offset
+    // the read fpstate begin from fpstate[offset]
+    pub fpstate_offset: usize,
+    pub fpstate: FpState,
     // Pushed by __alltraps at 'trap.asm'
     pub fsbase: usize,
 
@@ -46,6 +71,7 @@ impl TrapFrame {
         tf.ss = gdt::KDATA_SELECTOR.0 as usize;
         tf.rsp = rsp;
         tf.rflags = 0x282;
+        tf.fpstate_offset = 16; // skip restoring for first time
         tf
     }
     fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
@@ -56,6 +82,7 @@ impl TrapFrame {
         tf.ss = if is32 { gdt::UDATA32_SELECTOR.0 } else { gdt::UDATA_SELECTOR.0 } as usize;
         tf.rsp = rsp;
         tf.rflags = 0x282;
+        tf.fpstate_offset = 16; // skip restoring for first time
         tf
     }
     pub fn is_user(&self) -> bool {

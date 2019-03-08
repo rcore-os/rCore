@@ -65,3 +65,4 @@ impl StackWriter {
 pub const AT_PHDR: u8 = 3;
 pub const AT_PHENT: u8 = 4;
 pub const AT_PHNUM: u8 = 5;
+pub const AT_PAGESZ: u8 = 6;

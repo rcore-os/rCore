@@ -44,6 +44,14 @@ impl FileHandle {
         Ok(len)
     }
 
+    pub fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if !self.options.read {
+            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+        }
+        let len = self.inode.read_at(offset, buf)?;
+        Ok(len)
+    }
+
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if !self.options.write {
             return Err(FsError::InvalidParam);  // FIXME: => EBADF

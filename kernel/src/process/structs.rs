@@ -7,13 +7,13 @@ use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use smoltcp::socket::{SocketSet, SocketHandle};
 use smoltcp::wire::IpEndpoint;
+use rcore_memory::PAGE_SIZE;
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::fs::{FileHandle, OpenOptions};
 use crate::sync::Condvar;
 use crate::drivers::NET_DRIVERS;
-use crate::consts::{USER_TLS_OFFSET, USER_TMP_TLS_OFFSET};
 
 use super::abi::{self, ProcInitInfo};
 
@@ -151,6 +151,7 @@ impl Thread {
                 }
                 map.insert(abi::AT_PHENT, elf.header.pt2.ph_entry_size() as usize);
                 map.insert(abi::AT_PHNUM, elf.header.pt2.ph_count() as usize);
+                map.insert(abi::AT_PAGESZ, PAGE_SIZE);
                 map
             },
         };

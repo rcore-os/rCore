@@ -162,6 +162,7 @@ pub fn sys_exit(exit_code: isize) -> ! {
 }
 
 pub fn sys_sleep(time: usize) -> SysResult {
+    info!("sleep: time: {}", time);
     if time >= 1 << 31 {
         thread::park();
     } else {
