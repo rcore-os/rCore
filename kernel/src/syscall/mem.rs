@@ -45,18 +45,19 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
     let mut proc = process();
     let attr = prot.to_attr();
 
+    // FIXME: properly set the attribute of the area
+    //        now some mut ptr check is fault
     let memory_area = proc.memory_set.iter().find(|area| area.contains(addr));
-    if memory_area.is_some() {
-        proc.memory_set.edit(|pt| {
-            for page in Page::range_of(addr, addr + len) {
-                let entry = pt.get_entry(page.start_address()).expect("failed to get entry");
-                attr.apply(entry);
-            }
-        });
-        Ok(0)
-    } else {
-        Err(SysError::ENOMEM)
+    if memory_area.is_none() {
+        return Err(SysError::ENOMEM);
     }
+    proc.memory_set.edit(|pt| {
+        for page in Page::range_of(addr, addr + len) {
+            let entry = pt.get_entry(page.start_address()).expect("failed to get entry");
+            attr.apply(entry);
+        }
+    });
+    Ok(0)
 }
 
 pub fn sys_munmap(addr: usize, len: usize) -> SysResult {

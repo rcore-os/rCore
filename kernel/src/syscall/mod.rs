@@ -76,7 +76,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         052 => sys_getpeername(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
         054 => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
         055 => sys_getsockopt(args[0], args[1], args[2], args[3] as *mut u8, args[4] as *mut u32),
-//        056 => sys_clone(),
+        056 => sys_clone(args[0], args[1], args[2] as *mut usize, args[3] as *mut usize, tf),
         057 => sys_fork(tf),
         // use fork for vfork
         058 => sys_fork(tf),

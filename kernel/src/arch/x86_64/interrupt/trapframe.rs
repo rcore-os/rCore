@@ -105,7 +105,7 @@ struct ContextData {
 
 impl ContextData {
     fn new(cr3: usize) -> Self {
-        ContextData { rip: forkret as usize, cr3, ..ContextData::default() }
+        ContextData { rip: trap_ret as usize, cr3, ..ContextData::default() }
     }
 }
 
@@ -114,7 +114,6 @@ impl ContextData {
 #[repr(C)]
 struct InitStack {
     context: ContextData,
-    trapret: usize,
     tf: TrapFrame,
 }
 
@@ -128,11 +127,6 @@ impl InitStack {
 
 extern {
     fn trap_ret();
-}
-
-/// The entry point of new thread
-extern fn forkret() {
-    // Will return to `trapret`
 }
 
 #[derive(Debug)]
@@ -189,23 +183,23 @@ impl Context {
     pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
-            trapret: trap_ret as usize,
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top)
     }
     pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
-            trapret: trap_ret as usize,
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
         }.push_at(kstack_top)
     }
-    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
+    pub unsafe fn new_fork(tf: &TrapFrame, ustack_top: Option<usize>, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
             context: ContextData::new(cr3),
-            trapret: trap_ret as usize,
             tf: {
                 let mut tf = tf.clone();
+                if let Some(sp) = ustack_top {
+                    tf.rsp = sp;
+                }
                 tf.rax = 0;
                 // skip syscall inst;
                 tf.rip = tf.rip + 2;

@@ -30,7 +30,7 @@ pub extern fn shell(_arg: usize) -> ! {
         if cmd == "" {
             continue;
         }
-        let name = cmd.split(' ').next().unwrap();
+        let name = cmd.trim().split(' ').next().unwrap();
         if let Ok(file) = ROOT_INODE.lookup(name) {
             let data = file.read_as_vec().unwrap();
             let pid = processor().manager().add(Thread::new_user(data.as_slice(), cmd.split(' ')), thread::current().id());
