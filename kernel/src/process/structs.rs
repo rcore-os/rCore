@@ -21,6 +21,9 @@ use super::abi::{self, ProcInitInfo};
 pub struct Thread {
     pub context: Context,
     pub kstack: KernelStack,
+    /// Kernel performs futex wake when thread exits.
+    /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
+    pub clear_child_tid: usize,
     pub proc: Arc<Mutex<Process>>,
 }
 
@@ -57,6 +60,7 @@ pub struct Process {
     pub memory_set: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
+    futexes: BTreeMap<usize, Arc<Condvar>>,
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -74,10 +78,12 @@ impl Thread {
         Box::new(Thread {
             context: Context::null(),
             kstack: KernelStack::new(),
+            clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
                 memory_set: MemorySet::new(),
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
+                futexes: BTreeMap::default(),
             })),
         })
     }
@@ -89,10 +95,12 @@ impl Thread {
         Box::new(Thread {
             context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
             kstack,
+            clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
+                futexes: BTreeMap::default(),
             })),
         })
     }
@@ -174,10 +182,12 @@ impl Thread {
                     entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
             },
             kstack,
+            clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files,
                 cwd: String::from("/"),
+                futexes: BTreeMap::default(),
             })),
         })
     }
@@ -216,21 +226,24 @@ impl Thread {
         Box::new(Thread {
             context: unsafe { Context::new_fork(tf, kstack.top(), memory_set.token()) },
             kstack,
+            clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files,
                 cwd,
+                futexes: BTreeMap::default(),
             })),
         })
     }
 
     /// Create a new thread in the same process.
-    pub fn clone(&self, tf: &TrapFrame, stack_top: usize, tls: usize) -> Box<Thread> {
+    pub fn clone(&self, tf: &TrapFrame, stack_top: usize, tls: usize, clear_child_tid: usize) -> Box<Thread> {
         let kstack = KernelStack::new();
         let token = self.proc.lock().memory_set.token();
         Box::new(Thread {
             context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), token, tls) },
             kstack,
+            clear_child_tid,
             proc: self.proc.clone(),
         })
     }
@@ -239,6 +252,12 @@ impl Thread {
 impl Process {
     pub fn get_free_inode(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
+    pub fn get_futex(&mut self, uaddr: usize) -> Arc<Condvar> {
+        if !self.futexes.contains_key(&uaddr) {
+            self.futexes.insert(uaddr, Arc::new(Condvar::new()));
+        }
+        self.futexes.get(&uaddr).unwrap().clone()
     }
 }
 

@@ -45,6 +45,20 @@ impl Condvar {
             t.unpark();
         }
     }
+    /// Notify up to `n` waiters.
+    /// Return the number of waiters that were woken up.
+    pub fn notify_n(&self, mut n: usize) -> usize {
+        let mut count  = 0;
+        while count < n {
+            if let Some(t) = self.wait_queue.lock().pop_front() {
+                t.unpark();
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    }
     pub fn _clear(&self) {
         self.wait_queue.lock().clear();
     }

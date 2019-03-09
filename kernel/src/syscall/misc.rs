@@ -1,5 +1,22 @@
 use super::*;
 use core::mem::size_of;
+use core::sync::atomic::{AtomicI32, Ordering};
+use alloc::collections::btree_map::BTreeMap;
+use crate::sync::Condvar;
+use crate::sync::SpinNoIrqLock as Mutex;
+
+pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
+    const ARCH_SET_FS: i32 = 0x1002;
+    match code {
+        #[cfg(target_arch = "x86_64")]
+        ARCH_SET_FS => {
+            info!("sys_arch_prctl: set FS to {:#x}", addr);
+            tf.fsbase = addr;
+            Ok(0)
+        }
+        _ => Err(SysError::EINVAL),
+    }
+}
 
 pub fn sys_uname(buf: *mut u8) -> SysResult {
     info!("sched_uname: buf: {:?}", buf);
@@ -44,6 +61,52 @@ pub fn sys_sysinfo(sys_info: *mut SysInfo) -> SysResult {
         *sys_info = sysinfo
     };
     Ok(0)
+}
+
+pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> SysResult {
+    info!("futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
+          thread::current().id(), uaddr, op, val, timeout);
+//    if op & OP_PRIVATE == 0 {
+//        unimplemented!("futex only support process-private");
+//        return Err(SysError::ENOSYS);
+//    }
+    if uaddr % size_of::<u32>() != 0 {
+        return Err(SysError::EINVAL);
+    }
+    // FIXME: check uaddr, see sys_mprotect
+//    process().memory_set.check_mut_ptr(uaddr)?;
+    let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
+    let timeout = if timeout.is_null() {
+        None
+    } else {
+        process().memory_set.check_ptr(timeout)?;
+        Some(unsafe { *timeout })
+    };
+
+    const OP_WAIT: u32 = 0;
+    const OP_WAKE: u32 = 1;
+    const OP_PRIVATE: u32 = 128;
+
+    let queue = process().get_futex(uaddr);
+
+    match op & 0xf {
+        OP_WAIT => {
+            if atomic.load(Ordering::Acquire) != val {
+                return Err(SysError::EAGAIN);
+            }
+            // FIXME: support timeout
+            queue._wait();
+            Ok(0)
+        }
+        OP_WAKE => {
+            let woken_up_count = queue.notify_n(val as usize);
+            Ok(woken_up_count)
+        }
+        _ => {
+            warn!("unsupported futex operation: {}", op);
+            Err(SysError::ENOSYS)
+        },
+    }
 }
 
 #[repr(C)]

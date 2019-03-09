@@ -14,7 +14,7 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 /// The new thread's stack pointer will be set to `newsp`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
-pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut usize, child_tid: *mut usize, newtls: usize, tf: &TrapFrame) -> SysResult {
+pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *mut u32, newtls: usize, tf: &TrapFrame) -> SysResult {
     info!("clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
         flags, newsp, parent_tid, child_tid, newtls);
     if flags != 0x7d0f00 {
@@ -27,14 +27,13 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut usize, child_tid: 
 //        proc.memory_set.check_mut_ptr(parent_tid)?;
 //        proc.memory_set.check_mut_ptr(child_tid)?;
     }
-    // FIXME: tf.rip => tf.ip() for all arch
-    let new_thread = current_thread().clone(tf, newsp, newtls);
+    let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
     let tid = processor().manager().add(new_thread, thread::current().id());
     info!("clone: {} -> {}", thread::current().id(), tid);
     unsafe {
-        parent_tid.write(tid);
-        child_tid.write(tid);
+        parent_tid.write(tid as u32);
+        child_tid.write(tid as u32);
     }
     Ok(tid)
 }
@@ -183,6 +182,17 @@ pub fn sys_getppid() -> SysResult {
 pub fn sys_exit(exit_code: isize) -> ! {
     let pid = thread::current().id();
     info!("exit: {}, code: {}", pid, exit_code);
+
+    // perform futex wake 1
+    // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
+    // FIXME: do it in all possible ways a thread can exit
+    //        it has memory access so we can't move it to Thread::drop?
+    let clear_child_tid = current_thread().clear_child_tid;
+    if clear_child_tid != 0 {
+        unsafe { (clear_child_tid as *mut u32).write(0); }
+        let queue = process().get_futex(clear_child_tid);
+        queue.notify_one();
+    }
 
     processor().manager().exit(pid, exit_code as usize);
     processor().yield_now();

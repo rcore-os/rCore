@@ -19,7 +19,6 @@ use self::fs::*;
 use self::mem::*;
 use self::proc::*;
 use self::time::*;
-use self::ctrl::*;
 use self::net::*;
 use self::misc::*;
 
@@ -27,7 +26,6 @@ mod fs;
 mod mem;
 mod proc;
 mod time;
-mod ctrl;
 mod net;
 mod misc;
 
@@ -76,7 +74,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         052 => sys_getpeername(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
         054 => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
         055 => sys_getsockopt(args[0], args[1], args[2], args[3] as *mut u8, args[4] as *mut u32),
-        056 => sys_clone(args[0], args[1], args[2] as *mut usize, args[3] as *mut usize, args[4], tf),
+        056 => sys_clone(args[0], args[1], args[2] as *mut u32, args[3] as *mut u32, args[4], tf),
         057 => sys_fork(tf),
         // use fork for vfork
         058 => sys_fork(tf),
@@ -109,6 +107,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 //        169 => sys_reboot(),
         186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
+        202 => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
         204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
         228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
