@@ -30,8 +30,7 @@ impl PageTable for ActivePageTable {
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         // get p1 entry
-        let entry_addr = ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39)
-            | (vaddr & 0xffff_0000_0000_0000);
+        let entry_addr = ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39) | (vaddr & KERNEL_OFFSET);
         Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
     }
 }

@@ -1,4 +1,4 @@
-use crate::IO_BASE;
+use crate::consts::IO_BASE;
 use crate::gpio::{Function, Gpio};
 use volatile::{ReadOnly, Volatile};
 

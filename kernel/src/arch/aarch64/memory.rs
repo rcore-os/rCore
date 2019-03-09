@@ -4,7 +4,6 @@ use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use crate::consts::{MEMORY_OFFSET, KERNEL_OFFSET};
 use super::paging::MMIOType;
 use aarch64::regs::*;
-use atags::atags::Atags;
 use log::*;
 use rcore_memory::PAGE_SIZE;
 
@@ -20,7 +19,8 @@ fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
 
-    let (start, end) = memory_map().expect("failed to find memory map");
+    let end = super::board::probe_memory().expect("failed to find memory map").1;
+    let start = (_end as u64 + PAGE_SIZE as u64).wrapping_sub(KERNEL_OFFSET as u64) as usize;
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(start, end));
     info!("FrameAllocator init end");
@@ -70,23 +70,6 @@ pub fn ioremap(paddr: usize, len: usize, name: &'static str) -> usize {
         return vaddr;
     }
     0
-}
-
-/// Returns the (start address, end address) of the available memory on this
-/// system if it can be determined. If it cannot, `None` is returned.
-///
-/// This function is expected to return `Some` under all normal cirumstances.
-fn memory_map() -> Option<(usize, usize)> {
-    let binary_end = (_end as u64).wrapping_sub(KERNEL_OFFSET as u64);
-
-    let mut atags: Atags = Atags::get();
-    while let Some(atag) = atags.next() {
-        if let Some(mem) = atag.mem() {
-            return Some((binary_end as usize, (mem.start + mem.size) as usize));
-        }
-    }
-
-    None
 }
 
 extern "C" {

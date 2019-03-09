@@ -2,15 +2,13 @@ use aarch64::addr::{VirtAddr, PhysAddr};
 use aarch64::paging::{memory_attribute::*, Page, PageTable, PageTableFlags as EF, PhysFrame};
 use aarch64::paging::{Size4KiB, Size2MiB, Size1GiB};
 use aarch64::{asm::*, barrier, regs::*};
+use bcm2837::consts::RAW_IO_BASE;
 use core::ptr;
 use fixedvec::FixedVec;
 use xmas_elf::program::{ProgramHeader64, Type};
 
 const PAGE_SIZE: usize = 4096;
 const ALIGN_2MB: u64 = 0x200000;
-
-const IO_REMAP_BASE: u64 = 0x3F00_0000;
-const MEMORY_END: u64 = 0x4000_0000;
 
 const RECURSIVE_INDEX: usize = 0o777;
 const KERNEL_OFFSET: u64 = 0xFFFF_0000_0000_0000;
@@ -41,13 +39,13 @@ fn setup_temp_page_table(start_vaddr: VirtAddr, end_vaddr: VirtAddr, offset: u64
         p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
     }
     // device memory
-    for page in Page::<Size2MiB>::range_of(IO_REMAP_BASE, MEMORY_END) {
+    for page in Page::<Size2MiB>::range_of(RAW_IO_BASE as u64, 0x4000_0000) {
         let paddr = PhysAddr::new(page.start_address().as_u64());
         p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
     }
 
     p3[0].set_frame(frame_lvl2, EF::default(), MairNormal::attr_value());
-    p3[1].set_block::<Size1GiB>(PhysAddr::new(MEMORY_END), block_flags | EF::PXN, MairDevice::attr_value());
+    p3[1].set_block::<Size1GiB>(PhysAddr::new(0x4000_0000), block_flags | EF::PXN, MairDevice::attr_value());
 
     p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
     p4[RECURSIVE_INDEX].set_frame(frame_lvl4, EF::default(), MairNormal::attr_value());

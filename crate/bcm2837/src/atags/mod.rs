@@ -1,8 +1,12 @@
-pub use atag::*;
-use raw;
+mod atag;
+mod raw;
+
+use super::consts::KERNEL_OFFSET;
+pub use self::atag::*;
+pub use self::raw::{Cmd, Core, Mem};
 
 /// The address at which the firmware loads the ATAGS.
-const ATAG_BASE: usize = 0x100;
+const ATAG_BASE: usize = KERNEL_OFFSET + 0x100;
 
 /// An iterator over the ATAGS on this system.
 pub struct Atags {
@@ -13,7 +17,7 @@ impl Atags {
     /// Returns an instance of `Atags`, an iterator over ATAGS on this system.
     pub fn get() -> Atags {
         Atags {
-            ptr: unsafe { &*(ATAG_BASE as *const raw::Atag) }
+            ptr: unsafe { &*(ATAG_BASE as *const raw::Atag) },
         }
     }
 }
@@ -30,7 +34,7 @@ impl Iterator for Atags {
                 let result = Some(Atag::from(cur));
                 self.ptr = next;
                 result
-            },
+            }
             None => None,
         }
     }

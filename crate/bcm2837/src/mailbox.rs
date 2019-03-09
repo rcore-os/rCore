@@ -1,4 +1,4 @@
-use crate::IO_BASE;
+use crate::consts::IO_BASE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
 /// The base address for the `MU` registers.

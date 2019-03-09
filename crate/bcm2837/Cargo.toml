@@ -5,6 +5,7 @@ authors = ["equation314 <equation618@gmail.com>"]
 edition = "2018"
 
 [features]
+zero_kernel_offset = []
 use_generic_timer = ["aarch64"]
 
 [dependencies]

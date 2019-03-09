@@ -1,6 +1,6 @@
 use super::BasicTimer;
+use crate::consts::IO_BASE;
 use crate::interrupt::{Controller, Interrupt};
-use crate::IO_BASE;
 use volatile::{ReadOnly, Volatile};
 
 /// The base address for the ARM system timer registers.

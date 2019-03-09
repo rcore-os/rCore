@@ -31,10 +31,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atags"
-version = "0.1.0"
-
-[[package]]
 name = "bare-metal"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -251,7 +247,6 @@ version = "0.1.0"
 dependencies = [
  "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
  "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
- "atags 0.1.0",
  "bbl 0.1.0",
  "bcm2837 0.1.0",
  "bit-allocator 0.1.0",
