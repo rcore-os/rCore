@@ -199,14 +199,11 @@ pub fn sys_exit(exit_code: isize) -> ! {
     unreachable!();
 }
 
-pub fn sys_sleep(time: usize) -> SysResult {
-    info!("sleep: time: {}", time);
-    if time >= 1 << 31 {
-        thread::park();
-    } else {
-        use core::time::Duration;
-        thread::sleep(Duration::from_millis(time as u64 * 10));
-    }
+pub fn sys_nanosleep(req: *const TimeSpec) -> SysResult {
+    process().memory_set.check_ptr(req)?;
+    let time = unsafe { req.read() };
+    info!("nanosleep: time: {:#?}", time);
+    thread::sleep(time.to_duration());
     Ok(0)
 }
 

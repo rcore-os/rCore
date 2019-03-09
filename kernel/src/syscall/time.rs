@@ -4,6 +4,7 @@ use super::*;
 use crate::arch::consts::USEC_PER_TICK;
 use crate::arch::driver::rtc_cmos;
 use lazy_static::lazy_static;
+use core::time::Duration;
 
 lazy_static! {
     pub static ref EPOCH_BASE: u64 = unsafe { rtc_cmos::read_epoch() };
@@ -11,7 +12,7 @@ lazy_static! {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct TimeVal {
     sec: u64,
     usec: u64,
@@ -28,19 +29,15 @@ impl TimeVal {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct TimeSpec {
     sec: u64,
     nsec: u64,
 }
 
 impl TimeSpec {
-    pub fn to_msec(&self) -> u64 {
-        self.sec * 1000 + self.nsec / 1000_000
-    }
-
-    pub fn to_usec(&self) -> u64 {
-        self.sec * 1000_000 + self.nsec / 1000
+    pub fn to_duration(&self) -> Duration {
+        Duration::new(self.sec, self.nsec as u32)
     }
 }
 
