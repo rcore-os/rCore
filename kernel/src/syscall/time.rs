@@ -3,8 +3,8 @@
 use super::*;
 use crate::arch::consts::USEC_PER_TICK;
 use crate::arch::driver::rtc_cmos;
-use lazy_static::lazy_static;
 use core::time::Duration;
+use lazy_static::lazy_static;
 
 lazy_static! {
     pub static ref EPOCH_BASE: u64 = unsafe { rtc_cmos::read_epoch() };

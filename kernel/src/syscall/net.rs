@@ -371,9 +371,7 @@ pub fn sys_sendto(
 
         let slice = unsafe { slice::from_raw_parts(buffer, len) };
 
-        socket
-            .send_slice(&slice, endpoint)
-            .unwrap();
+        socket.send_slice(&slice, endpoint).unwrap();
 
         // avoid deadlock
         drop(socket);
@@ -433,7 +431,9 @@ pub fn sys_recvfrom(
                         addr: IpAddress::Ipv4(packet.src_addr()),
                         port: 0,
                     });
-                    unsafe { sockaddr_in.write_to(addr, addr_len); }
+                    unsafe {
+                        sockaddr_in.write_to(addr, addr_len);
+                    }
                 }
 
                 return Ok(size);
@@ -453,7 +453,9 @@ pub fn sys_recvfrom(
             if let Ok((size, endpoint)) = socket.recv_slice(&mut slice) {
                 if !addr.is_null() {
                     let sockaddr_in = SockaddrIn::from(endpoint);
-                    unsafe { sockaddr_in.write_to(addr, addr_len); }
+                    unsafe {
+                        sockaddr_in.write_to(addr, addr_len);
+                    }
                 }
 
                 return Ok(size);
@@ -473,7 +475,9 @@ pub fn sys_recvfrom(
             if let Ok(size) = socket.recv_slice(&mut slice) {
                 if !addr.is_null() {
                     let sockaddr_in = SockaddrIn::from(socket.remote_endpoint());
-                    unsafe { sockaddr_in.write_to(addr, addr_len); }
+                    unsafe {
+                        sockaddr_in.write_to(addr, addr_len);
+                    }
                 }
 
                 return Ok(size);
@@ -497,7 +501,7 @@ impl Clone for SocketWrapper {
 
         SocketWrapper {
             handle: self.handle.clone(),
-            socket_type: self.socket_type.clone()
+            socket_type: self.socket_type.clone(),
         }
     }
 }
@@ -534,7 +538,7 @@ pub fn sys_bind(fd: usize, addr: *const SockaddrIn, len: usize) -> SysResult {
     if let SocketType::Tcp(_) = wrapper.socket_type {
         wrapper.socket_type = SocketType::Tcp(TcpSocketState {
             local_endpoint: Some(endpoint),
-            is_listening: false
+            is_listening: false,
         });
         Ok(0)
     } else {
@@ -564,10 +568,8 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
                     Ok(()) => {
                         tcp_state.is_listening = true;
                         Ok(0)
-                    },
-                    Err(err) => {
-                        Err(SysError::EINVAL)
-                    },
+                    }
+                    Err(err) => Err(SysError::EINVAL),
                 }
             } else {
                 Ok(0)
@@ -639,6 +641,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
                     tcp_socket.listen(endpoint).unwrap();
 
                     let tcp_handle = sockets.add(tcp_socket);
+
                     let mut orig_socket = proc
                         .files
                         .insert(
@@ -650,21 +653,22 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
                         )
                         .unwrap();
 
-                    if let FileLike::Socket(wrapper) = orig_socket {
-                        proc.files.insert(new_fd, FileLike::Socket(SocketWrapper {
-                            handle: wrapper.handle,
-                            socket_type: SocketType::Tcp(TcpSocketState {
-                                local_endpoint: Some(endpoint),
-                                is_listening: false,
-                            })
-                        }));
+                    if let FileLike::Socket(ref mut wrapper) = orig_socket {
+                        if let SocketType::Tcp(ref mut state) = wrapper.socket_type {
+                            state.is_listening = false;
+                        } else {
+                            panic!("impossible");
+                        }
                     } else {
                         panic!("impossible");
                     }
+                    proc.files.insert(new_fd, orig_socket);
 
                     if !addr.is_null() {
                         let sockaddr_in = SockaddrIn::from(remote_endpoint);
-                        unsafe { sockaddr_in.write_to(addr, addr_len); }
+                        unsafe {
+                            sockaddr_in.write_to(addr, addr_len);
+                        }
                     }
                     return Ok(new_fd);
                 }
@@ -672,6 +676,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
                 // avoid deadlock
                 drop(socket);
                 drop(sockets);
+                drop(iface);
                 SOCKET_ACTIVITY._wait()
             }
         } else {
@@ -711,7 +716,9 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     if let SocketType::Tcp(state) = &wrapper.socket_type {
         if let Some(endpoint) = state.local_endpoint {
             let sockaddr_in = SockaddrIn::from(endpoint);
-            unsafe { sockaddr_in.write_to(addr, addr_len); }
+            unsafe {
+                sockaddr_in.write_to(addr, addr_len);
+            }
             Ok(0)
         } else {
             Err(SysError::EINVAL)
@@ -753,7 +760,9 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
         if socket.is_open() {
             let remote_endpoint = socket.remote_endpoint();
             let sockaddr_in = SockaddrIn::from(remote_endpoint);
-            unsafe { sockaddr_in.write_to(addr, addr_len); }
+            unsafe {
+                sockaddr_in.write_to(addr, addr_len);
+            }
             Ok(0)
         } else {
             Err(SysError::EINVAL)
@@ -775,7 +784,7 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         if state.is_listening && socket.is_active() {
-            // a new connection 
+            // a new connection
             input = true;
         } else if !socket.is_open() {
             err = true;
@@ -799,10 +808,7 @@ pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) ->
     let iface = &*(NET_DRIVERS.read()[0]);
     let mut sockets = iface.sockets();
     sockets.retain(wrapper.handle);
-    proc.files.insert(
-        fd,
-        FileLike::Socket(wrapper),
-    );
+    proc.files.insert(fd, FileLike::Socket(wrapper));
     Ok(fd)
 }
 
@@ -817,15 +823,13 @@ pub struct SockaddrIn {
 impl From<IpEndpoint> for SockaddrIn {
     fn from(endpoint: IpEndpoint) -> Self {
         match endpoint.addr {
-            IpAddress::Ipv4(ipv4) => {
-                SockaddrIn {
-                    sin_family: AF_INET as u16,
-                    sin_port: u16::to_be(endpoint.port),
-                    sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
-                    sin_zero: [0; 8],
-                }
-            }
-            _ => unimplemented!("ipv6")
+            IpAddress::Ipv4(ipv4) => SockaddrIn {
+                sin_family: AF_INET as u16,
+                sin_port: u16::to_be(endpoint.port),
+                sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
+                sin_zero: [0; 8],
+            },
+            _ => unimplemented!("ipv6"),
         }
     }
 }
@@ -836,11 +840,13 @@ impl SockaddrIn {
         if self.sin_family == AF_INET as u16 {
             let port = u16::from_be(self.sin_port);
             let addr = IpAddress::from(Ipv4Address::from_bytes(
-                &u32::from_be(self.sin_addr).to_be_bytes()[..]
+                &u32::from_be(self.sin_addr).to_be_bytes()[..],
             ));
             Ok((addr, port).into())
         } else if self.sin_family == AF_UNIX as u16 {
-            debug!("unix socket path {}", unsafe {util::from_cstr((self as *const SockaddrIn as *const u8).add(2)) });
+            debug!("unix socket path {}", unsafe {
+                util::from_cstr((self as *const SockaddrIn as *const u8).add(2))
+            });
             Err(SysError::EINVAL)
         } else {
             Err(SysError::EINVAL)
