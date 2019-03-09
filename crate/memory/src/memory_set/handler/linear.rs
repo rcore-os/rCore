@@ -21,7 +21,7 @@ impl MemoryHandler for Linear {
         pt.unmap(addr);
     }
 
-    fn page_fault_handler(&self, _pt: &mut PageTable, _addr: VirtAddr) -> bool {
+    fn handle_page_fault(&self, _pt: &mut PageTable, _addr: VirtAddr) -> bool {
         false
     }
 }

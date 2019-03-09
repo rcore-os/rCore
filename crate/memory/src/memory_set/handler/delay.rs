@@ -34,7 +34,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         pt.unmap(addr);
     }
 
-    fn page_fault_handler(&self, pt: &mut PageTable, addr: VirtAddr) -> bool {
+    fn handle_page_fault(&self, pt: &mut PageTable, addr: VirtAddr) -> bool {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
             // not a delay case

@@ -11,7 +11,8 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 }
 
 /// Create a new thread in the current process.
-/// The new thread's stack pointer will be set to `newsp`.
+/// The new thread's stack pointer will be set to `newsp`,
+///   and thread pointer will be set to `newtls`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
 pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *mut u32, newtls: usize, tf: &TrapFrame) -> SysResult {
@@ -22,10 +23,9 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *m
         return Err(SysError::ENOSYS);
     }
     {
-        // FIXME: see sys_mprotect
-//        let proc = process();
-//        proc.memory_set.check_mut_ptr(parent_tid)?;
-//        proc.memory_set.check_mut_ptr(child_tid)?;
+        let proc = process();
+        proc.memory_set.check_mut_ptr(parent_tid)?;
+        proc.memory_set.check_mut_ptr(child_tid)?;
     }
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid

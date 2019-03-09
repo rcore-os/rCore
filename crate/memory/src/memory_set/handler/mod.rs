@@ -20,7 +20,7 @@ pub trait MemoryHandler: Debug + 'static {
 
     /// Handle page fault on `addr`
     /// Return true if success, false if error
-    fn page_fault_handler(&self, pt: &mut PageTable, addr: VirtAddr) -> bool;
+    fn handle_page_fault(&self, pt: &mut PageTable, addr: VirtAddr) -> bool;
 }
 
 impl Clone for Box<MemoryHandler> {

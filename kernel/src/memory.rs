@@ -101,9 +101,9 @@ impl Drop for KernelStack {
 /// Handle page fault at `addr`.
 /// Return true to continue, false to halt.
 #[cfg(not(feature = "no_mmu"))]
-pub fn page_fault_handler(addr: usize) -> bool {
-    info!("start handling swap in/out page fault, badva={:x}", addr);
-    process().memory_set.page_fault_handler(addr)
+pub fn handle_page_fault(addr: usize) -> bool {
+    debug!("page fault @ {:#x}", addr);
+    process().memory_set.handle_page_fault(addr)
 }
 
 pub fn init_heap() {
@@ -127,6 +127,6 @@ impl rcore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
 }
 
 #[cfg(feature = "no_mmu")]
-pub fn page_fault_handler(_addr: usize) -> bool {
+pub fn handle_page_fault(_addr: usize) -> bool {
     unreachable!()
 }

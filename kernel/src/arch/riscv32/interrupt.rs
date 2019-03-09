@@ -194,7 +194,7 @@ fn page_fault(tf: &mut TrapFrame) {
     let addr = tf.stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    if !crate::memory::page_fault_handler(addr) {
+    if !crate::memory::handle_page_fault(addr) {
         crate::trap::error(tf);
     }
 }

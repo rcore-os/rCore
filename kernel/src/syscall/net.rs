@@ -40,7 +40,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
     match domain {
         AF_INET | AF_UNIX => match socket_type & SOCK_TYPE_MASK {
             SOCK_STREAM => {
-                let fd = proc.get_free_inode();
+                let fd = proc.get_free_fd();
 
                 let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
                 let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
@@ -58,7 +58,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                 Ok(fd)
             }
             SOCK_DGRAM => {
-                let fd = proc.get_free_inode();
+                let fd = proc.get_free_fd();
 
                 let udp_rx_buffer =
                     UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
@@ -78,7 +78,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                 Ok(fd)
             }
             SOCK_RAW => {
-                let fd = proc.get_free_inode();
+                let fd = proc.get_free_fd();
 
                 let raw_rx_buffer =
                     RawSocketBuffer::new(vec![RawPacketMetadata::EMPTY; 2], vec![0; 2048]);
@@ -599,7 +599,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
 
                 // move the current one to new_fd
                 // create a new one in fd
-                let new_fd = proc.get_free_inode();
+                let new_fd = proc.get_free_fd();
 
                 let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
                 let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);

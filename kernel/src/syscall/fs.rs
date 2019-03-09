@@ -316,7 +316,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
         }
     };
 
-    let fd = proc.get_free_inode();
+    let fd = proc.get_free_fd();
 
     let file = FileHandle::new(inode, flags.to_options());
     proc.files.insert(fd, FileLike::File(file));
@@ -545,12 +545,12 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     let mut proc = process();
     proc.memory_set.check_mut_array(fds, 2)?;
     let (read, write) = Pipe::create_pair();
-    let read_fd = proc.get_free_inode();
+    let read_fd = proc.get_free_fd();
 
-    let read_fd = proc.get_free_inode();
+    let read_fd = proc.get_free_fd();
     proc.files.insert(read_fd, FileLike::File(FileHandle::new(Arc::new(read), OpenOptions { read: true, write: false, append: false })));
 
-    let write_fd = proc.get_free_inode();
+    let write_fd = proc.get_free_fd();
     proc.files.insert(write_fd, FileLike::File(FileHandle::new(Arc::new(write), OpenOptions { read: false, write: true, append: false })));
 
     Ok(0)

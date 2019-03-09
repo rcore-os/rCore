@@ -97,7 +97,8 @@ impl MmapProt {
     fn to_attr(self) -> MemoryAttr {
         let mut attr = MemoryAttr::default().user();
         if self.contains(MmapProt::EXEC) { attr = attr.execute(); }
-        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
+        // FIXME: see sys_mprotect
+//        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
         attr
     }
 }

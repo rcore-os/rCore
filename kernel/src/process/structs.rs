@@ -194,12 +194,11 @@ impl Thread {
 
     /// Fork a new process from current one
     pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
-        info!("COME into fork!");
         // Clone memory set, make a new page table
         let memory_set = self.proc.lock().memory_set.clone();
         let files = self.proc.lock().files.clone();
         let cwd = self.proc.lock().cwd.clone();
-        info!("finish mmset clone in fork!");
+        debug!("fork: finish clone MemorySet");
 
         // MMU:   copy data to the new space
         // NoMMU: coping data has been done in `memory_set.clone()`
@@ -211,7 +210,7 @@ impl Thread {
             }) }
         }
 
-        info!("temporary copy data!");
+        debug!("fork: temporary copy data!");
         let kstack = KernelStack::new();
 
         let iface = &*(NET_DRIVERS.read()[0]);
@@ -250,7 +249,7 @@ impl Thread {
 }
 
 impl Process {
-    pub fn get_free_inode(&self) -> usize {
+    pub fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
     }
     pub fn get_futex(&mut self, uaddr: usize) -> Arc<Condvar> {
@@ -265,7 +264,7 @@ impl Process {
 /// Generate a MemorySet according to the ELF file.
 /// Also return the real entry point address.
 fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
-    debug!("come in to memory_set_from");
+    debug!("creating MemorySet from ELF");
     let mut ms = MemorySet::new();
     let mut entry = elf.header.pt2.entry_point() as usize;
 
@@ -300,7 +299,7 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
         #[cfg(feature = "no_mmu")]
         let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];
         #[cfg(feature = "no_mmu")]
-        info!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
+        debug!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
         #[cfg(not(feature = "no_mmu"))]
         let target = {
             ms.push(virt_addr, virt_addr + mem_size, ph.flags().to_attr(), ByFrame::new(GlobalFrameAlloc), "");

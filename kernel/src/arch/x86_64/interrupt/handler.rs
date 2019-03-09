@@ -67,6 +67,7 @@
 use super::consts::*;
 use super::TrapFrame;
 use log::*;
+use bitflags::*;
 use crate::drivers::DRIVERS;
 
 global_asm!(include_str!("trap.asm"));
@@ -124,10 +125,21 @@ fn page_fault(tf: &mut TrapFrame) {
     let addr: usize;
     unsafe { asm!("mov %cr2, $0" : "=r" (addr)); }
 
-    if crate::memory::page_fault_handler(addr) {
+    bitflags! {
+        struct PageError: u8 {
+            const PRESENT = 1 << 0;
+            const WRITE = 1 << 1;
+            const USER = 1 << 2;
+            const RESERVED_WRITE = 1 << 3;
+            const INST = 1 << 4;
+        }
+    }
+    let code = PageError::from_bits(tf.error_code as u8).unwrap();
+
+    if crate::memory::handle_page_fault(addr) {
         return;
     }
-    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:#x}", addr, tf.error_code);
+    error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:?}", addr, code);
     error(tf);
 }
 

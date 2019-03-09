@@ -375,10 +375,10 @@ impl<T: InactivePageTable> MemorySet<T> {
         &mut self.page_table
     }
 
-    pub fn page_fault_handler(&mut self, addr: VirtAddr) -> bool {
+    pub fn handle_page_fault(&mut self, addr: VirtAddr) -> bool {
         let area = self.areas.iter().find(|area| area.contains(addr));
         match area {
-            Some(area) => self.page_table.edit(|pt| area.handler.page_fault_handler(pt, addr)),
+            Some(area) => self.page_table.edit(|pt| area.handler.handle_page_fault(pt, addr)),
             None => false,
         }
     }

@@ -73,8 +73,7 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
     if uaddr % size_of::<u32>() != 0 {
         return Err(SysError::EINVAL);
     }
-    // FIXME: check uaddr, see sys_mprotect
-//    process().memory_set.check_mut_ptr(uaddr)?;
+    process().memory_set.check_mut_ptr(uaddr as *mut AtomicI32)?;
     let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
     let timeout = if timeout.is_null() {
         None
