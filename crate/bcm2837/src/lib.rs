@@ -9,4 +9,4 @@ pub mod mailbox;
 pub mod mini_uart;
 pub mod interrupt;
 
-pub const IO_BASE: usize = 0x3F000000;
+pub const IO_BASE: usize = 0xFFFF_0000_3F00_0000;

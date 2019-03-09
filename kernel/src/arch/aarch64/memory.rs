@@ -1,6 +1,7 @@
 //! Memory initialization for aarch64.
 
 use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::consts::{MEMORY_OFFSET, KERNEL_OFFSET};
 use super::paging::MMIOType;
 use aarch64::regs::*;
 use atags::atags::Atags;
@@ -16,7 +17,6 @@ pub fn init() {
 }
 
 fn init_frame_allocator() {
-    use crate::consts::MEMORY_OFFSET;
     use bit_allocator::BitAlloc;
     use core::ops::Range;
 
@@ -45,15 +45,16 @@ static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 
 /// remap kernel page table after all initialization.
 fn remap_the_kernel() {
+    let offset = -(KERNEL_OFFSET as isize);
     let mut ms = MemorySet::new_bare();
-    ms.push(0, bootstacktop as usize, Linear::new(0, MemoryAttr::default()), "kstack");
-    ms.push(stext as usize, etext as usize, Linear::new(0, MemoryAttr::default().execute().readonly()), "text");
-    ms.push(sdata as usize, edata as usize, Linear::new(0, MemoryAttr::default()), "data");
-    ms.push(srodata as usize, erodata as usize, Linear::new(0, MemoryAttr::default().readonly()), "rodata");
-    ms.push(sbss as usize, ebss as usize, Linear::new(0, MemoryAttr::default()), "bss");
+    ms.push(KERNEL_OFFSET, bootstacktop as usize, Linear::new(offset, MemoryAttr::default()), "kstack");
+    ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
+    ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");
+    ms.push(srodata as usize, erodata as usize, Linear::new(offset, MemoryAttr::default().readonly()), "rodata");
+    ms.push(sbss as usize, ebss as usize, Linear::new(offset, MemoryAttr::default()), "bss");
 
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
-    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(0, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
+    ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(offset, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
 
     info!("{:#x?}", ms);
     unsafe { ms.get_page_table_mut().activate_as_kernel() }
@@ -61,10 +62,12 @@ fn remap_the_kernel() {
     info!("kernel remap end");
 }
 
-pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
+pub fn ioremap(paddr: usize, len: usize, name: &'static str) -> usize {
+    let offset = -(KERNEL_OFFSET as isize);
+    let vaddr = paddr.wrapping_add(KERNEL_OFFSET);
     if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
-        ms.push(start, start + len, Linear::new(0, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8)), name);
-        return start;
+        ms.push(vaddr, vaddr + len, Linear::new(offset, MemoryAttr::default().mmio(MMIOType::NormalNonCacheable as u8)), name);
+        return vaddr;
     }
     0
 }
@@ -74,7 +77,7 @@ pub fn ioremap(start: usize, len: usize, name: &'static str) -> usize {
 ///
 /// This function is expected to return `Some` under all normal cirumstances.
 fn memory_map() -> Option<(usize, usize)> {
-    let binary_end = _end as u32;
+    let binary_end = (_end as u64).wrapping_sub(KERNEL_OFFSET as u64);
 
     let mut atags: Atags = Atags::get();
     while let Some(atag) = atags.next() {

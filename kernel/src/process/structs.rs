@@ -238,9 +238,6 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
         let file_size = ph.file_size() as usize;
         let mem_size = ph.mem_size() as usize;
 
-        #[cfg(target_arch = "aarch64")]
-        assert_eq!((virt_addr >> 48), 0xffff, "Segment Fault");
-
         // Get target slice
         #[cfg(feature = "no_mmu")]
         let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];

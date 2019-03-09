@@ -13,7 +13,7 @@ const IO_REMAP_BASE: u64 = 0x3F00_0000;
 const MEMORY_END: u64 = 0x4000_0000;
 
 const RECURSIVE_INDEX: usize = 0o777;
-const KERNEL_OFFSET: u64 = 0x0000_0000_0000_0000;
+const KERNEL_OFFSET: u64 = 0xFFFF_0000_0000_0000;
 
 global_asm!(include_str!("boot.S"));
 
@@ -52,7 +52,8 @@ fn setup_temp_page_table(start_vaddr: VirtAddr, end_vaddr: VirtAddr, offset: u64
     p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
     p4[RECURSIVE_INDEX].set_frame(frame_lvl4, EF::default(), MairNormal::attr_value());
 
-    ttbr_el1_write(VirtAddr::new(KERNEL_OFFSET).va_range().unwrap() as u8, frame_lvl4);
+    ttbr_el1_write(0, frame_lvl4);
+    ttbr_el1_write(1, frame_lvl4);
     tlb_invalidate_all();
 }
 
@@ -112,9 +113,9 @@ pub fn map_kernel(kernel_start: usize, segments: &FixedVec<ProgramHeader64>) {
 
         unsafe {
             let src = (kernel_start as u64 + offset) as *const u8;
-            let dst = virt_addr as *mut u8;
+            let dst = virt_addr.wrapping_sub(KERNEL_OFFSET) as *mut u8;
             ptr::copy(src, dst, file_size as usize);
-            ptr::write_bytes((virt_addr + file_size) as *mut u8, 0, (mem_size - file_size) as usize);
+            ptr::write_bytes(dst.offset(file_size as isize), 0, (mem_size - file_size) as usize);
         }
 
         if virt_addr < start_vaddr.as_u64() {

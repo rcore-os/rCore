@@ -9,7 +9,7 @@ pub mod serial;
 pub mod mailbox;
 
 pub const IO_REMAP_BASE: usize = bcm2837::IO_BASE;
-pub const IO_REMAP_END: usize = 0x40001000;
+pub const IO_REMAP_END: usize = 0xFFFF_0000_4000_1000;
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
