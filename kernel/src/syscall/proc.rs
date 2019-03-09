@@ -162,11 +162,13 @@ pub fn sys_kill(pid: usize) -> SysResult {
 
 /// Get the current process id
 pub fn sys_getpid() -> SysResult {
+    info!("getpid");
     Ok(thread::current().id())
 }
 
 /// Get the current thread id
 pub fn sys_gettid() -> SysResult {
+    info!("gettid");
     // use pid as tid for now
     Ok(thread::current().id())
 }

@@ -5,7 +5,7 @@ use log::*;
 use rcore_fs::vfs::INode;
 use spin::Mutex;
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
-use smoltcp::socket::{SocketSet, SocketHandle};
+use smoltcp::socket::SocketHandle;
 use smoltcp::wire::IpEndpoint;
 use rcore_memory::PAGE_SIZE;
 
@@ -28,9 +28,15 @@ pub struct Thread {
 }
 
 #[derive(Clone, Debug)]
+pub struct TcpSocketState {
+    pub local_endpoint: Option<IpEndpoint>, // save local endpoint for bind()
+    pub is_listening: bool,
+}
+
+#[derive(Clone, Debug)]
 pub enum SocketType {
     Raw,
-    Tcp(Option<IpEndpoint>), // save local endpoint for bind()
+    Tcp(TcpSocketState),
     Udp,
     Icmp
 }
@@ -51,7 +57,14 @@ impl fmt::Debug for FileLike {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FileLike::File(_) => write!(f, "File"),
-            FileLike::Socket(_) => write!(f, "Socket"),
+            FileLike::Socket(wrapper) => {
+                match wrapper.socket_type {
+                    SocketType::Raw => write!(f, "RawSocket"),
+                    SocketType::Tcp(_) => write!(f, "TcpSocket"),
+                    SocketType::Udp => write!(f, "UdpSocket"),
+                    SocketType::Icmp => write!(f, "IcmpSocket"),
+                }
+            },
         }
     }
 }

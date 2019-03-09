@@ -1,9 +1,6 @@
 use super::*;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
-use alloc::collections::btree_map::BTreeMap;
-use crate::sync::Condvar;
-use crate::sync::SpinNoIrqLock as Mutex;
 
 pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
     const ARCH_SET_FS: i32 = 0x1002;

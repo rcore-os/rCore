@@ -6,10 +6,8 @@ use core::{slice, str, fmt};
 use bitflags::bitflags;
 use rcore_memory::VMError;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
-use spin::{Mutex, MutexGuard};
 
 use crate::arch::interrupt::TrapFrame;
-use crate::fs::FileHandle;
 use crate::process::*;
 use crate::thread;
 use crate::util;
