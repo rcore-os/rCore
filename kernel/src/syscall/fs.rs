@@ -3,15 +3,13 @@
 use core::mem::size_of;
 use core::cmp::min;
 use rcore_fs::vfs::Timespec;
-use smoltcp::socket::*;
 
 use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
-use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
+use crate::drivers::SOCKET_ACTIVITY;
 
 use super::*;
-use super::net::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
     info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
@@ -552,6 +550,13 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
 
     let write_fd = proc.get_free_fd();
     proc.files.insert(write_fd, FileLike::File(FileHandle::new(Arc::new(write), OpenOptions { read: false, write: true, append: false })));
+
+    unsafe {
+        *fds = read_fd as u32;
+        *(fds.add(1)) = write_fd as u32;
+    }
+
+    info!("pipe: created rfd: {} wfd: {}", read_fd, write_fd);
 
     Ok(0)
 }
