@@ -484,16 +484,17 @@ pub fn sys_recvfrom(
     }
 }
 
-pub fn sys_close_socket(proc: &mut Process, fd: usize, handle: SocketHandle) -> SysResult {
-    let iface = &*(NET_DRIVERS.read()[0]);
-    let mut sockets = iface.sockets();
-    sockets.release(handle);
-    sockets.prune();
+impl Drop for SocketWrapper {
+    fn drop(&mut self) {
+        let iface = &*(NET_DRIVERS.read()[0]);
+        let mut sockets = iface.sockets();
+        sockets.release(self.handle);
+        sockets.prune();
 
-    // send FIN immediately when applicable
-    drop(sockets);
-    iface.poll();
-    Ok(0)
+        // send FIN immediately when applicable
+        drop(sockets);
+        iface.poll();
+    }
 }
 
 pub fn sys_bind(fd: usize, addr: *const SockaddrIn, len: usize) -> SysResult {

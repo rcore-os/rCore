@@ -179,19 +179,10 @@ pub fn sys_getppid() -> SysResult {
     Ok(ppid)
 }
 
-/// Exit the current process
+/// Exit the current thread
 pub fn sys_exit(exit_code: isize) -> ! {
     let pid = thread::current().id();
     info!("exit: {}, code: {}", pid, exit_code);
-
-    // close all files.
-    // TODO: close them in all possible ways a process can exit
-    let mut proc = process();
-    let fds: Vec<usize> = proc.files.keys().cloned().collect();
-    for fd in fds.into_iter() {
-        sys_close_internal(&mut proc, fd).unwrap();
-    }
-    drop(proc);
 
     processor().manager().exit(pid, exit_code as usize);
     processor().yield_now();

@@ -326,15 +326,8 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
 pub fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     let mut proc = process();
-    sys_close_internal(&mut proc, fd)
-}
-
-pub fn sys_close_internal(proc: &mut Process, fd: usize) -> SysResult {
-    match proc.files.remove(&fd) {
-        Some(FileLike::File(_)) => Ok(0),
-        Some(FileLike::Socket(wrapper)) => sys_close_socket(proc, fd, wrapper.handle),
-        None => Err(SysError::EINVAL),
-    }
+    proc.files.remove(&fd).ok_or(SysError::EBADF)?;
+    Ok(0)
 }
 
 pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
@@ -450,10 +443,8 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
 pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     info!("dup2: from {} to {}", fd1, fd2);
     let mut proc = process();
-    if proc.files.contains_key(&fd2) {
-        // close fd2 first if it is opened
-        sys_close_internal(&mut proc, fd2)?;
-    }
+    // close fd2 first if it is opened
+    proc.files.remove(&fd2);
 
     match proc.files.get(&fd1) {
         Some(FileLike::File(file)) => {
