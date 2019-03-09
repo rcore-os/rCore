@@ -484,6 +484,19 @@ pub fn sys_recvfrom(
     }
 }
 
+impl Clone for SocketWrapper {
+    fn clone(&self) -> Self {
+        let iface = &*(NET_DRIVERS.read()[0]);
+        let mut sockets = iface.sockets();
+        sockets.retain(self.handle);
+
+        SocketWrapper {
+            handle: self.handle.clone(),
+            socket_type: self.socket_type.clone()
+        }
+    }
+}
+
 impl Drop for SocketWrapper {
     fn drop(&mut self) {
         let iface = &*(NET_DRIVERS.read()[0]);

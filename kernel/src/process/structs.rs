@@ -35,7 +35,7 @@ pub enum SocketType {
     Icmp
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SocketWrapper {
     pub handle: SocketHandle,
     pub socket_type: SocketType,
