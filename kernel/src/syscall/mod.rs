@@ -29,9 +29,12 @@ mod misc;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
-    let pid = cpu::id();
+    let cid = cpu::id();
+    let pid = {
+        process().pid.clone()
+    };
     let tid = processor().tid();
-    debug!("{}:{} syscall id {} begin", pid, tid, id);
+    debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
     let ret = match id {
         // file
         000 => sys_read(args[0], args[1] as *mut u8, args[2]),
@@ -77,7 +80,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         // use fork for vfork
         058 => sys_fork(tf),
         059 => sys_exec(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8, tf),
-        060 => sys_exit(args[0] as isize),
+        060 => sys_exit(args[0] as usize),
         061 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
         062 => sys_kill(args[0]),
         063 => sys_uname(args[0] as *mut u8),
@@ -109,6 +112,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
         228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+        231 => sys_exit_group(args[0]),
         288 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
 //        293 => sys_pipe(),
 
@@ -185,10 +189,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id())
         }
-        231 => {
-            warn!("sys_exit_group is unimplemented");
-            sys_exit(args[0] as isize);
-        }
         280 => {
             warn!("sys_utimensat is unimplemented");
             Ok(0)
@@ -206,7 +206,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             crate::trap::error(tf);
         }
     };
-    debug!("{}:{} syscall id {} ret with {:x?}", pid, tid, id, ret);
+    debug!("{}:{}:{} syscall id {} ret with {:x?}", cid, pid, tid, id, ret);
     match ret {
         Ok(code) => code as isize,
         Err(err) => -(err as isize),
@@ -313,6 +313,14 @@ impl fmt::Display for SysError {
                 ENOLCK => "No record locks available",
                 ENOSYS => "Function not implemented",
                 ENOTEMPTY => "Directory not empty",
+                ENOTSOCK => "Socket operation on non-socket",
+                ENOPROTOOPT => "Protocol not available",
+                EPFNOSUPPORT => "Protocol family not supported",
+                EAFNOSUPPORT => "Address family not supported by protocol",
+                ENOBUFS => "No buffer space available",
+                EISCONN => "Transport endpoint is already connected",
+                ENOTCONN => "Transport endpoint is not connected",
+                ECONNREFUSED => "Connection refused",
                 _ => "Unknown error",
             },
         )

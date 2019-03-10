@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 use log::*;
 use crate::scheduler::Scheduler;
 use crate::timer::Timer;
@@ -9,8 +9,6 @@ struct Thread {
     status: Status,
     status_after_stop: Status,
     context: Option<Box<Context>>,
-    parent: Tid,
-    children: Vec<Tid>,
 }
 
 pub type Tid = usize;
@@ -21,7 +19,6 @@ pub enum Status {
     Ready,
     Running(usize),
     Sleeping,
-    Waiting(Tid),
     /// aka ZOMBIE. Its context was dropped.
     Exited(ExitCode),
 }
@@ -32,7 +29,11 @@ enum Event {
 }
 
 pub trait Context {
+    /// Switch to target context
     unsafe fn switch_to(&mut self, target: &mut Context);
+
+    /// A tid is allocated for this context
+    fn set_tid(&mut self, tid: Tid);
 }
 
 pub struct ThreadPool {
@@ -50,28 +51,27 @@ impl ThreadPool {
         }
     }
 
-    fn alloc_tid(&self) -> Tid {
+    fn alloc_tid(&self) -> (Tid, MutexGuard<Option<Thread>>) {
         for (i, proc) in self.threads.iter().enumerate() {
-            if proc.lock().is_none() {
-                return i;
+            let thread = proc.lock();
+            if thread.is_none() {
+                return (i, thread);
             }
         }
         panic!("Process number exceeded");
     }
 
-    /// Add a new process
-    pub fn add(&self, context: Box<Context>, parent: Tid) -> Tid {
-        let tid = self.alloc_tid();
-        *(&self.threads[tid]).lock() = Some(Thread {
+    /// Add a new thread
+    /// Calls action with tid and thread context
+    pub fn add(&self, mut context: Box<Context>) -> Tid {
+        let (tid, mut thread) = self.alloc_tid();
+        context.set_tid(tid);
+        *thread = Some(Thread {
             status: Status::Ready,
             status_after_stop: Status::Ready,
             context: Some(context),
-            parent,
-            children: Vec::new(),
         });
         self.scheduler.push(tid);
-        self.threads[parent].lock().as_mut().expect("invalid parent proc")
-            .children.push(tid);
         tid
     }
 
@@ -162,7 +162,6 @@ impl ThreadPool {
     }
 
     /// Remove an exited proc `tid`.
-    /// Its all children will be set parent to 0.
     pub fn remove(&self, tid: Tid) {
         let mut proc_lock = self.threads[tid].lock();
         let proc = proc_lock.as_ref().expect("process not exist");
@@ -170,13 +169,6 @@ impl ThreadPool {
             Status::Exited(_) => {}
             _ => panic!("can not remove non-exited process"),
         }
-        // orphan procs
-        for child in proc.children.iter() {
-            (&self.threads[*child]).lock().as_mut().expect("process not exist").parent = 0;
-        }
-        // remove self from parent's children list
-        self.threads[proc.parent].lock().as_mut().expect("process not exist")
-            .children.retain(|&i| i != tid);
         // release the tid
         *proc_lock = None;
     }
@@ -194,32 +186,12 @@ impl ThreadPool {
         self.set_status(tid, Status::Ready);
     }
 
-    pub fn wait(&self, tid: Tid, target: Tid) {
-        self.set_status(tid, Status::Waiting(target));
-    }
-    pub fn wait_child(&self, tid: Tid) {
-        self.set_status(tid, Status::Waiting(0));
-    }
-
-    pub fn get_children(&self, tid: Tid) -> Vec<Tid> {
-        self.threads[tid].lock().as_ref().expect("process not exist").children.clone()
-    }
-    pub fn get_parent(&self, tid: Tid) -> Tid {
-        self.threads[tid].lock().as_ref().expect("process not exist").parent
-    }
-
     pub fn exit(&self, tid: Tid, code: ExitCode) {
         // NOTE: if `tid` is running, status change will be deferred.
         self.set_status(tid, Status::Exited(code));
     }
     /// Called when a process exit
     fn exit_handler(&self, tid: Tid, proc: &mut Thread) {
-        // wakeup parent if waiting
-        let parent = proc.parent;
-        match self.get_status(parent).expect("process not exist") {
-            Status::Waiting(target) if target == tid || target == 0 => self.wakeup(parent),
-            _ => {}
-        }
         // drop its context
         proc.context = None;
     }

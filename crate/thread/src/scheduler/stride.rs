@@ -7,7 +7,7 @@ pub struct StrideScheduler {
 pub struct StrideSchedulerInner {
     max_time_slice: usize,
     infos: Vec<StrideProcInfo>,
-    queue: BinaryHeap<(Stride, Pid)>, // It's max heap, so pass < 0
+    queue: BinaryHeap<(Stride, Tid)>, // It's max heap, so pass < 0
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -35,17 +35,17 @@ impl StrideProcInfo {
 type Stride = i32;
 
 impl Scheduler for StrideScheduler {
-    fn push(&self, pid: usize) {
-        self.inner.lock().push(pid);
+    fn push(&self, tid: usize) {
+        self.inner.lock().push(tid);
     }
     fn pop(&self, _cpu_id: usize) -> Option<usize> {
         self.inner.lock().pop()
     }
-    fn tick(&self, current_pid: usize) -> bool {
-        self.inner.lock().tick(current_pid)
+    fn tick(&self, current_tid: usize) -> bool {
+        self.inner.lock().tick(current_tid)
     }
-    fn set_priority(&self, pid: usize, priority: u8) {
-        self.inner.lock().set_priority(pid, priority);
+    fn set_priority(&self, tid: usize, priority: u8) {
+        self.inner.lock().set_priority(tid, priority);
     }
 }
 
@@ -61,31 +61,31 @@ impl StrideScheduler {
 }
 
 impl StrideSchedulerInner {
-    fn push(&mut self, pid: Pid) {
-        expand(&mut self.infos, pid);
-        let info = &mut self.infos[pid];
+    fn push(&mut self, tid: Tid) {
+        expand(&mut self.infos, tid);
+        let info = &mut self.infos[tid];
         assert!(!info.present);
         info.present = true;
         if info.rest_slice == 0 {
             info.rest_slice = self.max_time_slice;
         }
-        self.queue.push((-info.stride, pid));
-        trace!("stride push {}", pid);
+        self.queue.push((-info.stride, tid));
+        trace!("stride push {}", tid);
     }
 
-    fn pop(&mut self) -> Option<Pid> {
-        let ret = self.queue.pop().map(|(_, pid)| pid);
-        if let Some(pid) = ret {
-            let old_stride = self.infos[pid].stride;
-            self.infos[pid].pass();
-            let stride = self.infos[pid].stride;
-            trace!("stride {} {:#x} -> {:#x}", pid, old_stride, stride);
+    fn pop(&mut self) -> Option<Tid> {
+        let ret = self.queue.pop().map(|(_, tid)| tid);
+        if let Some(tid) = ret {
+            let old_stride = self.infos[tid].stride;
+            self.infos[tid].pass();
+            let stride = self.infos[tid].stride;
+            trace!("stride {} {:#x} -> {:#x}", tid, old_stride, stride);
         }
         trace!("stride pop {:?}", ret);
         ret
     }
 
-    fn tick(&mut self, current: Pid) -> bool {
+    fn tick(&mut self, current: Tid) -> bool {
         expand(&mut self.infos, current);
         assert!(!self.infos[current].present);
 
@@ -98,8 +98,8 @@ impl StrideSchedulerInner {
         *rest == 0
     }
 
-    fn set_priority(&mut self, pid: Pid, priority: u8) {
-        self.infos[pid].priority = priority;
-        trace!("stride {} priority = {}", pid, priority);
+    fn set_priority(&mut self, tid: Tid, priority: u8) {
+        self.infos[tid].priority = priority;
+        trace!("stride {} priority = {}", tid, priority);
     }
 }

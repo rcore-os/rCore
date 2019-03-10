@@ -1,11 +1,13 @@
 //! Syscalls for process
 
 use super::*;
+use crate::process::{PROCESSES, CHILD_PROCESSES};
+use crate::sync::Condvar;
 
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     let new_thread = current_thread().fork(tf);
-    let pid = processor().manager().add(new_thread, thread::current().id());
+    let pid = processor().manager().add(new_thread);
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid)
 }
@@ -29,7 +31,7 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *m
     }
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
-    let tid = processor().manager().add(new_thread, thread::current().id());
+    let tid = processor().manager().add(new_thread);
     info!("clone: {} -> {}", thread::current().id(), tid);
     unsafe {
         parent_tid.write(tid as u32);
@@ -42,6 +44,7 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *m
 /// Return the PID. Store exit code to `code` if it's not null.
 pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     info!("wait4: pid: {}, code: {:?}", pid, wstatus);
+    let cur_pid = process().pid.get();
     if !wstatus.is_null() {
         process().memory_set.check_mut_ptr(wstatus)?;
     }
@@ -57,13 +60,13 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     };
     loop {
         use alloc::vec;
+        let all_child: Vec<_> = CHILD_PROCESSES.read().get(&cur_pid).unwrap().clone();
         let wait_procs = match target {
-            WaitFor::AnyChild => processor().manager().get_children(thread::current().id()),
+            WaitFor::AnyChild => all_child,
             WaitFor::Pid(pid) => {
                 // check if pid is a child
-                if processor().manager().get_children(thread::current().id()).iter()
-                    .find(|&&p| p == pid).is_some() {
-                    vec![pid]
+                if let Some(proc) = all_child.iter().find(|p| p.lock().pid.get() == pid) {
+                    vec![proc.clone()]
                 } else {
                     vec![]
                 }
@@ -73,26 +76,25 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
             return Err(SysError::ECHILD);
         }
 
-        for pid in wait_procs {
-            match processor().manager().get_status(pid) {
-                Some(Status::Exited(exit_code)) => {
-                    if !wstatus.is_null() {
-                        unsafe { wstatus.write(exit_code as i32); }
-                    }
-                    processor().manager().remove(pid);
-                    info!("wait: {} -> {}", thread::current().id(), pid);
-                    return Ok(pid);
-                }
-                None => return Err(SysError::ECHILD),
-                _ => {}
+        for proc_lock in wait_procs.iter() {
+            let proc = proc_lock.lock();
+            if let Some(exit_code) = proc.exit_code {
+                // recycle process
+                let pid = proc.pid.get();
+                drop(proc);
+
+                let mut child_processes = CHILD_PROCESSES.write();
+                child_processes.get_mut(&cur_pid).unwrap().retain(|p| p.lock().pid.get() != pid);
+                child_processes.remove(&pid);
+                return Ok(pid);
             }
         }
         info!("wait: {} -> {:?}, sleep", thread::current().id(), target);
-        match target {
-            WaitFor::AnyChild => processor().manager().wait_child(thread::current().id()),
-            WaitFor::Pid(pid) => processor().manager().wait(thread::current().id(), pid),
+
+        for proc in wait_procs.iter() {
+            proc.lock().exit_cond.add_to_wait_queue();
         }
-        processor().yield_now();
+        thread::park();
     }
 }
 
@@ -163,7 +165,7 @@ pub fn sys_kill(pid: usize) -> SysResult {
 /// Get the current process id
 pub fn sys_getpid() -> SysResult {
     info!("getpid");
-    Ok(thread::current().id())
+    Ok(process().pid.get())
 }
 
 /// Get the current thread id
@@ -175,15 +177,21 @@ pub fn sys_gettid() -> SysResult {
 
 /// Get the parent process id
 pub fn sys_getppid() -> SysResult {
-    let pid = thread::current().id();
-    let ppid = processor().manager().get_parent(pid);
-    Ok(ppid)
+    Ok(process().ppid.get())
 }
 
 /// Exit the current thread
-pub fn sys_exit(exit_code: isize) -> ! {
-    let pid = thread::current().id();
-    info!("exit: {}, code: {}", pid, exit_code);
+pub fn sys_exit(exit_code: usize) -> ! {
+    let tid = thread::current().id();
+    info!("exit: {}, code: {}", tid, exit_code);
+    let mut proc = process();
+    proc.threads.retain(|&id| id != tid);
+    if proc.threads.len() == 0 {
+        // last thread
+        proc.exit_code = Some(exit_code);
+        proc.exit_cond.notify_all();
+    }
+    drop(proc);
 
     // perform futex wake 1
     // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
@@ -196,7 +204,24 @@ pub fn sys_exit(exit_code: isize) -> ! {
         queue.notify_one();
     }
 
-    processor().manager().exit(pid, exit_code as usize);
+    processor().manager().exit(tid, exit_code as usize);
+    processor().yield_now();
+    unreachable!();
+}
+
+/// Exit the current thread group (i.e. progress)
+pub fn sys_exit_group(exit_code: usize) -> ! {
+    let mut proc = process();
+    info!("exit_group: {}, code: {}", proc.pid, exit_code);
+
+    // quit all threads
+    for tid in proc.threads.iter() {
+        processor().manager().exit(*tid, exit_code);
+    }
+    proc.exit_code = Some(exit_code);
+    proc.exit_cond.notify_all();
+    drop(proc);
+
     processor().yield_now();
     unreachable!();
 }

@@ -3,9 +3,9 @@ use deque::{self, Stealer, Worker, Stolen};
 
 pub struct WorkStealingScheduler {
     /// The ready queue of each processors
-    workers: Vec<Worker<Pid>>,
+    workers: Vec<Worker<Tid>>,
     /// Stealers to all processors' queue
-    stealers: Vec<Stealer<Pid>>,
+    stealers: Vec<Stealer<Tid>>,
 }
 
 impl WorkStealingScheduler {
@@ -16,17 +16,17 @@ impl WorkStealingScheduler {
 }
 
 impl Scheduler for WorkStealingScheduler {
-    fn push(&self, pid: usize) {
+    fn push(&self, tid: usize) {
         // TODO: push to random queue?
         // now just push to cpu0
-        self.workers[0].push(pid);
-        trace!("work-stealing: cpu0 push thread {}", pid);
+        self.workers[0].push(tid);
+        trace!("work-stealing: cpu0 push thread {}", tid);
     }
 
     fn pop(&self, cpu_id: usize) -> Option<usize> {
-        if let Some(pid) = self.workers[cpu_id].pop() {
-            trace!("work-stealing: cpu{} pop thread {}", cpu_id, pid);
-            return Some(pid);
+        if let Some(tid) = self.workers[cpu_id].pop() {
+            trace!("work-stealing: cpu{} pop thread {}", cpu_id, tid);
+            return Some(tid);
         }
         let n = self.workers.len();
         for i in 1..n {
@@ -38,9 +38,9 @@ impl Scheduler for WorkStealingScheduler {
                 match self.stealers[other_id].steal() {
                     Stolen::Abort => {} // retry
                     Stolen::Empty => break,
-                    Stolen::Data(pid) => {
-                        trace!("work-stealing: cpu{} steal thread {} from cpu{}", cpu_id, pid, other_id);
-                        return Some(pid);
+                    Stolen::Data(tid) => {
+                        trace!("work-stealing: cpu{} steal thread {} from cpu{}", cpu_id, tid, other_id);
+                        return Some(tid);
                     }
                 }
             }
@@ -48,9 +48,9 @@ impl Scheduler for WorkStealingScheduler {
         None
     }
 
-    fn tick(&self, _current_pid: usize) -> bool {
+    fn tick(&self, _current_tid: usize) -> bool {
         true
     }
 
-    fn set_priority(&self, _pid: usize, _priority: u8) {}
+    fn set_priority(&self, _tid: usize, _priority: u8) {}
 }

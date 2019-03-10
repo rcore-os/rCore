@@ -59,9 +59,9 @@ impl Processor {
                 unsafe {
                     inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
                 }
-                let (pid, context) = inner.proc.take().unwrap();
-                trace!("CPU{} stop running thread {}", inner.id, pid);
-                inner.manager.stop(pid, context);
+                let (tid, context) = inner.proc.take().unwrap();
+                trace!("CPU{} stop running thread {}", inner.id, tid);
+                inner.manager.stop(tid, context);
             } else {
                 trace!("CPU{} idle", inner.id);
                 unsafe { interrupt::enable_and_wfi(); }

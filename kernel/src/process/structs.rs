@@ -1,13 +1,13 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, collections::btree_map::Entry, string::String, sync::Arc, vec::Vec, sync::Weak};
 use core::fmt;
 
 use log::*;
-use rcore_fs::vfs::INode;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use smoltcp::socket::SocketHandle;
 use smoltcp::wire::IpEndpoint;
 use rcore_memory::PAGE_SIZE;
+use rcore_thread::Tid;
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
@@ -69,11 +69,65 @@ impl fmt::Debug for FileLike {
     }
 }
 
+/// Pid type
+/// For strong type separation
+#[derive(Clone, PartialEq)]
+pub struct Pid(Option<usize>);
+
+impl Pid {
+    pub fn uninitialized() -> Self {
+        Pid(None)
+    }
+
+    pub fn no_one() -> Self {
+        Pid(Some(0))
+    }
+
+    /// Return if it was uninitialized before this call
+    /// When returning true, it usually means this is the first thread
+    pub fn set_if_uninitialized(&mut self, tid: Tid) -> bool {
+        if self.0 == None {
+            self.0 = Some(tid as usize);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get(&self) -> usize {
+        self.0.unwrap()
+    }
+}
+
+impl fmt::Display for Pid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            Some(pid) => write!(f, "{}", pid),
+            None => write!(f, "None"),
+        }
+    }
+}
+
 pub struct Process {
     pub memory_set: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
+    pub pid: Pid, // i.e. tgid, usually the tid of first thread
+    pub ppid: Pid, // the pid of the parent process
+    pub threads: Vec<Tid>, // threads in the same process
+    pub exit_cond: Condvar, // notified when the whole process is going to terminate
+    pub exit_code: Option<usize>, // only available when last thread exits
     futexes: BTreeMap<usize, Arc<Condvar>>,
+}
+
+/// Records the mapping between pid and Process struct.
+lazy_static! {
+    pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> = RwLock::new(BTreeMap::new());
+}
+
+/// Records the list of child processes
+lazy_static! {
+    pub static ref CHILD_PROCESSES: RwLock<BTreeMap<usize, Vec<Arc<Mutex<Process>>>>> = RwLock::new(BTreeMap::new());
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -82,6 +136,26 @@ impl rcore_thread::Context for Thread {
         use core::mem::transmute;
         let (target, _): (&mut Thread, *const ()) = transmute(target);
         self.context.switch(&mut target.context);
+    }
+
+    fn set_tid(&mut self, tid: Tid) {
+        // set pid=tid if unspecified
+        let mut proc = self.proc.lock();
+        if proc.pid.set_if_uninitialized(tid) {
+            // first thread in the process
+            // link to its ppid
+            match CHILD_PROCESSES.write().entry(proc.ppid.get()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(vec![self.proc.clone()]);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().push(self.proc.clone());
+                }
+            }
+        }
+        // add it to threads
+        proc.threads.push(tid);
+        PROCESSES.write().insert(proc.pid.get(), Arc::downgrade(&self.proc));
     }
 }
 
@@ -97,6 +171,11 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
+                pid: Pid::uninitialized(),
+                ppid: Pid::no_one(),
+                exit_cond: Condvar::new(),
+                threads: Vec::new(),
+                exit_code: None
             })),
         })
     }
@@ -114,6 +193,11 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
+                pid: Pid::uninitialized(),
+                ppid: Pid::no_one(),
+                exit_cond: Condvar::new(),
+                threads: Vec::new(),
+                exit_code: None
             })),
         })
     }
@@ -201,6 +285,11 @@ impl Thread {
                 files,
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
+                pid: Pid::uninitialized(),
+                ppid: Pid::no_one(),
+                exit_cond: Condvar::new(),
+                threads: Vec::new(),
+                exit_code: None
             })),
         })
     }
@@ -211,6 +300,7 @@ impl Thread {
         let memory_set = self.proc.lock().memory_set.clone();
         let files = self.proc.lock().files.clone();
         let cwd = self.proc.lock().cwd.clone();
+        let ppid = self.proc.lock().pid.clone();
         debug!("fork: finish clone MemorySet");
 
         // MMU:   copy data to the new space
@@ -244,6 +334,11 @@ impl Thread {
                 files,
                 cwd,
                 futexes: BTreeMap::default(),
+                pid: Pid::uninitialized(),
+                ppid,
+                exit_cond: Condvar::new(),
+                threads: Vec::new(),
+                exit_code: None
             })),
         })
     }

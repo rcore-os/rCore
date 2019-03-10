@@ -14,7 +14,7 @@ impl Condvar {
     }
 
     pub fn _wait(&self) {
-        self.wait_queue.lock().push_back(Arc::new(thread::current()));
+        self.add_to_wait_queue();
         thread::park();
     }
 
@@ -24,6 +24,10 @@ impl Condvar {
             condvar.wait_queue.lock().push_back(token.clone());
         }
         thread::park();
+    }
+
+    pub fn add_to_wait_queue(&self) {
+        self.wait_queue.lock().push_back(Arc::new(thread::current()));
     }
 
     pub fn wait<'a, T, S>(&self, guard: MutexGuard<'a, T, S>) -> MutexGuard<'a, T, S>

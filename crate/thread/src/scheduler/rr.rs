@@ -13,21 +13,21 @@ struct RRSchedulerInner {
 struct RRProcInfo {
     present: bool,
     rest_slice: usize,
-    prev: Pid,
-    next: Pid,
+    prev: Tid,
+    next: Tid,
 }
 
 impl Scheduler for RRScheduler {
-    fn push(&self, pid: usize) {
-        self.inner.lock().push(pid);
+    fn push(&self, tid: usize) {
+        self.inner.lock().push(tid);
     }
     fn pop(&self, _cpu_id: usize) -> Option<usize> {
         self.inner.lock().pop()
     }
-    fn tick(&self, current_pid: usize) -> bool {
-        self.inner.lock().tick(current_pid)
+    fn tick(&self, current_tid: usize) -> bool {
+        self.inner.lock().tick(current_tid)
     }
-    fn set_priority(&self, _pid: usize, _priority: u8) {}
+    fn set_priority(&self, _tid: usize, _priority: u8) {}
 }
 
 impl RRScheduler {
@@ -41,35 +41,35 @@ impl RRScheduler {
 }
 
 impl RRSchedulerInner {
-    fn push(&mut self, pid: Pid) {
-        let pid = pid + 1;
-        expand(&mut self.infos, pid);
+    fn push(&mut self, tid: Tid) {
+        let tid = tid + 1;
+        expand(&mut self.infos, tid);
         {
-            let info = &mut self.infos[pid];
+            let info = &mut self.infos[tid];
             assert!(!info.present);
             info.present = true;
             if info.rest_slice == 0 {
                 info.rest_slice = self.max_time_slice;
             }
         }
-        self._list_add_before(pid, 0);
-        trace!("rr push {}", pid - 1);
+        self._list_add_before(tid, 0);
+        trace!("rr push {}", tid - 1);
     }
 
-    fn pop(&mut self) -> Option<Pid> {
+    fn pop(&mut self) -> Option<Tid> {
         let ret = match self.infos[0].next {
             0 => None,
-            pid => {
-                self.infos[pid].present = false;
-                self._list_remove(pid);
-                Some(pid - 1)
+            tid => {
+                self.infos[tid].present = false;
+                self._list_remove(tid);
+                Some(tid - 1)
             },
         };
         trace!("rr pop {:?}", ret);
         ret
     }
 
-    fn tick(&mut self, current: Pid) -> bool {
+    fn tick(&mut self, current: Tid) -> bool {
         let current = current + 1;
         expand(&mut self.infos, current);
         assert!(!self.infos[current].present);
@@ -85,18 +85,18 @@ impl RRSchedulerInner {
 }
 
 impl RRSchedulerInner {
-    fn _list_add_before(&mut self, i: Pid, at: Pid) {
+    fn _list_add_before(&mut self, i: Tid, at: Tid) {
         let prev = self.infos[at].prev;
         self.infos[i].next = at;
         self.infos[i].prev = prev;
         self.infos[prev].next = i;
         self.infos[at].prev = i;
     }
-    fn _list_add_after(&mut self, i: Pid, at: Pid) {
+    fn _list_add_after(&mut self, i: Tid, at: Tid) {
         let next = self.infos[at].next;
         self._list_add_before(i, next);
     }
-    fn _list_remove(&mut self, i: Pid) {
+    fn _list_remove(&mut self, i: Tid) {
         let next = self.infos[i].next;
         let prev = self.infos[i].prev;
         self.infos[next].prev = prev;

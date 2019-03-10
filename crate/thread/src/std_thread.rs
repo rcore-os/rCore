@@ -92,17 +92,16 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 
     // 在Processor中创建新的线程
     let context = new_kernel_context(kernel_thread_entry::<F, T>, f as usize);
-    let pid = processor().manager().add(context, 0);
+    let tid = processor().manager().add(context);
 
     // 接下来看看`JoinHandle::join()`的实现
     // 了解是如何获取f返回值的
     return JoinHandle {
-        thread: Thread { pid },
         mark: PhantomData,
     };
 }
 
-/// Cooperatively gives up a timeslice to the OS scheduler.
+/// Cooperatively gives up a time slice to the OS scheduler.
 pub fn yield_now() {
     trace!("yield:");
     processor().yield_now();
@@ -131,119 +130,14 @@ impl Thread {
     }
 }
 
-/// An owned permission to join on a thread (block on its termination).
+/// An owned permission to join on a process (block on its termination).
 pub struct JoinHandle<T> {
-    thread: Thread,
     mark: PhantomData<T>,
 }
 
 impl<T> JoinHandle<T> {
-    /// Extracts a handle to the underlying thread.
-    pub fn thread(&self) -> &Thread {
-        &self.thread
-    }
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
-        loop {
-            trace!("{} join", self.thread.pid);
-            match processor().manager().get_status(self.thread.pid) {
-                Some(Status::Exited(exit_code)) => {
-                    processor().manager().remove(self.thread.pid);
-                    // Find return value on the heap from the exit code.
-                    return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
-                }
-                None => return Err(()),
-                _ => {}
-            }
-            processor().manager().wait(current().id(), self.thread.pid);
-            processor().yield_now();
-        }
-    }
-    /// Force construct a JoinHandle struct
-    pub unsafe fn _of(pid: Tid) -> JoinHandle<T> {
-        JoinHandle {
-            thread: Thread { pid },
-            mark: PhantomData,
-        }
+        unimplemented!();
     }
 }
-
-//pub struct LocalKey<T: 'static> {
-//    init: fn() -> T,
-//}
-//
-//impl<T: 'static> LocalKey<T> {
-//    pub fn with<F, R>(&'static self, f: F) -> R
-//        where F: FnOnce(&T) -> R
-//    {
-//        let map = unsafe { Self::get_map() };
-//        let key = self as *const _ as usize;
-//        if !map.contains_key(&key) {
-//            map.insert(key, Box::new((self.init)()));
-//        }
-//        let value = map.get(&key).unwrap().downcast_ref::<T>().expect("type error");
-//        f(value)
-//    }
-//    pub const fn new(init: fn() -> T) -> Self {
-//        LocalKey { init }
-//    }
-//    /// Get `BTreeMap<usize, Box<Any>>` at the current kernel stack bottom
-//    /// The stack must be aligned with 0x8000
-//    unsafe fn get_map() -> &'static mut BTreeMap<usize, Box<Any>> {
-//        const STACK_SIZE: usize = 0x8000;
-//        let stack_var = 0usize;
-//        let ptr = (&stack_var as *const _ as usize) / STACK_SIZE * STACK_SIZE;
-//        let map = unsafe { &mut *(ptr as *mut Option<BTreeMap<usize, Box<Any>>>) };
-//        if map.is_none() {
-//            *map = Some(BTreeMap::new());
-//        }
-//        map.as_mut().unwrap()
-//    }
-//}
-//
-//pub mod test {
-//    use thread;
-//    use core::cell::RefCell;
-//    use core::time::Duration;
-//
-//    pub fn unpack() {
-//        let parked_thread = thread::spawn(|| {
-//            println!("Parking thread");
-//            thread::park();
-//            println!("Thread unparked");
-//            5
-//        });
-//
-//        // Let some time pass for the thread to be spawned.
-//        thread::sleep(Duration::from_secs(2));
-//
-//        println!("Unpark the thread");
-//        parked_thread.thread().unpark();
-//
-//        let ret = parked_thread.join().unwrap();
-//        assert_eq!(ret, 5);
-//    }
-//
-//    pub fn local_key() {
-//        static FOO: thread::LocalKey<RefCell<usize>> = thread::LocalKey::new(|| RefCell::new(1));
-//
-//        FOO.with(|f| {
-//            assert_eq!(*f.borrow(), 1);
-//            *f.borrow_mut() = 2;
-//        });
-//
-//        // each thread starts out with the initial value of 1
-//        thread::spawn(move || {
-//            FOO.with(|f| {
-//                assert_eq!(*f.borrow(), 1);
-//                *f.borrow_mut() = 3;
-//            });
-//        }).join();
-//
-//        // we retain our original value of 2 despite the child thread
-//        FOO.with(|f| {
-//            assert_eq!(*f.borrow(), 2);
-//        });
-//        println!("local key success");
-//    }
-//}

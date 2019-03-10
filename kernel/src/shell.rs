@@ -13,9 +13,9 @@ pub fn run_user_shell() {
         println!("Going to user mode shell.");
         println!("Use 'ls' to list available programs.");
         let data = inode.read_as_vec().unwrap();
-        processor().manager().add(Thread::new_user(data.as_slice(), "sh".split(' ')), 0);
+        processor().manager().add(Thread::new_user(data.as_slice(), "sh".split(' ')));
     } else {
-        processor().manager().add(Thread::new_kernel(shell, 0), 0);
+        processor().manager().add(Thread::new_kernel(shell, 0));
     }
 }
 
@@ -33,8 +33,8 @@ pub extern fn shell(_arg: usize) -> ! {
         let name = cmd.trim().split(' ').next().unwrap();
         if let Ok(file) = ROOT_INODE.lookup(name) {
             let data = file.read_as_vec().unwrap();
-            let pid = processor().manager().add(Thread::new_user(data.as_slice(), cmd.split(' ')), thread::current().id());
-            unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
+            let pid = processor().manager().add(Thread::new_user(data.as_slice(), cmd.split(' ')));
+            //unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
         } else {
             println!("Program not exist");
         }

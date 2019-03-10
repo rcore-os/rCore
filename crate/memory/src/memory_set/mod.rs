@@ -23,6 +23,8 @@ pub struct MemoryArea {
     name: &'static str,
 }
 
+unsafe impl Send for MemoryArea { }
+
 impl MemoryArea {
     /*
     **  @brief  get slice of the content in the memory area
