@@ -30,7 +30,7 @@ fn new_kernel_context(_entry: extern fn(usize) -> !, _arg: usize) -> Box<Context
 
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
-    Thread { pid: processor().tid() }
+    Thread { tid: processor().tid() }
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
@@ -79,8 +79,6 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
         let f = unsafe { Box::from_raw(f as *mut F) };
         // 调用f，并将其返回值也放在堆上
         let ret = Box::new(f());
-        // 清理本地线程存储
-        //   unsafe { LocalKey::<usize>::get_map() }.clear();
         // 让Processor退出当前线程
         // 把f返回值在堆上的指针，以线程返回码的形式传递出去
         let exit_code = Box::into_raw(ret) as usize;
@@ -97,6 +95,7 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
     // 接下来看看`JoinHandle::join()`的实现
     // 了解是如何获取f返回值的
     return JoinHandle {
+        thread: Thread { tid },
         mark: PhantomData,
     };
 }
@@ -116,28 +115,46 @@ pub fn park() {
 
 /// A handle to a thread.
 pub struct Thread {
-    pid: usize,
+    tid: usize,
 }
 
 impl Thread {
     /// Atomically makes the handle's token available if it is not already.
     pub fn unpark(&self) {
-        processor().manager().wakeup(self.pid);
+        processor().manager().wakeup(self.tid);
     }
     /// Gets the thread's unique identifier.
     pub fn id(&self) -> usize {
-        self.pid
+        self.tid
     }
 }
 
-/// An owned permission to join on a process (block on its termination).
+/// An owned permission to join on a thread (block on its termination).
 pub struct JoinHandle<T> {
+    thread: Thread,
     mark: PhantomData<T>,
 }
 
 impl<T> JoinHandle<T> {
+    /// Extracts a handle to the underlying thread.
+    pub fn thread(&self) -> &Thread {
+        &self.thread
+    }
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
-        unimplemented!();
+        loop {
+            trace!("join thread {}", self.thread.tid);
+            match processor().manager().get_status(self.thread.tid) {
+                Some(Status::Exited(exit_code)) => {
+                    processor().manager().remove(self.thread.tid);
+                    // Find return value on the heap from the exit code.
+                    return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
+                }
+                None => return Err(()),
+                _ => {}
+            }
+            processor().manager().wait(current().id(), self.thread.tid);
+            processor().yield_now();
+        }
     }
 }

@@ -8,6 +8,7 @@ use crate::timer::Timer;
 struct Thread {
     status: Status,
     status_after_stop: Status,
+    waiter: Option<Tid>,
     context: Option<Box<Context>>,
 }
 
@@ -69,6 +70,7 @@ impl ThreadPool {
         *thread = Some(Thread {
             status: Status::Ready,
             status_after_stop: Status::Ready,
+            waiter: None,
             context: Some(context),
         });
         self.scheduler.push(tid);
@@ -125,6 +127,16 @@ impl ThreadPool {
             Status::Exited(_) => self.exit_handler(tid, proc),
             _ => {}
         }
+    }
+
+    /// Called by `JoinHandle` to let thread `tid` wait for `target`.
+    /// The `tid` is going to sleep, and will be woke up when `target` exit.
+    /// (see `exit_handler()`)
+    pub(crate) fn wait(&self, tid: Tid, target: Tid) {
+        self.set_status(tid, Status::Sleeping);
+        let mut target_lock = self.threads[target].lock();
+        let target = target_lock.as_mut().expect("process not exist");
+        target.waiter = Some(tid);
     }
 
     /// Switch the status of a process.
@@ -190,8 +202,12 @@ impl ThreadPool {
         // NOTE: if `tid` is running, status change will be deferred.
         self.set_status(tid, Status::Exited(code));
     }
-    /// Called when a process exit
+    /// Called when a thread exit
     fn exit_handler(&self, tid: Tid, proc: &mut Thread) {
+        // wake up waiter
+        if let Some(waiter) = proc.waiter {
+            self.wakeup(waiter);
+        }
         // drop its context
         proc.context = None;
     }
