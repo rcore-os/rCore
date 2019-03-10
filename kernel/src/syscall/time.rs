@@ -6,9 +6,28 @@ use crate::arch::driver::rtc_cmos;
 use core::time::Duration;
 use lazy_static::lazy_static;
 
+/// should be initialized together
 lazy_static! {
-    pub static ref EPOCH_BASE: u64 = unsafe { rtc_cmos::read_epoch() };
+    pub static ref EPOCH_BASE: u64 = rtc_cmos::read_epoch();
     pub static ref TICK_BASE: u64 = unsafe { crate::trap::TICK as u64 };
+}
+
+// 1ms msec
+// 1us usec
+// 1ns nsec
+
+const USEC_PER_SEC: u64 = 1_000_000;
+const MSEC_PER_SEC: u64 = 1_000;
+const USEC_PER_MSEC: u64 = 1_000;
+const NSEC_PER_USEC: u64 = 1_000;
+
+/// Get time since epoch in usec
+fn get_epoch_usec() -> u64 {
+    let tick_base = *TICK_BASE;
+    let epoch_base = *EPOCH_BASE;
+    let tick = unsafe { crate::trap::TICK as u64 };
+
+    (tick - tick_base) * USEC_PER_TICK as u64 + epoch_base * USEC_PER_SEC
 }
 
 #[repr(C)]
@@ -20,11 +39,15 @@ pub struct TimeVal {
 
 impl TimeVal {
     pub fn to_msec(&self) -> u64 {
-        self.sec * 1000 + self.usec / 1000
+        self.sec * MSEC_PER_SEC + self.usec / USEC_PER_MSEC
     }
 
-    pub fn to_usec(&self) -> u64 {
-        self.sec * 1000_000 + self.usec
+    pub fn get_epoch() -> Self {
+        let usec = get_epoch_usec();
+        TimeVal {
+            sec: usec / USEC_PER_SEC,
+            usec: usec % USEC_PER_SEC,
+        }
     }
 }
 
@@ -39,6 +62,14 @@ impl TimeSpec {
     pub fn to_duration(&self) -> Duration {
         Duration::new(self.sec, self.nsec as u32)
     }
+
+    pub fn get_epoch() -> Self {
+        let usec = get_epoch_usec();
+        TimeSpec {
+            sec: usec / USEC_PER_SEC,
+            nsec: usec % USEC_PER_SEC * NSEC_PER_USEC,
+        }
+    }
 }
 
 pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
@@ -50,16 +81,7 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
     let proc = process();
     proc.memory_set.check_mut_ptr(tv)?;
 
-    let tick_base = *TICK_BASE;
-    let epoch_base = *EPOCH_BASE;
-    let tick = unsafe { crate::trap::TICK as u64 };
-
-    let usec = (tick - tick_base) * USEC_PER_TICK as u64;
-    let sec = epoch_base + usec / 1_000_000;
-    let timeval = TimeVal {
-        sec,
-        usec: usec % 1_000_000,
-    };
+    let timeval = TimeVal::get_epoch();
     unsafe {
         *tv = timeval;
     }
@@ -72,16 +94,7 @@ pub fn sys_clock_gettime(clock: usize, ts: *mut TimeSpec) -> SysResult {
     let proc = process();
     proc.memory_set.check_mut_ptr(ts)?;
 
-    let tick_base = *TICK_BASE;
-    let epoch_base = *EPOCH_BASE;
-    let tick = unsafe { crate::trap::TICK as u64 };
-
-    let usec = (tick - tick_base) * USEC_PER_TICK as u64;
-    let sec = epoch_base + usec / 1_000_000;
-    let timespec = TimeSpec {
-        sec,
-        nsec: (usec % 1_000_000) * 1000,
-    };
+    let timespec = TimeSpec::get_epoch();
     unsafe {
         *ts = timespec;
     }
@@ -89,12 +102,7 @@ pub fn sys_clock_gettime(clock: usize, ts: *mut TimeSpec) -> SysResult {
 }
 
 pub fn sys_time(time: *mut u64) -> SysResult {
-    let tick_base = *TICK_BASE;
-    let epoch_base = *EPOCH_BASE;
-    let tick = unsafe { crate::trap::TICK as u64 };
-
-    let usec = (tick - tick_base) * USEC_PER_TICK as u64;
-    let sec = epoch_base + usec / 1_000_000;
+    let sec = get_epoch_usec() / USEC_PER_SEC;
     if time as usize != 0 {
         let proc = process();
         proc.memory_set.check_mut_ptr(time)?;
