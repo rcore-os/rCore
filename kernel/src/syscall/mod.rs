@@ -59,17 +59,17 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         035 => sys_nanosleep(args[0] as *const TimeSpec),
         039 => sys_getpid(),
         041 => sys_socket(args[0], args[1], args[2]),
-        042 => sys_connect(args[0], args[1] as *const SockaddrIn, args[2]),
-        043 => sys_accept(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
-        044 => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const SockaddrIn, args[5]),
-        045 => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut SockaddrIn, args[5] as *mut u32),
+        042 => sys_connect(args[0], args[1] as *const SockAddr, args[2]),
+        043 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
+        044 => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const SockAddr, args[5]),
+        045 => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut SockAddr, args[5] as *mut u32),
 //        046 => sys_sendmsg(),
 //        047 => sys_recvmsg(),
         048 => sys_shutdown(args[0], args[1]),
-        049 => sys_bind(args[0], args[1] as *const SockaddrIn, args[2]),
+        049 => sys_bind(args[0], args[1] as *const SockAddr, args[2]),
         050 => sys_listen(args[0], args[1]),
-        051 => sys_getsockname(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
-        052 => sys_getpeername(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32),
+        051 => sys_getsockname(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
+        052 => sys_getpeername(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
         054 => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
         055 => sys_getsockopt(args[0], args[1], args[2], args[3] as *mut u8, args[4] as *mut u32),
         056 => sys_clone(args[0], args[1], args[2] as *mut u32, args[3] as *mut u32, args[4], tf),
@@ -109,7 +109,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         204 => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
         217 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
         228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
-        288 => sys_accept(args[0], args[1] as *mut SockaddrIn, args[2] as *mut u32), // use accept for accept4
+        288 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
 //        293 => sys_pipe(),
 
         // for musl: empty impl

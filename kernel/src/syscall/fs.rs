@@ -68,7 +68,7 @@ pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize
 
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
     info!("poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}", ufds, nfds, timeout_msecs);
-    let mut proc = process();
+    let proc = process();
     proc.memory_set.check_mut_array(ufds, nfds)?;
 
     let polls = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
@@ -82,7 +82,7 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
     let begin_time_ms = crate::trap::uptime_msec();
     loop {
         use PollEvents as PE;
-        let mut proc = process();
+        let proc = process();
         let mut events = 0;
         for poll in polls.iter_mut() {
             poll.revents = PE::NONE;
@@ -192,7 +192,7 @@ impl FdSet {
 pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, timeout: *const TimeVal) -> SysResult {
     info!("select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}", nfds, read, write, err, timeout);
 
-    let mut proc = process();
+    let proc = process();
     let mut read_fds = FdSet::new(&proc, read, nfds)?;
     let mut write_fds = FdSet::new(&proc, write, nfds)?;
     let mut err_fds = FdSet::new(&proc, err, nfds)?;
@@ -207,7 +207,7 @@ pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, t
 
     let begin_time_ms = crate::trap::uptime_msec();
     loop {
-        let mut proc = process();
+        let proc = process();
         let mut events = 0;
         for (fd, file) in proc.files.iter() {
             if *fd < nfds {
@@ -336,7 +336,7 @@ pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
 
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
-    let mut proc = process();
+    let proc = process();
     proc.memory_set.check_mut_array(buf, len)?;
     if proc.cwd.len() + 1 > len {
         return Err(SysError::ERANGE);
@@ -364,7 +364,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 }
 
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     proc.memory_set.check_mut_ptr(stat_ptr)?;
     info!("lstat: path: {}", path);
@@ -403,7 +403,7 @@ pub fn sys_fdatasync(fd: usize) -> SysResult {
 }
 
 pub fn sys_truncate(path: *const u8, len: usize) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     info!("truncate: path: {:?}, len: {}", path, len);
     proc.lookup_inode(&path)?.resize(len)?;
@@ -480,7 +480,7 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
 }
 
 pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
     let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
     info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
@@ -499,7 +499,7 @@ pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
 }
 
 pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     // TODO: check pathname
     info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
@@ -514,7 +514,7 @@ pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
 }
 
 pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
     let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
     info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
@@ -527,7 +527,7 @@ pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
 }
 
 pub fn sys_unlink(path: *const u8) -> SysResult {
-    let mut proc = process();
+    let proc = process();
     let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
     info!("unlink: path: {:?}", path);
 

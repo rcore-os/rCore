@@ -3,6 +3,7 @@
 use super::*;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::process::structs::TcpSocketState;
+use core::cmp::min;
 use core::mem::size_of;
 use smoltcp::socket::*;
 use smoltcp::wire::*;
@@ -159,18 +160,15 @@ impl Process {
     }
 }
 
-pub fn sys_connect(fd: usize, addr: *const SockaddrIn, addrlen: usize) -> SysResult {
+pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
     info!(
-        "sys_connect: fd: {}, addr: {:?}, addrlen: {}",
-        fd, addr, addrlen
+        "sys_connect: fd: {}, addr: {:?}, addr_len: {}",
+        fd, addr, addr_len
     );
 
     let mut proc = process();
-    proc.memory_set.check_ptr(addr)?;
 
-    // FIXME: check size as per sin_family
-    let sockaddr_in = unsafe { &*(addr) };
-    let endpoint = sockaddr_in.to_endpoint()?;
+    let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
 
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
@@ -192,7 +190,7 @@ pub fn sys_connect(fd: usize, addr: *const SockaddrIn, addrlen: usize) -> SysRes
                     iface.poll();
 
                     let mut sockets = iface.sockets();
-                    let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+                    let socket = sockets.get::<TcpSocket>(wrapper.handle);
                     if socket.state() == TcpState::SynSent {
                         // still connecting
                         drop(socket);
@@ -308,7 +306,7 @@ pub fn sys_sendto(
     buffer: *const u8,
     len: usize,
     flags: usize,
-    addr: *const SockaddrIn,
+    addr: *const SockAddr,
     addr_len: usize,
 ) -> SysResult {
     info!(
@@ -317,11 +315,9 @@ pub fn sys_sendto(
     );
 
     let mut proc = process();
-    proc.memory_set.check_ptr(addr)?;
     proc.memory_set.check_array(buffer, len)?;
 
-    let sockaddr_in = unsafe { &*(addr) };
-    let endpoint = sockaddr_in.to_endpoint()?;
+    let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
 
     let iface = &*(NET_DRIVERS.read()[0]);
 
@@ -389,7 +385,7 @@ pub fn sys_recvfrom(
     buffer: *mut u8,
     len: usize,
     flags: usize,
-    addr: *mut SockaddrIn,
+    addr: *mut SockAddr,
     addr_len: *mut u32,
 ) -> SysResult {
     info!(
@@ -404,7 +400,7 @@ pub fn sys_recvfrom(
         proc.memory_set.check_mut_ptr(addr_len)?;
 
         let max_addr_len = unsafe { *addr_len } as usize;
-        if max_addr_len < size_of::<SockaddrIn>() {
+        if max_addr_len < size_of::<SockAddr>() {
             return Err(SysError::EINVAL);
         }
 
@@ -423,16 +419,16 @@ pub fn sys_recvfrom(
 
             let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
             if let Ok(size) = socket.recv_slice(&mut slice) {
-                let mut packet = Ipv4Packet::new_unchecked(&slice);
+                let packet = Ipv4Packet::new_unchecked(&slice);
 
                 if !addr.is_null() {
                     // FIXME: check size as per sin_family
-                    let sockaddr_in = SockaddrIn::from(IpEndpoint {
+                    let sockaddr_in = SockAddr::from(IpEndpoint {
                         addr: IpAddress::Ipv4(packet.src_addr()),
                         port: 0,
                     });
                     unsafe {
-                        sockaddr_in.write_to(addr, addr_len);
+                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
                     }
                 }
 
@@ -452,9 +448,9 @@ pub fn sys_recvfrom(
             let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
             if let Ok((size, endpoint)) = socket.recv_slice(&mut slice) {
                 if !addr.is_null() {
-                    let sockaddr_in = SockaddrIn::from(endpoint);
+                    let sockaddr_in = SockAddr::from(endpoint);
                     unsafe {
-                        sockaddr_in.write_to(addr, addr_len);
+                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
                     }
                 }
 
@@ -474,9 +470,9 @@ pub fn sys_recvfrom(
             let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
             if let Ok(size) = socket.recv_slice(&mut slice) {
                 if !addr.is_null() {
-                    let sockaddr_in = SockaddrIn::from(socket.remote_endpoint());
+                    let sockaddr_in = SockAddr::from(socket.remote_endpoint());
                     unsafe {
-                        sockaddr_in.write_to(addr, addr_len);
+                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
                     }
                 }
 
@@ -519,16 +515,11 @@ impl Drop for SocketWrapper {
     }
 }
 
-pub fn sys_bind(fd: usize, addr: *const SockaddrIn, len: usize) -> SysResult {
-    info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, len);
+pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
+    info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, addr_len);
     let mut proc = process();
 
-    if len < size_of::<SockaddrIn>() {
-        return Err(SysError::EINVAL);
-    }
-
-    let sockaddr_in = unsafe { &*(addr) };
-    let mut endpoint = sockaddr_in.to_endpoint()?;
+    let mut endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
     if endpoint.port == 0 {
         endpoint.port = get_ephemeral_port();
     }
@@ -598,7 +589,7 @@ pub fn sys_shutdown(fd: usize, how: usize) -> SysResult {
     }
 }
 
-pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysResult {
+pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
     info!(
         "sys_accept: fd: {} addr: {:?} addr_len: {:?}",
         fd, addr, addr_len
@@ -611,7 +602,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
         proc.memory_set.check_mut_ptr(addr_len)?;
 
         let max_addr_len = unsafe { *addr_len } as usize;
-        if max_addr_len < size_of::<SockaddrIn>() {
+        if max_addr_len < size_of::<SockAddr>() {
             debug!("length too short {}", max_addr_len);
             return Err(SysError::EINVAL);
         }
@@ -625,7 +616,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
             loop {
                 let iface = &*(NET_DRIVERS.read()[0]);
                 let mut sockets = iface.sockets();
-                let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+                let socket = sockets.get::<TcpSocket>(wrapper.handle);
 
                 if socket.is_active() {
                     let remote_endpoint = socket.remote_endpoint();
@@ -665,9 +656,9 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
                     proc.files.insert(new_fd, orig_socket);
 
                     if !addr.is_null() {
-                        let sockaddr_in = SockaddrIn::from(remote_endpoint);
+                        let sockaddr_in = SockAddr::from(remote_endpoint);
                         unsafe {
-                            sockaddr_in.write_to(addr, addr_len);
+                            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
                         }
                     }
                     return Ok(new_fd);
@@ -688,7 +679,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysRe
     }
 }
 
-pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysResult {
+pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
     info!(
         "sys_getsockname: fd: {} addr: {:?} addr_len: {:?}",
         fd, addr, addr_len
@@ -705,7 +696,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     proc.memory_set.check_mut_ptr(addr_len)?;
 
     let max_addr_len = unsafe { *addr_len } as usize;
-    if max_addr_len < size_of::<SockaddrIn>() {
+    if max_addr_len < size_of::<SockAddr>() {
         return Err(SysError::EINVAL);
     }
 
@@ -715,9 +706,9 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(state) = &wrapper.socket_type {
         if let Some(endpoint) = state.local_endpoint {
-            let sockaddr_in = SockaddrIn::from(endpoint);
+            let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
-                sockaddr_in.write_to(addr, addr_len);
+                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
             }
             Ok(0)
         } else {
@@ -728,7 +719,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     }
 }
 
-pub fn sys_getpeername(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> SysResult {
+pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
     info!(
         "sys_getpeername: fd: {} addr: {:?} addr_len: {:?}",
         fd, addr, addr_len
@@ -745,7 +736,7 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
     proc.memory_set.check_mut_ptr(addr_len)?;
 
     let max_addr_len = unsafe { *addr_len } as usize;
-    if max_addr_len < size_of::<SockaddrIn>() {
+    if max_addr_len < size_of::<SockAddr>() {
         return Err(SysError::EINVAL);
     }
 
@@ -759,9 +750,9 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockaddrIn, addr_len: *mut u32) -> 
 
         if socket.is_open() {
             let remote_endpoint = socket.remote_endpoint();
-            let sockaddr_in = SockaddrIn::from(remote_endpoint);
+            let sockaddr_in = SockAddr::from(remote_endpoint);
             unsafe {
-                sockaddr_in.write_to(addr, addr_len);
+                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
             }
             Ok(0)
         } else {
@@ -781,7 +772,7 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
     if let SocketType::Tcp(state) = wrapper.socket_type.clone() {
         let iface = &*(NET_DRIVERS.read()[0]);
         let mut sockets = iface.sockets();
-        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
+        let socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         if state.is_listening && socket.is_active() {
             // a new connection
@@ -805,55 +796,115 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
 }
 
 pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) -> SysResult {
-    let iface = &*(NET_DRIVERS.read()[0]);
-    let mut sockets = iface.sockets();
-    sockets.retain(wrapper.handle);
     proc.files.insert(fd, FileLike::Socket(wrapper));
     Ok(fd)
 }
 
 #[repr(C)]
-pub struct SockaddrIn {
+pub struct SockAddrIn {
     sin_family: u16,
     sin_port: u16,
     sin_addr: u32,
     sin_zero: [u8; 8],
 }
 
-impl From<IpEndpoint> for SockaddrIn {
+#[repr(C)]
+pub struct SockAddrUn {
+    sun_family: u16,
+    sun_path: [u8; 108],
+}
+
+#[repr(C)]
+pub union SockAddrPayload {
+    addr_in: SockAddrIn,
+    addr_un: SockAddrUn,
+}
+
+#[repr(C)]
+pub struct SockAddr {
+    family: u16,
+    payload: SockAddrPayload,
+}
+
+impl From<IpEndpoint> for SockAddr {
     fn from(endpoint: IpEndpoint) -> Self {
         match endpoint.addr {
-            IpAddress::Ipv4(ipv4) => SockaddrIn {
-                sin_family: AF_INET as u16,
-                sin_port: u16::to_be(endpoint.port),
-                sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
-                sin_zero: [0; 8],
+            IpAddress::Ipv4(ipv4) => SockAddr {
+                family: AF_INET as u16,
+                payload: SockAddrPayload {
+                    addr_in: SockAddrIn {
+                        sin_family: AF_INET as u16,
+                        sin_port: u16::to_be(endpoint.port),
+                        sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
+                        sin_zero: [0; 8],
+                    },
+                },
             },
             _ => unimplemented!("ipv6"),
         }
     }
 }
 
-impl SockaddrIn {
-    fn to_endpoint(&self) -> Result<IpEndpoint, SysError> {
-        // FIXME: check size as per sin_family
-        if self.sin_family == AF_INET as u16 {
-            let port = u16::from_be(self.sin_port);
-            let addr = IpAddress::from(Ipv4Address::from_bytes(
-                &u32::from_be(self.sin_addr).to_be_bytes()[..],
-            ));
-            Ok((addr, port).into())
-        } else if self.sin_family == AF_UNIX as u16 {
-            debug!("unix socket path {}", unsafe {
-                util::from_cstr((self as *const SockaddrIn as *const u8).add(2))
-            });
-            Err(SysError::EINVAL)
-        } else {
-            Err(SysError::EINVAL)
+/// Convert sockaddr to endpoint
+// Check len is long enough
+fn sockaddr_to_endpoint(
+    proc: &mut Process,
+    addr: *const SockAddr,
+    len: usize,
+) -> Result<IpEndpoint, SysError> {
+    if len < size_of::<u16>() {
+        return Err(SysError::EINVAL);
+    }
+    proc.memory_set.check_array(addr as *const u8, len)?;
+    unsafe {
+        match (*addr).family as usize {
+            AF_INET => {
+                if len < size_of::<u16>() + size_of::<SockAddrIn>() {
+                    return Err(SysError::EINVAL);
+                }
+                let port = u16::from_be((*addr).payload.addr_in.sin_port);
+                let addr = IpAddress::from(Ipv4Address::from_bytes(
+                    &u32::from_be((*addr).payload.addr_in.sin_addr).to_be_bytes()[..],
+                ));
+                Ok((addr, port).into())
+            }
+            AF_UNIX => Err(SysError::EINVAL),
+            _ => Err(SysError::EINVAL),
         }
     }
-    unsafe fn write_to(self, addr: *mut SockaddrIn, addr_len: *mut u32) {
-        addr.write(self);
-        addr_len.write(size_of::<SockaddrIn>() as u32);
+}
+
+impl SockAddr {
+    /// Write to user sockaddr
+    /// Check mutability for user
+    unsafe fn write_to(
+        self,
+        proc: &mut Process,
+        addr: *mut SockAddr,
+        addr_len: *mut u32,
+    ) -> SysResult {
+        // Ignore NULL
+        if addr.is_null() {
+            return Ok(0);
+        }
+
+        proc.memory_set.check_mut_ptr(addr_len)?;
+        let max_addr_len = *addr_len as usize;
+        let full_len = match self.family as usize {
+            AF_INET => size_of::<u16>() + size_of::<SockAddrIn>(),
+            AF_UNIX => return Err(SysError::EINVAL),
+            _ => return Err(SysError::EINVAL),
+        };
+
+        let written_len = min(max_addr_len, full_len);
+        if written_len > 0 {
+            proc.memory_set
+                .check_mut_array(addr as *mut u8, written_len)?;
+            let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
+            let target = slice::from_raw_parts_mut(addr as *mut u8, written_len);
+            target.copy_from_slice(source);
+        }
+        addr_len.write(full_len as u32);
+        return Ok(0);
     }
 }

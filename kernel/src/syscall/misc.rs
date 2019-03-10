@@ -54,23 +54,29 @@ pub fn sys_sysinfo(sys_info: *mut SysInfo) -> SysResult {
     proc.memory_set.check_mut_ptr(sys_info)?;
 
     let sysinfo = SysInfo::default();
-    unsafe {
-        *sys_info = sysinfo
-    };
+    unsafe { *sys_info = sysinfo };
     Ok(0)
 }
 
 pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> SysResult {
-    info!("futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
-          thread::current().id(), uaddr, op, val, timeout);
-//    if op & OP_PRIVATE == 0 {
-//        unimplemented!("futex only support process-private");
-//        return Err(SysError::ENOSYS);
-//    }
+    info!(
+        "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
+        thread::current().id(),
+        uaddr,
+        op,
+        val,
+        timeout
+    );
+    //    if op & OP_PRIVATE == 0 {
+    //        unimplemented!("futex only support process-private");
+    //        return Err(SysError::ENOSYS);
+    //    }
     if uaddr % size_of::<u32>() != 0 {
         return Err(SysError::EINVAL);
     }
-    process().memory_set.check_mut_ptr(uaddr as *mut AtomicI32)?;
+    process()
+        .memory_set
+        .check_mut_ptr(uaddr as *mut AtomicI32)?;
     let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
     let timeout = if timeout.is_null() {
         None
@@ -101,7 +107,7 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
         _ => {
             warn!("unsupported futex operation: {}", op);
             Err(SysError::ENOSYS)
-        },
+        }
     }
 }
 
@@ -119,5 +125,5 @@ pub struct SysInfo {
     procs: u16,
     totalhigh: u64,
     freehigh: u64,
-    mem_unit: u32
+    mem_unit: u32,
 }

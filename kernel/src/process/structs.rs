@@ -279,7 +279,7 @@ impl Process {
 fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
     debug!("creating MemorySet from ELF");
     let mut ms = MemorySet::new();
-    let mut entry = elf.header.pt2.entry_point() as usize;
+    let entry = elf.header.pt2.entry_point() as usize;
 
     // [NoMMU] Get total memory size and alloc space
     let va_begin = elf.program_iter()

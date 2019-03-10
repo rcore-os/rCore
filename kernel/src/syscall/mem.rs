@@ -8,10 +8,20 @@ use crate::memory::GlobalFrameAlloc;
 
 use super::*;
 
-pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: i32, offset: usize) -> SysResult {
+pub fn sys_mmap(
+    mut addr: usize,
+    len: usize,
+    prot: usize,
+    flags: usize,
+    fd: i32,
+    offset: usize,
+) -> SysResult {
     let prot = MmapProt::from_bits_truncate(prot);
     let flags = MmapFlags::from_bits_truncate(flags);
-    info!("mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}", addr, len, prot, flags, fd, offset);
+    info!(
+        "mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}",
+        addr, len, prot, flags, fd, offset
+    );
 
     let mut proc = process();
     if addr == 0 {
@@ -32,7 +42,13 @@ pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: 
         if flags.contains(MmapFlags::SHARED) {
             return Err(SysError::EINVAL);
         }
-        proc.memory_set.push(addr, addr + len, prot.to_attr(), Delay::new(GlobalFrameAlloc), "mmap");
+        proc.memory_set.push(
+            addr,
+            addr + len,
+            prot.to_attr(),
+            Delay::new(GlobalFrameAlloc),
+            "mmap",
+        );
         return Ok(addr);
     }
     unimplemented!()
@@ -40,7 +56,10 @@ pub fn sys_mmap(mut addr: usize, mut len: usize, prot: usize, flags: usize, fd: 
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
     let prot = MmapProt::from_bits_truncate(prot);
-    info!("mprotect: addr={:#x}, size={:#x}, prot={:?}", addr, len, prot);
+    info!(
+        "mprotect: addr={:#x}, size={:#x}, prot={:?}",
+        addr, len, prot
+    );
 
     let mut proc = process();
     let attr = prot.to_attr();
@@ -53,7 +72,9 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
     }
     proc.memory_set.edit(|pt| {
         for page in Page::range_of(addr, addr + len) {
-            let entry = pt.get_entry(page.start_address()).expect("failed to get entry");
+            let entry = pt
+                .get_entry(page.start_address())
+                .expect("failed to get entry");
             attr.apply(entry);
         }
     });
@@ -96,9 +117,11 @@ bitflags! {
 impl MmapProt {
     fn to_attr(self) -> MemoryAttr {
         let mut attr = MemoryAttr::default().user();
-        if self.contains(MmapProt::EXEC) { attr = attr.execute(); }
+        if self.contains(MmapProt::EXEC) {
+            attr = attr.execute();
+        }
         // FIXME: see sys_mprotect
-//        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
+        //        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
         attr
     }
 }

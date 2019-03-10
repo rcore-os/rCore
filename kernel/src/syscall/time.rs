@@ -47,7 +47,7 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
         return Err(SysError::EINVAL);
     }
 
-    let mut proc = process();
+    let proc = process();
     proc.memory_set.check_mut_ptr(tv)?;
 
     let tick_base = *TICK_BASE;
@@ -69,7 +69,7 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
 pub fn sys_clock_gettime(clock: usize, ts: *mut TimeSpec) -> SysResult {
     info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
 
-    let mut proc = process();
+    let proc = process();
     proc.memory_set.check_mut_ptr(ts)?;
 
     let tick_base = *TICK_BASE;
@@ -96,7 +96,7 @@ pub fn sys_time(time: *mut u64) -> SysResult {
     let usec = (tick - tick_base) * USEC_PER_TICK as u64;
     let sec = epoch_base + usec / 1_000_000;
     if time as usize != 0 {
-        let mut proc = process();
+        let proc = process();
         proc.memory_set.check_mut_ptr(time)?;
         unsafe {
             time.write(sec as u64);
