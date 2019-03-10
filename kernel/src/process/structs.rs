@@ -71,16 +71,12 @@ impl fmt::Debug for FileLike {
 
 /// Pid type
 /// For strong type separation
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(Option<usize>);
 
 impl Pid {
     pub fn uninitialized() -> Self {
         Pid(None)
-    }
-
-    pub fn no_one() -> Self {
-        Pid(Some(0))
     }
 
     /// Return if it was uninitialized before this call
@@ -109,25 +105,26 @@ impl fmt::Display for Pid {
 }
 
 pub struct Process {
+    // resources
     pub memory_set: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
-    pub pid: Pid, // i.e. tgid, usually the tid of first thread
-    pub ppid: Pid, // the pid of the parent process
-    pub threads: Vec<Tid>, // threads in the same process
-    pub exit_cond: Condvar, // notified when the whole process is going to terminate
-    pub exit_code: Option<usize>, // only available when last thread exits
     futexes: BTreeMap<usize, Arc<Condvar>>,
+
+    // relationship
+    pub pid: Pid, // i.e. tgid, usually the tid of first thread
+    pub parent: Option<Arc<Mutex<Process>>>,
+    pub children: Vec<Weak<Mutex<Process>>>,
+    pub threads: Vec<Tid>, // threads in the same process
+
+    // for waiting child
+    pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
+    pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
 }
 
 /// Records the mapping between pid and Process struct.
 lazy_static! {
     pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> = RwLock::new(BTreeMap::new());
-}
-
-/// Records the list of child processes
-lazy_static! {
-    pub static ref CHILD_PROCESSES: RwLock<BTreeMap<usize, Vec<Arc<Mutex<Process>>>>> = RwLock::new(BTreeMap::new());
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -144,13 +141,9 @@ impl rcore_thread::Context for Thread {
         if proc.pid.set_if_uninitialized(tid) {
             // first thread in the process
             // link to its ppid
-            match CHILD_PROCESSES.write().entry(proc.ppid.get()) {
-                Entry::Vacant(entry) => {
-                    entry.insert(vec![self.proc.clone()]);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().push(self.proc.clone());
-                }
+            if let Some(parent) = &proc.parent {
+                let mut parent = parent.lock();
+                parent.children.push(Arc::downgrade(&self.proc));
             }
         }
         // add it to threads
@@ -161,6 +154,7 @@ impl rcore_thread::Context for Thread {
 
 impl Thread {
     /// Make a struct for the init thread
+    /// TODO: remove this, we only need `Context::null()`
     pub unsafe fn new_init() -> Box<Thread> {
         Box::new(Thread {
             context: Context::null(),
@@ -172,10 +166,11 @@ impl Thread {
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
                 pid: Pid::uninitialized(),
-                ppid: Pid::no_one(),
-                exit_cond: Condvar::new(),
+                parent: None,
+                children: Vec::new(),
                 threads: Vec::new(),
-                exit_code: None
+                child_exit: Arc::new(Condvar::new()),
+                child_exit_code: BTreeMap::new(),
             })),
         })
     }
@@ -188,16 +183,18 @@ impl Thread {
             context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
             kstack,
             clear_child_tid: 0,
+            // TODO: kernel thread should not have a process
             proc: Arc::new(Mutex::new(Process {
                 memory_set,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
                 pid: Pid::uninitialized(),
-                ppid: Pid::no_one(),
-                exit_cond: Condvar::new(),
+                parent: None,
+                children: Vec::new(),
                 threads: Vec::new(),
-                exit_code: None
+                child_exit: Arc::new(Condvar::new()),
+                child_exit_code: BTreeMap::new()
             })),
         })
     }
@@ -286,10 +283,11 @@ impl Thread {
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
                 pid: Pid::uninitialized(),
-                ppid: Pid::no_one(),
-                exit_cond: Condvar::new(),
+                parent: None,
+                children: Vec::new(),
                 threads: Vec::new(),
-                exit_code: None
+                child_exit: Arc::new(Condvar::new()),
+                child_exit_code: BTreeMap::new()
             })),
         })
     }
@@ -300,7 +298,7 @@ impl Thread {
         let memory_set = self.proc.lock().memory_set.clone();
         let files = self.proc.lock().files.clone();
         let cwd = self.proc.lock().cwd.clone();
-        let ppid = self.proc.lock().pid.clone();
+        let parent = Some(self.proc.clone());
         debug!("fork: finish clone MemorySet");
 
         // MMU:   copy data to the new space
@@ -335,10 +333,11 @@ impl Thread {
                 cwd,
                 futexes: BTreeMap::default(),
                 pid: Pid::uninitialized(),
-                ppid,
-                exit_cond: Condvar::new(),
+                parent,
+                children: Vec::new(),
                 threads: Vec::new(),
-                exit_code: None
+                child_exit: Arc::new(Condvar::new()),
+                child_exit_code: BTreeMap::new()
             })),
         })
     }
@@ -365,6 +364,13 @@ impl Process {
             self.futexes.insert(uaddr, Arc::new(Condvar::new()));
         }
         self.futexes.get(&uaddr).unwrap().clone()
+    }
+    pub fn report_exit_to_parent(&mut self, exit_code: usize) {
+        if let Some(parent) = &self.parent {
+            let mut parent = parent.lock();
+            parent.child_exit_code.insert(self.pid.get(), exit_code);
+            parent.child_exit.notify_one();
+        }
     }
 }
 
