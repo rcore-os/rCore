@@ -27,11 +27,11 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     // First init log mod, so that we can print log info.
     crate::logging::init();
-    info!("Hello world!");
     info!("{:#?}", boot_info);
 
     // Init trap handling.
     idt::init();
+    interrupt::fast_syscall::init();
 
     // Init physical memory management and heap.
     memory::init(boot_info);
@@ -57,5 +57,6 @@ fn other_start() -> ! {
     idt::init();
     gdt::init();
     cpu::init();
+    interrupt::fast_syscall::init();
     crate::kmain();
 }

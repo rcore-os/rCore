@@ -1,6 +1,7 @@
 pub mod consts;
 mod handler;
 mod trapframe;
+pub mod fast_syscall;
 
 pub use self::trapframe::*;
 pub use self::handler::*;

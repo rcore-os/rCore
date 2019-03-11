@@ -102,9 +102,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 },
             }
         }
-        SwitchToKernel => to_kernel(tf),
-        SwitchToUser => to_user(tf),
-        Syscall => syscall(tf),
         Syscall32 => syscall32(tf),
         InvalidOpcode => invalid_opcode(tf),
         DivideError | GeneralProtectionFault => error(tf),
@@ -167,22 +164,8 @@ fn ide() {
     trace!("\nInterupt: IDE");
 }
 
-fn to_user(tf: &mut TrapFrame) {
-    use crate::arch::gdt;
-    info!("\nInterupt: To User");
-    tf.cs = gdt::UCODE_SELECTOR.0 as usize;
-    tf.ss = gdt::UDATA_SELECTOR.0 as usize;
-    tf.rflags |= 3 << 12;   // 设置EFLAG的I/O特权位，使得在用户态可使用in/out指令
-}
-
-fn to_kernel(tf: &mut TrapFrame) {
-    use crate::arch::gdt;
-    info!("\nInterupt: To Kernel");
-    tf.cs = gdt::KCODE_SELECTOR.0 as usize;
-    tf.ss = gdt::KDATA_SELECTOR.0 as usize;
-}
-
-fn syscall(tf: &mut TrapFrame) {
+#[no_mangle]
+pub extern "C" fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
     tf.rax = ret as usize;
@@ -199,8 +182,8 @@ fn invalid_opcode(tf: &mut TrapFrame) {
     let opcode = unsafe { (tf.rip as *mut u16).read() };
     const SYSCALL_OPCODE: u16 = 0x05_0f;
     if opcode == SYSCALL_OPCODE {
+        tf.rip += 2;    // must before syscall
         syscall(tf);
-        tf.rip += 2;
     } else {
         crate::trap::error(tf);
     }
@@ -211,10 +194,7 @@ fn error(tf: &TrapFrame) {
 }
 
 #[no_mangle]
-pub extern fn set_return_rsp(tf: &TrapFrame) {
+pub unsafe extern fn set_return_rsp(tf: *const TrapFrame) {
     use crate::arch::gdt::Cpu;
-    use core::mem::size_of;
-    if tf.cs & 0x3 == 3 {
-        Cpu::current().set_ring0_rsp(tf as *const _ as usize + size_of::<TrapFrame>());
-    }
+    Cpu::current().set_ring0_rsp(tf.add(1) as usize);
 }

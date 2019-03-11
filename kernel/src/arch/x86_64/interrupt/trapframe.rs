@@ -79,7 +79,7 @@ impl TrapFrame {
         let mut tf = TrapFrame::default();
         tf.cs = if is32 { gdt::UCODE32_SELECTOR.0 } else { gdt::UCODE_SELECTOR.0 } as usize;
         tf.rip = entry_addr;
-        tf.ss = if is32 { gdt::UDATA32_SELECTOR.0 } else { gdt::UDATA_SELECTOR.0 } as usize;
+        tf.ss = gdt::UDATA32_SELECTOR.0 as usize;
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
@@ -198,8 +198,6 @@ impl Context {
             tf: {
                 let mut tf = tf.clone();
                 tf.rax = 0;
-                // skip syscall inst;
-                tf.rip += 2;
                 tf
             },
         }.push_at(kstack_top)
@@ -212,8 +210,6 @@ impl Context {
                 tf.rsp = ustack_top;
                 tf.fsbase = tls;
                 tf.rax = 0;
-                // skip syscall inst;
-                tf.rip += 2;
                 tf
             },
         }.push_at(kstack_top)

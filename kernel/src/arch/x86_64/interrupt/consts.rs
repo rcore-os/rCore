@@ -24,10 +24,7 @@ pub const VirtualizationException: u8 = 20;
 pub const SecurityException: u8 = 30;
 
 pub const IRQ0: u8 = 32;
-pub const Syscall: u8 = 0x40;
 pub const Syscall32: u8 = 0x80;
-pub const SwitchToUser: u8 = 120;
-pub const SwitchToKernel: u8 = 121;
 
 // IRQ
 pub const Timer: u8 = 0;

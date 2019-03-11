@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use x86_64::{PrivilegeLevel, VirtAddr};
 use x86_64::structures::gdt::*;
 use x86_64::structures::tss::TaskStateSegment;
+use x86_64::registers::model_specific::Msr;
 
 use crate::consts::MAX_CPU_NUM;
 
@@ -49,12 +50,10 @@ impl Cpu {
 
         // GDT
         self.gdt.add_entry(KCODE);
-        self.gdt.add_entry(UCODE);
-        // KDATA use segment 0
-        // self.gdt.add_entry(KDATA);
-        self.gdt.add_entry(UDATA);
+        self.gdt.add_entry(KDATA);
         self.gdt.add_entry(UCODE32);
         self.gdt.add_entry(UDATA32);
+        self.gdt.add_entry(UCODE);
         self.gdt.add_entry(Descriptor::tss_segment(&self.tss));
         self.gdt.load();
 
@@ -62,6 +61,10 @@ impl Cpu {
         set_cs(KCODE_SELECTOR);
         // load TSS
         load_tss(TSS_SELECTOR);
+        // for fast syscall:
+        // store address of TSS to kernel_gsbase
+        let mut kernel_gsbase = Msr::new(0xC0000102);
+        kernel_gsbase.write(&self.tss as *const _ as u64);
     }
 
     /// 设置从Ring3跳到Ring0时，自动切换栈的地址
@@ -81,14 +84,15 @@ const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000);  // EXECU
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000);  // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000);  // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
 // Copied from xv6
-const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff);
-// EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
+const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 const UDATA32: Descriptor = Descriptor::UserSegment(0x00cff200_0000ffff);  // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 
+// NOTICE: for fast syscall:
+//   STAR[47:32] = K_CS   = K_SS - 8
+//   STAR[63:48] = U_CS32 = U_SS32 - 8 = U_CS - 16
 pub const KCODE_SELECTOR: SegmentSelector = SegmentSelector::new(1, PrivilegeLevel::Ring0);
-pub const UCODE_SELECTOR: SegmentSelector = SegmentSelector::new(2, PrivilegeLevel::Ring3);
-pub const KDATA_SELECTOR: SegmentSelector = SegmentSelector::new(0, PrivilegeLevel::Ring0);
-pub const UDATA_SELECTOR: SegmentSelector = SegmentSelector::new(3, PrivilegeLevel::Ring3);
-pub const UCODE32_SELECTOR: SegmentSelector = SegmentSelector::new(4, PrivilegeLevel::Ring3);
-pub const UDATA32_SELECTOR: SegmentSelector = SegmentSelector::new(5, PrivilegeLevel::Ring3);
+pub const KDATA_SELECTOR: SegmentSelector = SegmentSelector::new(2, PrivilegeLevel::Ring0);
+pub const UCODE32_SELECTOR: SegmentSelector = SegmentSelector::new(3, PrivilegeLevel::Ring3);
+pub const UDATA32_SELECTOR: SegmentSelector = SegmentSelector::new(4, PrivilegeLevel::Ring3);
+pub const UCODE_SELECTOR: SegmentSelector = SegmentSelector::new(5, PrivilegeLevel::Ring3);
 pub const TSS_SELECTOR: SegmentSelector = SegmentSelector::new(6, PrivilegeLevel::Ring0);

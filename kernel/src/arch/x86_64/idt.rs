@@ -19,7 +19,7 @@ lazy_static! {
         // * 某些保留中断号不允许设置，会触发panic
         // 于是下面用了一些trick绕过了它们
 
-        let ring3 = [SwitchToKernel, Syscall, Syscall32];
+        let ring3 = [Syscall32];
 
         let mut idt = InterruptDescriptorTable::new();
         let entries = unsafe{ &mut *(&mut idt as *mut _ as *mut [Entry<HandlerFunc>; 256]) };
