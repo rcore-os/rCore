@@ -179,11 +179,21 @@ pub fn sys_exit(exit_code: usize) -> ! {
     info!("exit: {}, code: {}", tid, exit_code);
     let mut proc = process();
     proc.threads.retain(|&id| id != tid);
-    if proc.threads.len() == 0 {
-        // last thread
-        proc.report_exit_to_parent(exit_code);
-    }
+
+    // for last thread,
+    // notify parent and fill exit code
+    // avoid deadlock
+    let exit = proc.threads.len() == 0;
+    let proc_parent = proc.parent.clone();
+    let pid = proc.pid.get();
     drop(proc);
+    if exit {
+        if let Some(parent) = proc_parent {
+            let mut parent = parent.lock();
+            parent.child_exit_code.insert(pid, exit_code);
+            parent.child_exit.notify_one();
+        }
+    }
 
     // perform futex wake 1
     // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
@@ -210,8 +220,17 @@ pub fn sys_exit_group(exit_code: usize) -> ! {
     for tid in proc.threads.iter() {
         processor().manager().exit(*tid, exit_code);
     }
-    proc.report_exit_to_parent(exit_code);
+
+    // notify parent and fill exit code
+    // avoid deadlock
+    let proc_parent = proc.parent.clone();
+    let pid = proc.pid.get();
     drop(proc);
+    if let Some(parent) = proc_parent {
+        let mut parent = parent.lock();
+        parent.child_exit_code.insert(pid, exit_code);
+        parent.child_exit.notify_one();
+    }
 
     processor().yield_now();
     unreachable!();

@@ -365,13 +365,6 @@ impl Process {
         }
         self.futexes.get(&uaddr).unwrap().clone()
     }
-    pub fn report_exit_to_parent(&mut self, exit_code: usize) {
-        if let Some(parent) = &self.parent {
-            let mut parent = parent.lock();
-            parent.child_exit_code.insert(self.pid.get(), exit_code);
-            parent.child_exit.notify_one();
-        }
-    }
 }
 
 
