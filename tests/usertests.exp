@@ -4,9 +4,8 @@ spawn make run arch=x86_64
 sleep 2
 expect ">>"
 sleep 2
-send -- "biscuit/fork\r"
+send -- "biscuit/usertests\r"
 sleep 2
-expect "hello from 100"
-expect "parent done!"
+expect "exec test"
 send -- "^Ax"
 wait -nowait
