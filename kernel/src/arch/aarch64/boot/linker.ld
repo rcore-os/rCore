@@ -2,7 +2,6 @@ ENTRY(_start)
 
 SECTIONS {
   . = 0xffff000000100000; /* Load the kernel at this address. It's also kernel stack top address */
-  bootstacktop = .;
 
   .text : {
     stext = .;
@@ -35,12 +34,15 @@ SECTIONS {
     ebss = .;
   }
 
+  .stack : {
+    . = ALIGN(4K);
+    bootstack = .;
+    . += 0x100000;
+    bootstacktop = .;
+  }
+
   /* end of the binary */
   _end = ALIGN(8);
-
-  /* number of bytes in BSS section and complete binary */
-  __bss_length = (ebss - sbss);
-  __binary_length = (_end - _start);
 
   /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }

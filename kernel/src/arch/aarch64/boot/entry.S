@@ -5,3 +5,4 @@ _start:
     ldr     x0, =bootstacktop
     mov     sp, x0
     bl      rust_main
+1:  b       1b

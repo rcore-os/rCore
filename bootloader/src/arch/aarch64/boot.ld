@@ -27,5 +27,9 @@ SECTIONS {
     _ebss = .;
   }
 
+  .payload : {
+    *(.payload)
+  }
+
   /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }

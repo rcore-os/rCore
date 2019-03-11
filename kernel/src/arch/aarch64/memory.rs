@@ -47,11 +47,11 @@ static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 fn remap_the_kernel() {
     let offset = -(KERNEL_OFFSET as isize);
     let mut ms = MemorySet::new_bare();
-    ms.push(KERNEL_OFFSET, bootstacktop as usize, Linear::new(offset, MemoryAttr::default()), "kstack");
     ms.push(stext as usize, etext as usize, Linear::new(offset, MemoryAttr::default().execute().readonly()), "text");
     ms.push(sdata as usize, edata as usize, Linear::new(offset, MemoryAttr::default()), "data");
     ms.push(srodata as usize, erodata as usize, Linear::new(offset, MemoryAttr::default().readonly()), "rodata");
     ms.push(sbss as usize, ebss as usize, Linear::new(offset, MemoryAttr::default()), "bss");
+    ms.push(bootstack as usize, bootstacktop as usize, Linear::new(offset, MemoryAttr::default()), "kstack");
 
     use super::board::{IO_REMAP_BASE, IO_REMAP_END};
     ms.push(IO_REMAP_BASE, IO_REMAP_END, Linear::new(offset, MemoryAttr::default().mmio(MMIOType::Device as u8)), "io_remap");
@@ -73,7 +73,6 @@ pub fn ioremap(paddr: usize, len: usize, name: &'static str) -> usize {
 }
 
 extern "C" {
-    fn bootstacktop();
     fn stext();
     fn etext();
     fn sdata();
@@ -82,6 +81,8 @@ extern "C" {
     fn erodata();
     fn sbss();
     fn ebss();
+    fn bootstack();
+    fn bootstacktop();
     fn _start();
     fn _end();
 }
