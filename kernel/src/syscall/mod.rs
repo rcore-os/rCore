@@ -82,7 +82,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         059 => sys_exec(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8, tf),
         060 => sys_exit(args[0] as usize),
         061 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
-        062 => sys_kill(args[0]),
+        062 => sys_kill(args[0], args[1]),
         063 => sys_uname(args[0] as *mut u8),
 //        072 => sys_fcntl(),
         074 => sys_fsync(args[0]),

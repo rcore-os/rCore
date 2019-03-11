@@ -146,13 +146,35 @@ pub fn sys_yield() -> SysResult {
 }
 
 /// Kill the process
-pub fn sys_kill(pid: usize) -> SysResult {
-    info!("{} killed: {}", thread::current().id(), pid);
-    processor().manager().exit(pid, 0x100);
-    if pid == thread::current().id() {
-        processor().yield_now();
+pub fn sys_kill(pid: usize, sig: usize) -> SysResult {
+    info!("kill: {} killed: {} with sig {}", thread::current().id(), pid, sig);
+    let current_pid = process().pid.get().clone();
+    if current_pid == pid {
+        // killing myself
+        sys_exit_group(sig);
+        Ok(0)
+    } else {
+        if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
+            let proc = proc_arc.lock();
+            // quit all threads
+            for tid in proc.threads.iter() {
+                processor().manager().exit(*tid, sig);
+            }
+            // notify parent and fill exit code
+            // avoid deadlock
+            let proc_parent = proc.parent.clone();
+            let pid = proc.pid.get();
+            drop(proc);
+            if let Some(parent) = proc_parent {
+                let mut parent = parent.lock();
+                parent.child_exit_code.insert(pid, sig);
+                parent.child_exit.notify_one();
+            }
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
+        }
     }
-    Ok(0)
 }
 
 /// Get the current process id
