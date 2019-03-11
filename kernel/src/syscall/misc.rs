@@ -1,6 +1,7 @@
 use super::*;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
+use crate::arch::cpu;
 
 pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
     const ARCH_SET_FS: i32 = 0x1002;
@@ -109,6 +110,18 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
             Err(SysError::ENOSYS)
         }
     }
+}
+
+
+const LINUX_REBOOT_CMD_HALT: u32 = 0xcdef0123;
+pub fn sys_reboot(magic: u32, magic2: u32, cmd: u32, arg: *const u8) -> SysResult {
+    // we will skip verifying magic
+    if cmd == LINUX_REBOOT_CMD_HALT {
+        unsafe {
+            cpu::exit_in_qemu(1);
+        }
+    }
+    Ok(0)
 }
 
 #[repr(C)]

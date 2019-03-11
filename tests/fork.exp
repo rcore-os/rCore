@@ -1,0 +1,13 @@
+set timeout -1
+cd ../kernel
+spawn make run arch=x86_64
+sleep 2
+expect ">>"
+sleep 2
+send "biscuit/fork\n"
+sleep 2
+expect "hello from 100"
+expect "parent done!"
+sleep 2
+send "busybox halt -f\n"
+expect ">>"

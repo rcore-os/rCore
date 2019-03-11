@@ -105,7 +105,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         158 => sys_arch_prctl(args[0] as i32, args[1], tf),
 //        160 => sys_setrlimit(),
 //        162 => sys_sync(),
-//        169 => sys_reboot(),
+        169 => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
         186 => sys_gettid(),
         201 => sys_time(args[0] as *mut u64),
         202 => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
@@ -179,6 +179,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         131 => {
             warn!("sys_sigaltstack is unimplemented");
+            Ok(0)
+        }
+        162 => {
+            warn!("sys_sync is unimplemented");
             Ok(0)
         }
         213 => {

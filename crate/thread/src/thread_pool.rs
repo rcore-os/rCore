@@ -148,7 +148,7 @@ impl ThreadPool {
             match (&proc.status, &status) {
                 (Status::Ready, Status::Ready) => return,
                 (Status::Ready, _) => panic!("can not remove a process from ready queue"),
-                (Status::Exited(_), _) => panic!("can not set status for a exited process"),
+                (Status::Exited(_), _) => panic!("can not set status for a exited thread"),
                 (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
                 (Status::Running(_), Status::Ready) => {} // process will be added to scheduler in stop() 
                 (_, Status::Ready) => self.scheduler.push(tid),
