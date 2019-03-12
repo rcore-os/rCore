@@ -18,6 +18,7 @@ const SOCK_TYPE_MASK: usize = 0xf;
 
 const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
+const IPPROTO_TCP: usize = 6;
 
 fn get_ephemeral_port() -> u16 {
     // TODO selects non-conflict high port
@@ -127,6 +128,13 @@ pub fn sys_setsockopt(
     Ok(0)
 }
 
+const SOL_SOCKET: usize = 1;
+const SO_SNDBUF: usize = 7;
+const SO_RCVBUF: usize = 8;
+const SO_LINGER: usize = 13;
+
+const TCP_CONGESTION: usize = 13;
+
 pub fn sys_getsockopt(
     fd: usize,
     level: usize,
@@ -138,8 +146,32 @@ pub fn sys_getsockopt(
         "getsockopt: fd: {}, level: {}, optname: {} optval: {:?} optlen: {:?}",
         fd, level, optname, optval, optlen
     );
-    warn!("sys_getsockopt is unimplemented");
-    Err(SysError::ENOPROTOOPT)
+    let proc = process();
+    proc.memory_set.check_mut_ptr(optlen)?;
+    match level {
+        SOL_SOCKET => {
+            match optname {
+                SO_SNDBUF | SO_RCVBUF => {
+                    proc.memory_set.check_mut_array(optval, 4)?;
+                    unsafe {
+                        *(optval as *mut u32) = 1024;
+                        *optlen = 4;
+                    }
+                    Ok(0)
+                }
+                _ => Err(SysError::ENOPROTOOPT)
+            }
+        }
+        IPPROTO_TCP => {
+            match optname {
+                TCP_CONGESTION => {
+                    Ok(0)
+                }
+                _ => Err(SysError::ENOPROTOOPT)
+            }
+        }
+        _ => Err(SysError::ENOPROTOOPT)
+    }
 }
 
 impl Process {
@@ -685,22 +717,11 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         fd, addr, addr_len
     );
 
-    // smoltcp tcp sockets do not support backlog
-    // open multiple sockets for each connection
     let mut proc = process();
 
     if addr.is_null() {
         return Err(SysError::EINVAL);
     }
-
-    proc.memory_set.check_mut_ptr(addr_len)?;
-
-    let max_addr_len = unsafe { *addr_len } as usize;
-    if max_addr_len < size_of::<SockAddr>() {
-        return Err(SysError::EINVAL);
-    }
-
-    proc.memory_set.check_mut_array(addr, max_addr_len)?;
 
     let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
@@ -712,7 +733,18 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
             }
             Ok(0)
         } else {
-            Err(SysError::EINVAL)
+            let mut sockets = iface.sockets();
+            let socket = sockets.get::<TcpSocket>(wrapper.handle);
+            let endpoint = socket.local_endpoint();
+            if endpoint.is_specified() {
+                let sockaddr_in = SockAddr::from(socket.local_endpoint());
+                unsafe {
+                    sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+                }
+                Ok(0)
+            } else {
+                Err(SysError::EINVAL)
+            }
         }
     } else {
         Err(SysError::EINVAL)
@@ -732,15 +764,6 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
     if addr as usize == 0 {
         return Err(SysError::EINVAL);
     }
-
-    proc.memory_set.check_mut_ptr(addr_len)?;
-
-    let max_addr_len = unsafe { *addr_len } as usize;
-    if max_addr_len < size_of::<SockAddr>() {
-        return Err(SysError::EINVAL);
-    }
-
-    proc.memory_set.check_mut_array(addr, max_addr_len)?;
 
     let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
@@ -800,9 +823,9 @@ pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) ->
     Ok(fd)
 }
 
-#[repr(C)]
+// cancel alignment
+#[repr(packed)]
 pub struct SockAddrIn {
-    sin_family: u16,
     sin_port: u16,
     sin_addr: u32,
     sin_zero: [u8; 8],
@@ -810,7 +833,6 @@ pub struct SockAddrIn {
 
 #[repr(C)]
 pub struct SockAddrUn {
-    sun_family: u16,
     sun_path: [u8; 108],
 }
 
@@ -833,7 +855,6 @@ impl From<IpEndpoint> for SockAddr {
                 family: AF_INET as u16,
                 payload: SockAddrPayload {
                     addr_in: SockAddrIn {
-                        sin_family: AF_INET as u16,
                         sin_port: u16::to_be(endpoint.port),
                         sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
                         sin_zero: [0; 8],

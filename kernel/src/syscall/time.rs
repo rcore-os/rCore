@@ -112,3 +112,35 @@ pub fn sys_time(time: *mut u64) -> SysResult {
     }
     Ok(sec as usize)
 }
+
+// ignore other fields for now
+#[repr(C)]
+pub struct RUsage {
+    utime: TimeVal,
+    stime: TimeVal
+}
+
+pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
+    info!("getrusage: who: {}, rusage: {:?}", who, rusage);
+    let proc = process();
+    proc.memory_set.check_mut_ptr(rusage)?;
+
+    let tick_base = *TICK_BASE;
+    let tick = unsafe { crate::trap::TICK as u64 };
+
+    let usec = (tick - tick_base) * USEC_PER_TICK as u64;
+    let new_rusage = RUsage {
+        utime: TimeVal {
+            sec: usec / USEC_PER_SEC,
+            usec: usec % USEC_PER_SEC,
+        },
+        stime: TimeVal {
+            sec: usec / USEC_PER_SEC,
+            usec: usec % USEC_PER_SEC,
+        }
+    };
+    unsafe {
+        *rusage = new_rusage
+    };
+    Ok(0)
+}
