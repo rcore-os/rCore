@@ -878,7 +878,6 @@ impl IoVecs {
 
     fn write_all_from_slice(&mut self, buf: &[u8]) {
         let mut copied_len = 0;
-        debug!("copy {:?}", buf);
         for slice in self.0.iter_mut() {
             let copy_len = min(slice.len(), buf.len() - copied_len);
             if copy_len == 0 {
@@ -886,7 +885,6 @@ impl IoVecs {
             }
 
             slice[..copy_len].copy_from_slice(&buf[copied_len..copied_len + copy_len]);
-            debug!("copy to {:?}", slice);
             copied_len += copy_len;
         }
     }

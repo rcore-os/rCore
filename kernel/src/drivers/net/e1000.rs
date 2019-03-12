@@ -72,10 +72,13 @@ impl Driver for E1000Interface {
     fn try_handle_interrupt(&self) -> bool {
         let irq = {
             let driver = self.driver.0.lock();
-            let mut current_addr = driver.header;
-            while current_addr < driver.header + driver.size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
+
+            if let None = active_table().get_entry(driver.header) {
+                let mut current_addr = driver.header;
+                while current_addr < driver.header + driver.size {
+                    active_table().map_if_not_exists(current_addr, current_addr);
+                    current_addr = current_addr + PAGE_SIZE;
+                }
             }
 
             let e1000 = unsafe {
@@ -115,11 +118,12 @@ impl Driver for E1000Interface {
 
 impl E1000 {
     fn transmit_available(&self) -> bool {
-        // TODO map it in all cpu
-        let mut current_addr = self.header;
-        while current_addr < self.header + self.size {
-            active_table().map_if_not_exists(current_addr, current_addr);
-            current_addr = current_addr + PAGE_SIZE;
+        if let None = active_table().get_entry(self.header) {
+            let mut current_addr = self.header;
+            while current_addr < self.header + self.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
         }
 
         let e1000 =
@@ -136,11 +140,12 @@ impl E1000 {
     }
 
     fn receive_available(&self) -> bool {
-        // TODO map it in all cpu
-        let mut current_addr = self.header;
-        while current_addr < self.header + self.size {
-            active_table().map_if_not_exists(current_addr, current_addr);
-            current_addr = current_addr + PAGE_SIZE;
+        if let None = active_table().get_entry(self.header) {
+            let mut current_addr = self.header;
+            while current_addr < self.header + self.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
         }
 
         let e1000 =
