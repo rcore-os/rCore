@@ -20,6 +20,9 @@ const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
 const IPPROTO_TCP: usize = 6;
 
+const TCP_SENDBUF: usize = 128 * 1024; // 128K
+const TCP_RECVBUF: usize = 128 * 1024;
+
 fn get_ephemeral_port() -> u16 {
     // TODO selects non-conflict high port
     static mut EPHEMERAL_PORT: u16 = 49152;
@@ -45,8 +48,8 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
             SOCK_STREAM => {
                 let fd = proc.get_free_fd();
 
-                let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
-                let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
+                let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; TCP_RECVBUF]);
+                let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; TCP_SENDBUF]);
                 let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
                 let tcp_handle = iface.sockets().add(tcp_socket);
@@ -151,10 +154,18 @@ pub fn sys_getsockopt(
     match level {
         SOL_SOCKET => {
             match optname {
-                SO_SNDBUF | SO_RCVBUF => {
+                SO_SNDBUF => {
                     proc.memory_set.check_mut_array(optval, 4)?;
                     unsafe {
-                        *(optval as *mut u32) = 1024;
+                        *(optval as *mut u32) = TCP_SENDBUF as u32;
+                        *optlen = 4;
+                    }
+                    Ok(0)
+                }
+                SO_RCVBUF => {
+                    proc.memory_set.check_mut_array(optval, 4)?;
+                    unsafe {
+                        *(optval as *mut u32) = TCP_RECVBUF as u32;
                         *optlen = 4;
                     }
                     Ok(0)

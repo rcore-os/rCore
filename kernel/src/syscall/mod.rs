@@ -8,6 +8,7 @@ use rcore_memory::VMError;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
 
 use crate::arch::interrupt::TrapFrame;
+use crate::sync::Condvar;
 use crate::process::*;
 use crate::thread;
 use crate::util;
@@ -336,3 +337,21 @@ impl From<VMError> for SysError {
         SysError::EFAULT
     }
 }
+
+
+const SPIN_WAIT_TIMES: usize = 100;
+
+pub fn spin_and_wait(condvars: &[&Condvar], mut action: impl FnMut() -> Option<SysResult>) -> SysResult {
+    for i in 0..SPIN_WAIT_TIMES {
+        if let Some(result) = action() {
+            return result;
+        }
+    }
+    loop {
+        if let Some(result) = action() {
+            return result;
+        }
+        Condvar::wait_any(&condvars);
+    }
+}
+
