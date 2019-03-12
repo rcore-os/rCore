@@ -1,7 +1,6 @@
 //! Syscalls for process
 
 use super::*;
-use crate::sync::Condvar;
 
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
@@ -152,7 +151,6 @@ pub fn sys_kill(pid: usize, sig: usize) -> SysResult {
     if current_pid == pid {
         // killing myself
         sys_exit_group(sig);
-        Ok(0)
     } else {
         if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
             let proc = proc_arc.lock();

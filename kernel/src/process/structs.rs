@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::BTreeMap, collections::btree_map::Entry, string::String, sync::Arc, vec::Vec, sync::Weak};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec, sync::Weak};
 use core::fmt;
 
 use log::*;
@@ -34,10 +34,15 @@ pub struct TcpSocketState {
 }
 
 #[derive(Clone, Debug)]
+pub struct UdpSocketState {
+    pub remote_endpoint: Option<IpEndpoint>, // remember remote endpoint for connect(0)
+}
+
+#[derive(Clone, Debug)]
 pub enum SocketType {
     Raw,
     Tcp(TcpSocketState),
-    Udp,
+    Udp(UdpSocketState),
     Icmp
 }
 
@@ -61,7 +66,7 @@ impl fmt::Debug for FileLike {
                 match wrapper.socket_type {
                     SocketType::Raw => write!(f, "RawSocket"),
                     SocketType::Tcp(_) => write!(f, "TcpSocket"),
-                    SocketType::Udp => write!(f, "UdpSocket"),
+                    SocketType::Udp(_) => write!(f, "UdpSocket"),
                     SocketType::Icmp => write!(f, "IcmpSocket"),
                 }
             },

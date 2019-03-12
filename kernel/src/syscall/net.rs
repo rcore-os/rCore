@@ -80,7 +80,9 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     fd,
                     FileLike::Socket(SocketWrapper {
                         handle: udp_handle,
-                        socket_type: SocketType::Udp,
+                        socket_type: SocketType::Udp(UdpSocketState {
+                            remote_endpoint: None
+                        }),
                     }),
                 );
 
@@ -213,7 +215,7 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
 
     let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
 
-    let wrapper = proc.get_socket(fd)?;
+    let wrapper = &mut proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         let iface = &*(NET_DRIVERS.read()[0]);
         let mut sockets = iface.sockets();
@@ -249,8 +251,10 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
             }
             Err(_) => Err(SysError::ENOBUFS),
         }
-    } else if let SocketType::Udp = wrapper.socket_type {
-        // do nothing when only sendto() is used
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
+        wrapper.socket_type = SocketType::Udp(UdpSocketState {
+            remote_endpoint: Some(endpoint),
+        });
         Ok(0)
     } else {
         unimplemented!("socket type")
@@ -280,6 +284,42 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
                 }
             } else {
                 Err(SysError::ENOBUFS)
+            }
+        } else {
+            Err(SysError::ENOTCONN)
+        }
+    } else if let SocketType::Udp(ref state) = wrapper.socket_type {
+        if let Some(ref remote_endpoint) = state.remote_endpoint {
+            let mut sockets = iface.sockets();
+            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+            if !socket.endpoint().is_specified() {
+                let v4_src = iface.ipv4_address().unwrap();
+                let temp_port = get_ephemeral_port();
+                socket
+                    .bind(IpEndpoint::new(IpAddress::Ipv4(v4_src), temp_port))
+                    .unwrap();
+            }
+
+            let slice = unsafe { slice::from_raw_parts(base, len) };
+            if socket.is_open() {
+                if socket.can_send() {
+                    match socket.send_slice(&slice, *remote_endpoint) {
+                        Ok(()) => {
+                            // avoid deadlock
+                            drop(socket);
+                            drop(sockets);
+
+                            iface.poll();
+                            Ok(len)
+                        }
+                        Err(err) => Err(SysError::ENOBUFS),
+                    }
+                } else {
+                    Err(SysError::ENOBUFS)
+                }
+            } else {
+                Err(SysError::ENOTCONN)
             }
         } else {
             Err(SysError::ENOTCONN)
@@ -316,7 +356,7 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
             drop(sockets);
             SOCKET_ACTIVITY._wait()
         }
-    } else if let SocketType::Udp = wrapper.socket_type {
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
@@ -396,7 +436,7 @@ pub fn sys_sendto(
         } else {
             unimplemented!("ip type")
         }
-    } else if let SocketType::Udp = wrapper.socket_type {
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
         let v4_src = iface.ipv4_address().unwrap();
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
@@ -483,7 +523,7 @@ pub fn sys_recvfrom(
             drop(sockets);
             SOCKET_ACTIVITY._wait()
         }
-    } else if let SocketType::Udp = wrapper.socket_type {
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
@@ -757,6 +797,19 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
                 Err(SysError::EINVAL)
             }
         }
+    } else if let SocketType::Udp(_) = &wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let socket = sockets.get::<UdpSocket>(wrapper.handle);
+        let endpoint = socket.endpoint();
+        if endpoint.is_specified() {
+            let sockaddr_in = SockAddr::from(endpoint);
+            unsafe {
+                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+            }
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
+        }
     } else {
         Err(SysError::EINVAL)
     }
@@ -785,6 +838,16 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         if socket.is_open() {
             let remote_endpoint = socket.remote_endpoint();
             let sockaddr_in = SockAddr::from(remote_endpoint);
+            unsafe {
+                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+            }
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
+        }
+    } else if let SocketType::Udp(state) = &wrapper.socket_type {
+        if let Some(endpoint) = state.remote_endpoint {
+            let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
                 sockaddr_in.write_to(&mut proc, addr, addr_len)?;
             }
