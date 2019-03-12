@@ -138,8 +138,7 @@ fn try_process_serial() -> bool {
 }
 
 fn try_process_drivers() -> bool {
-    let mut drivers = DRIVERS.lock();
-    for driver in drivers.iter_mut() {
+    for driver in DRIVERS.read().iter() {
         if driver.try_handle_interrupt() == true {
             return true
         }

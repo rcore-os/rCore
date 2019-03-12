@@ -50,13 +50,13 @@ impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
-        self.0.map_to(Page::of_addr(addr), Frame::of_addr(target), flags, attr, &mut FrameAllocatorForAarch64)
+        self.0.map_to(Page::of_addr(addr as u64), Frame::of_addr(target as u64), flags, attr, &mut FrameAllocatorForAarch64)
             .unwrap().flush();
         self.get_entry(addr).expect("fail to get entry")
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (_frame, flush) = self.0.unmap(Page::of_addr(addr)).unwrap();
+        let (_frame, flush) = self.0.unmap(Page::of_addr(addr as u64)).unwrap();
         flush.flush();
     }
 
@@ -191,7 +191,7 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
-        let frame = Frame::of_addr(target);
+        let frame = Frame::of_addr(target as u64);
         active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
@@ -274,7 +274,7 @@ struct FrameAllocatorForAarch64;
 
 impl FrameAllocator<Size4KiB> for FrameAllocatorForAarch64 {
     fn alloc(&mut self) -> Option<Frame> {
-        alloc_frame().map(|addr| Frame::of_addr(addr))
+        alloc_frame().map(|addr| Frame::of_addr(addr as u64))
     }
 }
 

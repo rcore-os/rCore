@@ -11,6 +11,7 @@ pub mod idt;
 pub mod memory;
 pub mod io;
 pub mod consts;
+pub mod timer;
 
 static AP_CAN_INIT: AtomicBool = ATOMIC_BOOL_INIT;
 

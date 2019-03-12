@@ -6,3 +6,7 @@ pub fn id() -> usize {
     // TODO: cpu id
     0
 }
+
+pub fn exit_in_qemu(error_code: u8) -> ! {
+    unimplemented!()
+}

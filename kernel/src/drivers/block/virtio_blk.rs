@@ -17,7 +17,7 @@ use rcore_fs::dev::BlockDevice;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS};
+use super::super::{DeviceType, Driver, DRIVERS, BLK_DRIVERS};
 use super::super::bus::virtio_mmio::*;
 
 pub struct VirtIOBlk {
@@ -176,5 +176,7 @@ pub fn virtio_blk_init(node: &Node) {
 
     header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
 
-    DRIVERS.write().push(Arc::new(driver));
+    let driver = Arc::new(driver);
+    DRIVERS.write().push(driver.clone());
+    BLK_DRIVERS.write().push(driver);
 }

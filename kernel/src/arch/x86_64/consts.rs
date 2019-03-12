@@ -95,5 +95,3 @@ pub const USER_TMP_TLS_PML4: usize = (USER_TMP_TLS_OFFSET & PML4_MASK) / PML4_SI
 /// Offset for usage in other temporary pages
 pub const USER_TMP_MISC_OFFSET: usize = USER_TMP_TLS_OFFSET + PML4_SIZE;
 pub const USER_TMP_MISC_PML4: usize = (USER_TMP_MISC_OFFSET & PML4_MASK) / PML4_SIZE;
-
-pub const USEC_PER_TICK: usize = 10000;

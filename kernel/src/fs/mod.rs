@@ -1,6 +1,4 @@
 use alloc::{boxed::Box, collections::VecDeque, string::String, sync::Arc, vec::Vec};
-use core::any::Any;
-use core::ops::Deref;
 
 use rcore_fs::vfs::*;
 use rcore_fs_sfs::SimpleFileSystem;
@@ -25,15 +23,13 @@ lazy_static! {
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
             {
-                Box::new(crate::drivers::DRIVERS.lock().iter()
-                    .map(|device| device.deref().as_any().downcast_ref::<VirtIOBlkDriver>())
-                    .find(|maybe_blk| maybe_blk.is_some())
-                    .expect("VirtIOBlk not found")
-                    .unwrap().clone())
+                crate::drivers::BLK_DRIVERS.read().iter()
+                    .next().expect("VirtIOBlk not found")
+                    .clone()
             }
             #[cfg(target_arch = "x86_64")]
             {
-                Box::new(ide::IDE::new(1))
+                Arc::new(ide::IDE::new(1))
             }
         };
         #[cfg(feature = "link_user")]
@@ -42,7 +38,7 @@ lazy_static! {
                 fn _user_img_start();
                 fn _user_img_end();
             }
-            Box::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
+            Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");

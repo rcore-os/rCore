@@ -7,6 +7,7 @@ pub mod interrupt;
 pub mod consts;
 pub mod cpu;
 pub mod driver;
+pub mod timer;
 
 #[cfg(feature = "board_raspi3")]
 #[path = "board/raspi3/mod.rs"]

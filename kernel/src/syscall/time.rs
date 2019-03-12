@@ -1,14 +1,13 @@
 //! Syscalls for time
 
 use super::*;
-use crate::arch::consts::USEC_PER_TICK;
-use crate::arch::driver::rtc_cmos;
+use crate::consts::USEC_PER_TICK;
 use core::time::Duration;
 use lazy_static::lazy_static;
 
 /// should be initialized together
 lazy_static! {
-    pub static ref EPOCH_BASE: u64 = rtc_cmos::read_epoch();
+    pub static ref EPOCH_BASE: u64 = crate::arch::timer::read_epoch();
     pub static ref TICK_BASE: u64 = unsafe { crate::trap::TICK as u64 };
 }
 

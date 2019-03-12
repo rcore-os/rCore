@@ -7,6 +7,7 @@ use smoltcp::socket::SocketSet;
 use spin::RwLock;
 
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
+use self::block::virtio_blk::VirtIOBlkDriver;
 
 mod device_tree;
 pub mod bus;
@@ -15,6 +16,7 @@ pub mod block;
 mod gpu;
 mod input;
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
     Net,
     Gpu,
@@ -52,11 +54,8 @@ pub trait NetDriver : Driver {
 lazy_static! {
     // NOTE: RwLock only write when initializing drivers
     pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
-}
-
-lazy_static! {
-    // NOTE: RwLock only write when initializing drivers
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<NetDriver>>> = RwLock::new(Vec::new());
+    pub static ref BLK_DRIVERS: RwLock<Vec<Arc<VirtIOBlkDriver>>> = RwLock::new(Vec::new());
 }
 
 lazy_static!{

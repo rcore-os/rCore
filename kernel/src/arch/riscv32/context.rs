@@ -284,6 +284,20 @@ impl Context {
             },
         }.push_at(kstack_top)
     }
+
+    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, cr3: usize, tls: usize) -> Self {
+        InitStack {
+            context: ContextData::new(cr3),
+            tf: {
+                let mut tf = tf.clone();
+                tf.x[2] = ustack_top;   // sp
+                tf.x[4] = tls; // tp
+                tf.x[10] = 0;  // a0
+                tf
+            },
+        }.push_at(kstack_top)
+    }
+
     /// Called at a new user context
     /// To get the init TrapFrame in sys_exec
     pub unsafe fn get_init_tf(&self) -> TrapFrame {
