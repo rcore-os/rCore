@@ -245,7 +245,13 @@ pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, t
             return Ok(events);
         }
 
+        if timeout_msecs == 0 {
+            // no timeout, return now;
+            return Ok(0);
+        }
+
         let current_time_ms = crate::trap::uptime_msec();
+        // infinity check
         if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs as usize {
             return Ok(0);
         }

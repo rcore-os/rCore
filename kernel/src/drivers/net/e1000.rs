@@ -27,6 +27,11 @@ use crate::HEAP_ALLOCATOR;
 
 use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
+// At the beginning, all transmit descriptors have there status non-zero,
+// so we need to track whether we are using the descriptor for the first time.
+// When the descriptors wrap around, we set first_trans to false,
+// and lookup status instead for checking whether it is empty.
+
 pub struct E1000 {
     header: usize,
     size: usize,
@@ -116,51 +121,6 @@ impl Driver for E1000Interface {
     }
 }
 
-impl E1000 {
-    fn transmit_available(&self) -> bool {
-        if let None = active_table().get_entry(self.header) {
-            let mut current_addr = self.header;
-            while current_addr < self.header + self.size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-
-        let e1000 =
-            unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
-        let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
-        let send_queue = unsafe {
-            slice::from_raw_parts_mut(self.send_page as *mut E1000RecvDesc, send_queue_size)
-        };
-        let tdt = e1000[E1000_TDT].read();
-        let index = (tdt as usize) % send_queue_size;
-        let send_desc = &mut send_queue[index];
-
-        return self.first_trans || (*send_desc).status & 1 != 0;
-    }
-
-    fn receive_available(&self) -> bool {
-        if let None = active_table().get_entry(self.header) {
-            let mut current_addr = self.header;
-            while current_addr < self.header + self.size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-
-        let e1000 =
-            unsafe { slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4) };
-        let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
-        let mut recv_queue = unsafe {
-            slice::from_raw_parts_mut(self.recv_page as *mut E1000RecvDesc, recv_queue_size)
-        };
-        let mut rdt = e1000[E1000_RDT].read();
-        let index = (rdt as usize + 1) % recv_queue_size;
-        let recv_desc = &mut recv_queue[index];
-        return (*recv_desc).status & 1 != 0;
-    }
-}
-
 impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
@@ -215,7 +175,7 @@ struct E1000RecvDesc {
     special: u8,
 }
 
-pub struct E1000RxToken(E1000Driver);
+pub struct E1000RxToken(Vec<u8>);
 pub struct E1000TxToken(E1000Driver);
 
 impl<'a> phy::Device<'a> for E1000Driver {
@@ -224,49 +184,38 @@ impl<'a> phy::Device<'a> for E1000Driver {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let driver = self.0.lock();
-        if driver.transmit_available() && driver.receive_available() {
-            // potential racing
-            Some((E1000RxToken(self.clone()), E1000TxToken(self.clone())))
-        } else {
-            None
+
+        if let None = active_table().get_entry(driver.header) {
+            let mut current_addr = driver.header;
+            while current_addr < driver.header + driver.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
         }
-    }
 
-    fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        let driver = self.0.lock();
-        if driver.transmit_available() {
-            Some(E1000TxToken(self.clone()))
-        } else {
-            None
-        }
-    }
+        let e1000 =
+            unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
 
-    fn capabilities(&self) -> DeviceCapabilities {
-        let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = 1536;
-        caps.max_burst_size = Some(32);
-        caps
-    }
-}
+        let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
+        let send_queue = unsafe {
+            slice::from_raw_parts_mut(driver.send_page as *mut E1000SendDesc, send_queue_size)
+        };
+        let tdt = e1000[E1000_TDT].read();
+        let index = (tdt as usize) % send_queue_size;
+        let send_desc = &mut send_queue[index];
 
-impl phy::RxToken for E1000RxToken {
-    fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
-    where
-        F: FnOnce(&[u8]) -> Result<R>,
-    {
-        let data = {
-            let mut driver = (self.0).0.lock();
-            let e1000 = unsafe {
-                slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
-            };
-            let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
-            let mut recv_queue = unsafe {
-                slice::from_raw_parts_mut(driver.recv_page as *mut E1000RecvDesc, recv_queue_size)
-            };
-            let mut rdt = e1000[E1000_RDT].read();
-            let index = (rdt as usize + 1) % recv_queue_size;
-            let recv_desc = &mut recv_queue[index];
-            assert!(recv_desc.status & 1 != 0);
+        let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
+        let mut recv_queue = unsafe {
+            slice::from_raw_parts_mut(driver.recv_page as *mut E1000RecvDesc, recv_queue_size)
+        };
+        let mut rdt = e1000[E1000_RDT].read();
+        let index = (rdt as usize + 1) % recv_queue_size;
+        let recv_desc = &mut recv_queue[index];
+
+        let transmit_avail =  driver.first_trans || (*send_desc).status & 1 != 0;
+        let receive_avail =  (*recv_desc).status & 1 != 0;
+
+        if transmit_avail && receive_avail {
             let buffer = unsafe {
                 slice::from_raw_parts(
                     driver.recv_buffers[index] as *const u8,
@@ -279,11 +228,55 @@ impl phy::RxToken for E1000RxToken {
             rdt = (rdt + 1) % recv_queue_size as u32;
             e1000[E1000_RDT].write(rdt);
 
-            buffer
-        };
-        let result = f(&data);
+            Some((E1000RxToken(buffer.to_vec()), E1000TxToken(self.clone())))
+        } else {
+            None
+        }
+    }
 
-        result
+    fn transmit(&'a mut self) -> Option<Self::TxToken> {
+        let driver = self.0.lock();
+
+        if let None = active_table().get_entry(driver.header) {
+            let mut current_addr = driver.header;
+            while current_addr < driver.header + driver.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+
+        let e1000 =
+            unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+
+        let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
+        let send_queue = unsafe {
+            slice::from_raw_parts_mut(driver.send_page as *mut E1000RecvDesc, send_queue_size)
+        };
+        let tdt = e1000[E1000_TDT].read();
+        let index = (tdt as usize) % send_queue_size;
+        let send_desc = &mut send_queue[index];
+        let transmit_avail = driver.first_trans || (*send_desc).status & 1 != 0;
+        if transmit_avail {
+            Some(E1000TxToken(self.clone()))
+        } else {
+            None
+        }
+    }
+
+    fn capabilities(&self) -> DeviceCapabilities {
+        let mut caps = DeviceCapabilities::default();
+        caps.max_transmission_unit = 1536;
+        caps.max_burst_size = Some(64);
+        caps
+    }
+}
+
+impl phy::RxToken for E1000RxToken {
+    fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
+    {
+        f(&self.0)
     }
 }
 
