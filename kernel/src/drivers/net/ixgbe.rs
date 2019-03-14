@@ -78,6 +78,7 @@ const IXGBE_FCCFG: usize = 0x03D00 / 4;
 const IXGBE_AUTOC: usize = 0x042A0 / 4;
 const IXGBE_LINKS: usize = 0x042A4 / 4;
 const IXGBE_AUTOC2: usize = 0x04324 / 4;
+const IXGBE_DMATXCTL: usize = 0x04A80 / 4;
 const IXGBE_FCTRL: usize = 0x05080 / 4;
 const IXGBE_MTA: usize = 0x05200 / 4;
 const IXGBE_MTA_END: usize = 0x05400 / 4;
@@ -86,6 +87,7 @@ const IXGBE_TDBAH: usize = 0x06004 / 4;
 const IXGBE_TDLEN: usize = 0x06008 / 4;
 const IXGBE_TDH: usize = 0x06010 / 4;
 const IXGBE_TDT: usize = 0x06018 / 4;
+const IXGBE_TXDCTL: usize = 0x06028 / 4;
 const IXGBE_SECRXCTRL: usize = 0x08D00 / 4;
 const IXGBE_SECRXSTAT: usize = 0x08D04 / 4;
 const IXGBE_VFTA: usize = 0x0A000 / 4;
@@ -196,7 +198,7 @@ struct IXGBESendDesc {
     cmd: u8,
     status: u8,
     css: u8,
-    special: u8,
+    vlan: u16,
 }
 
 #[repr(C)]
@@ -227,8 +229,9 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
             }
         }
 
-        let ixgbe =
-            unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+        let ixgbe = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
 
         let send_queue_size = PAGE_SIZE / size_of::<IXGBESendDesc>();
         let send_queue = unsafe {
@@ -246,10 +249,9 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
         let index = (rdt as usize + 1) % recv_queue_size;
         let recv_desc = &mut recv_queue[index];
 
-        //let transmit_avail =  driver.first_trans || (*send_desc).status & 1 != 0;
-        let transmit_avail = true;
+        let transmit_avail = driver.first_trans || (*send_desc).status & 1 != 0;
         // Ignore packet spanning multiple descriptor
-        let receive_avail =  (*recv_desc).status_error & 1 != 0;
+        let receive_avail = (*recv_desc).status_error & 1 != 0;
 
         if transmit_avail && receive_avail {
             let buffer = unsafe {
@@ -271,7 +273,33 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        unimplemented!()
+        let driver = self.0.lock();
+
+        if let None = active_table().get_entry(driver.header) {
+            let mut current_addr = driver.header;
+            while current_addr < driver.header + driver.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+
+        let ixgbe = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
+
+        let send_queue_size = PAGE_SIZE / size_of::<IXGBESendDesc>();
+        let send_queue = unsafe {
+            slice::from_raw_parts_mut(driver.send_page as *mut IXGBESendDesc, send_queue_size)
+        };
+        let tdt = ixgbe[IXGBE_TDT].read();
+        let index = (tdt as usize) % send_queue_size;
+        let send_desc = &mut send_queue[index];
+        let transmit_avail = driver.first_trans || (*send_desc).status & 1 != 0;
+        if transmit_avail {
+            Some(IXGBETxToken(self.clone()))
+        } else {
+            None
+        }
     }
 
     fn capabilities(&self) -> DeviceCapabilities {
@@ -296,7 +324,51 @@ impl phy::TxToken for IXGBETxToken {
     where
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
-        unimplemented!()
+        let mut buffer = [0u8; PAGE_SIZE];
+        let result = f(&mut buffer[..len]);
+
+        let mut driver = (self.0).0.lock();
+
+        let ixgbe = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
+        let send_queue_size = PAGE_SIZE / size_of::<IXGBESendDesc>();
+        let mut send_queue = unsafe {
+            slice::from_raw_parts_mut(driver.send_page as *mut IXGBESendDesc, send_queue_size)
+        };
+        let mut tdt = ixgbe[IXGBE_TDT].read();
+
+        let index = (tdt as usize) % send_queue_size;
+        let send_desc = &mut send_queue[index];
+        assert!(driver.first_trans || send_desc.status & 1 != 0);
+
+        let target =
+            unsafe { slice::from_raw_parts_mut(driver.send_buffers[index] as *mut u8, len) };
+        target.copy_from_slice(&buffer[..len]);
+
+        let buffer_page_pa = active_table()
+            .get_entry(driver.send_buffers[index])
+            .unwrap()
+            .target();
+        assert_eq!(buffer_page_pa, send_desc.addr as usize);
+        send_desc.len = len as u16 + 4;
+        // RS | EOP
+        send_desc.cmd = (1 << 3) | (1 << 0);
+        send_desc.status = 0;
+
+        fence(Ordering::SeqCst);
+
+        tdt = (tdt + 1) % send_queue_size as u32;
+        ixgbe[IXGBE_TDT].write(tdt);
+
+        fence(Ordering::SeqCst);
+
+        // round
+        if tdt == 0 {
+            driver.first_trans = false;
+        }
+
+        result
     }
 }
 
@@ -354,15 +426,18 @@ pub fn ixgbe_init(header: usize, size: usize) {
     // 4.6.3 Initialization Sequence
 
     // 4.6.3.1 Interrupts During Initialization
+    // 1. Disable interrupts.
     // mask all interrupts
     ixgbe[IXGBE_EIMC].write(!0);
     ixgbe[IXGBE_EIMC1].write(!0);
     ixgbe[IXGBE_EIMC2].write(!0);
 
+    // 2. Issue a global reset.
     // reset: LRST | RST
     ixgbe[IXGBE_CTRL].write(1 << 3 | 1 << 26);
     while ixgbe[IXGBE_CTRL].read() & (1 << 3 | 1 << 26) != 0 {}
 
+    // 3. Disable interrupts (again).
     // mask all interrupts
     ixgbe[IXGBE_EIMC].write(!0);
     ixgbe[IXGBE_EIMC1].write(!0);
@@ -388,6 +463,23 @@ pub fn ixgbe_init(header: usize, size: usize) {
     // DMA Init Done
     while ixgbe[IXGBE_RDRXCTL].read() & (1 << 3) == 0 {}
 
+    let mut driver = IXGBE {
+        header,
+        size,
+        mac: EthernetAddress::from_bytes(&mac),
+        send_page,
+        send_buffers: Vec::with_capacity(send_queue_size),
+        recv_page,
+        recv_buffers: Vec::with_capacity(recv_queue_size),
+        first_trans: true,
+    };
+
+    // BAM, Accept Broadcast packets
+    ixgbe[IXGBE_FCTRL].write(ixgbe[IXGBE_FCTRL].read() | (1 << 10));
+
+    // 4.6.7 Receive Initialization
+
+    // Receive Address (RAL[n] and RAH[n]) for used addresses.
     // Read MAC Address
     let ral = ixgbe[IXGBE_RAL].read();
     let rah = ixgbe[IXGBE_RAH].read();
@@ -401,52 +493,34 @@ pub fn ixgbe_init(header: usize, size: usize) {
     ];
     debug!("mac {:x?}", mac);
 
-    let mut driver = IXGBE {
-        header,
-        size,
-        mac: EthernetAddress::from_bytes(&mac),
-        send_page,
-        send_buffers: Vec::with_capacity(send_queue_size),
-        recv_page,
-        recv_buffers: Vec::with_capacity(recv_queue_size),
-        first_trans: true,
-    };
-
-    // 4.6.7 Receive Initialization
-    // PFUTA
+    // Unicast Table Array (PFUTA).
     for i in IXGBE_PFUTA..IXGBE_PFUTA_END {
         ixgbe[i].write(0);
     }
-    // VFTA
+    // VLAN Filter Table Array (VFTA[n]).
     for i in IXGBE_VFTA..IXGBE_VFTA_END {
         ixgbe[i].write(0);
     }
-    // PFVLVF
+    // VLAN Pool Filter (PFVLVF[n]).
     for i in IXGBE_PFVLVF..IXGBE_PFVLVF_END {
         ixgbe[i].write(0);
     }
-    // MPSAR
+    // MAC Pool Select Array (MPSAR[n]).
     for i in IXGBE_MPSAR..IXGBE_MPSAR_END {
         ixgbe[i].write(0);
     }
-    // PFVLVFB
+    // VLAN Pool Filter Bitmap (PFVLVFB[n]).
     for i in IXGBE_PFVLVFB..IXGBE_PFVLVFB_END {
         ixgbe[i].write(0);
     }
-    // MTA
+    // Set up the Multicast Table Array (MTA) registers. This entire table should be zeroed and only the desired multicast addresses should be permitted (by writing 0x1 to the corresponding bit location).
     for i in IXGBE_MTA..IXGBE_MTA_END {
         ixgbe[i].write(0);
     }
 
     // Setup receive queue 0
-    ixgbe[IXGBE_RDBAL].write(recv_page_pa as u32); // RDBAL
-    ixgbe[IXGBE_RDBAH].write((recv_page_pa >> 32) as u32); // RDBAH
-    ixgbe[IXGBE_RDLEN].write(PAGE_SIZE as u32); // RDLEN
-
-    // Legacy descriptor, default SRRCTL is ok
-    // BAM, Accept Broadcast packets
-    ixgbe[IXGBE_FCTRL].write(ixgbe[IXGBE_FCTRL].read() | (1 << 10));
-
+    // The following steps should be done once per transmit queue:
+    // 2. Receive buffers of appropriate size should be allocated and pointers to these buffers should be stored in the descriptor ring.
     for i in 0..recv_queue_size {
         let buffer_page = unsafe {
             HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
@@ -456,32 +530,80 @@ pub fn ixgbe_init(header: usize, size: usize) {
         driver.recv_buffers.push(buffer_page);
     }
 
+    // 3. Program the descriptor base address with the address of the region (registers RDBAL, RDBAH).
+    ixgbe[IXGBE_RDBAL].write(recv_page_pa as u32); // RDBAL
+    ixgbe[IXGBE_RDBAH].write((recv_page_pa >> 32) as u32); // RDBAH
+
+    // 4. Set the length register to the size of the descriptor ring (register RDLEN).
+    ixgbe[IXGBE_RDLEN].write(PAGE_SIZE as u32); // RDLEN
+
+    // 5. Program SRRCTL associated with this queue according to the size of the buffers and the required header control.
+    // Legacy descriptor, default SRRCTL is ok
+
     ixgbe[IXGBE_RDH].write(0); // RDH
+
+    // 8. Program RXDCTL with appropriate values including the queue Enable bit. Note that packets directed to a disabled queue are dropped.
     ixgbe[IXGBE_RXDCTL].write(ixgbe[IXGBE_RXDCTL].read() | (1 << 25)); // enable queue
+
+    // 9. Poll the RXDCTL register until the Enable bit is set. The tail should not be bumped before this bit was read as 1b.
     while ixgbe[IXGBE_RXDCTL].read() | (1 << 25) == 0 {} // wait for it
+
+    // 10. Bump the tail pointer (RDT) to enable descriptors fetching by setting it to the ring length minus one.
     ixgbe[IXGBE_RDT].write((recv_queue_size - 1) as u32); // RDT
 
     // all queues are setup
-    // halt receive data path RX_DIS
+    // 11. Enable the receive path by setting RXCTRL.RXEN. This should be done only after all other settings are done following the steps below.
+    // Halt the receive data path by setting SECRXCTRL.RX_DIS bit.
     ixgbe[IXGBE_SECRXCTRL].write(ixgbe[IXGBE_SECRXCTRL].read() | (1 << 1));
-    while ixgbe[IXGBE_SECRXSTAT].read() & (1 << 0) == 0 {} // poll 
-    // enable receive
+    // Wait for the data paths to be emptied by HW. Poll the SECRXSTAT.SECRX_RDY bit until it is asserted by HW.
+    while ixgbe[IXGBE_SECRXSTAT].read() & (1 << 0) == 0 {} // poll
+                                                           // Set RXCTRL.RXEN
+                                                           // enable the queue
     ixgbe[IXGBE_RXCTRL].write(ixgbe[IXGBE_RXCTRL].read() | (1 << 0));
-    // resume receive data path RX_DIS
+    // Clear the SECRXCTRL.SECRX_DIS bits to enable receive data path
     ixgbe[IXGBE_SECRXCTRL].write(ixgbe[IXGBE_SECRXCTRL].read() & !(1 << 1));
-    // no snoop enable
+
+    // Set bit 16 of the CTRL_EXT register and clear bit 12 of the DCA_RXCTRL[n] register[n].
     ixgbe[IXGBE_CTRL_EXT].write(ixgbe[IXGBE_CTRL_EXT].read() | (1 << 16));
-    // clear bit 12
     ixgbe[IXGBE_DCA_RXCTRL].write(ixgbe[IXGBE_DCA_RXCTRL].read() & !(1 << 12));
 
-    // enable interrupts
+    // 4.6.8 Transmit Initialization
+
+    // The following steps should be done once per transmit queue:
+    // 1. Allocate a region of memory for the transmit descriptor list.
+    for i in 0..send_queue_size {
+        let buffer_page = unsafe {
+            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
+        } as usize;
+        let buffer_page_pa = active_table().get_entry(buffer_page).unwrap().target();
+        send_queue[i].addr = buffer_page_pa as u64;
+        driver.send_buffers.push(buffer_page);
+    }
+
+    // 2. Program the descriptor base address with the address of the region (TDBAL, TDBAH).
+    ixgbe[IXGBE_TDBAL].write(send_page_pa as u32); // TDBAL
+    ixgbe[IXGBE_TDBAH].write((send_page_pa >> 32) as u32); // TDBAH
+
+    // 3. Set the length register to the size of the descriptor ring (TDLEN).
+    ixgbe[IXGBE_TDLEN].write(PAGE_SIZE as u32); // TDLEN
+    ixgbe[IXGBE_TDH].write(0); // TDH
+    ixgbe[IXGBE_TDT].write(0); // TDT
+
+    // 6. Enable transmit path by setting DMATXCTL.TE. This step should be executed only for the first enabled transmit queue and does not need to be repeated for any following queues.
+    ixgbe[IXGBE_DMATXCTL].write(ixgbe[IXGBE_DMATXCTL].read() | 1 << 0);
+
+    // 7. Enable the queue using TXDCTL.ENABLE. Poll the TXDCTL register until the Enable bit is set.
+    ixgbe[IXGBE_TXDCTL].write(ixgbe[IXGBE_TXDCTL].read() | 1 << 25);
+    while ixgbe[IXGBE_TXDCTL].read() & (1 << 25) == 0 {}
+
+    // Enable interrupts
     // map Rx0 and Tx0 to interrupt 0
     ixgbe[IXGBE_IVAR].write(0b00000000_00000000_10000000_10000000);
 
     // clear all interrupt
     ixgbe[IXGBE_EICR].write(!0);
     // unmask tx/rx interrupts
-    ixgbe[IXGBE_EIMS].write(1);
+    ixgbe[IXGBE_EIMS].write(1 << 0);
 
     debug!(
         "status after setup: {:#?}",

@@ -252,7 +252,7 @@ impl<'a> phy::Device<'a> for E1000Driver {
 
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
         let send_queue = unsafe {
-            slice::from_raw_parts_mut(driver.send_page as *mut E1000RecvDesc, send_queue_size)
+            slice::from_raw_parts_mut(driver.send_page as *mut E1000SendDesc, send_queue_size)
         };
         let tdt = e1000[E1000_TDT].read();
         let index = (tdt as usize) % send_queue_size;
