@@ -1,8 +1,10 @@
+//! Intel PRO/1000 Network Adapter i.e. e1000 network driver
+
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::format;
 use alloc::prelude::*;
 use alloc::sync::Arc;
-use core::mem::{size_of, transmute};
+use core::mem::size_of;
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
 
@@ -285,7 +287,7 @@ impl phy::TxToken for E1000TxToken {
     where
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
-        let mut buffer = [0u8; 2048];
+        let mut buffer = [0u8; PAGE_SIZE];
         let result = f(&mut buffer[..len]);
 
         let mut driver = (self.0).0.lock();

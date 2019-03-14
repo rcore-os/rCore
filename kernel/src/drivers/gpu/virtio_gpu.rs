@@ -1,5 +1,4 @@
 use alloc::alloc::{GlobalAlloc, Layout};
-use alloc::prelude::*;
 use alloc::sync::Arc;
 use core::slice;
 

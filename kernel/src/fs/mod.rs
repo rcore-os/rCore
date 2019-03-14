@@ -1,11 +1,10 @@
-use alloc::{boxed::Box, collections::VecDeque, string::String, sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec};
 
 use rcore_fs::vfs::*;
 use rcore_fs_sfs::SimpleFileSystem;
 
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
-use crate::drivers::block::virtio_blk::VirtIOBlkDriver;
 
 pub use self::file::*;
 pub use self::stdio::{STDIN, STDOUT};

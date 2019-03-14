@@ -4,7 +4,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
-use crate::thread;
 
 pub fn run_user_shell() {
     //use crate::net::server;
@@ -34,6 +33,7 @@ pub extern fn shell(_arg: usize) -> ! {
         if let Ok(file) = ROOT_INODE.lookup(name) {
             let data = file.read_as_vec().unwrap();
             let pid = processor().manager().add(Thread::new_user(data.as_slice(), cmd.split(' ')));
+            // TODO: wait until process exits, or use user land shell completely
             //unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
         } else {
             println!("Program not exist");

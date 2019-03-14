@@ -1,4 +1,4 @@
-use crate::drivers::net::e1000;
+use crate::drivers::net::*;
 use x86_64::instructions::port::Port;
 
 const PCI_VENDOR: u32 = 0x00;
@@ -105,25 +105,45 @@ impl PciTag {
     pub unsafe fn get_bar_mem(&self, bar_number: u32) -> Option<(usize, usize)> {
         assert!(bar_number <= 4);
         let bar = PCI_BAR0 + 4 * bar_number;
-        let mut base = self.read(bar, 4);
+        let mut base_lo = self.read(bar, 4);
         self.write(bar, 0xffffffff);
-        let mut max_base = self.read(bar, 4);
-        self.write(bar, base);
+        let mut max_base_lo = self.read(bar, 4);
+        self.write(bar, base_lo);
+
+        let mut base = 0usize;
+        let mut max_base = 0usize;
+        let mut address_mark = 0usize;
 
         // memory instead of io
-        assert!(base & PCI_BASE_ADDRESS_SPACE == PCI_BASE_ADDRESS_SPACE_MEMORY);
-        // only support 32bit addr for now
-        assert!(base & PCI_BASE_ADDRESS_MEM_TYPE_MASK == PCI_BASE_ADDRESS_MEM_TYPE_32);
+        assert!(base_lo & PCI_BASE_ADDRESS_SPACE == PCI_BASE_ADDRESS_SPACE_MEMORY);
+        match base_lo & PCI_BASE_ADDRESS_MEM_TYPE_MASK {
+            PCI_BASE_ADDRESS_MEM_TYPE_32 => {
+                base = (base_lo & PCI_BASE_ADDRESS_MEM_MASK) as usize;
+                max_base = (max_base_lo & PCI_BASE_ADDRESS_MEM_MASK) as usize;
+                address_mark = PCI_BASE_ADDRESS_MEM_MASK as usize;
+            }
+            PCI_BASE_ADDRESS_MEM_TYPE_64 => {
+                base = (base_lo & PCI_BASE_ADDRESS_MEM_MASK) as usize;
+                max_base = (max_base_lo & PCI_BASE_ADDRESS_MEM_MASK) as usize;
 
-        base = base & PCI_BASE_ADDRESS_MEM_MASK;
-        max_base = max_base & PCI_BASE_ADDRESS_MEM_MASK;
+                let base_hi = self.read(bar + 4, 4);
+                self.write(bar + 4, 0xffffffff);
+                let max_base_hi = self.read(bar + 4, 4);
+                self.write(bar + 4, base_hi);
+                base |= (base_hi as usize) << 32;
+                max_base |= (max_base_hi as usize) << 32;
+                address_mark = !0;
+            }
+            _ => unimplemented!("pci bar mem type")
+        }
+
 
         if max_base == 0 {
             return None;
         }
 
         // linux/drivers/pci/probe.c pci_size
-        let mut size = PCI_BASE_ADDRESS_MEM_MASK & max_base;
+        let mut size = max_base & address_mark;
         if size == 0 {
             return None;
         }
@@ -191,12 +211,24 @@ impl PciTag {
 }
 
 pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
-    if vid == 0x8086 && (did == 0x100e || did == 0x10d3) {
-        if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
-            unsafe {
-                tag.enable();
+    if vid == 0x8086 {
+        if did == 0x100e || did == 0x10d3 {
+            // 82540EM Gigabit Ethernet Controller
+            // 82574L Gigabit Network Connection
+            if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
+                unsafe {
+                    tag.enable();
+                }
+                e1000::e1000_init(addr, len);
             }
-            e1000::e1000_init(addr, len);
+        } else if did == 0x10fb {
+            // 82599ES 10-Gigabit SFI/SFP+ Network Connection
+            if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
+                unsafe {
+                    tag.enable();
+                }
+                ixgbe::ixgbe_init(addr, len);
+            }
         }
     }
 }
