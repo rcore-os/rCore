@@ -351,7 +351,7 @@ impl phy::TxToken for IXGBETxToken {
             .unwrap()
             .target();
         assert_eq!(buffer_page_pa, send_desc.addr as usize);
-        send_desc.len = len as u16 + 4;
+        send_desc.len = len as u16;
         // RS | EOP
         send_desc.cmd = (1 << 3) | (1 << 0);
         send_desc.status = 0;
@@ -408,8 +408,6 @@ pub fn ixgbe_init(header: usize, size: usize) {
         unsafe { slice::from_raw_parts_mut(send_page as *mut IXGBESendDesc, send_queue_size) };
     let mut recv_queue =
         unsafe { slice::from_raw_parts_mut(recv_page as *mut IXGBERecvDesc, recv_queue_size) };
-    // randomly generated
-    let mac: [u8; 6] = [0x54, 0x51, 0x9F, 0x71, 0xC0, 0x3C];
 
     let mut current_addr = header;
     while current_addr < header + size {
@@ -463,17 +461,6 @@ pub fn ixgbe_init(header: usize, size: usize) {
     // DMA Init Done
     while ixgbe[IXGBE_RDRXCTL].read() & (1 << 3) == 0 {}
 
-    let mut driver = IXGBE {
-        header,
-        size,
-        mac: EthernetAddress::from_bytes(&mac),
-        send_page,
-        send_buffers: Vec::with_capacity(send_queue_size),
-        recv_page,
-        recv_buffers: Vec::with_capacity(recv_queue_size),
-        first_trans: true,
-    };
-
     // BAM, Accept Broadcast packets
     ixgbe[IXGBE_FCTRL].write(ixgbe[IXGBE_FCTRL].read() | (1 << 10));
 
@@ -492,6 +479,17 @@ pub fn ixgbe_init(header: usize, size: usize) {
         (rah >> 8) as u8,
     ];
     debug!("mac {:x?}", mac);
+
+    let mut driver = IXGBE {
+        header,
+        size,
+        mac: EthernetAddress::from_bytes(&mac),
+        send_page,
+        send_buffers: Vec::with_capacity(send_queue_size),
+        recv_page,
+        recv_buffers: Vec::with_capacity(recv_queue_size),
+        first_trans: true,
+    };
 
     // Unicast Table Array (PFUTA).
     for i in IXGBE_PFUTA..IXGBE_PFUTA_END {
@@ -557,8 +555,9 @@ pub fn ixgbe_init(header: usize, size: usize) {
     ixgbe[IXGBE_SECRXCTRL].write(ixgbe[IXGBE_SECRXCTRL].read() | (1 << 1));
     // Wait for the data paths to be emptied by HW. Poll the SECRXSTAT.SECRX_RDY bit until it is asserted by HW.
     while ixgbe[IXGBE_SECRXSTAT].read() & (1 << 0) == 0 {} // poll
-                                                           // Set RXCTRL.RXEN
-                                                           // enable the queue
+
+    // Set RXCTRL.RXEN
+    // enable the queue
     ixgbe[IXGBE_RXCTRL].write(ixgbe[IXGBE_RXCTRL].read() | (1 << 0));
     // Clear the SECRXCTRL.SECRX_DIS bits to enable receive data path
     ixgbe[IXGBE_SECRXCTRL].write(ixgbe[IXGBE_SECRXCTRL].read() & !(1 << 1));
