@@ -98,6 +98,11 @@ impl Pid {
     pub fn get(&self) -> usize {
         self.0.unwrap()
     }
+
+    /// Return whether this pid represents the init process
+    pub fn is_init(&self) -> bool {
+        self.0 == Some(0)
+    }
 }
 
 impl fmt::Display for Pid {

@@ -12,8 +12,11 @@ use crate::drivers::SOCKET_ACTIVITY;
 use super::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
-    info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+    }
     proc.memory_set.check_mut_array(base, len)?;
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_read_file(&mut proc, fd, base, len),
@@ -23,8 +26,11 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
 }
 
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
-    info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     let mut proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+    }
     proc.memory_set.check_array(base, len)?;
 
     match proc.files.get(&fd) {

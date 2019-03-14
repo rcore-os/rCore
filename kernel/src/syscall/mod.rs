@@ -35,7 +35,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         process().pid.clone()
     };
     let tid = processor().tid();
-    debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
+    if !pid.is_init() {
+        // we trust pid 0 process
+        debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
+    }
     let ret = match id {
         // file
         000 => sys_read(args[0], args[1] as *mut u8, args[2]),
@@ -211,7 +214,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             crate::trap::error(tf);
         }
     };
-    debug!("{}:{}:{} syscall id {} ret with {:x?}", cid, pid, tid, id, ret);
+    if !pid.is_init() {
+        // we trust pid 0 process
+        debug!("{}:{}:{} syscall id {} ret with {:x?}", cid, pid, tid, id, ret);
+    }
     match ret {
         Ok(code) => code as isize,
         Err(err) => -(err as isize),

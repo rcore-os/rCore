@@ -104,6 +104,7 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     let mut args = Vec::new();
     unsafe {
         let mut current_argv = argv as *const *const u8;
+        proc.memory_set.check_ptr(current_argv)?;
         while !(*current_argv).is_null() {
             let arg = proc.memory_set.check_and_clone_cstr(*current_argv)?;
             args.push(arg);
@@ -125,6 +126,9 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     let mut thread = Thread::new_user(buf.as_slice(), iter);
     thread.proc.lock().files = proc.files.clone();
     thread.proc.lock().cwd = proc.cwd.clone();
+    thread.proc.lock().pid = proc.pid.clone();
+    thread.proc.lock().parent = proc.parent.clone();
+    thread.proc.lock().threads = proc.threads.clone();
 
     // Activate new page table
     unsafe { thread.proc.lock().memory_set.activate(); }
