@@ -24,14 +24,14 @@ mod context;
 */
 pub fn init() {
     extern {
-        fn __alltraps();
+        fn trap_entry();
     }
     unsafe {
         // Set sscratch register to 0, indicating to exception vector that we are
         // presently executing in the kernel
         xscratch::write(0);
         // Set the exception vector address
-        xtvec::write(__alltraps as usize, xtvec::TrapMode::Direct);
+        xtvec::write(trap_entry as usize, xtvec::TrapMode::Direct);
         // Enable IPI
         sie::set_ssoft();
         // Enable serial interrupt
@@ -168,7 +168,7 @@ fn timer() {
 */
 fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4;   // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(tf.x[10], [tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15], tf.x[16]], tf);
+    let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
     tf.x[10] = ret as usize;
 }
 

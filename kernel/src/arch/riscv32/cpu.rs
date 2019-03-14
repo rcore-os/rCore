@@ -4,13 +4,13 @@ use core::ptr::{read_volatile, write_volatile};
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 
 pub unsafe fn set_cpu_id(cpu_id: usize) {
-    asm!("mv tp, $0" : : "r"(cpu_id));
+    asm!("mv gp, $0" : : "r"(cpu_id));
 }
 
 pub fn id() -> usize {
     let cpu_id;
     #[cfg(not(feature = "m_mode"))]
-    unsafe { asm!("mv $0, tp" : "=r"(cpu_id)); }
+    unsafe { asm!("mv $0, gp" : "=r"(cpu_id)); }
     #[cfg(feature = "m_mode")]
     unsafe { asm!("csrr $0, mhartid" : "=r"(cpu_id)); }
     cpu_id

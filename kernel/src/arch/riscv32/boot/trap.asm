@@ -15,18 +15,18 @@
     # the kernel stack pointer. If we came from the kernel, sscratch
     # will contain 0, and we should continue on the current stack.
     csrrw sp, (xscratch), sp
-    bnez sp, _save_context
-_restore_kernel_sp:
+    bnez sp, trap_from_user
+trap_from_kernel:
     csrr sp, (xscratch)
+    STORE gp, 0
     # sscratch = previous-sp, sp = kernel-sp
-_save_context:
+trap_from_user:
     # provide room for trap frame
     addi sp, sp, -36 * XLENB
     # save x registers except x2 (sp)
     STORE x1, 1
     STORE x3, 3
-    # tp(x4) = hartid. DON'T change.
-    # STORE x4, 4
+    STORE x4, 4
     STORE x5, 5
     STORE x6, 6
     STORE x7, 7
@@ -55,6 +55,9 @@ _save_context:
     STORE x30, 30
     STORE x31, 31
 
+    # load hartid to gp from sp[36]
+    LOAD gp, 36
+
     # get sp, sstatus, sepc, stval, scause
     # set sscratch = 0
     csrrw s0, (xscratch), x0
@@ -74,11 +77,12 @@ _save_context:
     LOAD s1, 32             # s1 = sstatus
     LOAD s2, 33             # s2 = sepc
     TEST_BACK_TO_KERNEL
-    bnez s0, _restore_context   # s0 = back to kernel?
-_save_kernel_sp:
+    bnez s0, _to_kernel     # s0 = back to kernel?
+_to_user:
     addi s0, sp, 36*XLENB
-    csrw (xscratch), s0         # sscratch = kernel-sp
-_restore_context:
+    csrw (xscratch), s0     # sscratch = kernel-sp
+    STORE gp, 36            # store hartid from gp to sp[36]
+_to_kernel:
     # restore sstatus, sepc
     csrw (xstatus), s1
     csrw (xepc), s2
@@ -86,7 +90,7 @@ _restore_context:
     # restore x registers except x2 (sp)
     LOAD x1, 1
     LOAD x3, 3
-    # LOAD x4, 4
+    LOAD x4, 4
     LOAD x5, 5
     LOAD x6, 6
     LOAD x7, 7
@@ -119,13 +123,13 @@ _restore_context:
 .endm
 
     .section .text
-    .globl __alltraps
-__alltraps:
+    .globl trap_entry
+trap_entry:
     SAVE_ALL
     mv a0, sp
     jal rust_trap
-    .globl __trapret
-__trapret:
+    .globl trap_return
+trap_return:
     RESTORE_ALL
     # return from supervisor call
     XRET

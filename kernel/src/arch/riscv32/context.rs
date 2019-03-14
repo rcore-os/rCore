@@ -19,6 +19,7 @@ pub struct TrapFrame {
     pub sepc: usize, // Supervisor exception program counter, save the trap virtual address (here is used to save the process program entry addr?)
     pub stval: usize, // Supervisor trap value
     pub scause: Mcause, // scause register: record the cause of exception/interrupt/trap
+    pub _hartid: usize, // reserve space
 }
 
 /// Generate the trapframe for building new thread in kernel
@@ -123,7 +124,7 @@ impl InitStack {
 }
 
 extern {
-    fn __trapret();
+    fn trap_return();
 }
 
 #[derive(Debug, Default)]
@@ -137,7 +138,7 @@ struct ContextData {
 impl ContextData {
     fn new(satp: usize) -> Self {
         // satp(asid) just like cr3, save the physical address for Page directory?
-        ContextData { ra: __trapret as usize, satp, ..ContextData::default() }
+        ContextData { ra: trap_return as usize, satp, ..ContextData::default() }
     }
 }
 
