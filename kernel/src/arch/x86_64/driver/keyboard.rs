@@ -18,14 +18,18 @@ pub fn receive() -> Option<char> {
     }
 
     let mut keyboard = KEYBOARD.lock();
-    let port = Port::<u8>::new(0x60);
+    let data_port = Port::<u8>::new(0x60);
+    let status_port = Port::<u8>::new(0x64);
 
-    let scancode = unsafe { port.read() };
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => return Some(character),
-                DecodedKey::RawKey(_key) => {}, // TODO: handle RawKey from keyboard
+    // Output buffer status = 1
+    if unsafe { status_port.read() } & (1 << 0) != 0 {
+        let scancode = unsafe { data_port.read() };
+        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+            if let Some(key) = keyboard.process_keyevent(key_event) {
+                match key {
+                    DecodedKey::Unicode(character) => return Some(character),
+                    DecodedKey::RawKey(_key) => {}, // TODO: handle RawKey from keyboard
+                }
             }
         }
     }
