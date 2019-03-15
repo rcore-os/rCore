@@ -251,3 +251,27 @@ pub fn init() {
         }
     }
 }
+
+pub fn find_device(vendor: u32, product: u32) -> Option<PciTag> {
+    for bus in 0..256 {
+        for dev in 0..32 {
+            let tag = PciTag::new(bus, dev, 0);
+            if let Some((vid, did, next)) = tag.probe() {
+                if vid == vendor && did == product {
+                    return Some(tag);
+                }
+                if next {
+                    for func in 1..8 {
+                        let tag = PciTag::new(bus, dev, func);
+                        if let Some((vid, did, _)) = tag.probe() {
+                            if vid == vendor && did == product {
+                                return Some(tag);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}

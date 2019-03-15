@@ -21,6 +21,7 @@ use self::proc::*;
 use self::time::*;
 use self::net::*;
 use self::misc::*;
+use self::custom::*;
 
 mod fs;
 mod mem;
@@ -28,6 +29,7 @@ mod proc;
 mod time;
 mod net;
 mod misc;
+mod custom;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
@@ -124,6 +126,8 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         228 => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         231 => sys_exit_group(args[0]),
         288 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
+        // custom temporary syscall
+        999 => sys_map_pci_device(args[0], args[1]),
 //        293 => sys_pipe(),
 
         // for musl: empty impl
@@ -149,6 +153,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         037 => {
             warn!("sys_alarm is unimplemented");
+            Ok(0)
+        }
+        038 => {
+            warn!("sys_setitimer is unimplemented");
             Ok(0)
         }
         072 => {
