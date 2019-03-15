@@ -13,6 +13,7 @@ use crate::process::*;
 use crate::thread;
 use crate::util;
 use crate::arch::cpu;
+use crate::arch::syscall;
 
 use self::fs::*;
 use self::mem::*;
@@ -30,6 +31,7 @@ mod misc;
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
+    let x86_64_id = syscall::translate(id);
     let cid = cpu::id();
     let pid = {
         process().pid.clone()
@@ -37,9 +39,13 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let tid = processor().tid();
     if !pid.is_init() {
         // we trust pid 0 process
-        debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
+        debug!("{}:{}:{} syscall id {}->{} begin", cid, pid, tid, id, x86_64_id);
     }
-    let ret = match id {
+
+    // use syscall numbers in Linux x86_64
+    // See https://filippo.io/linux-syscall-table/
+    // And https://fedora.juszkiewicz.com.pl/syscalls.html.
+    let ret = match x86_64_id {
         // file
         000 => sys_read(args[0], args[1] as *mut u8, args[2]),
         001 => sys_write(args[0], args[1] as *const u8, args[2]),
@@ -165,6 +171,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_getuid is unimplemented");
             Ok(0)
         }
+        104 => {
+            warn!("sys_getgid is unimplemented");
+            Ok(0)
+        }
         105 => {
             warn!("sys_setuid is unimplemented");
             Ok(0)
@@ -210,13 +220,13 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             Ok(0)
         }
         _ => {
-            error!("unknown syscall id: {:#x?}, args: {:x?}", id, args);
+            error!("unknown syscall id: {}->{}, args: {:x?}", id, x86_64_id, args);
             crate::trap::error(tf);
         }
     };
     if !pid.is_init() {
         // we trust pid 0 process
-        debug!("{}:{}:{} syscall id {} ret with {:x?}", cid, pid, tid, id, ret);
+        debug!("{}:{}:{} syscall id {}->{} ret with {:x?}", cid, pid, tid, id, x86_64_id, ret);
     }
     match ret {
         Ok(code) => code as isize,

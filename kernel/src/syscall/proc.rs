@@ -18,6 +18,10 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *mut u32, newtls: usize, tf: &TrapFrame) -> SysResult {
     info!("clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
         flags, newsp, parent_tid, child_tid, newtls);
+    if flags == 0x4111 {
+        warn!("sys_clone is calling sys_fork instead, ignoring other args");
+        return sys_fork(tf);
+    }
     if flags != 0x7d0f00 {
         warn!("sys_clone only support musl pthread_create");
         return Err(SysError::ENOSYS);

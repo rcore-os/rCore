@@ -345,7 +345,7 @@ pub fn virtio_probe(node: &Node) {
         let device_id = header.device_id.read();
         // only support legacy device
         if magic == 0x74726976 && version == 1 && device_id != 0 { // "virt" magic
-            info!("Detected virtio net device with vendor id {:#X}", header.vendor_id.read());
+            info!("Detected virtio device with vendor id {:#X}", header.vendor_id.read());
             info!("Device tree node {:?}", node);
             // virtio 3.1.1 Device Initialization
             header.status.write(0);

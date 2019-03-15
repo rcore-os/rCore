@@ -324,11 +324,12 @@ impl Thread {
         debug!("fork: temporary copy data!");
         let kstack = KernelStack::new();
 
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
-        for (_fd, file) in files.iter() {
-            if let FileLike::Socket(wrapper) = file {
-                sockets.retain(wrapper.handle);
+        for iface in NET_DRIVERS.read().iter() {
+            let mut sockets = iface.sockets();
+            for (_fd, file) in files.iter() {
+                if let FileLike::Socket(wrapper) = file {
+                    sockets.retain(wrapper.handle);
+                }
             }
         }
 

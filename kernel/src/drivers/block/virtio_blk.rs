@@ -99,7 +99,6 @@ impl Driver for VirtIOBlkDriver {
         let interrupt = header.interrupt_status.read();
         if interrupt != 0 {
             header.interrupt_ack.write(interrupt);
-            debug!("Got interrupt {:?}", interrupt);
             return true;
         }
         return false;
