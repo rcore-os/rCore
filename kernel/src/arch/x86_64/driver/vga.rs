@@ -68,7 +68,8 @@ impl VgaBuffer {
 
 lazy_static! {
 	pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
-		VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xb8000) as *mut VgaBuffer) })
+	    // VGA virtual address is specified at bootloader
+		VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xf0000000) as *mut VgaBuffer) })
 	);
 }
 
