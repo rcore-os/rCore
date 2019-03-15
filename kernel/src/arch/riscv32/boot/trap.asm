@@ -18,11 +18,11 @@
     bnez sp, trap_from_user
 trap_from_kernel:
     csrr sp, (xscratch)
-    STORE gp, 0
+    STORE gp, -1
     # sscratch = previous-sp, sp = kernel-sp
 trap_from_user:
     # provide room for trap frame
-    addi sp, sp, -36 * XLENB
+    addi sp, sp, -37 * XLENB
     # save x registers except x2 (sp)
     STORE x1, 1
     STORE x3, 3
@@ -79,7 +79,7 @@ trap_from_user:
     TEST_BACK_TO_KERNEL
     bnez s0, _to_kernel     # s0 = back to kernel?
 _to_user:
-    addi s0, sp, 36*XLENB
+    addi s0, sp, 37*XLENB
     csrw (xscratch), s0     # sscratch = kernel-sp
     STORE gp, 36            # store hartid from gp to sp[36]
 _to_kernel:
