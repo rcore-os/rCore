@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 use crate::logging::Color;
 use crate::consts::KERNEL_OFFSET;
+use console_traits::*;
 
 #[derive(Debug, Clone, Copy)]
 struct ColorCode(u8);
@@ -74,44 +75,60 @@ lazy_static! {
 }
 
 pub struct VgaWriter {
-    column_position: usize,
+    pos: Position,
     color: Color,
+    ctrl_char_mode: ControlCharMode,
+    esc_char_mode: EscapeCharMode,
     buffer: &'static mut VgaBuffer,
 }
 
-impl VgaWriter {
-    fn new(buffer: &'static mut VgaBuffer) -> Self {
-        buffer.clear();
-        VgaWriter {
-            column_position: 0,
-            color: Color::LightGray,
-            buffer,
-        }
+impl BaseConsole for VgaWriter {
+    type Error = ();
+
+    fn get_width(&self) -> Col {
+        Col(BUFFER_WIDTH as u8 - 1)
     }
 
-    pub fn set_color(&mut self, color: Color) {
-        self.color = color;
+    fn get_height(&self) -> Row {
+        Row(BUFFER_HEIGHT as u8 - 1)
     }
 
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
-
-                self.buffer.write(row, col, ScreenChar::new(byte, self.color, Color::Black));
-                self.column_position += 1;
-                self.buffer.set_cursor_at(row, col);
-            }
-        }
+    fn set_col(&mut self, col: Col) -> Result<(), Self::Error> {
+        self.pos.col = col;
+        Ok(())
     }
 
-    fn new_line(&mut self) {
+    fn set_row(&mut self, row: Row) -> Result<(), Self::Error> {
+        self.pos.row = row;
+        Ok(())
+    }
+
+    fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
+        self.pos = pos;
+        Ok(())
+    }
+
+    fn get_pos(&self) -> Position {
+        self.pos
+    }
+
+    fn set_control_char_mode(&mut self, mode: ControlCharMode) {
+        self.ctrl_char_mode = mode;
+    }
+
+    fn get_control_char_mode(&self) -> ControlCharMode {
+        self.ctrl_char_mode
+    }
+
+    fn set_escape_char_mode(&mut self, mode: EscapeCharMode) {
+        self.esc_char_mode = mode;
+    }
+
+    fn get_escape_char_mode(&self) -> EscapeCharMode {
+        self.esc_char_mode
+    }
+
+    fn scroll_screen(&mut self) -> Result<(), Self::Error> {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let screen_char = self.buffer.read(row, col);
@@ -122,16 +139,43 @@ impl VgaWriter {
         for col in 0..BUFFER_WIDTH {
             self.buffer.write(BUFFER_HEIGHT - 1, col, blank);
         }
-        self.column_position = 0;
         self.buffer.set_cursor_at(BUFFER_HEIGHT - 1, 0);
+        Ok(())
+    }
+}
+
+impl AsciiConsole for VgaWriter {
+    fn write_char_at(&mut self, ch: u8, pos: Position) -> Result<(), Self::Error> {
+        self.buffer.write(pos.row.0 as usize, pos.col.0 as usize, ScreenChar::new(ch, self.color, Color::Black));
+        self.buffer.set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
+        Ok(())
+    }
+
+    fn handle_escape(&mut self, escaped_char: u8) -> bool {
+        true
+    }
+}
+
+impl VgaWriter {
+    fn new(buffer: &'static mut VgaBuffer) -> Self {
+        buffer.clear();
+        VgaWriter {
+            pos: Position::origin(),
+            color: Color::LightGray,
+            ctrl_char_mode: ControlCharMode::Interpret,
+            esc_char_mode: EscapeCharMode::Waiting,
+            buffer,
+        }
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
     }
 }
 
 impl fmt::Write for VgaWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.bytes() {
-            self.write_byte(byte)
-        }
-        Ok(())
+        self.write_string(s.as_bytes())
+            .map_err(|_| fmt::Error)
     }
 }
