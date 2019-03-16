@@ -315,8 +315,8 @@ impl phy::TxToken for E1000TxToken {
             .target();
         assert_eq!(buffer_page_pa, send_desc.addr as usize);
         send_desc.len = len as u16 + 4;
-        // RS | EOP
-        send_desc.cmd = (1 << 3) | (1 << 0);
+        // RS | IFCS | EOP
+        send_desc.cmd = (1 << 3) | (1 << 1) | (1 << 0);
         send_desc.status = 0;
 
         fence(Ordering::SeqCst);
@@ -399,9 +399,18 @@ pub fn e1000_init(header: usize, size: usize) {
         E1000Status::from_bits_truncate(e1000[E1000_STATUS].read())
     );
 
+    // 4.6 Software Initialization Sequence
+
+    // 4.6.6 Transmit Initialization
+
+    // Program the descriptor base address with the address of the region.
     e1000[E1000_TDBAL].write(send_page_pa as u32); // TDBAL
     e1000[E1000_TDBAH].write((send_page_pa >> 32) as u32); // TDBAH
+
+    // Set the length register to the size of the descriptor ring.
     e1000[E1000_TDLEN].write(PAGE_SIZE as u32); // TDLEN
+
+    // If needed, program the head and tail registers.
     e1000[E1000_TDH].write(0); // TDH
     e1000[E1000_TDT].write(0); // TDT
 
@@ -419,6 +428,8 @@ pub fn e1000_init(header: usize, size: usize) {
                                                                                // IPGT=0xa | IPGR1=0x8 | IPGR2=0xc
     e1000[E1000_TIPG].write(0xa | (0x8 << 10) | (0xc << 20)); // TIPG
 
+
+    // 4.6.5 Receive Initialization
     let mut ral: u32 = 0;
     let mut rah: u32 = 0;
     for i in 0..4 {
@@ -437,19 +448,20 @@ pub fn e1000_init(header: usize, size: usize) {
         e1000[i].write(0);
     }
 
-    // enable interrupt
-    // RXT0
-    e1000[E1000_IMS].write(1 << 7); // IMS
-
-    // clear interrupt
-    e1000[E1000_ICR].write(e1000[E1000_ICR].read());
-
+    // Program the descriptor base address with the address of the region.
     e1000[E1000_RDBAL].write(recv_page_pa as u32); // RDBAL
     e1000[E1000_RDBAH].write((recv_page_pa >> 32) as u32); // RDBAH
+
+    // Set the length register to the size of the descriptor ring.
     e1000[E1000_RDLEN].write(PAGE_SIZE as u32); // RDLEN
+
+    // If needed, program the head and tail registers. Note: the head and tail pointers are initialized (by hardware) to zero after a power-on or a software-initiated device reset.
     e1000[E1000_RDH].write(0); // RDH
+
+    // The tail pointer should be set to point one descriptor beyond the end.
     e1000[E1000_RDT].write((recv_queue_size - 1) as u32); // RDT
 
+    // Receive buffers of appropriate size should be allocated and pointers to these buffers should be stored in the descriptor ring.
     for i in 0..recv_queue_size {
         let buffer_page = unsafe {
             HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
@@ -467,6 +479,15 @@ pub fn e1000_init(header: usize, size: usize) {
         "status after setup: {:#?}",
         E1000Status::from_bits_truncate(e1000[E1000_STATUS].read())
     );
+
+    // enable interrupt
+    // clear interrupt
+    e1000[E1000_ICR].write(e1000[E1000_ICR].read());
+    // RXT0
+    e1000[E1000_IMS].write(1 << 7); // IMS
+
+    // clear interrupt
+    e1000[E1000_ICR].write(e1000[E1000_ICR].read());
 
     let net_driver = E1000Driver(Arc::new(Mutex::new(driver)));
 

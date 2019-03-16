@@ -65,8 +65,13 @@ const IXGBE_RDH: usize = 0x01010 / 4;
 const IXGBE_SRRCTL: usize = 0x01014 / 4;
 const IXGBE_RDT: usize = 0x01018 / 4;
 const IXGBE_RXDCTL: usize = 0x01028 / 4;
+const IXGBE_RTRPT4C: usize = 0x02140 / 4;
+const IXGBE_RTRPT4C_END: usize = 0x02160 / 4;
+const IXGBE_RTRPCS: usize = 0x02430 / 4;
 const IXGBE_RDRXCTL: usize = 0x02F00 / 4;
+const IXGBE_PFQDE: usize = 0x02F04 / 4;
 const IXGBE_RXCTRL: usize = 0x03000 / 4;
+const IXGBE_RTRUP2TC: usize = 0x03020 / 4;
 const IXGBE_FCTTV: usize = 0x03200 / 4;
 const IXGBE_FCTTV_END: usize = 0x03210 / 4;
 const IXGBE_FCRTL: usize = 0x03220 / 4;
@@ -74,20 +79,36 @@ const IXGBE_FCRTL_END: usize = 0x03240 / 4;
 const IXGBE_FCRTH: usize = 0x03260 / 4;
 const IXGBE_FCRTH_END: usize = 0x03280 / 4;
 const IXGBE_FCRTV: usize = 0x032A0 / 4;
+const IXGBE_RXPBSIZE: usize = 0x03C00 / 4;
+const IXGBE_RXPBSIZE_END: usize = 0x03C20 / 4;
 const IXGBE_FCCFG: usize = 0x03D00 / 4;
+const IXGBE_HLREG0: usize = 0x04240 / 4;
+const IXGBE_MFLCN: usize = 0x04294 / 4;
 const IXGBE_AUTOC: usize = 0x042A0 / 4;
 const IXGBE_LINKS: usize = 0x042A4 / 4;
 const IXGBE_AUTOC2: usize = 0x04324 / 4;
+const IXGBE_RTTDCS: usize = 0x04900 / 4;
+const IXGBE_RTTDT1C: usize = 0x04908 / 4;
+const IXGBE_RTTDT2C: usize = 0x04910 / 4;
+const IXGBE_RTTDT2C_END: usize = 0x04930 / 4;
+const IXGBE_RTTDQSEL: usize = 0x04904 / 4;
+const IXGBE_RTTDC1C: usize = 0x04908 / 4;
+const IXGBE_TXPBTHRESH: usize = 0x04950 / 4;
+const IXGBE_TXPBTHRESH_END: usize = 0x04970 / 4;
 const IXGBE_DMATXCTL: usize = 0x04A80 / 4;
 const IXGBE_FCTRL: usize = 0x05080 / 4;
+const IXGBE_PFVTCTL: usize = 0x051B0 / 4;
 const IXGBE_MTA: usize = 0x05200 / 4;
 const IXGBE_MTA_END: usize = 0x05400 / 4;
+const IXGBE_MRQC: usize = 0x05818 / 4;
 const IXGBE_TDBAL: usize = 0x06000 / 4;
 const IXGBE_TDBAH: usize = 0x06004 / 4;
 const IXGBE_TDLEN: usize = 0x06008 / 4;
 const IXGBE_TDH: usize = 0x06010 / 4;
 const IXGBE_TDT: usize = 0x06018 / 4;
 const IXGBE_TXDCTL: usize = 0x06028 / 4;
+const IXGBE_DTXMXSZRQ: usize = 0x08100 / 4;
+const IXGBE_MTQC: usize = 0x08120 / 4;
 const IXGBE_SECRXCTRL: usize = 0x08D00 / 4;
 const IXGBE_SECRXSTAT: usize = 0x08D04 / 4;
 const IXGBE_VFTA: usize = 0x0A000 / 4;
@@ -96,6 +117,14 @@ const IXGBE_RAL: usize = 0x0A200 / 4;
 const IXGBE_RAH: usize = 0x0A204 / 4;
 const IXGBE_MPSAR: usize = 0x0A600 / 4;
 const IXGBE_MPSAR_END: usize = 0x0A800 / 4;
+const IXGBE_RTTUP2TC: usize = 0x0C800 / 4;
+const IXGBE_TXPBSIZE: usize = 0x0CC00 / 4;
+const IXGBE_TXPBSIZE_END: usize = 0x0CC20 / 4;
+const IXGBE_RTTPCS: usize = 0x0CD00 / 4;
+const IXGBE_RTTPT2C: usize = 0x0CD20 / 4;
+const IXGBE_RTTPT2C_END: usize = 0x0CD40 / 4;
+const IXGBE_RTTPT2S: usize = 0x0CD40 / 4;
+const IXGBE_RTTPT2S_END: usize = 0x0CD60 / 4;
 const IXGBE_PFVLVF: usize = 0x0F100 / 4;
 const IXGBE_PFVLVF_END: usize = 0x0F200 / 4;
 const IXGBE_PFVLVFB: usize = 0x0F200 / 4;
@@ -352,8 +381,8 @@ impl phy::TxToken for IXGBETxToken {
             .target();
         assert_eq!(buffer_page_pa, send_desc.addr as usize);
         send_desc.len = len as u16;
-        // RS | EOP
-        send_desc.cmd = (1 << 3) | (1 << 0);
+        // RS | IFCS | EOP
+        send_desc.cmd = (1 << 3) | (1 << 1) | (1 << 0);
         send_desc.status = 0;
 
         fence(Ordering::SeqCst);
@@ -516,6 +545,92 @@ pub fn ixgbe_init(header: usize, size: usize) {
         ixgbe[i].write(0);
     }
 
+    // Note that RDRXCTL.CRCStrip and HLREG0.RXCRCSTRP must be set to the same value. At the same time the RDRXCTL.RSCFRSTSIZE should be set to 0x0 as opposed to its hardware default.
+    // CRCStrip | RSCACKC | FCOE_WRFIX
+    //ixgbe[IXGBE_RDRXCTL].write(ixgbe[IXGBE_RDRXCTL].read() & !(1 << 0));
+    ixgbe[IXGBE_RDRXCTL].write(ixgbe[IXGBE_RDRXCTL].read() | (1 << 0) | (1 << 25) | (1 << 26));
+
+    // Program RXPBSIZE, MRQC, PFQDE, RTRUP2TC, MFLCN.RPFCE, and MFLCN.RFCE according to the DCB and virtualization modes (see Section 4.6.11.3).
+    // 4.6.11.3.4 DCB-Off, VT-Off
+    // RXPBSIZE[0].SIZE=0x200, RXPBSIZE[1-7].SIZE=0x0
+    ixgbe[IXGBE_RXPBSIZE].write(0x200 << 10);
+    for i in (IXGBE_RXPBSIZE+1)..IXGBE_RXPBSIZE_END {
+        ixgbe[i].write(0);
+    }
+    // TXPBSIZE[0].SIZE=0xA0, TXPBSIZE[1-7].SIZE=0x0
+    ixgbe[IXGBE_TXPBSIZE].write(0xA0 << 10);
+    for i in (IXGBE_TXPBSIZE+1)..IXGBE_TXPBSIZE_END {
+        ixgbe[i].write(0);
+    }
+    // TXPBTHRESH.THRESH[0]=0xA0 — Maximum expected Tx packet length in this TC TXPBTHRESH.THRESH[1-7]=0x0
+    ixgbe[IXGBE_TXPBTHRESH].write(0xA0);
+    for i in (IXGBE_TXPBTHRESH+1)..IXGBE_TXPBTHRESH_END {
+        ixgbe[i].write(0);
+    }
+
+    // Disbale Arbiter
+    // ARBDIS = 1
+    ixgbe[IXGBE_RTTDCS].write(ixgbe[IXGBE_RTTDCS].read() | (1 << 6));
+
+    // Set MRQE to 0xxxb, with the three least significant bits set according to the RSS mode
+    ixgbe[IXGBE_MRQC].write(ixgbe[IXGBE_MRQC].read() & !(0xf));
+    // Clear both RT_Ena and VT_Ena bits in the MTQC register.
+    // Set MTQC.NUM_TC_OR_Q to 00b.
+    ixgbe[IXGBE_MTQC].write(ixgbe[IXGBE_MTQC].read() & !(0xf));
+
+    // Enable Arbiter
+    // ARBDIS = 0
+    ixgbe[IXGBE_RTTDCS].write(ixgbe[IXGBE_RTTDCS].read() & !(1 << 6));
+
+    // Clear PFVTCTL.VT_Ena (as the MRQC.VT_Ena)
+    ixgbe[IXGBE_PFVTCTL].write(ixgbe[IXGBE_PFVTCTL].read() & !(1 << 0));
+
+    // Rx UP to TC (RTRUP2TC), UPnMAP=0b, n=0,...,7
+    ixgbe[IXGBE_RTRUP2TC].write(0);
+    // Tx UP to TC (RTTUP2TC), UPnMAP=0b, n=0,...,7
+    ixgbe[IXGBE_RTTUP2TC].write(0);
+    // DMA TX TCP Maximum Allowed Size Requests (DTXMXSZRQ) — set Max_byte_num_req = 0xFFF = 1 MB
+    ixgbe[IXGBE_DTXMXSZRQ].write(0xfff);
+
+    // PFQDE: The QDE bit should be set to 0b in the PFQDE register for all queues enabling per queue policy by the SRRCTL[n] setting.
+    ixgbe[IXGBE_PFQDE].write(ixgbe[IXGBE_PFQDE].read() & !(1 << 0));
+
+    // Disable PFC and enable legacy flow control:
+    ixgbe[IXGBE_MFLCN].write(ixgbe[IXGBE_MFLCN].read() & !(1 << 2) & !(0xff << 4));
+
+    // Clear RTTDT1C register, per each queue, via setting RTTDQSEL first
+    for i in 0..128 {
+        ixgbe[IXGBE_RTTDQSEL].write(i);
+        ixgbe[IXGBE_RTTDT1C].write(0);
+    }
+
+    // Clear RTTDT2C[0-7] registers
+    for i in IXGBE_RTTDT2C..IXGBE_RTTDT2C_END {
+        ixgbe[i].write(0);
+    }
+
+    // Clear RTTPT2C[0-7] registers
+    for i in IXGBE_RTTPT2C..IXGBE_RTTPT2C_END {
+        ixgbe[i].write(0);
+    }
+
+    // Clear RTRPT4C[0-7] registers
+    for i in IXGBE_RTRPT4C..IXGBE_RTRPT4C_END {
+        ixgbe[i].write(0);
+    }
+
+    // Tx Descriptor Plane Control and Status (RTTDCS), bits:
+    // TDPAC=0b, VMPAC=0b, TDRM=0b, BDPM=1b, BPBFSM=1b
+    ixgbe[IXGBE_RTTDCS].write(ixgbe[IXGBE_RTTDCS].read() & !(1 << 0) & !(1 << 1) & !(1 << 4));
+    ixgbe[IXGBE_RTTDCS].write(ixgbe[IXGBE_RTTDCS].read() | (1 << 22) | (1 << 23));
+
+    // Tx Packet Plane Control and Status (RTTPCS): TPPAC=0b, TPRM=0b, ARBD=0x224
+    ixgbe[IXGBE_RTTPCS].write(ixgbe[IXGBE_RTTPCS].read() & !(1 << 5) & !(1 << 8) & !(0x3ff << 22));
+    ixgbe[IXGBE_RTTPCS].write(ixgbe[IXGBE_RTTPCS].read() | (0x224 << 22));
+
+    // Rx Packet Plane Control and Status (RTRPCS): RAC=0b, RRM=0b
+    ixgbe[IXGBE_RTRPCS].write(ixgbe[IXGBE_RTRPCS].read() & !(1 << 1) & !(1 << 2));
+
     // Setup receive queue 0
     // The following steps should be done once per transmit queue:
     // 2. Receive buffers of appropriate size should be allocated and pointers to these buffers should be stored in the descriptor ring.
@@ -568,6 +683,11 @@ pub fn ixgbe_init(header: usize, size: usize) {
 
     // 4.6.8 Transmit Initialization
 
+    // Program the HLREG0 register according to the required MAC behavior.
+    // TXCRCEN | RXCRCSTRP | TXPADEN | RXLNGTHERREN
+    // ixgbe[IXGBE_HLREG0].write(ixgbe[IXGBE_HLREG0].read() & !(1 << 0) & !(1 << 1));
+    ixgbe[IXGBE_HLREG0].write(ixgbe[IXGBE_HLREG0].read() | (1 << 0) | (1 << 1) | (1 << 10) | (1 << 27));
+
     // The following steps should be done once per transmit queue:
     // 1. Allocate a region of memory for the transmit descriptor list.
     for i in 0..send_queue_size {
@@ -596,8 +716,8 @@ pub fn ixgbe_init(header: usize, size: usize) {
     while ixgbe[IXGBE_TXDCTL].read() & (1 << 25) == 0 {}
 
     // Enable interrupts
-    // map Rx0 and Tx0 to interrupt 0
-    ixgbe[IXGBE_IVAR].write(0b00000000_00000000_10000000_10000000);
+    // map Tx0 to interrupt 0
+    ixgbe[IXGBE_IVAR].write(0b00000000_00000000_00000000_10000000);
 
     // clear all interrupt
     ixgbe[IXGBE_EICR].write(!0);

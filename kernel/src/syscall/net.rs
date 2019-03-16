@@ -479,17 +479,6 @@ pub fn sys_recvfrom(
     let mut proc = process();
     proc.memory_set.check_mut_array(buffer, len)?;
 
-    if !addr.is_null() {
-        proc.memory_set.check_mut_ptr(addr_len)?;
-
-        let max_addr_len = unsafe { *addr_len } as usize;
-        if max_addr_len < size_of::<SockAddr>() {
-            return Err(SysError::EINVAL);
-        }
-
-        proc.memory_set.check_mut_array(addr, max_addr_len)?;
-    }
-
     let iface = &*(NET_DRIVERS.read()[0]);
     debug!("sockets {:#?}", proc.files);
 
@@ -744,6 +733,10 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
                             sockaddr_in.write_to(&mut proc, addr, addr_len)?;
                         }
                     }
+
+                    drop(sockets);
+                    drop(proc);
+                    iface.poll();
                     return Ok(new_fd);
                 }
 
