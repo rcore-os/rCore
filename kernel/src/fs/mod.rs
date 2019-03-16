@@ -15,6 +15,17 @@ mod stdio;
 mod device;
 mod pipe;
 
+/// Hard link user programs
+#[cfg(feature = "link_user")]
+global_asm!(concat!(r#"
+	.section .data
+	.global _user_img_start
+	.global _user_img_end
+_user_img_start:
+    .incbin ""#, env!("SFSIMG"), r#""
+_user_img_end:
+"#));
+
 lazy_static! {
     /// The root of file system
     pub static ref ROOT_INODE: Arc<INode> = {
