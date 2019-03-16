@@ -1,20 +1,22 @@
 //! Framebuffer console display driver for ARM64
 
-mod color;
-mod escape_parser;
-mod fonts;
-
-use self::color::FramebufferColor;
-use self::escape_parser::{CharacterAttribute, EscapeParser};
-use self::fonts::{Font, Font8x16};
-
-use super::fb::{ColorDepth::*, FramebufferInfo, FRAME_BUFFER};
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
+
 use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
+
+use crate::util::escape_parser::{CharacterAttribute, EscapeParser};
+
+use super::fb::{ColorDepth::*, FRAME_BUFFER, FramebufferInfo};
+
+use self::color::FramebufferColor;
+use self::fonts::{Font, Font8x16};
+
+mod color;
+mod fonts;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]

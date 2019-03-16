@@ -207,7 +207,7 @@ debug: $(kernel) $(bin)
 build: $(bin)
 
 asm:
-	@$(objdump) -dS $(kernel) | less
+	@$(objdump) -d $(kernel) | less
 
 header:
 	@$(objdump) -h $(kernel)

@@ -1,16 +1,17 @@
 //! ANSI escape sequences parser
 //! (ref: https://en.wikipedia.org/wiki/ANSI_escape_code)
 
-use super::color::{ConsoleColor, ConsoleColor::*, FramebufferColor};
-use alloc::vec::Vec;
+use heapless::Vec;
+use heapless::consts::U8;
+use super::color::ConsoleColor;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CharacterAttribute<C: FramebufferColor = ConsoleColor> {
+pub struct CharacterAttribute {
     /// foreground color
-    pub foreground: C,
+    pub foreground: ConsoleColor,
     /// background color
-    pub background: C,
+    pub background: ConsoleColor,
     /// show underline
     pub underline: bool,
     /// swap foreground and background colors
@@ -22,8 +23,8 @@ pub struct CharacterAttribute<C: FramebufferColor = ConsoleColor> {
 impl Default for CharacterAttribute {
     fn default() -> Self {
         CharacterAttribute {
-            foreground: White,
-            background: Black,
+            foreground: ConsoleColor::White,
+            background: ConsoleColor::Black,
             underline: false,
             reverse: false,
             strikethrough: false,
@@ -50,7 +51,7 @@ pub struct EscapeParser {
     status: ParseStatus,
     char_attr: CharacterAttribute,
     current_param: Option<u8>,
-    params: Vec<u8>,
+    params: Vec<u8, U8>,
 }
 
 impl EscapeParser {
@@ -69,14 +70,13 @@ impl EscapeParser {
 
     /// See an `ECS` character, start parsing escape sequence.
     pub fn start_parse(&mut self) {
-        assert!(self.status == ParseStatus::Text);
+        assert_eq!(self.status, ParseStatus::Text);
         self.status = ParseStatus::BeginEscapeSequence;
         self.current_param = None;
     }
 
     //// Parse SGR (Select Graphic Rendition) parameters.
     fn parse_sgr_params(&mut self) {
-        use core::mem::transmute;
         for param in &self.params {
             match param {
                 0 => self.char_attr = CharacterAttribute::default(),
@@ -86,8 +86,8 @@ impl EscapeParser {
                 24 => self.char_attr.underline = false,
                 27 => self.char_attr.reverse = false,
                 29 => self.char_attr.strikethrough = false,
-                30...37 | 90...97 => self.char_attr.foreground = unsafe { transmute(param - 30) },
-                40...47 | 100...107 => self.char_attr.background = unsafe { transmute(param - 40) },
+                30...37 | 90...97 => self.char_attr.foreground = ConsoleColor::from_console_code(*param).unwrap(),
+                40...47 | 100...107 => self.char_attr.background = ConsoleColor::from_console_code(*param - 10).unwrap(),
                 _ => { /* unimplemented!() */ }
             }
         }
@@ -95,7 +95,7 @@ impl EscapeParser {
 
     /// See a character during parsing.
     pub fn parse(&mut self, byte: u8) -> bool {
-        assert!(self.status != ParseStatus::Text);
+        assert_ne!(self.status, ParseStatus::Text);
         match self.status {
             ParseStatus::BeginEscapeSequence => match byte {
                 b'[' => {
@@ -117,7 +117,7 @@ impl EscapeParser {
                 }
                 b';' => {
                     if let Some(param) = self.current_param {
-                        self.params.push(param);
+                        self.params.push(param).unwrap();
                     }
                     self.current_param = Some(0);
                     return true;
@@ -125,7 +125,7 @@ impl EscapeParser {
                 // @A–Z[\]^_`a–z{|}~
                 0x40...0x7E => {
                     if let Some(param) = self.current_param {
-                        self.params.push(param);
+                        self.params.push(param).unwrap();
                     }
                     match byte {
                         b'm' => self.parse_sgr_params(),

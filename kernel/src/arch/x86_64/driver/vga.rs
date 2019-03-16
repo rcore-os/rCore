@@ -1,18 +1,45 @@
 use core::fmt;
+
+use console_traits::*;
+use lazy_static::lazy_static;
 use spin::Mutex;
 use volatile::Volatile;
-use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
-use crate::logging::Color;
+
 use crate::consts::KERNEL_OFFSET;
-use console_traits::*;
+use crate::util::color::ConsoleColor;
+use crate::util::escape_parser::EscapeParser;
 
 #[derive(Debug, Clone, Copy)]
 struct ColorCode(u8);
 
 impl ColorCode {
-    const fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
+    fn new(foreground: ConsoleColor, background: ConsoleColor) -> ColorCode {
+        ColorCode(background.to_code() << 4 | foreground.to_code())
+    }
+}
+
+impl ConsoleColor {
+    fn to_code(&self) -> u8 {
+        use self::ConsoleColor::*;
+        match self {
+            Black => 0,
+            Blue => 1,
+            Green => 2,
+            Cyan => 3,
+            Red => 4,
+            Magenta => 5,
+            Yellow => 6,
+            White => 7,
+            BrightBlack => 8,
+            BrightBlue => 9,
+            BrightGreen => 10,
+            BrightCyan => 11,
+            BrightRed => 12,
+            BrightMagenta => 13,
+            BrightYellow => 14,
+            BrightWhite => 15,
+        }
     }
 }
 
@@ -24,7 +51,7 @@ pub struct ScreenChar {
 }
 
 impl ScreenChar {
-    pub const fn new(ascii_char: u8, foreground_color: Color, background_color: Color) -> Self {
+    pub fn new(ascii_char: u8, foreground_color: ConsoleColor, background_color: ConsoleColor) -> Self {
         ScreenChar {
             ascii_char,
             color_code: ColorCode::new(foreground_color, background_color)
@@ -41,7 +68,7 @@ pub struct VgaBuffer {
 
 impl VgaBuffer {
     pub fn clear(&mut self) {
-        let blank = ScreenChar::new(b' ', Color::LightGray, Color::Black);
+        let blank = ScreenChar::new(b' ', ConsoleColor::White, ConsoleColor::Black);
         for row in 0 .. BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 self.chars[row][col].write(blank);
@@ -76,9 +103,10 @@ lazy_static! {
 
 pub struct VgaWriter {
     pos: Position,
-    color: Color,
+    color_code: ColorCode,
     ctrl_char_mode: ControlCharMode,
     esc_char_mode: EscapeCharMode,
+    escape_parser: EscapeParser,
     buffer: &'static mut VgaBuffer,
 }
 
@@ -105,6 +133,7 @@ impl BaseConsole for VgaWriter {
 
     fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
         self.pos = pos;
+        self.buffer.set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
         Ok(())
     }
 
@@ -135,24 +164,35 @@ impl BaseConsole for VgaWriter {
                 self.buffer.write(row - 1, col, screen_char);
             }
         }
-        let blank = ScreenChar::new(b' ', self.color, Color::Black);
+        let blank = ScreenChar::new(b' ', ConsoleColor::White, ConsoleColor::Black);
         for col in 0..BUFFER_WIDTH {
             self.buffer.write(BUFFER_HEIGHT - 1, col, blank);
         }
-        self.buffer.set_cursor_at(BUFFER_HEIGHT - 1, 0);
         Ok(())
     }
 }
 
 impl AsciiConsole for VgaWriter {
     fn write_char_at(&mut self, ch: u8, pos: Position) -> Result<(), Self::Error> {
-        self.buffer.write(pos.row.0 as usize, pos.col.0 as usize, ScreenChar::new(ch, self.color, Color::Black));
-        self.buffer.set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
+        let screen_char = ScreenChar {
+            ascii_char: ch,
+            color_code: self.color_code,
+        };
+        self.buffer.write(pos.row.0 as usize, pos.col.0 as usize, screen_char);
         Ok(())
     }
 
     fn handle_escape(&mut self, escaped_char: u8) -> bool {
-        true
+        if escaped_char == b'[' {
+            self.escape_parser.start_parse();
+        }
+        self.escape_parser.parse(escaped_char);
+        let end = escaped_char == b'm';
+        if end {
+            let attr = self.escape_parser.char_attribute();
+            self.color_code = ColorCode::new(attr.foreground, attr.background);
+        }
+        end
     }
 }
 
@@ -161,15 +201,12 @@ impl VgaWriter {
         buffer.clear();
         VgaWriter {
             pos: Position::origin(),
-            color: Color::LightGray,
+            color_code: ColorCode::new(ConsoleColor::White, ConsoleColor::Black),
             ctrl_char_mode: ControlCharMode::Interpret,
             esc_char_mode: EscapeCharMode::Waiting,
+            escape_parser: EscapeParser::new(),
             buffer,
         }
-    }
-
-    pub fn set_color(&mut self, color: Color) {
-        self.color = color;
     }
 }
 

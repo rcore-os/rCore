@@ -1,7 +1,9 @@
 //! Frambuffer color
 
+use crate::util::color::ConsoleColor;
+
 pub trait FramebufferColor {
-    /// pack as 32-bit integer
+    /// pack as 16-bit integer
     fn pack16(&self) -> u16;
 
     /// pack as 32-bit integer
@@ -12,34 +14,12 @@ pub trait FramebufferColor {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RgbColor(u8, u8, u8);
 
-#[repr(u8)]
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ConsoleColor {
-    Black = 0,
-    Red = 1,
-    Green = 2,
-    Yellow = 3,
-    Blue = 4,
-    Magenta = 5,
-    Cyan = 6,
-    White = 7,
-    BrightBlack = 60,
-    BrightRed = 61,
-    BrightGreen = 62,
-    BrightYellow = 63,
-    BrightBlue = 64,
-    BrightMagenta = 65,
-    BrightCyan = 66,
-    BrightWhite = 67,
-}
-use self::ConsoleColor::*;
-
 impl From<ConsoleColor> for RgbColor {
     /// Convert `ConsoleColor` to `RgbColor`.
     /// use `CMD` color scheme.
     /// (ref: https://en.wikipedia.org/wiki/ANSI_escape_code)
     fn from(color: ConsoleColor) -> Self {
+        use self::ConsoleColor::*;
         match color {
             Black => RgbColor(0, 0, 0),
             Red => RgbColor(128, 0, 0),

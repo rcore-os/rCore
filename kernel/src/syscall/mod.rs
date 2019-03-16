@@ -301,6 +301,7 @@ pub enum SysError {
 #[allow(non_snake_case)]
 impl fmt::Display for SysError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::SysError::*;
         write!(f, "{}",
             match self {
                 EPERM => "Operation not permitted",

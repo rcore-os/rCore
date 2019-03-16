@@ -1,10 +1,13 @@
 use core::fmt;
-use log::{self, Level, LevelFilter, Log, Metadata, Record};
-use crate::sync::SpinNoIrqLock as Mutex;
+
 use lazy_static::lazy_static;
+use log::{self, Level, LevelFilter, Log, Metadata, Record};
+
+use crate::sync::SpinNoIrqLock as Mutex;
+use crate::util::color::ConsoleColor;
 
 lazy_static! {
-    static ref log_mutex: Mutex<()> = Mutex::new(());
+    static ref LOG_LOCK: Mutex<()> = Mutex::new(());
 }
 
 pub fn init() {
@@ -37,20 +40,20 @@ macro_rules! println {
 /// Add escape sequence to print with color in Linux console
 macro_rules! with_color {
     ($args: ident, $color: ident) => {{
-        let (show, code) = color_to_console_code($color);
-        format_args!("\u{1B}[{};{}m{}\u{1B}[0m", show.clone(), code + 30, $args)
+        let code = $color.to_console_code();
+        format_args!("\u{1B}[{}m{}\u{1B}[0m", code as u8, $args)
     }};
 }
 
-fn print_in_color(args: fmt::Arguments, color: Color) {
+fn print_in_color(args: fmt::Arguments, color: ConsoleColor) {
     use crate::arch::io;
-    let _guard = log_mutex.lock();
+    let _guard = LOG_LOCK.lock();
     io::putfmt(with_color!(args, color));
 }
 
 pub fn print(args: fmt::Arguments) {
     use crate::arch::io;
-    let _guard = log_mutex.lock();
+    let _guard = LOG_LOCK.lock();
     io::putfmt(args);
 }
 
@@ -66,63 +69,20 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
 //            let target = record.target();
 //            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
-            print_in_color(format_args!("[{:>5}] {}\n", record.level(), record.args()), Color::from(record.level()));
+            print_in_color(format_args!("[{:>5}] {}\n", record.level(), record.args()), ConsoleColor::from(record.level()));
         }
     }
     fn flush(&self) {}
 }
 
-impl From<Level> for Color {
+impl From<Level> for ConsoleColor {
     fn from(level: Level) -> Self {
         match level {
-            Level::Error => Color::Red,
-            Level::Warn => Color::Yellow,
-            Level::Info => Color::Blue,
-            Level::Debug => Color::Green,
-            Level::Trace => Color::DarkGray,
+            Level::Error => ConsoleColor::Red,
+            Level::Warn => ConsoleColor::Yellow,
+            Level::Info => ConsoleColor::Blue,
+            Level::Debug => ConsoleColor::Green,
+            Level::Trace => ConsoleColor::BrightBlack,
         }
     }
-}
-
-fn color_to_console_code(color: Color) -> (u8, u8) {
-    match color {
-        Color::Black => (0, 0),
-        Color::Blue => (0, 4),
-        Color::Green => (0, 2),
-        Color::Cyan => (0, 6),
-        Color::Red => (0, 1),
-        Color::Magenta => (0, 5),
-        Color::Brown => (0, 3),
-        Color::LightGray => (1, 7),
-        Color::DarkGray => (0, 7),
-        Color::LightBlue => (1, 4),
-        Color::LightGreen => (1, 2),
-        Color::LightCyan => (1, 6),
-        Color::LightRed => (1, 1),
-        Color::Pink => (1, 5),
-        Color::Yellow => (1, 3),
-        Color::White => (1, 0),
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[repr(u8)]
-pub enum Color {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
 }
