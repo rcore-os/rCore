@@ -14,7 +14,7 @@ use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
-use smoltcp::phy::{self, DeviceCapabilities};
+use smoltcp::phy::{self, DeviceCapabilities, Checksum};
 use smoltcp::socket::*;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
@@ -96,6 +96,7 @@ const IXGBE_RTTDC1C: usize = 0x04908 / 4;
 const IXGBE_TXPBTHRESH: usize = 0x04950 / 4;
 const IXGBE_TXPBTHRESH_END: usize = 0x04970 / 4;
 const IXGBE_DMATXCTL: usize = 0x04A80 / 4;
+const IXGBE_RXCSUM: usize = 0x05000 / 4;
 const IXGBE_FCTRL: usize = 0x05080 / 4;
 const IXGBE_PFVTCTL: usize = 0x051B0 / 4;
 const IXGBE_MTA: usize = 0x05200 / 4;
@@ -335,6 +336,8 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = 1536;
         caps.max_burst_size = Some(64);
+        // IP Rx checksum is offloaded with RXCSUM
+        caps.checksum.ipv4 = Checksum::Tx;
         caps
     }
 }
@@ -545,11 +548,16 @@ pub fn ixgbe_init(header: usize, size: usize) {
         ixgbe[i].write(0);
     }
 
+    // Program the different Rx filters and Rx offloads via registers FCTRL, VLNCTRL, MCSTCTRL, RXCSUM, RQTC, RFCTL, MPSAR, RSSRK, RETA, SAQF, DAQF, SDPQF, FTQF, SYNQF, ETQF, ETQS, RDRXCTL, RSCDBU.
+    // IPPCSE IP Payload Checksum Enable
+    ixgbe[IXGBE_RXCSUM].write(ixgbe[IXGBE_RXCSUM].read() | (1 << 12));
+
     // Note that RDRXCTL.CRCStrip and HLREG0.RXCRCSTRP must be set to the same value. At the same time the RDRXCTL.RSCFRSTSIZE should be set to 0x0 as opposed to its hardware default.
     // CRCStrip | RSCACKC | FCOE_WRFIX
-    //ixgbe[IXGBE_RDRXCTL].write(ixgbe[IXGBE_RDRXCTL].read() & !(1 << 0));
     ixgbe[IXGBE_RDRXCTL].write(ixgbe[IXGBE_RDRXCTL].read() | (1 << 0) | (1 << 25) | (1 << 26));
 
+
+    /* Not completed part
     // Program RXPBSIZE, MRQC, PFQDE, RTRUP2TC, MFLCN.RPFCE, and MFLCN.RFCE according to the DCB and virtualization modes (see Section 4.6.11.3).
     // 4.6.11.3.4 DCB-Off, VT-Off
     // RXPBSIZE[0].SIZE=0x200, RXPBSIZE[1-7].SIZE=0x0
@@ -630,6 +638,8 @@ pub fn ixgbe_init(header: usize, size: usize) {
 
     // Rx Packet Plane Control and Status (RTRPCS): RAC=0b, RRM=0b
     ixgbe[IXGBE_RTRPCS].write(ixgbe[IXGBE_RTRPCS].read() & !(1 << 1) & !(1 << 2));
+
+    */
 
     // Setup receive queue 0
     // The following steps should be done once per transmit queue:

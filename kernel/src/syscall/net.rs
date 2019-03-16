@@ -340,12 +340,14 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
             if socket.is_open() {
                 let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
                 if let Ok(size) = socket.recv_slice(&mut slice) {
-                    // avoid deadlock
-                    drop(socket);
-                    drop(sockets);
+                    if size > 0 {
+                        // avoid deadlock
+                        drop(socket);
+                        drop(sockets);
 
-                    iface.poll();
-                    return Ok(size);
+                        iface.poll();
+                        return Ok(size);
+                    }
                 }
             } else {
                 return Err(SysError::ENOTCONN);
