@@ -369,6 +369,19 @@ impl<T: InactivePageTable> MemorySet<T> {
         areas.clear();
     }
 
+    /// Get physical address of the page of given virtual `addr`
+    pub fn translate(&mut self, addr: VirtAddr) -> Option<PhysAddr> {
+        self.page_table.edit(|pt| {
+            pt.get_entry(addr).and_then(|entry| {
+                if entry.user() {
+                    Some(entry.target())
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
     /*
     **  @brief  get the mutable reference for the inactive page table
     **  @retval: &mut T                 the mutable reference of the inactive page table

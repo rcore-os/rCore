@@ -128,6 +128,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         288 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
         // custom temporary syscall
         999 => sys_map_pci_device(args[0], args[1]),
+        998 => sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2]),
 //        293 => sys_pipe(),
 
         // for musl: empty impl

@@ -16,9 +16,9 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 #[cfg(feature = "no_mmu")]
 pub type MemorySet = rcore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 
-// x86_64 support up to 256M memory
+// x86_64 support up to 64G memory
 #[cfg(target_arch = "x86_64")]
-pub type FrameAlloc = bit_allocator::BitAlloc64K;
+pub type FrameAlloc = bit_allocator::BitAlloc16M;
 
 // RISCV has 8M memory
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]

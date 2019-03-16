@@ -33,3 +33,18 @@ pub fn sys_map_pci_device(vendor: usize, product: usize) -> SysResult {
 pub fn sys_map_pci_device(vendor: usize, product: usize) -> SysResult {
     Err(SysError::ENOSYS)
 }
+
+/// Get start physical addresses of frames
+/// mapped to a list of virtual addresses.
+pub fn sys_get_paddr(vaddrs: *const u64, paddrs: *mut u64, count: usize) -> SysResult {
+    let mut proc = process();
+    proc.memory_set.check_array(vaddrs, count)?;
+    proc.memory_set.check_mut_array(paddrs, count)?;
+    let vaddrs = unsafe { slice::from_raw_parts(vaddrs, count) };
+    let paddrs = unsafe { slice::from_raw_parts_mut(paddrs, count) };
+    for i in 0..count {
+        let paddr = proc.memory_set.translate(vaddrs[i] as usize).unwrap_or(0);
+        paddrs[i] = paddr as u64;
+    }
+    Ok(0)
+}
