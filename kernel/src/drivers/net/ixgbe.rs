@@ -52,8 +52,10 @@ const IXGBE_CTRL: usize = 0x00000 / 4;
 const IXGBE_STATUS: usize = 0x00008 / 4;
 const IXGBE_CTRL_EXT: usize = 0x00018 / 4;
 const IXGBE_EICR: usize = 0x00800 / 4;
+const IXGBE_EITR: usize = 0x00820 / 4;
 const IXGBE_EIMS: usize = 0x00880 / 4;
 const IXGBE_EIMC: usize = 0x00888 / 4;
+const IXGBE_GPIE: usize = 0x00898 / 4;
 const IXGBE_IVAR: usize = 0x00900 / 4;
 const IXGBE_EIMC1: usize = 0x00A90 / 4;
 const IXGBE_EIMC2: usize = 0x00A91 / 4;
@@ -725,9 +727,21 @@ pub fn ixgbe_init(header: usize, size: usize) {
     ixgbe[IXGBE_TXDCTL].write(ixgbe[IXGBE_TXDCTL].read() | 1 << 25);
     while ixgbe[IXGBE_TXDCTL].read() & (1 << 25) == 0 {}
 
+    // Interrupt Moderation
+    // Throttle interrupts
+    // Seems having good effect on tx bandwidth
+    // but bad effect on rx bandwidth
+    // CNT_WDIS | ITR Interval=100us
+    // if sys_read() spin more times, the interval here should be larger
+    // Linux use dynamic ETIR based on statistics
+    ixgbe[IXGBE_EITR].write(((100/2) << 3) | (1 << 31));
+
     // Enable interrupts
-    // map Tx0 to interrupt 0
+    // map Rx0 to interrupt 0
     ixgbe[IXGBE_IVAR].write(0b00000000_00000000_00000000_10000000);
+    // Disable general purpose interrupt
+    // We don't need them
+    ixgbe[IXGBE_GPIE].write(0);
 
     // clear all interrupt
     ixgbe[IXGBE_EICR].write(!0);

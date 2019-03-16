@@ -81,7 +81,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     FileLike::Socket(SocketWrapper {
                         handle: udp_handle,
                         socket_type: SocketType::Udp(UdpSocketState {
-                            remote_endpoint: None
+                            remote_endpoint: None,
                         }),
                     }),
                 );
@@ -154,36 +154,30 @@ pub fn sys_getsockopt(
     let proc = process();
     proc.memory_set.check_mut_ptr(optlen)?;
     match level {
-        SOL_SOCKET => {
-            match optname {
-                SO_SNDBUF => {
-                    proc.memory_set.check_mut_array(optval, 4)?;
-                    unsafe {
-                        *(optval as *mut u32) = TCP_SENDBUF as u32;
-                        *optlen = 4;
-                    }
-                    Ok(0)
+        SOL_SOCKET => match optname {
+            SO_SNDBUF => {
+                proc.memory_set.check_mut_array(optval, 4)?;
+                unsafe {
+                    *(optval as *mut u32) = TCP_SENDBUF as u32;
+                    *optlen = 4;
                 }
-                SO_RCVBUF => {
-                    proc.memory_set.check_mut_array(optval, 4)?;
-                    unsafe {
-                        *(optval as *mut u32) = TCP_RECVBUF as u32;
-                        *optlen = 4;
-                    }
-                    Ok(0)
-                }
-                _ => Err(SysError::ENOPROTOOPT)
+                Ok(0)
             }
-        }
-        IPPROTO_TCP => {
-            match optname {
-                TCP_CONGESTION => {
-                    Ok(0)
+            SO_RCVBUF => {
+                proc.memory_set.check_mut_array(optval, 4)?;
+                unsafe {
+                    *(optval as *mut u32) = TCP_RECVBUF as u32;
+                    *optlen = 4;
                 }
-                _ => Err(SysError::ENOPROTOOPT)
+                Ok(0)
             }
-        }
-        _ => Err(SysError::ENOPROTOOPT)
+            _ => Err(SysError::ENOPROTOOPT),
+        },
+        IPPROTO_TCP => match optname {
+            TCP_CONGESTION => Ok(0),
+            _ => Err(SysError::ENOPROTOOPT),
+        },
+        _ => Err(SysError::ENOPROTOOPT),
     }
 }
 
@@ -293,7 +287,7 @@ pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usi
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
 
-            if !socket.endpoint().is_specified() {
+            if socket.endpoint().port == 0 {
                 let v4_src = iface.ipv4_address().unwrap();
                 let temp_port = get_ephemeral_port();
                 socket
@@ -333,7 +327,8 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
     let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
-        loop {
+        spin_and_wait(&[&SOCKET_ACTIVITY], move || {
+            iface.poll();
             let mut sockets = iface.sockets();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
@@ -346,18 +341,14 @@ pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize)
                         drop(sockets);
 
                         iface.poll();
-                        return Ok(size);
+                        return Some(Ok(size));
                     }
                 }
             } else {
-                return Err(SysError::ENOTCONN);
+                return Some(Err(SysError::ENOTCONN));
             }
-
-            // avoid deadlock
-            drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
-        }
+            None
+        })
     } else if let SocketType::Udp(_) = wrapper.socket_type {
         loop {
             let mut sockets = iface.sockets();
@@ -443,7 +434,7 @@ pub fn sys_sendto(
         let mut sockets = iface.sockets();
         let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
 
-        if !socket.endpoint().is_specified() {
+        if socket.endpoint().port == 0 {
             let temp_port = get_ephemeral_port();
             socket
                 .bind(IpEndpoint::new(IpAddress::Ipv4(v4_src), temp_port))
@@ -482,7 +473,6 @@ pub fn sys_recvfrom(
     proc.memory_set.check_mut_array(buffer, len)?;
 
     let iface = &*(NET_DRIVERS.read()[0]);
-    debug!("sockets {:#?}", proc.files);
 
     let wrapper = proc.get_socket(fd)?;
     // TODO: move some part of these into one generic function
@@ -597,6 +587,7 @@ pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult 
     if endpoint.port == 0 {
         endpoint.port = get_ephemeral_port();
     }
+    info!("sys_bind: fd: {} bind to {}", fd, endpoint);
 
     let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = &mut proc.get_socket_mut(fd)?;
@@ -606,6 +597,13 @@ pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult 
             is_listening: false,
         });
         Ok(0)
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
+        let mut sockets = iface.sockets();
+        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
+        match socket.bind(endpoint) {
+            Ok(()) => Ok(0),
+            Err(_) => Err(SysError::EINVAL),
+        }
     } else {
         Err(SysError::EINVAL)
     }
@@ -782,7 +780,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
             let mut sockets = iface.sockets();
             let socket = sockets.get::<TcpSocket>(wrapper.handle);
             let endpoint = socket.local_endpoint();
-            if endpoint.is_specified() {
+            if endpoint.port != 0 {
                 let sockaddr_in = SockAddr::from(socket.local_endpoint());
                 unsafe {
                     sockaddr_in.write_to(&mut proc, addr, addr_len)?;
@@ -796,7 +794,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         let mut sockets = iface.sockets();
         let socket = sockets.get::<UdpSocket>(wrapper.handle);
         let endpoint = socket.endpoint();
-        if endpoint.is_specified() {
+        if endpoint.port != 0 {
             let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
                 sockaddr_in.write_to(&mut proc, addr, addr_len)?;
@@ -879,6 +877,18 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
             if socket.can_send() {
                 output = true;
             }
+        }
+    } else if let SocketType::Udp(_) = wrapper.socket_type {
+        let iface = &*(NET_DRIVERS.read()[0]);
+        let mut sockets = iface.sockets();
+        let socket = sockets.get::<UdpSocket>(wrapper.handle);
+
+        if socket.can_recv() {
+            input = true;
+        }
+
+        if socket.can_send() {
+            output = true;
         }
     } else {
         unimplemented!()

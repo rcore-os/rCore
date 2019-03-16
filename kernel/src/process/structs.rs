@@ -35,7 +35,7 @@ pub struct TcpSocketState {
 
 #[derive(Clone, Debug)]
 pub struct UdpSocketState {
-    pub remote_endpoint: Option<IpEndpoint>, // remember remote endpoint for connect(0)
+    pub remote_endpoint: Option<IpEndpoint>, // remember remote endpoint for connect()
 }
 
 #[derive(Clone, Debug)]
