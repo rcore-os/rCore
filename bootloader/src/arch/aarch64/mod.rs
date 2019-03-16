@@ -99,8 +99,15 @@ fn enable_mmu() {
 }
 
 pub fn map_kernel(kernel_start: usize, segments: &FixedVec<ProgramHeader64>) {
+    // reverse program headers to avoid overlapping in memory copying
+    let mut space = alloc_stack!([ProgramHeader64; 32]);
+    let mut rev_segments = FixedVec::new(&mut space);
+    for i in (0..segments.len()).rev() {
+        rev_segments.push(segments[i]).unwrap();
+    }
+
     let (mut start_vaddr, mut end_vaddr) = (VirtAddr::new(core::u64::MAX), VirtAddr::zero());
-    for segment in segments {
+    for segment in &rev_segments {
         if segment.get_type() != Ok(Type::Load) {
             continue;
         }
