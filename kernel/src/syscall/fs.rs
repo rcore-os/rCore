@@ -718,7 +718,9 @@ impl DirentBufWriter {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 #[repr(C)]
+#[derive(Debug)]
 pub struct Stat {
     /// ID of device containing file
     dev: u64,
@@ -741,6 +743,44 @@ pub struct Stat {
     size: u64,
     /// blocksize for filesystem I/O
     blksize: u64,
+    /// number of 512B blocks allocated
+    blocks: u64,
+
+    /// last access time
+    atime: Timespec,
+    /// last modification time
+    mtime: Timespec,
+    /// last status change time
+    ctime: Timespec,
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+#[repr(C)]
+#[derive(Debug)]
+pub struct Stat {
+    /// ID of device containing file
+    dev: u64,
+    /// inode number
+    ino: u64,
+    /// file type and mode
+    mode: StatMode,
+    /// number of hard links
+    nlink: u32,
+
+    /// user ID of owner
+    uid: u32,
+    /// group ID of owner
+    gid: u32,
+    /// device ID (if special file)
+    rdev: u64,
+    /// padding
+    __pad: u64,
+    /// total size, in bytes
+    size: u64,
+    /// blocksize for filesystem I/O
+    blksize: u32,
+    /// padding
+    __pad2: u32,
     /// number of 512B blocks allocated
     blocks: u64,
 
@@ -824,6 +864,7 @@ impl StatMode {
 }
 
 impl From<Metadata> for Stat {
+    #[cfg(target_arch = "x86_64")]
     fn from(info: Metadata) -> Self {
         Stat {
             dev: info.dev as u64,
@@ -840,6 +881,27 @@ impl From<Metadata> for Stat {
             mtime: info.mtime,
             ctime: info.ctime,
             _pad0: 0
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    fn from(info: Metadata) -> Self {
+        Stat {
+            dev: info.dev as u64,
+            ino: info.inode as u64,
+            mode: StatMode::from_type_mode(info.type_, info.mode as u16),
+            nlink: info.nlinks as u32,
+            uid: info.uid as u32,
+            gid: info.gid as u32,
+            rdev: 0,
+            size: info.size as u64,
+            blksize: info.blk_size as u32,
+            blocks: info.blocks as u64,
+            atime: info.atime,
+            mtime: info.mtime,
+            ctime: info.ctime,
+            __pad: 0,
+            __pad2: 0
         }
     }
 }
