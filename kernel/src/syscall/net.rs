@@ -20,8 +20,8 @@ const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
 const IPPROTO_TCP: usize = 6;
 
-const TCP_SENDBUF: usize = 128 * 1024; // 128K
-const TCP_RECVBUF: usize = 128 * 1024;
+const TCP_SENDBUF: usize = 512 * 1024; // 512K
+const TCP_RECVBUF: usize = 512 * 1024; // 512K
 
 fn get_ephemeral_port() -> u16 {
     // TODO selects non-conflict high port
@@ -698,8 +698,8 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
                     // create a new one in fd
                     let new_fd = proc.get_free_fd();
 
-                    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
-                    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 2048]);
+                    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; TCP_RECVBUF]);
+                    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; TCP_SENDBUF]);
                     let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
                     tcp_socket.listen(endpoint).unwrap();
 

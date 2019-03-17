@@ -380,11 +380,6 @@ impl phy::TxToken for IXGBETxToken {
             unsafe { slice::from_raw_parts_mut(driver.send_buffers[index] as *mut u8, len) };
         target.copy_from_slice(&buffer[..len]);
 
-        let buffer_page_pa = active_table()
-            .get_entry(driver.send_buffers[index])
-            .unwrap()
-            .target();
-        assert_eq!(buffer_page_pa, send_desc.addr as usize);
         send_desc.len = len as u16;
         // RS | IFCS | EOP
         send_desc.cmd = (1 << 3) | (1 << 1) | (1 << 0);
@@ -663,7 +658,8 @@ pub fn ixgbe_init(header: usize, size: usize) {
     ixgbe[IXGBE_RDLEN].write(PAGE_SIZE as u32); // RDLEN
 
     // 5. Program SRRCTL associated with this queue according to the size of the buffers and the required header control.
-    // Legacy descriptor, default SRRCTL is ok
+    // Legacy descriptor, 4K buffer size
+    ixgbe[IXGBE_SRRCTL].write((ixgbe[IXGBE_SRRCTL].read() & !0xf) | (4 << 0));
 
     ixgbe[IXGBE_RDH].write(0); // RDH
 
@@ -727,7 +723,12 @@ pub fn ixgbe_init(header: usize, size: usize) {
     ixgbe[IXGBE_TXDCTL].write(ixgbe[IXGBE_TXDCTL].read() | 1 << 25);
     while ixgbe[IXGBE_TXDCTL].read() & (1 << 25) == 0 {}
 
-    // Interrupt Moderation
+
+    // 4.6.6 Interrupt Initialization
+    // The software driver associates between Tx and Rx interrupt causes and the EICR register by setting the IVAR[n] registers.
+    // map Rx0 to interrupt 0
+    ixgbe[IXGBE_IVAR].write(0b00000000_00000000_00000000_10000000);
+    // Set the interrupt throttling in EITR[n] and GPIE according to the preferred mode of operation.
     // Throttle interrupts
     // Seems having good effect on tx bandwidth
     // but bad effect on rx bandwidth
@@ -735,16 +736,13 @@ pub fn ixgbe_init(header: usize, size: usize) {
     // if sys_read() spin more times, the interval here should be larger
     // Linux use dynamic ETIR based on statistics
     ixgbe[IXGBE_EITR].write(((100/2) << 3) | (1 << 31));
-
-    // Enable interrupts
-    // map Rx0 to interrupt 0
-    ixgbe[IXGBE_IVAR].write(0b00000000_00000000_00000000_10000000);
     // Disable general purpose interrupt
     // We don't need them
     ixgbe[IXGBE_GPIE].write(0);
-
+    // Software clears EICR by writing all ones to clear old interrupt causes.
     // clear all interrupt
     ixgbe[IXGBE_EICR].write(!0);
+    // Software enables the required interrupt causes by setting the EIMS register.
     // unmask tx/rx interrupts
     ixgbe[IXGBE_EIMS].write(1 << 0);
 
