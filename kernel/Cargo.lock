@@ -15,6 +15,16 @@ dependencies = [
 [[package]]
 name = "apic"
 version = "0.1.0"
+source = "git+https://github.com/rcore-os/apic-rs#5ddc5fba952ae7420bcf3b7af3d79004e2b8c12f"
+dependencies = [
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "apic"
+version = "0.1.0"
 source = "git+https://github.com/wangrunji0408/APIC-Rust#5ddc5fba952ae7420bcf3b7af3d79004e2b8c12f"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -76,7 +86,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "bootloader"
 version = "0.3.14"
-source = "git+https://github.com/wangrunji0408/bootloader#d19ff0de234a8a54d4f93c355af5399672e026ae"
+source = "git+https://github.com/rcore-os/bootloader#301082be285196d285c0a07ea2c2f49d053b4d64"
 dependencies = [
  "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -114,7 +124,7 @@ source = "git+https://github.com/wangrunji0408/deque.git?branch=no_std#907d03935
 [[package]]
 name = "device_tree"
 version = "1.0.3"
-source = "git+https://github.com/jiegec/device_tree-rs#4bcec298a212974b7a52ce3b5fb50e01aefdbbfe"
+source = "git+https://github.com/rcore-os/device_tree-rs#4bcec298a212974b7a52ce3b5fb50e01aefdbbfe"
 
 [[package]]
 name = "fixedvec"
@@ -274,19 +284,19 @@ dependencies = [
 
 [[package]]
 name = "rcore"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
- "apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)",
+ "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "bbl 0.1.0",
  "bcm2837 0.1.0 (git+https://github.com/equation314/bcm2837)",
  "bit-allocator 0.1.0",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "bootloader 0.3.14 (git+https://github.com/wangrunji0408/bootloader)",
+ "bootloader 0.3.14 (git+https://github.com/rcore-os/bootloader)",
  "cc 1.0.30 (registry+https://github.com/rust-lang/crates.io-index)",
  "console-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "device_tree 1.0.3 (git+https://github.com/jiegec/device_tree-rs)",
+ "device_tree 1.0.3 (git+https://github.com/rcore-os/device_tree-rs)",
  "heapless 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -294,11 +304,11 @@ dependencies = [
  "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/wangrunji0408/rcore-fs?branch=sefs)",
- "rcore-fs-sfs 0.1.0 (git+https://github.com/wangrunji0408/rcore-fs?branch=sefs)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)",
+ "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)",
  "rcore-memory 0.1.0",
  "rcore-thread 0.1.0",
- "riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)",
+ "riscv 0.3.0 (git+https://github.com/rcore-os/riscv)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -310,16 +320,16 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/wangrunji0408/rcore-fs?branch=sefs#0eba40886d36311b28d42ff2a27a0f4292e2ad9f"
+source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#0eba40886d36311b28d42ff2a27a0f4292e2ad9f"
 
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/wangrunji0408/rcore-fs?branch=sefs#0eba40886d36311b28d42ff2a27a0f4292e2ad9f"
+source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#0eba40886d36311b28d42ff2a27a0f4292e2ad9f"
 dependencies = [
  "bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/wangrunji0408/rcore-fs?branch=sefs)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -367,7 +377,7 @@ dependencies = [
 [[package]]
 name = "riscv"
 version = "0.3.0"
-source = "git+https://github.com/riscv-and-rust-and-decaf/riscv#ac09fc675387998df9874349fd9794aced81185c"
+source = "git+https://github.com/rcore-os/riscv#ac09fc675387998df9874349fd9794aced81185c"
 dependencies = [
  "bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -560,6 +570,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum aarch64 2.2.2 (git+https://github.com/equation314/aarch64)" = "<none>"
+"checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum apic 0.1.0 (git+https://github.com/wangrunji0408/APIC-Rust)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
@@ -567,13 +578,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cfadef5c4e2c2e64067b9ecc061179f12ac7ec65ba613b1f60f3972bbada1f5b"
-"checksum bootloader 0.3.14 (git+https://github.com/wangrunji0408/bootloader)" = "<none>"
+"checksum bootloader 0.3.14 (git+https://github.com/rcore-os/bootloader)" = "<none>"
 "checksum byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a019b10a2a7cdeb292db131fc8113e57ea2a908f6e7894b0c3c671893b65dbeb"
 "checksum cc 1.0.30 (registry+https://github.com/rust-lang/crates.io-index)" = "d01c69d08ff207f231f07196e30f84c70f1c815b04f980f8b7b01ff01f05eb92"
 "checksum cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "11d43355396e872eefb45ce6342e4374ed7bc2b3a502d1b28e36d6e23c05d1f4"
 "checksum console-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f711b3d1d5c3f7ae7d6428901c0f3e5d5f5c800fcfac86bf0252e96373a2cec6"
 "checksum deque 0.3.2 (git+https://github.com/wangrunji0408/deque.git?branch=no_std)" = "<none>"
-"checksum device_tree 1.0.3 (git+https://github.com/jiegec/device_tree-rs)" = "<none>"
+"checksum device_tree 1.0.3 (git+https://github.com/rcore-os/device_tree-rs)" = "<none>"
 "checksum fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "7c6c16d316ccdac21a4dd648e314e76facbbaf316e83ca137d0857a9c07419d0"
 "checksum font8x8 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b81d84c3c978af7d05d31a2198af4b9ba956d819d15d8f6d58fc150e33f8dc1f"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
@@ -596,12 +607,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
 "checksum rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d0e7a549d590831370895ab7ba4ea0c1b6b011d106b5ff2da6eee112615e6dc0"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
-"checksum rcore-fs 0.1.0 (git+https://github.com/wangrunji0408/rcore-fs?branch=sefs)" = "<none>"
-"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/wangrunji0408/rcore-fs?branch=sefs)" = "<none>"
+"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)" = "<none>"
+"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)" = "<none>"
 "checksum rdrand 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
-"checksum riscv 0.3.0 (git+https://github.com/riscv-and-rust-and-decaf/riscv)" = "<none>"
+"checksum riscv 0.3.0 (git+https://github.com/rcore-os/riscv)" = "<none>"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
