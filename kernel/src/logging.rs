@@ -79,7 +79,7 @@ impl From<Level> for ConsoleColor {
     fn from(level: Level) -> Self {
         match level {
             Level::Error => ConsoleColor::Red,
-            Level::Warn => ConsoleColor::Yellow,
+            Level::Warn => ConsoleColor::BrightYellow,
             Level::Info => ConsoleColor::Blue,
             Level::Debug => ConsoleColor::Green,
             Level::Trace => ConsoleColor::BrightBlack,

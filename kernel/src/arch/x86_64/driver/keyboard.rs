@@ -11,7 +11,7 @@ pub fn init() {
 
 /// Receive character from keyboard
 /// Should be called on every interrupt
-pub fn receive() -> Option<char> {
+pub fn receive() -> Option<DecodedKey> {
     lazy_static! {
         static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
             Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore));
@@ -25,12 +25,7 @@ pub fn receive() -> Option<char> {
     if unsafe { status_port.read() } & (1 << 0) != 0 {
         let scancode = unsafe { data_port.read() };
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-            if let Some(key) = keyboard.process_keyevent(key_event) {
-                match key {
-                    DecodedKey::Unicode(character) => return Some(character),
-                    DecodedKey::RawKey(_key) => {}, // TODO: handle RawKey from keyboard
-                }
-            }
+            return keyboard.process_keyevent(key_event);
         }
     }
     None

@@ -32,6 +32,24 @@ impl Default for CharacterAttribute {
     }
 }
 
+impl CharacterAttribute {
+    /// Parse and apply SGR (Select Graphic Rendition) parameters.
+    fn apply_sgr(&mut self, code: u8) {
+        match code {
+            0 => *self = CharacterAttribute::default(),
+            4 => self.underline = true,
+            7 => self.reverse = true,
+            9 => self.strikethrough = true,
+            24 => self.underline = false,
+            27 => self.reverse = false,
+            29 => self.strikethrough = false,
+            30...37 | 90...97 => self.foreground = ConsoleColor::from_console_code(code).unwrap(),
+            40...47 | 100...107 => self.background = ConsoleColor::from_console_code(code - 10).unwrap(),
+            _ => { /* unimplemented!() */ }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum ParseStatus {
     /// The last character is `ESC`, start parsing the escape sequence.
@@ -44,6 +62,30 @@ enum ParseStatus {
 
     /// Display text Normally.
     Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CSI {
+    CursorMove(i8, i8),
+    CursorMoveLine(i8),
+    SGR,
+    Unknown,
+}
+
+impl CSI {
+    fn new(final_byte: u8, params: &[u8]) -> CSI {
+        let n = *params.get(0).unwrap_or(&1) as i8;
+        match final_byte {
+            b'A' => CSI::CursorMove(-n, 0),
+            b'B' => CSI::CursorMove(n, 0),
+            b'C' => CSI::CursorMove(0, n),
+            b'D' => CSI::CursorMove(0, -n),
+            b'E' => CSI::CursorMoveLine(n),
+            b'F' => CSI::CursorMoveLine(-n),
+            b'm' => CSI::SGR,
+            _ => CSI::Unknown,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -75,66 +117,49 @@ impl EscapeParser {
         self.current_param = None;
     }
 
-    //// Parse SGR (Select Graphic Rendition) parameters.
-    fn parse_sgr_params(&mut self) {
-        for param in &self.params {
-            match param {
-                0 => self.char_attr = CharacterAttribute::default(),
-                4 => self.char_attr.underline = true,
-                7 => self.char_attr.reverse = true,
-                9 => self.char_attr.strikethrough = true,
-                24 => self.char_attr.underline = false,
-                27 => self.char_attr.reverse = false,
-                29 => self.char_attr.strikethrough = false,
-                30...37 | 90...97 => self.char_attr.foreground = ConsoleColor::from_console_code(*param).unwrap(),
-                40...47 | 100...107 => self.char_attr.background = ConsoleColor::from_console_code(*param - 10).unwrap(),
-                _ => { /* unimplemented!() */ }
-            }
-        }
-    }
-
     /// See a character during parsing.
-    pub fn parse(&mut self, byte: u8) -> bool {
+    /// Return `Some(csi)` if parse end, else `None`.
+    pub fn parse(&mut self, byte: u8) -> Option<CSI> {
         assert_ne!(self.status, ParseStatus::Text);
         match self.status {
             ParseStatus::BeginEscapeSequence => match byte {
                 b'[' => {
                     self.status = ParseStatus::ParsingCSI;
-                    self.current_param = Some(0);
+                    self.current_param = None;
                     self.params.clear();
-                    return true;
+                    return None;
                 }
                 _ => { /* unimplemented!() */ }
             },
             ParseStatus::ParsingCSI => match byte {
                 b'0'...b'9' => {
                     let digit = (byte - b'0') as u32;
-                    if let Some(param) = self.current_param {
-                        let res: u32 = param as u32 * 10 + digit;
-                        self.current_param = if res <= 0xFF { Some(res as u8) } else { None };
-                    }
-                    return true;
+                    let param = self.current_param.unwrap_or(0) as u32;
+                    let res = param * 10 + digit;
+                    self.current_param = if res <= 0xFF { Some(res as u8) } else { None };
+                    return None;
                 }
                 b';' => {
-                    if let Some(param) = self.current_param {
-                        self.params.push(param).unwrap();
-                    }
+                    let param = self.current_param.unwrap_or(0);
+                    self.params.push(param).unwrap();
                     self.current_param = Some(0);
-                    return true;
+                    return None;
                 }
                 // @A–Z[\]^_`a–z{|}~
                 0x40...0x7E => {
                     if let Some(param) = self.current_param {
                         self.params.push(param).unwrap();
                     }
-                    match byte {
-                        b'm' => self.parse_sgr_params(),
-                        _ => { /* unimplemented!() */ }
+                    let csi = CSI::new(byte, &self.params);
+                    if csi == CSI::SGR {
+                        for &param in self.params.iter() {
+                            self.char_attr.apply_sgr(param);
+                        }
                     }
                     self.status = ParseStatus::Text;
                     self.current_param = None;
                     self.params.clear();
-                    return true;
+                    return Some(csi);
                 }
                 _ => {}
             },
@@ -143,7 +168,7 @@ impl EscapeParser {
         self.status = ParseStatus::Text;
         self.current_param = None;
         self.params.clear();
-        false
+        None
     }
 
     pub fn char_attribute(&self) -> CharacterAttribute {

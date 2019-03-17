@@ -171,9 +171,8 @@ impl<F: Font> Console<F> {
 
     fn write_byte(&mut self, byte: u8) {
         if self.parser.is_parsing() {
-            if self.parser.parse(byte) {
-                return;
-            }
+            self.parser.parse(byte);
+            return;
         }
         match byte {
             b'\x7f' => {

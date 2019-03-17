@@ -8,7 +8,7 @@ use x86_64::instructions::port::Port;
 
 use crate::consts::KERNEL_OFFSET;
 use crate::util::color::ConsoleColor;
-use crate::util::escape_parser::EscapeParser;
+use crate::util::escape_parser::{EscapeParser, CSI};
 
 #[derive(Debug, Clone, Copy)]
 struct ColorCode(u8);
@@ -131,7 +131,9 @@ impl BaseConsole for VgaWriter {
         Ok(())
     }
 
-    fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
+    fn set_pos(&mut self, mut pos: Position) -> Result<(), Self::Error> {
+        pos.row.bound(self.get_height());
+        pos.col.bound(self.get_width());
         self.pos = pos;
         self.buffer.set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
         Ok(())
@@ -186,13 +188,45 @@ impl AsciiConsole for VgaWriter {
         if escaped_char == b'[' {
             self.escape_parser.start_parse();
         }
-        self.escape_parser.parse(escaped_char);
-        let end = escaped_char == b'm';
-        if end {
-            let attr = self.escape_parser.char_attribute();
-            self.color_code = ColorCode::new(attr.foreground, attr.background);
+        let csi = match self.escape_parser.parse(escaped_char) {
+            Some(csi) => csi,
+            None => return false,
+        };
+        match csi {
+            CSI::SGR => {
+                let attr = self.escape_parser.char_attribute();
+                self.color_code = ColorCode::new(attr.foreground, attr.background);
+            }
+            CSI::CursorMove(dx, dy) => {
+                let x = (self.pos.row.0 as i8 + dx).max(0) as u8;
+                let y = (self.pos.col.0 as i8 + dy).max(0) as u8;
+                self.set_pos(Position::new(Row(x), Col(y)));
+            }
+            CSI::CursorMoveLine(dx) => {
+                let x = (self.pos.row.0 as i8 + dx).max(0) as u8;
+                self.set_pos(Position::new(Row(x), Col(0)));
+            }
+            _ => {}
         }
-        end
+        true
+    }
+
+    /// Check if an 8-bit char is special
+    fn is_special(&self, ch: u8) -> Option<SpecialChar> {
+        match self.get_control_char_mode() {
+            ControlCharMode::Interpret => match ch {
+                b'\n' => Some(SpecialChar::Linefeed),
+                b'\r' => Some(SpecialChar::CarriageReturn),
+                b'\t' => Some(SpecialChar::Tab),
+                0x1b => Some(SpecialChar::Escape),
+                0x7f => Some(SpecialChar::Delete),
+                0x08 => Some(SpecialChar::Backspace),
+                _ if !(ch.is_ascii_graphic() || ch == b' ')
+                    => Some(SpecialChar::Delete),   // ignore non-graphic ascii
+                _ => None,
+            },
+            _ => None,
+        }
     }
 }
 

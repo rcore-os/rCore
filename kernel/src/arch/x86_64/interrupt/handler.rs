@@ -142,9 +142,24 @@ fn page_fault(tf: &mut TrapFrame) {
 
 fn keyboard() {
     use crate::arch::driver::keyboard;
+    use pc_keyboard::{DecodedKey, KeyCode};
     trace!("\nInterupt: Keyboard");
-    if let Some(c) = keyboard::receive() {
-        crate::trap::serial(c);
+    if let Some(key) = keyboard::receive() {
+        match key {
+            DecodedKey::Unicode(c) => crate::trap::serial(c),
+            DecodedKey::RawKey(code) => {
+                let s = match code {
+                    KeyCode::ArrowUp => "\u{1b}[A",
+                    KeyCode::ArrowDown => "\u{1b}[B",
+                    KeyCode::ArrowRight => "\u{1b}[C",
+                    KeyCode::ArrowLeft => "\u{1b}[D",
+                    _ => "",
+                };
+                for c in s.chars() {
+                    crate::trap::serial(c);
+                }
+            }
+        }
     }
 }
 
