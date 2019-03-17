@@ -127,11 +127,11 @@ impl Context {
     }
 
     pub unsafe fn switch(&mut self, target: &mut Self) {
-        self.ttbr = ttbr_el1_read(1);
+        self.ttbr = ttbr_el1_read(0);
         target.asid = ASID_ALLOCATOR.lock().alloc(target.asid);
 
         // with ASID we needn't flush TLB frequently
-        ttbr_el1_write_asid(1, target.asid.value, target.ttbr);
+        ttbr_el1_write_asid(0, target.asid.value, target.ttbr);
         barrier::dsb(barrier::ISH);
         Self::__switch(&mut self.stack_top, &mut target.stack_top);
     }

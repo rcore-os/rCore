@@ -32,8 +32,10 @@ m_mode ?=
 
 target := $(arch)
 kernel := target/$(target)/$(mode)/rcore
-bin := target/$(target)/$(mode)/kernel.bin
+kernel_img := target/$(target)/$(mode)/kernel.img
 bootimage := target/$(target)/bootimage.bin
+bootloader_dir = ../bootloader
+bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 k210_lib := ../tools/k210/libkendryte.a
@@ -53,9 +55,7 @@ endif
 export M_MODE = $(m_mode)
 
 ifeq ($(arch), aarch64)
-graphic ?= on
-else
-graphic ?= off
+graphic := on
 endif
 
 ### qemu options ###
@@ -76,7 +76,7 @@ qemu_net_opts += \
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
-	-kernel $(bin) \
+	-kernel $(kernel_img) \
 	-drive file=$(SFSIMG),format=raw,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
@@ -89,7 +89,7 @@ endif
 else ifeq ($(arch), riscv64)
 qemu_opts += \
 	-machine virt \
-	-kernel $(bin) \
+	-kernel $(kernel_img) \
 	-drive file=$(SFSIMG),format=raw,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
@@ -103,7 +103,7 @@ else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
-	-kernel $(bin)
+	-kernel $(kernel_img)
 endif
 
 ifdef d
@@ -170,8 +170,9 @@ objdump := $(prefix)objdump
 objcopy := $(prefix)objcopy
 cc := $(prefix)gcc
 as := $(prefix)as
-gdb := gdb
-export CC=$(cc)
+gdb := $(prefix)gdb
+strip := $(prefix)strip
+export CC = $(cc)
 
 .PHONY: all clean run build asm doc justrun debug kernel sfsimg install runnet
 
@@ -179,6 +180,7 @@ all: kernel
 
 clean:
 	@cargo clean
+	@cd $(bootloader_dir) && make clean
 	@cd $(user_dir) && make clean
 
 doc:
@@ -199,12 +201,12 @@ justrunui: build
 		-device virtio-gpu-device \
 		-device virtio-mouse-device
 
-debug: $(kernel) $(bin)
+debug: $(kernel) $(kernel_img)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
-build: $(bin)
+build: $(kernel_img)
 
 asm:
 	@$(objdump) -d $(kernel) | less
@@ -215,7 +217,15 @@ header:
 sym:
 	@$(objdump) -t $(kernel) | less
 
-$(bin): kernel
+$(bootloader): $(kernel)
+ifeq ($(arch), aarch64)
+	@echo Building $(arch) bootloader
+	@$(strip) $(kernel) -o $(kernel)_stripped
+	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
+	@rm $(kernel)_stripped
+endif
+
+$(kernel_img): kernel $(bootloader)
 ifeq ($(arch), riscv32)
 	@mkdir -p target/$(target)/bbl && \
 	cd target/$(target)/bbl && \
@@ -243,10 +253,11 @@ else
 	cp bbl $(abspath $@)
 endif
 else ifeq ($(arch), aarch64)
-	@$(objcopy) $(kernel) --strip-all -O binary $@
+	@$(objcopy) $(bootloader) --strip-all -O binary $@
 endif
 
 kernel:
+	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 else ifeq ($(arch), riscv32)
@@ -287,8 +298,8 @@ endif
 
 ifdef sd_card
 .PHONY:
-install: $(bin)
-	cp $(bin) $(sd_card)/kernel8.img
+install: $(kernel_img)
+	cp $(kernel_img) $(sd_card)/kernel8.img
 	sudo umount $(sd_card)
 endif
 
@@ -296,9 +307,9 @@ endif
 
 ifeq ($(board), k210)
 .PHONY:
-install: $(bin)
+install: $(kernel_img)
 	## baudrate no more than 600000
-	@python3 ../tools/k210/kflash.py $(bin) -b 600000
+	@python3 ../tools/k210/kflash.py $(kernel_img) -b 600000
 endif
 
 .PHONY:

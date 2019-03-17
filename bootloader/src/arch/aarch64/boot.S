@@ -1,8 +1,7 @@
-# TODO rewrite in Rust, use crate cortex-a
-
 .section .text.boot
+.globl _start
 
-boot:
+_start:
     # read cpu affinity, start core 0, halt rest
     mrs     x1, mpidr_el1
     and     x1, x1, #3
@@ -93,22 +92,16 @@ set_stack:
 
 zero_bss:
     # load the start address and number of bytes in BSS section
-    ldr     x1, =sbss
-    ldr     x2, =__bss_length
+    ldr     x1, =_sbss
+    ldr     x2, =_ebss
 
 zero_bss_loop:
     # zero out the BSS section, 64-bits at a time
-    cbz     x2, zero_bss_loop_end
+    cmp     x1, x2
+    b.ge    zero_bss_loop_end
     str     xzr, [x1], #8
-    sub     x2, x2, #8
-    cbnz    x2, zero_bss_loop
+    b       zero_bss_loop
 
 zero_bss_loop_end:
-    b       _start
-
-.section .text.entry
-.globl _start
-_start:
-    # jump to rust_main, which shouldn't return. halt if it does
-    bl      rust_main
+    bl      boot_main
     b       halt

@@ -14,12 +14,11 @@ pub mod syscall;
 #[path = "board/raspi3/mod.rs"]
 pub mod board;
 
-global_asm!(include_str!("boot/boot.S"));
+global_asm!(include_str!("boot/entry.S"));
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main() -> ! {
-    memory::init_mmu_early(); // Enable mmu and paging
     board::init_serial_early();
 
     crate::logging::init();

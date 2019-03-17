@@ -53,19 +53,19 @@ union ColorBuffer {
 }
 
 impl ColorBuffer {
-    fn new(color_depth: ColorDepth, bus_addr: u32, size: u32) -> ColorBuffer {
+    fn new(color_depth: ColorDepth, base_addr: usize, size: usize) -> ColorBuffer {
         unsafe {
             match color_depth {
                 ColorDepth16 => ColorBuffer {
                     buf16: core::slice::from_raw_parts_mut(
-                        bus_addr as *mut u16,
-                        (size / 2) as usize,
+                        base_addr as *mut u16,
+                        size / 2,
                     ),
                 },
                 ColorDepth32 => ColorBuffer {
                     buf32: core::slice::from_raw_parts_mut(
-                        bus_addr as *mut u32,
-                        (size / 4) as usize,
+                        base_addr as *mut u32,
+                        size / 4,
                     ),
                 },
             }
@@ -144,7 +144,7 @@ impl Framebuffer {
 
         use crate::arch::memory;
         let paddr = info.bus_addr & !0xC0000000;
-        let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb") as u32;
+        let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb");
         if vaddr == 0 {
             Err(format!(
                 "cannot remap memory range [{:#x?}..{:#x?}]",
@@ -153,7 +153,7 @@ impl Framebuffer {
             ))?;
         }
         Ok(Framebuffer {
-            buf: ColorBuffer::new(color_depth, vaddr, info.screen_size),
+            buf: ColorBuffer::new(color_depth, vaddr, info.screen_size as usize),
             color_depth,
             fb_info: info,
         })
