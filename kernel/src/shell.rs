@@ -6,11 +6,7 @@ use crate::fs::{ROOT_INODE, INodeExt};
 use crate::process::*;
 
 pub fn run_user_shell() {
-    //use crate::net::server;
-    //processor().manager().add(Thread::new_kernel(server, 0), 0);
     if let Ok(inode) = ROOT_INODE.lookup("rust/sh") {
-        println!("Going to user mode shell.");
-        println!("Use 'ls' to list available programs.");
         let data = inode.read_as_vec().unwrap();
         processor().manager().add(Thread::new_user(data.as_slice(), "sh".split(' ')));
     } else {

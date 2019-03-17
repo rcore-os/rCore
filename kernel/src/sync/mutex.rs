@@ -30,7 +30,7 @@ use crate::arch::interrupt;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{ATOMIC_BOOL_INIT, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
 use super::Condvar;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
@@ -78,7 +78,7 @@ impl<T, S: MutexSupport> Mutex<T, S>
     /// ```
     pub fn new(user_data: T) -> Mutex<T, S> {
         Mutex {
-            lock: ATOMIC_BOOL_INIT,
+            lock: AtomicBool::new(false),
             data: UnsafeCell::new(user_data),
             support: S::new(),
         }

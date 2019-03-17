@@ -11,9 +11,7 @@ extern fn eh_personality() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let location = info.location().unwrap();
-    let message = info.message().unwrap();
-    error!("\n\nPANIC in {} at line {}\n    {}", location.file(), location.line(), message);
+    error!("\n\n{}", info);
     backtrace::backtrace();
     loop { crate::arch::cpu::halt() }
 }

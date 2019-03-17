@@ -1,6 +1,7 @@
 //! Syscalls for process
 
 use super::*;
+use crate::fs::INodeExt;
 
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
@@ -120,19 +121,12 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     // Read program file
     let path = args[0].as_str();
     let inode = crate::fs::ROOT_INODE.lookup(path)?;
-    let size = inode.metadata()?.size;
-    let mut buf = Vec::with_capacity(size);
-    unsafe { buf.set_len(size); }
-    inode.read_at(0, buf.as_mut_slice())?;
+    let buf = inode.read_as_vec()?;
 
     // Make new Thread
     let iter = args.iter().map(|s| s.as_str());
     let mut thread = Thread::new_user(buf.as_slice(), iter);
-    thread.proc.lock().files = proc.files.clone();
-    thread.proc.lock().cwd = proc.cwd.clone();
-    thread.proc.lock().pid = proc.pid.clone();
-    thread.proc.lock().parent = proc.parent.clone();
-    thread.proc.lock().threads = proc.threads.clone();
+    thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table
     unsafe { thread.proc.lock().memory_set.activate(); }

@@ -235,7 +235,7 @@ ifeq ($(arch), riscv32)
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
-	make -j32 && \
+	make -j && \
 	cp bbl $(abspath $@)
 else ifeq ($(arch), riscv64)
 ifeq ($(board), k210)
@@ -249,7 +249,7 @@ else
 		--disable-fp-emulation \
 		--host=riscv64-unknown-elf \
 		--with-payload=$(abspath $(kernel)) && \
-	make -j32 && \
+	make -j && \
 	cp bbl $(abspath $@)
 endif
 else ifeq ($(arch), aarch64)

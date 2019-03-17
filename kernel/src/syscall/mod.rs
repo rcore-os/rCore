@@ -13,7 +13,7 @@ use crate::process::*;
 use crate::thread;
 use crate::util;
 use crate::arch::cpu;
-use crate::arch::syscall;
+use crate::arch::syscall::*;
 
 use self::fs::*;
 use self::mem::*;
@@ -48,155 +48,155 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     // And https://fedora.juszkiewicz.com.pl/syscalls.html.
     let ret = match id {
         // file
-        syscall::SYS_READ => sys_read(args[0], args[1] as *mut u8, args[2]),
-        syscall::SYS_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
-        syscall::SYS_CLOSE => sys_close(args[0]),
-        syscall::SYS_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
-        syscall::SYS_LSEEK => sys_lseek(args[0], args[1] as i64, args[2] as u8),
-        syscall::SYS_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
-        syscall::SYS_MPROTECT => sys_mprotect(args[0], args[1], args[2]),
-        syscall::SYS_MUNMAP => sys_munmap(args[0], args[1]),
-        syscall::SYS_PREAD64 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
-        syscall::SYS_PWRITE64 => sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
-        syscall::SYS_READV => sys_readv(args[0], args[1] as *const IoVec, args[2]),
-        syscall::SYS_WRITEV => sys_writev(args[0], args[1] as *const IoVec, args[2]),
-        syscall::SYS_SCHED_YIELD => sys_yield(),
-        syscall::SYS_NANOSLEEP => sys_nanosleep(args[0] as *const TimeSpec),
-        syscall::SYS_GETPID => sys_getpid(),
-        syscall::SYS_SOCKET => sys_socket(args[0], args[1], args[2]),
-        syscall::SYS_CONNECT => sys_connect(args[0], args[1] as *const SockAddr, args[2]),
-        syscall::SYS_ACCEPT => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
-        syscall::SYS_SENDTO => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const SockAddr, args[5]),
-        syscall::SYS_RECVFROM => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut SockAddr, args[5] as *mut u32),
-//        syscall::SYS_SENDMSG => sys_sendmsg(),
-//        syscall::SYS_RECVMSG => sys_recvmsg(),
-        syscall::SYS_SHUTDOWN => sys_shutdown(args[0], args[1]),
-        syscall::SYS_BIND => sys_bind(args[0], args[1] as *const SockAddr, args[2]),
-        syscall::SYS_LISTEN => sys_listen(args[0], args[1]),
-        syscall::SYS_GETSOCKNAME => sys_getsockname(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
-        syscall::SYS_GETPEERNAME => sys_getpeername(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
-        syscall::SYS_SETSOCKOPT => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
-        syscall::SYS_GETSOCKOPT => sys_getsockopt(args[0], args[1], args[2], args[3] as *mut u8, args[4] as *mut u32),
-        syscall::SYS_CLONE => sys_clone(args[0], args[1], args[2] as *mut u32, args[3] as *mut u32, args[4], tf),
-        syscall::SYS_EXECVE => sys_exec(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8, tf),
-        syscall::SYS_EXIT => sys_exit(args[0] as usize),
-        syscall::SYS_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
-        syscall::SYS_KILL => sys_kill(args[0], args[1]),
-        syscall::SYS_UNAME => sys_uname(args[0] as *mut u8),
-        syscall::SYS_FSYNC => sys_fsync(args[0]),
-        syscall::SYS_FDATASYNC => sys_fdatasync(args[0]),
-        syscall::SYS_TRUNCATE => sys_truncate(args[0] as *const u8, args[1]),
-        syscall::SYS_FTRUNCATE => sys_ftruncate(args[0], args[1]),
-        syscall::SYS_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
-        syscall::SYS_CHDIR => sys_chdir(args[0] as *const u8),
-        syscall::SYS_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
-//        syscall::SYS_GETRLIMIT => sys_getrlimit(),
-        syscall::SYS_GETRUSAGE => sys_getrusage(args[0], args[1] as *mut RUsage),
-        syscall::SYS_SYSINFO => sys_sysinfo(args[0] as *mut SysInfo),
-        syscall::SYS_GETPPID => sys_getppid(),
-        syscall::SYS_SETPRIORITY => sys_set_priority(args[0]),
-//        syscall::SYS_SETRLIMIT => sys_setrlimit(),
-//        syscall::SYS_SYNC => sys_sync(),
-        syscall::SYS_REBOOT => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
-        syscall::SYS_GETTID => sys_gettid(),
-        syscall::SYS_FUTEX => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
-        syscall::SYS_SCHED_GETAFFINITY => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
-        syscall::SYS_GETDENTS64 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
-        syscall::SYS_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
-        syscall::SYS_EXIT_GROUP => sys_exit_group(args[0]),
-        syscall::SYS_OPENAT => sys_open(args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
-        syscall::SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
-//        syscall::SYS_MKNODAT => sys_mknod(),
-        syscall::SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
-        syscall::SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
-        syscall::SYS_RENAMEAT => sys_rename(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
-        syscall::SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
-        syscall::SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
-        syscall::SYS_ACCEPT4 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
-        syscall::SYS_DUP3 => sys_dup2(args[0], args[1]), // TODO: handle `flags`
-        syscall::SYS_PIPE2 => sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
+        SYS_READ => sys_read(args[0], args[1] as *mut u8, args[2]),
+        SYS_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
+        SYS_CLOSE => sys_close(args[0]),
+        SYS_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
+        SYS_LSEEK => sys_lseek(args[0], args[1] as i64, args[2] as u8),
+        SYS_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
+        SYS_MPROTECT => sys_mprotect(args[0], args[1], args[2]),
+        SYS_MUNMAP => sys_munmap(args[0], args[1]),
+        SYS_PREAD64 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
+        SYS_PWRITE64 => sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
+        SYS_READV => sys_readv(args[0], args[1] as *const IoVec, args[2]),
+        SYS_WRITEV => sys_writev(args[0], args[1] as *const IoVec, args[2]),
+        SYS_SCHED_YIELD => sys_yield(),
+        SYS_NANOSLEEP => sys_nanosleep(args[0] as *const TimeSpec),
+        SYS_GETPID => sys_getpid(),
+        SYS_SOCKET => sys_socket(args[0], args[1], args[2]),
+        SYS_CONNECT => sys_connect(args[0], args[1] as *const SockAddr, args[2]),
+        SYS_ACCEPT => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
+        SYS_SENDTO => sys_sendto(args[0], args[1] as *const u8, args[2], args[3], args[4] as *const SockAddr, args[5]),
+        SYS_RECVFROM => sys_recvfrom(args[0], args[1] as *mut u8, args[2], args[3], args[4] as *mut SockAddr, args[5] as *mut u32),
+//        SYS_SENDMSG => sys_sendmsg(),
+//        SYS_RECVMSG => sys_recvmsg(),
+        SYS_SHUTDOWN => sys_shutdown(args[0], args[1]),
+        SYS_BIND => sys_bind(args[0], args[1] as *const SockAddr, args[2]),
+        SYS_LISTEN => sys_listen(args[0], args[1]),
+        SYS_GETSOCKNAME => sys_getsockname(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
+        SYS_GETPEERNAME => sys_getpeername(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
+        SYS_SETSOCKOPT => sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
+        SYS_GETSOCKOPT => sys_getsockopt(args[0], args[1], args[2], args[3] as *mut u8, args[4] as *mut u32),
+        SYS_CLONE => sys_clone(args[0], args[1], args[2] as *mut u32, args[3] as *mut u32, args[4], tf),
+        SYS_EXECVE => sys_exec(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8, tf),
+        SYS_EXIT => sys_exit(args[0] as usize),
+        SYS_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
+        SYS_KILL => sys_kill(args[0], args[1]),
+        SYS_UNAME => sys_uname(args[0] as *mut u8),
+        SYS_FSYNC => sys_fsync(args[0]),
+        SYS_FDATASYNC => sys_fdatasync(args[0]),
+        SYS_TRUNCATE => sys_truncate(args[0] as *const u8, args[1]),
+        SYS_FTRUNCATE => sys_ftruncate(args[0], args[1]),
+        SYS_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
+        SYS_CHDIR => sys_chdir(args[0] as *const u8),
+        SYS_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
+//        SYS_GETRLIMIT => sys_getrlimit(),
+        SYS_GETRUSAGE => sys_getrusage(args[0], args[1] as *mut RUsage),
+        SYS_SYSINFO => sys_sysinfo(args[0] as *mut SysInfo),
+        SYS_GETPPID => sys_getppid(),
+        SYS_SETPRIORITY => sys_set_priority(args[0]),
+//        SYS_SETRLIMIT => sys_setrlimit(),
+//        SYS_SYNC => sys_sync(),
+        SYS_REBOOT => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
+        SYS_GETTID => sys_gettid(),
+        SYS_FUTEX => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
+        SYS_SCHED_GETAFFINITY => sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
+        SYS_GETDENTS64 => sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
+        SYS_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+        SYS_EXIT_GROUP => sys_exit_group(args[0]),
+        SYS_OPENAT => sys_open(args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
+        SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+//        SYS_MKNODAT => sys_mknod(),
+        SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
+        SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
+        SYS_RENAMEAT => sys_rename(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
+        SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
+        SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+        SYS_ACCEPT4 => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32), // use accept for accept4
+        SYS_DUP3 => sys_dup2(args[0], args[1]), // TODO: handle `flags`
+        SYS_PIPE2 => sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
         // custom temporary syscall
-        syscall::SYS_MAP_PCI_DEVICE => sys_map_pci_device(args[0], args[1]),
-        syscall::SYS_GET_PADDR => sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2]),
+        SYS_MAP_PCI_DEVICE => sys_map_pci_device(args[0], args[1]),
+        SYS_GET_PADDR => sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2]),
 
         // for musl: empty impl
-        syscall::SYS_BRK => {
+        SYS_BRK => {
             warn!("sys_brk is unimplemented");
             Ok(0)
         }
-        syscall::SYS_RT_SIGACTION => {
+        SYS_RT_SIGACTION => {
             warn!("sys_sigaction is unimplemented");
             Ok(0)
         }
-        syscall::SYS_RT_SIGPROCMASK => {
+        SYS_RT_SIGPROCMASK => {
             warn!("sys_sigprocmask is unimplemented");
             Ok(0)
         }
-        syscall::SYS_IOCTL => {
+        SYS_IOCTL => {
             warn!("sys_ioctl is unimplemented");
             Ok(0)
         }
-        syscall::SYS_MADVISE => {
+        SYS_MADVISE => {
             warn!("sys_madvise is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SETITIMER => {
+        SYS_SETITIMER => {
             warn!("sys_setitimer is unimplemented");
             Ok(0)
         }
-        syscall::SYS_FCNTL => {
+        SYS_FCNTL => {
             warn!("sys_fcntl is unimplemented");
             Ok(0)
         }
-        syscall::SYS_UMASK => {
+        SYS_UMASK => {
             warn!("sys_umask is unimplemented");
             Ok(0o777)
         }
-        syscall::SYS_GETUID => {
+        SYS_GETUID => {
             warn!("sys_getuid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_GETGID => {
+        SYS_GETGID => {
             warn!("sys_getgid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SETUID => {
+        SYS_SETUID => {
             warn!("sys_setuid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_GETEUID => {
+        SYS_GETEUID => {
             warn!("sys_geteuid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_GETEGID => {
+        SYS_GETEGID => {
             warn!("sys_getegid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SETSID => {
+        SYS_SETSID => {
             warn!("sys_setsid is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SIGALTSTACK => {
+        SYS_SIGALTSTACK => {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SYNC => {
+        SYS_SYNC => {
             warn!("sys_sync is unimplemented");
             Ok(0)
         }
-        syscall::SYS_SET_TID_ADDRESS => {
+        SYS_SET_TID_ADDRESS => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id())
         }
-        syscall::SYS_UTIMENSAT => {
+        SYS_UTIMENSAT => {
             warn!("sys_utimensat is unimplemented");
             Ok(0)
         }
-        syscall::SYS_EPOLL_CREATE1 => {
+        SYS_EPOLL_CREATE1 => {
             warn!("sys_epoll_create1 is unimplemented");
             Err(SysError::ENOSYS)
         }
-        syscall::SYS_PRLIMIT64 => {
+        SYS_PRLIMIT64 => {
             warn!("sys_prlimit64 is unimplemented");
             Ok(0)
         }
@@ -226,37 +226,37 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 #[cfg(target_arch = "x86_64")]
 fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysResult> {
     let ret = match id {
-        syscall::SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
-        syscall::SYS_STAT => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
-        syscall::SYS_LSTAT => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
-        syscall::SYS_POLL => sys_poll(args[0] as *mut PollFd, args[1], args[2]),
-        syscall::SYS_ACCESS => sys_access(args[0] as *const u8, args[1]),
-        syscall::SYS_PIPE => sys_pipe(args[0] as *mut u32),
-        syscall::SYS_SELECT => sys_select(args[0], args[1] as *mut u32, args[2] as *mut u32, args[3] as *mut u32, args[4] as *const TimeVal),
-        syscall::SYS_DUP2 => sys_dup2(args[0], args[1]),
-//        syscall::SYS_PAUSE => sys_pause(),
+        SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
+        SYS_STAT => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_LSTAT => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_POLL => sys_poll(args[0] as *mut PollFd, args[1], args[2]),
+        SYS_ACCESS => sys_access(args[0] as *const u8, args[1]),
+        SYS_PIPE => sys_pipe(args[0] as *mut u32),
+        SYS_SELECT => sys_select(args[0], args[1] as *mut u32, args[2] as *mut u32, args[3] as *mut u32, args[4] as *const TimeVal),
+        SYS_DUP2 => sys_dup2(args[0], args[1]),
+//        SYS_PAUSE => sys_pause(),
         SYS_FORK => sys_fork(tf),
         // use fork for vfork
-        syscall::SYS_VFORK => sys_fork(tf),
-        syscall::SYS_RENAME => sys_rename(args[0] as *const u8, args[1] as *const u8),
-        syscall::SYS_MKDIR => sys_mkdir(args[0] as *const u8, args[1]),
-        syscall::SYS_LINK => sys_link(args[0] as *const u8, args[1] as *const u8),
-        syscall::SYS_UNLINK => sys_unlink(args[0] as *const u8),
-        syscall::SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
-        syscall::SYS_TIME => sys_time(args[0] as *mut u64),
-        syscall::SYS_ALARM => {
+        SYS_VFORK => sys_fork(tf),
+        SYS_RENAME => sys_rename(args[0] as *const u8, args[1] as *const u8),
+        SYS_MKDIR => sys_mkdir(args[0] as *const u8, args[1]),
+        SYS_LINK => sys_link(args[0] as *const u8, args[1] as *const u8),
+        SYS_UNLINK => sys_unlink(args[0] as *const u8),
+        SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
+        SYS_TIME => sys_time(args[0] as *mut u64),
+        SYS_ALARM => {
             warn!("sys_alarm is unimplemented");
             Ok(0)
         }
-        syscall::SYS_READLINK => {
+        SYS_READLINK => {
             warn!("sys_readlink is unimplemented");
             Err(SysError::ENOENT)
         }
-        syscall::SYS_CHOWN => {
+        SYS_CHOWN => {
             warn!("sys_chown is unimplemented");
             Ok(0)
         }
-        syscall::SYS_EPOLL_CREATE => {
+        SYS_EPOLL_CREATE => {
             warn!("sys_epoll_create is unimplemented");
             Err(SysError::ENOSYS)
         }

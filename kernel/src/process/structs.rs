@@ -376,6 +376,13 @@ impl Process {
         }
         self.futexes.get(&uaddr).unwrap().clone()
     }
+    pub fn clone_for_exec(&mut self, other: &Self) {
+        self.files = other.files.clone();
+        self.cwd = other.cwd.clone();
+        self.pid = other.pid.clone();
+        self.parent = other.parent.clone();
+        self.threads = other.threads.clone();
+    }
 }
 
 

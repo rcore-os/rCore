@@ -203,7 +203,7 @@ impl ThreadPool {
         self.set_status(tid, Status::Exited(code));
     }
     /// Called when a thread exit
-    fn exit_handler(&self, tid: Tid, proc: &mut Thread) {
+    fn exit_handler(&self, _tid: Tid, proc: &mut Thread) {
         // wake up waiter
         if let Some(waiter) = proc.waiter {
             self.wakeup(waiter);
