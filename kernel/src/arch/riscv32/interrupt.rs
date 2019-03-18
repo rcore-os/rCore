@@ -139,7 +139,7 @@ fn try_process_serial() -> bool {
 
 fn try_process_drivers() -> bool {
     for driver in DRIVERS.read().iter() {
-        if driver.try_handle_interrupt() == true {
+        if driver.try_handle_interrupt(None) == true {
             return true
         }
     }

@@ -90,7 +90,7 @@ bitflags! {
 }
 
 impl Driver for VirtIOBlkDriver {
-    fn try_handle_interrupt(&self) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         let mut driver = self.0.lock();
 
         // ensure header page is mapped

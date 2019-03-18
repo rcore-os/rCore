@@ -27,7 +27,9 @@ pub enum DeviceType {
 pub trait Driver : Send + Sync {
     // if interrupt belongs to this driver, handle it and return true
     // return false otherwise
-    fn try_handle_interrupt(&self) -> bool;
+    // irq number is provided when available
+    // driver should skip handling when irq number is mismatched
+    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool;
 
     // return the correspondent device type, see DeviceType
     fn device_type(&self) -> DeviceType;

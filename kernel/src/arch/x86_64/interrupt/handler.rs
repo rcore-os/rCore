@@ -93,7 +93,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                 IDE => ide(),
                 _ => {
                     for driver in DRIVERS.read().iter() {
-                        if driver.try_handle_interrupt() == true {
+                        if driver.try_handle_interrupt(Some(irq.into())) == true {
                             debug!("driver processed interrupt");
                             return;
                         }

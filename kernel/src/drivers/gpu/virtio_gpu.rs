@@ -189,7 +189,7 @@ const VIRTIO_GPU_RESOURCE_ID: u32 = 0xbabe;
 pub struct VirtIOGpuDriver(Mutex<VirtIOGpu>);
 
 impl Driver for VirtIOGpuDriver {
-    fn try_handle_interrupt(&self) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         // for simplicity
         if cpu::id() > 0 {
             return false

@@ -76,7 +76,7 @@ pub struct E1000Interface {
 }
 
 impl Driver for E1000Interface {
-    fn try_handle_interrupt(&self) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         let irq = {
             let driver = self.driver.0.lock();
 

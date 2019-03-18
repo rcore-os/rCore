@@ -141,10 +141,16 @@ pub struct IXGBEInterface {
     driver: IXGBEDriver,
     sockets: Mutex<SocketSet<'static, 'static, 'static>>,
     name: String,
+    irq: Option<u32>,
 }
 
 impl Driver for IXGBEInterface {
-    fn try_handle_interrupt(&self) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+        if irq.is_some() && self.irq.is_some() && irq != self.irq {
+            // not ours, skip it
+            return false;
+        }
+
         let (handled, rx) = {
             let driver = self.driver.0.lock();
 
@@ -436,7 +442,7 @@ bitflags! {
     }
 }
 
-pub fn ixgbe_init(name: String, header: usize, size: usize) {
+pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     assert_eq!(size_of::<IXGBESendDesc>(), 16);
     assert_eq!(size_of::<IXGBERecvDesc>(), 16);
 
@@ -786,6 +792,7 @@ pub fn ixgbe_init(name: String, header: usize, size: usize) {
         sockets: Mutex::new(SocketSet::new(vec![])),
         driver: net_driver.clone(),
         name,
+        irq,
     };
 
     let driver = Arc::new(ixgbe_iface);

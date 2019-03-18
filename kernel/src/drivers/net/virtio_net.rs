@@ -42,7 +42,7 @@ const VIRTIO_QUEUE_RECEIVE: usize = 0;
 const VIRTIO_QUEUE_TRANSMIT: usize = 1;
 
 impl Driver for VirtIONetDriver {
-    fn try_handle_interrupt(&self) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         let driver = self.0.lock();
 
         // ensure header page is mapped

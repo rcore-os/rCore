@@ -161,18 +161,21 @@ impl PciTag {
     // returns a tuple of (vid, did, next)
     pub fn probe(&self) -> Option<(u32, u32, bool)> {
         unsafe {
+            // To lookup vendor and device, please see https://pci-ids.ucw.cz/read/PC/
             let v = self.read(PCI_VENDOR, 2);
             if v == 0xffff {
                 return None;
             }
             let d = self.read(PCI_DEVICE, 2);
             let mf = self.read(PCI_HEADER, 1);
+
+            // To lookup class and subclass, please see https://pci-ids.ucw.cz/read/PD/
             let cl = self.read(PCI_CLASS, 1);
             let scl = self.read(PCI_SUBCLASS, 1);
             let line = self.read(PCI_INTERRUPT_LINE, 1);
             let pin = self.read(PCI_INTERRUPT_PIN, 1);
             info!(
-                "{}: {}: {}: {:#X} {:#X} ({} {}) at {}:{}",
+                "{:02x}:{:02x}.{}: {:#x} {:#x} ({} {}) irq {}:{}",
                 self.bus(),
                 self.dev(),
                 self.func(),
@@ -188,7 +191,13 @@ impl PciTag {
         }
     }
 
-    pub unsafe fn enable(&self) {
+
+    /// Enable the pci tag and its interrupt
+    /// Return assigned MSI interrupt number when applicable
+    pub unsafe fn enable(&self) -> Option<u32> {
+        // 23 and lower are used
+        static mut MSI_IRQ: u32 = 23;
+
         let orig = self.read(PCI_COMMAND, 2);
         // IO Space | MEM Space | Bus Mastering | Special Cycles | PCI Interrupt Disable
         self.write(PCI_COMMAND, orig | 0x40f);
@@ -196,14 +205,17 @@ impl PciTag {
         // find MSI cap
         let mut msi_found = false;
         let mut cap_ptr = self.read(PCI_CAP_PTR, 1);
+        let mut assigned_irq = None;
         while cap_ptr > 0 {
             let cap_id = self.read(cap_ptr, 1);
             if cap_id == PCI_CAP_ID_MSI {
                 self.write(cap_ptr + PCI_MSI_ADDR, 0xfee00000);
-                // irq 23 means no 23, should be allocated from a pool
-                // 23 + 32 = 55
+                MSI_IRQ += 1;
+                let irq = MSI_IRQ;
+                assigned_irq = Some(irq);
+                // irq number + 32 = MSI data
                 // 0 is (usually) the apic id of the bsp.
-                self.write(cap_ptr + PCI_MSI_DATA, 55 | 0 << 12);
+                self.write(cap_ptr + PCI_MSI_DATA, (irq + 32) | 0 << 12);
 
                 // enable MSI interrupt
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
@@ -224,6 +236,8 @@ impl PciTag {
             let pin = self.read(PCI_INTERRUPT_PIN, 1);
             debug!("MSI not found, using PCI interrupt line {} pin {}", line, pin);
         }
+
+        assigned_irq
     }
 }
 
@@ -249,10 +263,10 @@ pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
         } else if did == 0x10fb {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
-                unsafe {
-                    tag.enable();
-                }
-                ixgbe::ixgbe_init(name, addr, len);
+                let irq = unsafe {
+                    tag.enable()
+                };
+                ixgbe::ixgbe_init(name, irq, addr, len);
             }
         }
     }
