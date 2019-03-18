@@ -160,7 +160,7 @@ fn try_process_drivers() -> bool {
 
 fn ipi() {
     debug!("IPI");
-    bbl::sbi::clear_ipi();
+    super::sbi::clear_ipi();
 }
 
 /*

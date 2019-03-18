@@ -7,6 +7,8 @@ pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
 pub mod syscall;
+mod sbi;
+
 use log::*;
 
 #[no_mangle]

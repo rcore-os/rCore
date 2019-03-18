@@ -1,5 +1,5 @@
 use riscv::register::*;
-use bbl::sbi;
+use super::sbi;
 use log::*;
 
 /*

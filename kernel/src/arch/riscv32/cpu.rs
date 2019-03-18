@@ -17,7 +17,7 @@ pub fn id() -> usize {
 }
 
 pub fn send_ipi(cpu_id: usize) {
-    bbl::sbi::send_ipi(1 << cpu_id);
+    super::sbi::send_ipi(1 << cpu_id);
 }
 
 pub unsafe fn has_started(cpu_id: usize) -> bool {
@@ -37,5 +37,5 @@ pub fn halt() {
 }
 
 pub fn exit_in_qemu(error_code: u8) -> ! {
-    bbl::sbi::shutdown()
+    super::sbi::shutdown()
 }
