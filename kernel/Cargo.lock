@@ -320,7 +320,7 @@ dependencies = [
  "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?branch=sefs)",
  "rcore-memory 0.1.0",
  "rcore-thread 0.1.0",
- "riscv 0.3.0 (git+https://github.com/rcore-os/riscv)",
+ "riscv 0.5.0 (git+https://github.com/rcore-os/riscv)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "uart_16550 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -388,8 +388,8 @@ dependencies = [
 
 [[package]]
 name = "riscv"
-version = "0.3.0"
-source = "git+https://github.com/rcore-os/riscv#26f9a05dc82c747f0ca5e01174abfae3aa6e82c1"
+version = "0.5.0"
+source = "git+https://github.com/rcore-os/riscv#e8be9f93513225596709a2dccd9064324591fc3c"
 dependencies = [
  "bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -625,7 +625,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rdrand 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
-"checksum riscv 0.3.0 (git+https://github.com/rcore-os/riscv)" = "<none>"
+"checksum riscv 0.5.0 (git+https://github.com/rcore-os/riscv)" = "<none>"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"

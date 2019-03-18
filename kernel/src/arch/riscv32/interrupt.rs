@@ -50,9 +50,12 @@ pub fn init() {
 * @brief:
 *   enable interrupt
 */
-#[inline(always)]
+#[inline]
 pub unsafe fn enable() {
-    xstatus::set_xie();
+    #[cfg(feature = "m_mode")]
+    xstatus::set_mie();
+    #[cfg(not(feature = "m_mode"))]
+    xstatus::set_sie();
 }
 
 /*
@@ -61,10 +64,19 @@ pub unsafe fn enable() {
 * @retbal:
 *   a usize value store the origin sie
 */
-#[inline(always)]
+#[inline]
+#[cfg(feature = "m_mode")]
 pub unsafe fn disable_and_store() -> usize {
-    let e = xstatus::read().xie() as usize;
-    xstatus::clear_xie();
+    let e = xstatus::read().mie() as usize;
+    xstatus::clear_mie();
+    e
+}
+
+#[inline]
+#[cfg(not(feature = "m_mode"))]
+pub unsafe fn disable_and_store() -> usize {
+    let e = xstatus::read().sie() as usize;
+    xstatus::clear_sie();
     e
 }
 
@@ -74,10 +86,10 @@ pub unsafe fn disable_and_store() -> usize {
 * @brief:
 *   enable interrupt if flags != 0
 */
-#[inline(always)]
+#[inline]
 pub unsafe fn restore(flags: usize) {
     if flags != 0 {
-        xstatus::set_xie();
+        enable();
     }
 }
 

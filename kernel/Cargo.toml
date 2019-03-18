@@ -66,7 +66,7 @@ uart_16550 = "0.1"
 pc-keyboard = "0.5"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv" }
+riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]

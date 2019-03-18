@@ -97,7 +97,7 @@ impl ActivePageTable {
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
-        sfence_vma(0, self.1.start_address());
+        unsafe { sfence_vma(0, self.1.start_address().as_usize()); }
     }
     fn accessed(&self) -> bool { self.0.flags().contains(EF::ACCESSED) }
     fn dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
@@ -212,7 +212,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn flush_tlb() {
-        sfence_vma_all();
+        unsafe { sfence_vma_all(); }
     }
 
     /*
@@ -229,14 +229,14 @@ impl InactivePageTable for InactivePageTable0 {
 
             // overwrite recursive mapping
             root_table[RECURSIVE_INDEX].set(self.root_frame.clone(), EF::VALID);
-            sfence_vma_all();
+            unsafe { sfence_vma_all(); }
 
             // execute f in the new context
             let ret = f(active_table);
 
             // restore recursive mapping to original p2 table
             root_table[RECURSIVE_INDEX] = backup;
-            sfence_vma_all();
+            unsafe { sfence_vma_all(); }
 
             ret
         })
