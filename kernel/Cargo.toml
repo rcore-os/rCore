@@ -70,8 +70,8 @@ riscv = { git = "https://github.com/rcore-os/riscv" }
 bbl = { path = "../crate/bbl" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { git = "https://github.com/equation314/aarch64" }
-bcm2837 = { git = "https://github.com/equation314/bcm2837", optional = true }
+aarch64 = { git = "https://github.com/rcore-os/aarch64" }
+bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
 
 [package.metadata.bootimage]
 default-target = "targets/x86_64.json"
