@@ -18,7 +18,7 @@ extern crate lazy_static;
 
 pub use crate::process::{processor, new_kernel_context};
 use rcore_thread::std_thread as thread;
-use linked_list_allocator::LockedHeap;
+use buddy_system_allocator::LockedHeap;
 
 #[macro_use]    // print!
 mod logging;

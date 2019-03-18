@@ -8,7 +8,7 @@ use crate::process::{process};
 use crate::sync::SpinNoIrqLock;
 use lazy_static::*;
 use log::*;
-use linked_list_allocator::LockedHeap;
+use buddy_system_allocator::LockedHeap;
 
 #[cfg(not(feature = "no_mmu"))]
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
