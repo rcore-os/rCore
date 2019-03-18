@@ -126,7 +126,7 @@ const VIRTIO_QUEUE_STATUS: usize = 1;
 pub struct VirtIOInputDriver(Mutex<VirtIOInput>);
 
 impl VirtIOInput {
-    fn try_handle_interrupt(&mut self) -> bool {
+    fn try_handle_interrupt(&mut self, _irq: Option<u32>) -> bool {
         // for simplicity
         if cpu::id() > 0 {
             return false
@@ -165,8 +165,8 @@ impl VirtIOInput {
 }
 
 impl Driver for VirtIOInputDriver {
-    fn try_handle_interrupt(&self) -> bool {
-        self.0.lock().try_handle_interrupt()
+    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+        self.0.lock().try_handle_interrupt(irq)
     }
 
     fn device_type(&self) -> DeviceType {
