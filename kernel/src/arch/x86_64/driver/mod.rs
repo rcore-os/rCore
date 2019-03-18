@@ -21,7 +21,10 @@ pub fn init() {
     serial::init();
     keyboard::init();
 
-    // Enable PCI Interrupts
+    // Enable PCI Interrupts when necessary
+    // because they can be shared among devices
+    // including mouse and keyboard
+    /*
     enable_irq(consts::PIRQA);
     enable_irq(consts::PIRQB);
     enable_irq(consts::PIRQC);
@@ -30,4 +33,5 @@ pub fn init() {
     enable_irq(consts::PIRQF);
     enable_irq(consts::PIRQG);
     enable_irq(consts::PIRQH);
+    */
 }
