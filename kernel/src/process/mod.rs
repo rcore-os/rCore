@@ -22,7 +22,7 @@ pub fn init() {
 
     crate::shell::run_user_shell();
 
-    info!("process init end");
+    info!("process: init end");
 }
 
 static PROCESSORS: [Processor; MAX_CPU_NUM] = [Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new()];

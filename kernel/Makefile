@@ -22,7 +22,7 @@
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   m_mode                      Only available on riscv32, build for M-Mode, without MMU
 
-arch ?= riscv32
+arch ?= riscv64
 board ?= none
 mode ?= debug
 LOG  ?= debug
@@ -31,9 +31,10 @@ smp  ?= 4
 m_mode ?=
 
 target := $(arch)
-kernel := target/$(target)/$(mode)/rcore
-kernel_img := target/$(target)/$(mode)/kernel.img
-bootimage := target/$(target)/bootimage.bin
+build_path := target/$(target)/$(mode)
+kernel := $(build_path)/rcore
+kernel_img := $(build_path)/kernel.img
+bootimage := $(build_path)/bootimage.bin
 bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
@@ -260,6 +261,7 @@ kernel:
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
+	@mv target/x86_64/bootimage.bin $(bootimage)
 else ifeq ($(arch), riscv32)
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
@@ -310,6 +312,13 @@ ifeq ($(board), k210)
 install: $(kernel_img)
 	## baudrate no more than 600000
 	@python3 ../tools/k210/kflash.py $(kernel_img) -b 600000
+endif
+
+ifeq ($(board), u540)
+.PHONY:
+install: $(kernel_img)
+	@$(objcopy) -S -O binary --change-addresses -0x80000000 $< $(build_path)/bin
+	@sudo sh ../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
 endif
 
 .PHONY:

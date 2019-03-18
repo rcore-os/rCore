@@ -15,7 +15,7 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
 
     unsafe { cpu::set_cpu_id(hartid); }
 
-    if hartid != 0 {
+    if hartid != BOOT_HART_ID {
         while unsafe { !cpu::has_started(hartid) }  { }
         println!("Hello RISCV! in hart {}, dtb @ {:#x}, functions @ {:#x}", hartid, dtb, functions);
         others_main();
@@ -31,6 +31,8 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
     interrupt::init();
     memory::init(dtb);
     timer::init();
+    // FIXME: init driver on u540
+    #[cfg(not(feature = "board_u540"))]
     crate::drivers::init(dtb);
     crate::process::init();
 
@@ -45,6 +47,10 @@ fn others_main() -> ! {
     crate::kmain();
 }
 
+#[cfg(not(feature = "board_u540"))]
+const BOOT_HART_ID: usize = 0;
+#[cfg(feature = "board_u540")]
+const BOOT_HART_ID: usize = 1;
 
 /// Constant & Macro for `trap.asm`
 #[cfg(feature = "m_mode")]

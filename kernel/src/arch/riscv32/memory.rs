@@ -25,12 +25,9 @@ pub fn init(dtb: usize) {
     unsafe { sstatus::set_sum(); }  // Allow user memory access
     // initialize heap and Frame allocator
     init_frame_allocator();
-    info!("init_frame_allocator end");
     init_heap();
-    info!("init_heap end");
     // remap the kernel use 4K page
     remap_the_kernel(dtb);
-    info!("remap_the_kernel end");
 }
 
 pub fn init_other() {
@@ -51,6 +48,8 @@ fn init_frame_allocator() {
     let mut ba = FRAME_ALLOCATOR.lock();
     let range = to_range((end as usize) - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE, MEMORY_END);
     ba.insert(range);
+
+    info!("frame allocator: init end");
 
     /*
     * @param:
@@ -83,6 +82,7 @@ fn remap_the_kernel(dtb: usize) {
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);
+    info!("remap kernel end");
 }
 
 // First core stores its SATP here.
