@@ -140,11 +140,12 @@ pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
     driver: IXGBEDriver,
     sockets: Mutex<SocketSet<'static, 'static, 'static>>,
+    name: String,
 }
 
 impl Driver for IXGBEInterface {
     fn try_handle_interrupt(&self) -> bool {
-        let irq = {
+        let (handled, rx) = {
             let driver = self.driver.0.lock();
 
             if let None = active_table().get_entry(driver.header) {
@@ -163,13 +164,29 @@ impl Driver for IXGBEInterface {
             if icr != 0 {
                 // clear it
                 ixgbe[IXGBE_EICR].write(icr);
-                true
+                if icr & (1 << 20) != 0 {
+                    // link status change
+                    let status = ixgbe[IXGBE_LINKS].read();
+                    if status & (1 << 7) != 0 {
+                        // link up
+                        info!("ixgbe: interface {} link up", &self.name);
+                    } else {
+                        // link down
+                        info!("ixgbe: interface {} link down", &self.name);
+                    }
+                }
+                if icr & (1 << 0) != 0 {
+                    // rx interrupt
+                    (true, true)
+                } else {
+                    (true, false)
+                }
             } else {
-                false
+                (false, false)
             }
         };
 
-        if irq {
+        if rx {
             let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
             let mut sockets = self.sockets.lock();
             match self.iface.lock().poll(&mut sockets, timestamp) {
@@ -182,7 +199,7 @@ impl Driver for IXGBEInterface {
             }
         }
 
-        return irq;
+        return handled;
     }
 
     fn device_type(&self) -> DeviceType {
@@ -196,7 +213,7 @@ impl NetDriver for IXGBEInterface {
     }
 
     fn get_ifname(&self) -> String {
-        format!("ixgbe")
+        self.name.clone()
     }
 
     fn ipv4_address(&self) -> Option<Ipv4Address> {
@@ -403,8 +420,9 @@ impl phy::TxToken for IXGBETxToken {
 
 bitflags! {
     struct IXGBEStatus : u32 {
-        const LANID0 = 1 << 2;
-        const LABID1 = 1 << 3;
+        // if LANID1 is clear, this is LAN0
+        // if LANID1 is set, this is LAN1
+        const LANID1 = 1 << 2;
         const LINK_UP = 1 << 7;
         const NUM_VFS1 = 1 << 10;
         const NUM_VFS2 = 1 << 11;
@@ -418,8 +436,7 @@ bitflags! {
     }
 }
 
-pub fn ixgbe_init(header: usize, size: usize) {
-    info!("Probing ixgbe");
+pub fn ixgbe_init(name: String, header: usize, size: usize) {
     assert_eq!(size_of::<IXGBESendDesc>(), 16);
     assert_eq!(size_of::<IXGBERecvDesc>(), 16);
 
@@ -743,8 +760,8 @@ pub fn ixgbe_init(header: usize, size: usize) {
     // clear all interrupt
     ixgbe[IXGBE_EICR].write(!0);
     // Software enables the required interrupt causes by setting the EIMS register.
-    // unmask tx/rx interrupts
-    ixgbe[IXGBE_EIMS].write(1 << 0);
+    // unmask rx interrupt and link status change
+    ixgbe[IXGBE_EIMS].write((1 << 0) | (1 << 20));
 
     debug!(
         "status after setup: {:#?}",
@@ -762,13 +779,17 @@ pub fn ixgbe_init(header: usize, size: usize) {
         .neighbor_cache(neighbor_cache)
         .finalize();
 
+    info!("ixgbe: interface {} up", &name);
+
     let ixgbe_iface = IXGBEInterface {
         iface: Mutex::new(iface),
         sockets: Mutex::new(SocketSet::new(vec![])),
         driver: net_driver.clone(),
+        name,
     };
 
     let driver = Arc::new(ixgbe_iface);
     DRIVERS.write().push(driver.clone());
     NET_DRIVERS.write().push(driver);
+
 }

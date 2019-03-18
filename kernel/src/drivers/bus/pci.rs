@@ -1,5 +1,6 @@
 use crate::drivers::net::*;
 use x86_64::instructions::port::Port;
+use alloc::string::String;
 
 const PCI_VENDOR: u32 = 0x00;
 const PCI_DEVICE: u32 = 0x02;
@@ -207,11 +208,11 @@ impl PciTag {
                 // enable MSI interrupt
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
-                info!("MSI control {:#b}, enabling MSI interrupts", orig_ctrl >> 16);
+                debug!("MSI control {:#b}, enabling MSI interrupts", orig_ctrl >> 16);
                 msi_found = true;
                 break;
             }
-            info!("PCI device has cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
+            debug!("PCI device has cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
             cap_ptr = self.read(cap_ptr + 1, 1);
         }
 
@@ -221,12 +222,12 @@ impl PciTag {
             self.write(PCI_COMMAND, orig | 0xf);
             let line = self.read(PCI_INTERRUPT_LINE, 1);
             let pin = self.read(PCI_INTERRUPT_PIN, 1);
-            info!("MSI not found, using PCI interrupt line {} pin {}", line, pin);
+            debug!("MSI not found, using PCI interrupt line {} pin {}", line, pin);
         }
     }
 }
 
-pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
+pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
     if vid == 0x8086 {
         if did == 0x100e || did == 0x100f || did == 0x10d3 || did == 0x15b8 {
             // 0x100e
@@ -237,19 +238,21 @@ pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
             // 82574L Gigabit Network Connection
             // 0x15b8
             // Ethernet Connection (2) I219-V
+            /*
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
                 unsafe {
                     tag.enable();
                 }
                 e1000::e1000_init(addr, len);
             }
+            */
         } else if did == 0x10fb {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
                 unsafe {
                     tag.enable();
                 }
-                //ixgbe::ixgbe_init(addr, len);
+                ixgbe::ixgbe_init(name, addr, len);
             }
         }
     }
@@ -260,12 +263,14 @@ pub fn init() {
         for dev in 0..32 {
             let tag = PciTag::new(bus, dev, 0);
             if let Some((vid, did, next)) = tag.probe() {
-                init_driver(vid, did, tag);
+                let name = format!("enp{}s{}f0", bus, dev);
+                init_driver(name, vid, did, tag);
                 if next {
                     for func in 1..8 {
                         let tag = PciTag::new(bus, dev, func);
                         if let Some((vid, did, _)) = tag.probe() {
-                            init_driver(vid, did, tag);
+                            let name = format!("enp{}s{}f{}", bus, dev, func);
+                            init_driver(name, vid, did, tag);
                         }
                     }
                 }
