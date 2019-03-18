@@ -32,6 +32,9 @@ mod misc;
 mod custom;
 
 /// System call dispatcher
+// This #[deny(unreachable_patterns)] checks if each match arm is defined
+// See discussion in https://github.com/oscourse-tsinghua/rcore_plus/commit/17e644e54e494835f1a49b34b80c2c4f15ed0dbe.
+#[deny(unreachable_patterns)]
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let cid = cpu::id();
     let pid = {
