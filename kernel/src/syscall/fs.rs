@@ -357,7 +357,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     unsafe {
         util::write_cstr(buf, &proc.cwd)
     }
-    Ok(0)
+    Ok(buf as usize)
 }
 
 pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
