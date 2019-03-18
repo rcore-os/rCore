@@ -34,3 +34,14 @@ pub const COM1: u8 = 4;
 pub const IDE: u8 = 14;
 pub const Error: u8 = 19;
 pub const Spurious: u8 = 31;
+
+// PCI Interrupts
+// See https://gist.github.com/mcastelino/4acda7c2407f1c51e68f3f994d8ffc98 
+pub const PIRQA: u8 = 16;
+pub const PIRQB: u8 = 17;
+pub const PIRQC: u8 = 18;
+pub const PIRQD: u8 = 19;
+pub const PIRQE: u8 = 20;
+pub const PIRQF: u8 = 21;
+pub const PIRQG: u8 = 22;
+pub const PIRQH: u8 = 23;

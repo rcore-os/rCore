@@ -1,4 +1,5 @@
 use once::*;
+use crate::arch::interrupt::{consts, enable_irq};
 
 pub mod vga;
 pub mod serial;
@@ -19,4 +20,14 @@ pub fn init() {
 
     serial::init();
     keyboard::init();
+
+    // Enable PCI Interrupts
+    enable_irq(consts::PIRQA);
+    enable_irq(consts::PIRQB);
+    enable_irq(consts::PIRQC);
+    enable_irq(consts::PIRQD);
+    enable_irq(consts::PIRQE);
+    enable_irq(consts::PIRQF);
+    enable_irq(consts::PIRQG);
+    enable_irq(consts::PIRQH);
 }

@@ -168,15 +168,19 @@ impl PciTag {
             let mf = self.read(PCI_HEADER, 1);
             let cl = self.read(PCI_CLASS, 1);
             let scl = self.read(PCI_SUBCLASS, 1);
+            let line = self.read(PCI_INTERRUPT_LINE, 1);
+            let pin = self.read(PCI_INTERRUPT_PIN, 1);
             info!(
-                "{}: {}: {}: {:#X} {:#X} ({} {})",
+                "{}: {}: {}: {:#X} {:#X} ({} {}) at {}:{}",
                 self.bus(),
                 self.dev(),
                 self.func(),
                 v,
                 d,
                 cl,
-                scl
+                scl,
+                line,
+                pin
             );
 
             return Some((v, d, mf & 0x80 != 0));
@@ -189,6 +193,7 @@ impl PciTag {
         self.write(PCI_COMMAND, orig | 0x40f);
 
         // find MSI cap
+        let mut msi_found = false;
         let mut cap_ptr = self.read(PCI_CAP_PTR, 1);
         while cap_ptr > 0 {
             let cap_id = self.read(cap_ptr, 1);
@@ -202,19 +207,36 @@ impl PciTag {
                 // enable MSI interrupt
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
+                info!("MSI control {:#b}, enabling MSI interrupts", orig_ctrl >> 16);
+                msi_found = true;
                 break;
             }
-            info!("cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
+            info!("PCI device has cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
             cap_ptr = self.read(cap_ptr + 1, 1);
+        }
+
+        if !msi_found {
+            // Use PCI legacy interrupt instead
+            // IO Space | MEM Space | Bus Mastering | Special Cycles
+            self.write(PCI_COMMAND, orig | 0xf);
+            let line = self.read(PCI_INTERRUPT_LINE, 1);
+            let pin = self.read(PCI_INTERRUPT_PIN, 1);
+            info!("MSI not found, using PCI interrupt line {} pin {}", line, pin);
         }
     }
 }
 
 pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
     if vid == 0x8086 {
-        if did == 0x100e || did == 0x10d3 {
+        if did == 0x100e || did == 0x100f || did == 0x10d3 || did == 0x15b8 {
+            // 0x100e
             // 82540EM Gigabit Ethernet Controller
+            // 0x100f
+            // 82545EM Gigabit Ethernet Controller (Copper)
+            // 0x10d3
             // 82574L Gigabit Network Connection
+            // 0x15b8
+            // Ethernet Connection (2) I219-V
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
                 unsafe {
                     tag.enable();
@@ -227,7 +249,7 @@ pub fn init_driver(vid: u32, did: u32, tag: PciTag) {
                 unsafe {
                     tag.enable();
                 }
-                ixgbe::ixgbe_init(addr, len);
+                //ixgbe::ixgbe_init(addr, len);
             }
         }
     }
