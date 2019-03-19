@@ -27,6 +27,11 @@ fn putchar(c: u8) {
     } else if cfg!(feature = "m_mode") {
         (super::BBL.mcall_console_putchar)(c);
     } else {
+        if cfg!(feature = "board_u540") {
+            if c == b'\n' {
+                sbi::console_putchar(b'\r' as usize);
+            }
+        }
         sbi::console_putchar(c as usize);
     }
 }

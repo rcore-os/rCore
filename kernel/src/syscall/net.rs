@@ -407,18 +407,6 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
     // open multiple sockets for each connection
     let mut proc = process();
 
-    if !addr.is_null() {
-        proc.memory_set.check_mut_ptr(addr_len)?;
-
-        let max_addr_len = unsafe { *addr_len } as usize;
-        if max_addr_len < size_of::<SockAddr>() {
-            debug!("length too short {}", max_addr_len);
-            return Err(SysError::EINVAL);
-        }
-
-        proc.memory_set.check_mut_ptr(addr)?;
-    }
-
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(tcp_state) = wrapper.socket_type.clone() {
         if let Some(endpoint) = tcp_state.local_endpoint {
