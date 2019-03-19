@@ -394,7 +394,7 @@ impl From<VMError> for SysError {
 
 const SPIN_WAIT_TIMES: usize = 100;
 
-pub fn spin_and_wait(condvars: &[&Condvar], mut action: impl FnMut() -> Option<SysResult>) -> SysResult {
+pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Option<T>) -> T {
     for i in 0..SPIN_WAIT_TIMES {
         if let Some(result) = action() {
             return result;
