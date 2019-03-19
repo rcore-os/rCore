@@ -318,7 +318,7 @@ ifeq ($(board), u540)
 .PHONY:
 install: $(kernel_img)
 	@$(objcopy) -S -O binary --change-addresses -0x80000000 $< $(build_path)/bin
-	@sudo sh ../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
+	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
 endif
 
 .PHONY:

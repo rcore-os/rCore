@@ -79,6 +79,10 @@ fn remap_the_kernel(dtb: usize) {
     ms.push(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), Linear::new(offset), "stack");
     ms.push(sbss as usize, ebss as usize, MemoryAttr::default(), Linear::new(offset), "bss");
     ms.push(dtb, dtb + super::consts::MAX_DTB_SIZE, MemoryAttr::default().readonly(), Linear::new(offset), "dts");
+    // map PLIC for HiFiveU
+    let offset = -(KERNEL_OFFSET as isize);
+    ms.push(KERNEL_OFFSET + 0x0C00_2000, KERNEL_OFFSET + 0x0C00_2000 + PAGE_SIZE, MemoryAttr::default(), Linear::new(offset), "plic0");
+    ms.push(KERNEL_OFFSET + 0x0C20_2000, KERNEL_OFFSET + 0x0C20_2000 + PAGE_SIZE, MemoryAttr::default(), Linear::new(offset), "plic1");
     unsafe { ms.activate(); }
     unsafe { SATP = ms.token(); }
     mem::forget(ms);

@@ -7,6 +7,9 @@ pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
 pub mod syscall;
+#[cfg(feature = "board_u540")]
+#[path = "board/u540/mod.rs"]
+mod board;
 mod sbi;
 
 use log::*;
@@ -36,6 +39,8 @@ pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize, functions: 
     // FIXME: init driver on u540
     #[cfg(not(feature = "board_u540"))]
     crate::drivers::init(dtb);
+    #[cfg(feature = "board_u540")]
+    unsafe { board::init_external_interrupt(); }
     crate::process::init();
 
     unsafe { cpu::start_others(hart_mask); }

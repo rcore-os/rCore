@@ -34,14 +34,16 @@ pub fn init() {
         xtvec::write(trap_entry as usize, xtvec::TrapMode::Direct);
         // Enable IPI
         sie::set_ssoft();
-        // Enable serial interrupt
-        #[cfg(feature = "m_mode")]
-        mie::set_mext();
-        #[cfg(not(feature = "m_mode"))]
-        sie::set_sext();
-        // NOTE: In M-mode: mie.MSIE is set by BBL.
-        //                  mie.MEIE can not be set in QEMU v3.0
-        //                  (seems like a bug)
+        // Enable external interrupt
+        if super::cpu::id() == super::BOOT_HART_ID {
+            #[cfg(feature = "m_mode")]
+            mie::set_mext();
+            #[cfg(not(feature = "m_mode"))]
+            sie::set_sext();
+            // NOTE: In M-mode: mie.MSIE is set by BBL.
+            //                  mie.MEIE can not be set in QEMU v3.0
+            //                  (seems like a bug)
+        }
     }
     info!("interrupt: init end");
 }
@@ -130,6 +132,9 @@ fn sbi(tf: &mut TrapFrame) {
 }
 
 fn external() {
+    #[cfg(feature = "board_u540")]
+    unsafe { super::board::handle_external_interrupt(); }
+
     // true means handled, false otherwise
     let handlers = [try_process_serial, try_process_drivers];
     for handler in handlers.iter() {
