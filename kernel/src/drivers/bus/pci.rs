@@ -209,15 +209,16 @@ impl PciTag {
         while cap_ptr > 0 {
             let cap_id = self.read(cap_ptr, 1);
             if cap_id == PCI_CAP_ID_MSI {
-                self.write(cap_ptr + PCI_MSI_ADDR, 0xfee00000);
+                // The manual Volume 3 Chapter 10.11 Message Signalled Interrupts
+                // 0 is (usually) the apic id of the bsp.
+                self.write(cap_ptr + PCI_MSI_ADDR, 0xfee00000 | (0 << 12));
                 MSI_IRQ += 1;
                 let irq = MSI_IRQ;
                 assigned_irq = Some(irq);
-                // irq number + 32 = MSI data
-                // 0 is (usually) the apic id of the bsp.
-                self.write(cap_ptr + PCI_MSI_DATA, (irq + 32) | 0 << 12);
+                // we offset all our irq numbers by 32
+                self.write(cap_ptr + PCI_MSI_DATA, irq + 32);
 
-                // enable MSI interrupt
+                // enable MSI interrupt, assuming 64bit for now
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
                 debug!("MSI control {:#b}, enabling MSI interrupts", orig_ctrl >> 16);
@@ -243,23 +244,19 @@ impl PciTag {
 
 pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
     if vid == 0x8086 {
-        if did == 0x100e || did == 0x100f || did == 0x10d3 || did == 0x15b8 {
+        if did == 0x100e || did == 0x100f || did == 0x10d3 {
             // 0x100e
             // 82540EM Gigabit Ethernet Controller
             // 0x100f
             // 82545EM Gigabit Ethernet Controller (Copper)
             // 0x10d3
             // 82574L Gigabit Network Connection
-            // 0x15b8
-            // Ethernet Connection (2) I219-V
-            /*
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
                 unsafe {
                     tag.enable();
                 }
                 e1000::e1000_init(addr, len);
             }
-            */
         } else if did == 0x10fb {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
