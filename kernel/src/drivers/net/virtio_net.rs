@@ -6,25 +6,25 @@ use core::mem::size_of;
 use core::slice;
 
 use bitflags::*;
-use device_tree::Node;
 use device_tree::util::SliceRead;
+use device_tree::Node;
 use log::*;
-use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
+use rcore_memory::PAGE_SIZE;
 use smoltcp::phy::{self, DeviceCapabilities};
-use smoltcp::Result;
+use smoltcp::socket::SocketSet;
 use smoltcp::time::Instant;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
-use smoltcp::socket::SocketSet;
+use smoltcp::Result;
 use volatile::{ReadOnly, Volatile};
 
-use crate::HEAP_ALLOCATOR;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
+use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, NetDriver};
 use super::super::bus::virtio_mmio::*;
+use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS};
 
 pub struct VirtIONet {
     interrupt_parent: u32,
@@ -71,7 +71,6 @@ impl VirtIONet {
         self.queues[VIRTIO_QUEUE_TRANSMIT].can_add(1, 0)
     }
 
-
     fn receive_available(&self) -> bool {
         self.queues[VIRTIO_QUEUE_RECEIVE].can_get()
     }
@@ -87,10 +86,6 @@ impl NetDriver for VirtIONetDriver {
     }
 
     fn ipv4_address(&self) -> Option<Ipv4Address> {
-        unimplemented!()
-    }
-
-    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
         unimplemented!()
     }
 
@@ -110,8 +105,10 @@ impl<'a> phy::Device<'a> for VirtIONetDriver {
         let driver = self.0.lock();
         if driver.transmit_available() && driver.receive_available() {
             // potential racing
-            Some((VirtIONetRxToken(self.clone()),
-                VirtIONetTxToken(self.clone())))
+            Some((
+                VirtIONetRxToken(self.clone()),
+                VirtIONetTxToken(self.clone()),
+            ))
         } else {
             None
         }
@@ -134,9 +131,10 @@ impl<'a> phy::Device<'a> for VirtIONetDriver {
     }
 }
 
-impl phy::RxToken for VirtIONetRxToken { 
+impl phy::RxToken for VirtIONetRxToken {
     fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
-        where F: FnOnce(&[u8]) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
     {
         let (input, output, _, user_data) = {
             let mut driver = (self.0).0.lock();
@@ -156,7 +154,8 @@ impl phy::RxToken for VirtIONetRxToken {
 
 impl phy::TxToken for VirtIONetTxToken {
     fn consume<R, F>(self, _timestamp: Instant, len: usize, f: F) -> Result<R>
-        where F: FnOnce(&mut [u8]) -> Result<R>,
+    where
+        F: FnOnce(&mut [u8]) -> Result<R>,
     {
         let output = {
             let mut driver = (self.0).0.lock();
@@ -165,16 +164,18 @@ impl phy::TxToken for VirtIONetTxToken {
             active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
 
             if let Some((_, output, _, _)) = driver.queues[VIRTIO_QUEUE_TRANSMIT].get() {
-                unsafe { slice::from_raw_parts_mut(output[0].as_ptr() as *mut u8, output[0].len())}
+                unsafe { slice::from_raw_parts_mut(output[0].as_ptr() as *mut u8, output[0].len()) }
             } else {
                 // allocate a page for buffer
                 let page = unsafe {
-                    HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
+                    HEAP_ALLOCATOR
+                        .alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
                 } as usize;
                 unsafe { slice::from_raw_parts_mut(page as *mut u8, PAGE_SIZE) }
             }
         };
-        let output_buffer = &mut output[size_of::<VirtIONetHeader>()..(size_of::<VirtIONetHeader>() + len)];
+        let output_buffer =
+            &mut output[size_of::<VirtIONetHeader>()..(size_of::<VirtIONetHeader>() + len)];
         let result = f(output_buffer);
 
         let mut driver = (self.0).0.lock();
@@ -182,7 +183,6 @@ impl phy::TxToken for VirtIONetTxToken {
         result
     }
 }
-
 
 bitflags! {
     struct VirtIONetFeature : u64 {
@@ -234,7 +234,7 @@ bitflags! {
 #[derive(Debug)]
 struct VirtIONetworkConfig {
     mac: [u8; 6],
-    status: ReadOnly<u16>
+    status: ReadOnly<u16>,
 }
 
 // virtio 5.1.6 Device Operation
@@ -249,7 +249,6 @@ struct VirtIONetHeader {
     csum_offset: Volatile<u16>,
     // payload starts from here
 }
-
 
 pub fn virtio_net_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
@@ -283,8 +282,10 @@ pub fn virtio_net_init(node: &Node) {
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
         header: from as usize,
         mac: EthernetAddress(mac),
-        queues: [VirtIOVirtqueue::new(header, VIRTIO_QUEUE_RECEIVE, queue_num),
-                    VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num)],
+        queues: [
+            VirtIOVirtqueue::new(header, VIRTIO_QUEUE_RECEIVE, queue_num),
+            VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num),
+        ],
     };
 
     // allocate a page for buffer

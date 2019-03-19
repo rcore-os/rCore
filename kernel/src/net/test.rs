@@ -1,11 +1,12 @@
-use crate::thread;
-use crate::drivers::NET_DRIVERS;
-use smoltcp::socket::*;
 use crate::drivers::NetDriver;
+use crate::drivers::NET_DRIVERS;
+use crate::net::SOCKETS;
+use crate::thread;
 use alloc::vec;
 use core::fmt::Write;
+use smoltcp::socket::*;
 
-pub extern fn server(_arg: usize) -> ! {
+pub extern "C" fn server(_arg: usize) -> ! {
     if NET_DRIVERS.read().len() < 1 {
         loop {
             thread::yield_now();
@@ -24,18 +25,15 @@ pub extern fn server(_arg: usize) -> ! {
     let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 1024]);
     let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
 
-    let iface = &*(NET_DRIVERS.read()[0]);
-    let mut sockets = iface.sockets();
+    let mut sockets = SOCKETS.lock();
     let udp_handle = sockets.add(udp_socket);
     let tcp_handle = sockets.add(tcp_socket);
     let tcp2_handle = sockets.add(tcp2_socket);
     drop(sockets);
-    drop(iface);
 
     loop {
         {
-            let iface = &*(NET_DRIVERS.read()[0]);
-            let mut sockets = iface.sockets();
+            let mut sockets = SOCKETS.lock();
 
             // udp server
             {
@@ -45,10 +43,8 @@ pub extern fn server(_arg: usize) -> ! {
                 }
 
                 let client = match socket.recv() {
-                    Ok((_, endpoint)) => {
-                        Some(endpoint)
-                    }
-                    Err(_) => None
+                    Ok((_, endpoint)) => Some(endpoint),
+                    Err(_) => None,
                 };
                 if let Some(endpoint) = client {
                     let hello = b"hello\n";
@@ -85,5 +81,4 @@ pub extern fn server(_arg: usize) -> ! {
 
         thread::yield_now();
     }
-
 }

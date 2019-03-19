@@ -10,10 +10,15 @@ use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use self::block::virtio_blk::VirtIOBlkDriver;
 
 mod device_tree;
+#[allow(dead_code)]
 pub mod bus;
+#[allow(dead_code)]
 pub mod net;
+#[allow(dead_code)]
 pub mod block;
+#[allow(dead_code)]
 mod gpu;
+#[allow(dead_code)]
 mod input;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -44,9 +49,6 @@ pub trait NetDriver : Driver {
 
     // get ipv4 address
     fn ipv4_address(&self) -> Option<Ipv4Address>;
-
-    // get sockets
-    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq>;
 
     // manually trigger a poll, use it after sending packets
     fn poll(&self);

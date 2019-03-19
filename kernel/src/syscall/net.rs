@@ -2,7 +2,10 @@
 
 use super::*;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
-use crate::process::structs::TcpSocketState;
+use crate::net::{
+    get_ephemeral_port, poll_ifaces, SocketType, SocketWrapper, TcpSocketState, UdpSocketState,
+    SOCKETS,
+};
 use core::cmp::min;
 use core::mem::size_of;
 use smoltcp::socket::*;
@@ -23,26 +26,12 @@ const IPPROTO_TCP: usize = 6;
 const TCP_SENDBUF: usize = 512 * 1024; // 512K
 const TCP_RECVBUF: usize = 512 * 1024; // 512K
 
-fn get_ephemeral_port() -> u16 {
-    // TODO selects non-conflict high port
-    static mut EPHEMERAL_PORT: u16 = 49152;
-    unsafe {
-        if EPHEMERAL_PORT == 65535 {
-            EPHEMERAL_PORT = 49152;
-        } else {
-            EPHEMERAL_PORT = EPHEMERAL_PORT + 1;
-        }
-        EPHEMERAL_PORT
-    }
-}
-
 pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResult {
     info!(
         "socket: domain: {}, socket_type: {}, protocol: {}",
         domain, socket_type, protocol
     );
     let mut proc = process();
-    let iface = &*(NET_DRIVERS.read()[0]);
     match domain {
         AF_INET | AF_UNIX => match socket_type & SOCK_TYPE_MASK {
             SOCK_STREAM => {
@@ -52,7 +41,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                 let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; TCP_SENDBUF]);
                 let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
-                let tcp_handle = iface.sockets().add(tcp_socket);
+                let tcp_handle = SOCKETS.lock().add(tcp_socket);
                 proc.files.insert(
                     fd,
                     FileLike::Socket(SocketWrapper {
@@ -75,7 +64,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
                 let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
 
-                let udp_handle = iface.sockets().add(udp_socket);
+                let udp_handle = SOCKETS.lock().add(udp_socket);
                 proc.files.insert(
                     fd,
                     FileLike::Socket(SocketWrapper {
@@ -102,7 +91,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
                     raw_tx_buffer,
                 );
 
-                let raw_handle = iface.sockets().add(raw_socket);
+                let raw_handle = SOCKETS.lock().add(raw_socket);
                 proc.files.insert(
                     fd,
                     FileLike::Socket(SocketWrapper {
@@ -211,8 +200,7 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
 
     let wrapper = &mut proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         let temp_port = get_ephemeral_port();
@@ -225,10 +213,9 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
 
                 // wait for connection result
                 loop {
-                    let iface = &*(NET_DRIVERS.read()[0]);
-                    iface.poll();
+                    poll_ifaces();
 
-                    let mut sockets = iface.sockets();
+                    let mut sockets = SOCKETS.lock();
                     let socket = sockets.get::<TcpSocket>(wrapper.handle);
                     if socket.state() == TcpState::SynSent {
                         // still connecting
@@ -256,326 +243,79 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
 }
 
 pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = iface.sockets();
-        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-        let slice = unsafe { slice::from_raw_parts(base, len) };
-        if socket.is_open() {
-            if socket.can_send() {
-                match socket.send_slice(&slice) {
-                    Ok(size) => {
-                        // avoid deadlock
-                        drop(socket);
-                        drop(sockets);
-
-                        iface.poll();
-                        Ok(size)
-                    }
-                    Err(err) => Err(SysError::ENOBUFS),
-                }
-            } else {
-                Err(SysError::ENOBUFS)
-            }
-        } else {
-            Err(SysError::ENOTCONN)
-        }
-    } else if let SocketType::Udp(ref state) = wrapper.socket_type {
-        if let Some(ref remote_endpoint) = state.remote_endpoint {
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
-
-            if socket.endpoint().port == 0 {
-                let v4_src = iface.ipv4_address().unwrap();
-                let temp_port = get_ephemeral_port();
-                socket
-                    .bind(IpEndpoint::new(IpAddress::Ipv4(v4_src), temp_port))
-                    .unwrap();
-            }
-
-            let slice = unsafe { slice::from_raw_parts(base, len) };
-            if socket.is_open() {
-                if socket.can_send() {
-                    match socket.send_slice(&slice, *remote_endpoint) {
-                        Ok(()) => {
-                            // avoid deadlock
-                            drop(socket);
-                            drop(sockets);
-
-                            iface.poll();
-                            Ok(len)
-                        }
-                        Err(err) => Err(SysError::ENOBUFS),
-                    }
-                } else {
-                    Err(SysError::ENOBUFS)
-                }
-            } else {
-                Err(SysError::ENOTCONN)
-            }
-        } else {
-            Err(SysError::ENOTCONN)
-        }
-    } else {
-        unimplemented!("socket type")
-    }
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    wrapper.write(&slice, None)
 }
 
 pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        spin_and_wait(&[&SOCKET_ACTIVITY], move || {
-            iface.poll();
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-            if socket.is_open() {
-                let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
-                if let Ok(size) = socket.recv_slice(&mut slice) {
-                    if size > 0 {
-                        // avoid deadlock
-                        drop(socket);
-                        drop(sockets);
-
-                        iface.poll();
-                        return Some(Ok(size));
-                    }
-                }
-            } else {
-                return Some(Err(SysError::ENOTCONN));
-            }
-            None
-        })
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        loop {
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
-
-            if socket.is_open() {
-                let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
-                if let Ok((size, _)) = socket.recv_slice(&mut slice) {
-                    // avoid deadlock
-                    drop(socket);
-                    drop(sockets);
-
-                    iface.poll();
-                    return Ok(size);
-                }
-            } else {
-                return Err(SysError::ENOTCONN);
-            }
-
-            // avoid deadlock
-            drop(socket);
-            SOCKET_ACTIVITY._wait()
-        }
-    } else {
-        unimplemented!("socket type")
-    }
+    let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+    let (result, _) = wrapper.read(&mut slice);
+    result
 }
 
 pub fn sys_sendto(
     fd: usize,
-    buffer: *const u8,
+    base: *const u8,
     len: usize,
     flags: usize,
     addr: *const SockAddr,
     addr_len: usize,
 ) -> SysResult {
     info!(
-        "sys_sendto: fd: {} buffer: {:?} len: {} addr: {:?} addr_len: {}",
-        fd, buffer, len, addr, addr_len
+        "sys_sendto: fd: {} base: {:?} len: {} addr: {:?} addr_len: {}",
+        fd, base, len, addr, addr_len
     );
 
     let mut proc = process();
-    proc.memory_set.check_array(buffer, len)?;
-
-    let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
-
-    let iface = &*(NET_DRIVERS.read()[0]);
+    proc.memory_set.check_array(base, len)?;
 
     let wrapper = proc.get_socket(fd)?;
-    if let SocketType::Raw = wrapper.socket_type {
-        let v4_src = iface.ipv4_address().unwrap();
-        let mut sockets = iface.sockets();
-        let mut socket = sockets.get::<RawSocket>(wrapper.handle);
-
-        if let IpAddress::Ipv4(v4_dst) = endpoint.addr {
-            let slice = unsafe { slice::from_raw_parts(buffer, len) };
-            // using 20-byte IPv4 header
-            let mut buffer = vec![0u8; len + 20];
-            let mut packet = Ipv4Packet::new_unchecked(&mut buffer);
-            packet.set_version(4);
-            packet.set_header_len(20);
-            packet.set_total_len((20 + len) as u16);
-            packet.set_protocol(socket.ip_protocol().into());
-            packet.set_src_addr(v4_src);
-            packet.set_dst_addr(v4_dst);
-            let payload = packet.payload_mut();
-            payload.copy_from_slice(slice);
-            packet.fill_checksum();
-
-            socket.send_slice(&buffer).unwrap();
-
-            // avoid deadlock
-            drop(socket);
-            drop(sockets);
-            iface.poll();
-
-            Ok(len)
-        } else {
-            unimplemented!("ip type")
-        }
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        let v4_src = iface.ipv4_address().unwrap();
-        let mut sockets = iface.sockets();
-        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
-
-        if socket.endpoint().port == 0 {
-            let temp_port = get_ephemeral_port();
-            socket
-                .bind(IpEndpoint::new(IpAddress::Ipv4(v4_src), temp_port))
-                .unwrap();
-        }
-
-        let slice = unsafe { slice::from_raw_parts(buffer, len) };
-
-        socket.send_slice(&slice, endpoint).unwrap();
-
-        // avoid deadlock
-        drop(socket);
-        drop(sockets);
-        iface.poll();
-
-        Ok(len)
-    } else {
-        unimplemented!("socket type")
-    }
+    let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    wrapper.write(&slice, Some(endpoint))
 }
 
 pub fn sys_recvfrom(
     fd: usize,
-    buffer: *mut u8,
+    base: *mut u8,
     len: usize,
     flags: usize,
     addr: *mut SockAddr,
     addr_len: *mut u32,
 ) -> SysResult {
     info!(
-        "sys_recvfrom: fd: {} buffer: {:?} len: {} flags: {} addr: {:?} addr_len: {:?}",
-        fd, buffer, len, flags, addr, addr_len
+        "sys_recvfrom: fd: {} base: {:?} len: {} flags: {} addr: {:?} addr_len: {:?}",
+        fd, base, len, flags, addr, addr_len
     );
 
     let mut proc = process();
-    proc.memory_set.check_mut_array(buffer, len)?;
-
-    let iface = &*(NET_DRIVERS.read()[0]);
+    proc.memory_set.check_mut_array(base, len)?;
 
     let wrapper = proc.get_socket(fd)?;
-    // TODO: move some part of these into one generic function
-    if let SocketType::Raw = wrapper.socket_type {
-        loop {
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<RawSocket>(wrapper.handle);
+    let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+    let (result, endpoint) = wrapper.read(&mut slice);
 
-            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
-            if let Ok(size) = socket.recv_slice(&mut slice) {
-                let packet = Ipv4Packet::new_unchecked(&slice);
-
-                if !addr.is_null() {
-                    // FIXME: check size as per sin_family
-                    let sockaddr_in = SockAddr::from(IpEndpoint {
-                        addr: IpAddress::Ipv4(packet.src_addr()),
-                        port: 0,
-                    });
-                    unsafe {
-                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-                    }
-                }
-
-                return Ok(size);
-            }
-
-            // avoid deadlock
-            drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
+    if result.is_ok() && !addr.is_null() {
+        let sockaddr_in = SockAddr::from(endpoint);
+        unsafe {
+            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
         }
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        loop {
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
-
-            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
-            if let Ok((size, endpoint)) = socket.recv_slice(&mut slice) {
-                if !addr.is_null() {
-                    let sockaddr_in = SockAddr::from(endpoint);
-                    unsafe {
-                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-                    }
-                }
-
-                return Ok(size);
-            }
-
-            // avoid deadlock
-            drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
-        }
-    } else if let SocketType::Tcp(_) = wrapper.socket_type {
-        loop {
-            let mut sockets = iface.sockets();
-            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-            let mut slice = unsafe { slice::from_raw_parts_mut(buffer, len) };
-            if let Ok(size) = socket.recv_slice(&mut slice) {
-                if !addr.is_null() {
-                    let sockaddr_in = SockAddr::from(socket.remote_endpoint());
-                    unsafe {
-                        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-                    }
-                }
-
-                return Ok(size);
-            }
-
-            // avoid deadlock
-            drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
-        }
-    } else {
-        unimplemented!("socket type")
     }
+
+    result
 }
 
 impl Clone for SocketWrapper {
     fn clone(&self) -> Self {
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         sockets.retain(self.handle);
 
         SocketWrapper {
             handle: self.handle.clone(),
             socket_type: self.socket_type.clone(),
         }
-    }
-}
-
-impl Drop for SocketWrapper {
-    fn drop(&mut self) {
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
-        sockets.release(self.handle);
-        sockets.prune();
-
-        // send FIN immediately when applicable
-        drop(sockets);
-        iface.poll();
     }
 }
 
@@ -589,7 +329,6 @@ pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult 
     }
     info!("sys_bind: fd: {} bind to {}", fd, endpoint);
 
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = &mut proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
         wrapper.socket_type = SocketType::Tcp(TcpSocketState {
@@ -598,7 +337,7 @@ pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult 
         });
         Ok(0)
     } else if let SocketType::Udp(_) = wrapper.socket_type {
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
         match socket.bind(endpoint) {
             Ok(()) => Ok(0),
@@ -615,14 +354,13 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
     // open multiple sockets for each connection
     let mut proc = process();
 
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(ref mut tcp_state) = wrapper.socket_type {
         if tcp_state.is_listening {
             // it is ok to listen twice
             Ok(0)
         } else if let Some(local_endpoint) = tcp_state.local_endpoint {
-            let mut sockets = iface.sockets();
+            let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
 
             info!("socket {} listening on {:?}", fd, local_endpoint);
@@ -649,10 +387,9 @@ pub fn sys_shutdown(fd: usize, how: usize) -> SysResult {
     info!("sys_shutdown: fd: {} how: {}", fd, how);
     let mut proc = process();
 
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
         socket.close();
         Ok(0)
@@ -686,8 +423,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
     if let SocketType::Tcp(tcp_state) = wrapper.socket_type.clone() {
         if let Some(endpoint) = tcp_state.local_endpoint {
             loop {
-                let iface = &*(NET_DRIVERS.read()[0]);
-                let mut sockets = iface.sockets();
+                let mut sockets = SOCKETS.lock();
                 let socket = sockets.get::<TcpSocket>(wrapper.handle);
 
                 if socket.is_active() {
@@ -736,14 +472,13 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
 
                     drop(sockets);
                     drop(proc);
-                    iface.poll();
+                    poll_ifaces();
                     return Ok(new_fd);
                 }
 
                 // avoid deadlock
                 drop(socket);
                 drop(sockets);
-                drop(iface);
                 SOCKET_ACTIVITY._wait()
             }
         } else {
@@ -767,7 +502,6 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         return Err(SysError::EINVAL);
     }
 
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(state) = &wrapper.socket_type {
         if let Some(endpoint) = state.local_endpoint {
@@ -777,7 +511,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
             }
             Ok(0)
         } else {
-            let mut sockets = iface.sockets();
+            let mut sockets = SOCKETS.lock();
             let socket = sockets.get::<TcpSocket>(wrapper.handle);
             let endpoint = socket.local_endpoint();
             if endpoint.port != 0 {
@@ -791,7 +525,7 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
             }
         }
     } else if let SocketType::Udp(_) = &wrapper.socket_type {
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<UdpSocket>(wrapper.handle);
         let endpoint = socket.endpoint();
         if endpoint.port != 0 {
@@ -822,10 +556,9 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         return Err(SysError::EINVAL);
     }
 
-    let iface = &*(NET_DRIVERS.read()[0]);
     let wrapper = proc.get_socket_mut(fd)?;
     if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         if socket.is_open() {
@@ -860,8 +593,7 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
     let mut output = false;
     let mut err = false;
     if let SocketType::Tcp(state) = wrapper.socket_type.clone() {
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<TcpSocket>(wrapper.handle);
 
         if state.is_listening && socket.is_active() {
@@ -879,8 +611,7 @@ pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
             }
         }
     } else if let SocketType::Udp(_) = wrapper.socket_type {
-        let iface = &*(NET_DRIVERS.read()[0]);
-        let mut sockets = iface.sockets();
+        let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<UdpSocket>(wrapper.handle);
 
         if socket.can_recv() {

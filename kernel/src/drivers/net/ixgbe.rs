@@ -1,7 +1,6 @@
 //! Intel 10Gb Network Adapter 82599 i.e. ixgbe network driver
 
 use alloc::alloc::{GlobalAlloc, Layout};
-use alloc::format;
 use alloc::prelude::*;
 use alloc::sync::Arc;
 use core::mem::size_of;
@@ -14,7 +13,7 @@ use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
-use smoltcp::phy::{self, DeviceCapabilities, Checksum};
+use smoltcp::phy::{self, Checksum, DeviceCapabilities};
 use smoltcp::socket::*;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
@@ -23,6 +22,7 @@ use smoltcp::Result;
 use volatile::Volatile;
 
 use crate::memory::active_table;
+use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
@@ -139,7 +139,6 @@ const IXGBE_EEC: usize = 0x10010 / 4;
 pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
     driver: IXGBEDriver,
-    sockets: Mutex<SocketSet<'static, 'static, 'static>>,
     name: String,
     irq: Option<u32>,
 }
@@ -194,7 +193,7 @@ impl Driver for IXGBEInterface {
 
         if rx {
             let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
-            let mut sockets = self.sockets.lock();
+            let mut sockets = SOCKETS.lock();
             match self.iface.lock().poll(&mut sockets, timestamp) {
                 Ok(_) => {
                     SOCKET_ACTIVITY.notify_all();
@@ -226,13 +225,9 @@ impl NetDriver for IXGBEInterface {
         self.iface.lock().ipv4_address()
     }
 
-    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
-        self.sockets.lock()
-    }
-
     fn poll(&self) {
         let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
-        let mut sockets = self.sockets.lock();
+        let mut sockets = SOCKETS.lock();
         match self.iface.lock().poll(&mut sockets, timestamp) {
             Ok(_) => {
                 SOCKET_ACTIVITY.notify_all();
@@ -576,7 +571,6 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     // CRCStrip | RSCACKC | FCOE_WRFIX
     ixgbe[IXGBE_RDRXCTL].write(ixgbe[IXGBE_RDRXCTL].read() | (1 << 0) | (1 << 25) | (1 << 26));
 
-
     /* Not completed part
     // Program RXPBSIZE, MRQC, PFQDE, RTRUP2TC, MFLCN.RPFCE, and MFLCN.RFCE according to the DCB and virtualization modes (see Section 4.6.11.3).
     // 4.6.11.3.4 DCB-Off, VT-Off
@@ -717,7 +711,8 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     // Program the HLREG0 register according to the required MAC behavior.
     // TXCRCEN | RXCRCSTRP | TXPADEN | RXLNGTHERREN
     // ixgbe[IXGBE_HLREG0].write(ixgbe[IXGBE_HLREG0].read() & !(1 << 0) & !(1 << 1));
-    ixgbe[IXGBE_HLREG0].write(ixgbe[IXGBE_HLREG0].read() | (1 << 0) | (1 << 1) | (1 << 10) | (1 << 27));
+    ixgbe[IXGBE_HLREG0]
+        .write(ixgbe[IXGBE_HLREG0].read() | (1 << 0) | (1 << 1) | (1 << 10) | (1 << 27));
 
     // The following steps should be done once per transmit queue:
     // 1. Allocate a region of memory for the transmit descriptor list.
@@ -746,7 +741,6 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     ixgbe[IXGBE_TXDCTL].write(ixgbe[IXGBE_TXDCTL].read() | 1 << 25);
     while ixgbe[IXGBE_TXDCTL].read() & (1 << 25) == 0 {}
 
-
     // 4.6.6 Interrupt Initialization
     // The software driver associates between Tx and Rx interrupt causes and the EICR register by setting the IVAR[n] registers.
     // map Rx0 to interrupt 0
@@ -758,7 +752,7 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     // CNT_WDIS | ITR Interval=100us
     // if sys_read() spin more times, the interval here should be larger
     // Linux use dynamic ETIR based on statistics
-    ixgbe[IXGBE_EITR].write(((100/2) << 3) | (1 << 31));
+    ixgbe[IXGBE_EITR].write(((100 / 2) << 3) | (1 << 31));
     // Disable general purpose interrupt
     // We don't need them
     ixgbe[IXGBE_GPIE].write(0);
@@ -789,7 +783,6 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
 
     let ixgbe_iface = IXGBEInterface {
         iface: Mutex::new(iface),
-        sockets: Mutex::new(SocketSet::new(vec![])),
         driver: net_driver.clone(),
         name,
         irq,
@@ -798,5 +791,4 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     let driver = Arc::new(ixgbe_iface);
     DRIVERS.write().push(driver.clone());
     NET_DRIVERS.write().push(driver);
-
 }

@@ -23,6 +23,7 @@ use smoltcp::Result;
 use volatile::Volatile;
 
 use crate::memory::active_table;
+use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
@@ -72,7 +73,6 @@ const E1000_RAH: usize = 0x5404 / 4;
 pub struct E1000Interface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>,
     driver: E1000Driver,
-    sockets: Mutex<SocketSet<'static, 'static, 'static>>,
 }
 
 impl Driver for E1000Interface {
@@ -104,7 +104,7 @@ impl Driver for E1000Interface {
 
         if irq {
             let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
-            let mut sockets = self.sockets.lock();
+            let mut sockets = SOCKETS.lock();
             match self.iface.lock().poll(&mut sockets, timestamp) {
                 Ok(_) => {
                     SOCKET_ACTIVITY.notify_all();
@@ -136,13 +136,9 @@ impl NetDriver for E1000Interface {
         self.iface.lock().ipv4_address()
     }
 
-    fn sockets(&self) -> MutexGuard<SocketSet<'static, 'static, 'static>, SpinNoIrq> {
-        self.sockets.lock()
-    }
-
     fn poll(&self) {
         let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
-        let mut sockets = self.sockets.lock();
+        let mut sockets = SOCKETS.lock();
         match self.iface.lock().poll(&mut sockets, timestamp) {
             Ok(_) => {
                 SOCKET_ACTIVITY.notify_all();
@@ -195,8 +191,9 @@ impl<'a> phy::Device<'a> for E1000Driver {
             }
         }
 
-        let e1000 =
-            unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+        let e1000 = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
 
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
         let send_queue = unsafe {
@@ -214,8 +211,8 @@ impl<'a> phy::Device<'a> for E1000Driver {
         let index = (rdt as usize + 1) % recv_queue_size;
         let recv_desc = &mut recv_queue[index];
 
-        let transmit_avail =  driver.first_trans || (*send_desc).status & 1 != 0;
-        let receive_avail =  (*recv_desc).status & 1 != 0;
+        let transmit_avail = driver.first_trans || (*send_desc).status & 1 != 0;
+        let receive_avail = (*recv_desc).status & 1 != 0;
 
         if transmit_avail && receive_avail {
             let buffer = unsafe {
@@ -247,8 +244,9 @@ impl<'a> phy::Device<'a> for E1000Driver {
             }
         }
 
-        let e1000 =
-            unsafe { slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4) };
+        let e1000 = unsafe {
+            slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
+        };
 
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
         let send_queue = unsafe {
@@ -428,7 +426,6 @@ pub fn e1000_init(header: usize, size: usize) {
                                                                                // IPGT=0xa | IPGR1=0x8 | IPGR2=0xc
     e1000[E1000_TIPG].write(0xa | (0x8 << 10) | (0xc << 20)); // TIPG
 
-
     // 4.6.5 Receive Initialization
     let mut ral: u32 = 0;
     let mut rah: u32 = 0;
@@ -502,7 +499,6 @@ pub fn e1000_init(header: usize, size: usize) {
 
     let e1000_iface = E1000Interface {
         iface: Mutex::new(iface),
-        sockets: Mutex::new(SocketSet::new(vec![])),
         driver: net_driver.clone(),
     };
 

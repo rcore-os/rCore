@@ -4,8 +4,6 @@ use core::fmt;
 use log::*;
 use spin::{Mutex, RwLock};
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
-use smoltcp::socket::SocketHandle;
-use smoltcp::wire::IpEndpoint;
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
 
@@ -14,6 +12,7 @@ use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySe
 use crate::fs::{FileHandle, OpenOptions};
 use crate::sync::Condvar;
 use crate::drivers::NET_DRIVERS;
+use crate::net::{SocketWrapper, SOCKETS};
 
 use super::abi::{self, ProcInitInfo};
 
@@ -27,30 +26,6 @@ pub struct Thread {
     pub proc: Arc<Mutex<Process>>,
 }
 
-#[derive(Clone, Debug)]
-pub struct TcpSocketState {
-    pub local_endpoint: Option<IpEndpoint>, // save local endpoint for bind()
-    pub is_listening: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct UdpSocketState {
-    pub remote_endpoint: Option<IpEndpoint>, // remember remote endpoint for connect()
-}
-
-#[derive(Clone, Debug)]
-pub enum SocketType {
-    Raw,
-    Tcp(TcpSocketState),
-    Udp(UdpSocketState),
-    Icmp
-}
-
-#[derive(Debug)]
-pub struct SocketWrapper {
-    pub handle: SocketHandle,
-    pub socket_type: SocketType,
-}
 
 #[derive(Clone)]
 pub enum FileLike {
@@ -63,12 +38,7 @@ impl fmt::Debug for FileLike {
         match self {
             FileLike::File(_) => write!(f, "File"),
             FileLike::Socket(wrapper) => {
-                match wrapper.socket_type {
-                    SocketType::Raw => write!(f, "RawSocket"),
-                    SocketType::Tcp(_) => write!(f, "TcpSocket"),
-                    SocketType::Udp(_) => write!(f, "UdpSocket"),
-                    SocketType::Icmp => write!(f, "IcmpSocket"),
-                }
+                write!(f, "{:?}", wrapper)
             },
         }
     }
@@ -324,12 +294,10 @@ impl Thread {
         debug!("fork: temporary copy data!");
         let kstack = KernelStack::new();
 
-        for iface in NET_DRIVERS.read().iter() {
-            let mut sockets = iface.sockets();
-            for (_fd, file) in files.iter() {
-                if let FileLike::Socket(wrapper) = file {
-                    sockets.retain(wrapper.handle);
-                }
+        let mut sockets = SOCKETS.lock();
+        for (_fd, file) in files.iter() {
+            if let FileLike::Socket(wrapper) = file {
+                sockets.retain(wrapper.handle);
             }
         }
 
