@@ -143,15 +143,10 @@ impl<T> JoinHandle<T> {
     /// Waits for the associated thread to finish.
     pub fn join(self) -> Result<T, ()> {
         loop {
-            trace!("join thread {}", self.thread.tid);
-            match processor().manager().get_status(self.thread.tid) {
-                Some(Status::Exited(exit_code)) => {
-                    processor().manager().remove(self.thread.tid);
-                    // Find return value on the heap from the exit code.
-                    return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
-                }
-                None => return Err(()),
-                _ => {}
+            trace!("try to join thread {}", self.thread.tid);
+            if let Some(exit_code) = processor().manager().try_remove(self.thread.tid) {
+                // Find return value on the heap from the exit code.
+                return Ok(unsafe { *Box::from_raw(exit_code as *mut T) });
             }
             processor().manager().wait(current().id(), self.thread.tid);
             processor().yield_now();

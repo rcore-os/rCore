@@ -59,7 +59,7 @@ impl ThreadPool {
                 return (i, thread);
             }
         }
-        panic!("Process number exceeded");
+        panic!("Thread number exceeded");
     }
 
     /// Add a new thread
@@ -77,7 +77,7 @@ impl ThreadPool {
         tid
     }
 
-    /// Make process `tid` time slice -= 1.
+    /// Make thread `tid` time slice -= 1.
     /// Return true if time slice == 0.
     /// Called by timer interrupt handler.
     pub(crate) fn tick(&self, cpu_id: usize, tid: Option<Tid>) -> bool {
@@ -96,35 +96,35 @@ impl ThreadPool {
         }
     }
 
-    /// Set the priority of process `tid`
+    /// Set the priority of thread `tid`
     pub fn set_priority(&self, tid: Tid, priority: u8) {
         self.scheduler.set_priority(tid, priority);
     }
 
-    /// Called by Processor to get a process to run.
+    /// Called by Processor to get a thread to run.
     /// The manager first mark it `Running`,
     /// then take out and return its Context.
     pub(crate) fn run(&self, cpu_id: usize) -> Option<(Tid, Box<Context>)> {
         self.scheduler.pop(cpu_id)
             .map(|tid| {
                 let mut proc_lock = self.threads[tid].lock();
-                let mut proc = proc_lock.as_mut().expect("process not exist");
+                let mut proc = proc_lock.as_mut().expect("thread not exist");
                 proc.status = Status::Running(cpu_id);
                 (tid, proc.context.take().expect("context not exist"))
             })
     }
 
-    /// Called by Processor to finish running a process
+    /// Called by Processor to finish running a thread
     /// and give its context back.
     pub(crate) fn stop(&self, tid: Tid, context: Box<Context>) {
         let mut proc_lock = self.threads[tid].lock();
-        let mut proc = proc_lock.as_mut().expect("process not exist");
+        let proc = proc_lock.as_mut().expect("thread not exist");
         proc.status = proc.status_after_stop.clone();
         proc.status_after_stop = Status::Ready;
         proc.context = Some(context);
         match proc.status {
             Status::Ready => self.scheduler.push(tid),
-            Status::Exited(_) => self.exit_handler(tid, proc),
+            Status::Exited(_) => self.exit_handler(proc),
             _ => {}
         }
     }
@@ -135,22 +135,22 @@ impl ThreadPool {
     pub(crate) fn wait(&self, tid: Tid, target: Tid) {
         self.set_status(tid, Status::Sleeping);
         let mut target_lock = self.threads[target].lock();
-        let target = target_lock.as_mut().expect("process not exist");
+        let target = target_lock.as_mut().expect("thread not exist");
         target.waiter = Some(tid);
     }
 
-    /// Switch the status of a process.
+    /// Switch the status of a thread.
     /// Insert/Remove it to/from scheduler if necessary.
     fn set_status(&self, tid: Tid, status: Status) {
         let mut proc_lock = self.threads[tid].lock();
         if let Some(mut proc) = proc_lock.as_mut() {
-            trace!("process {} {:?} -> {:?}", tid, proc.status, status);
+            trace!("thread {} {:?} -> {:?}", tid, proc.status, status);
             match (&proc.status, &status) {
                 (Status::Ready, Status::Ready) => return,
-                (Status::Ready, _) => panic!("can not remove a process from ready queue"),
+                (Status::Ready, _) => panic!("can not remove a thread from ready queue"),
                 (Status::Exited(_), _) => panic!("can not set status for a exited thread"),
                 (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
-                (Status::Running(_), Status::Ready) => {} // process will be added to scheduler in stop() 
+                (Status::Running(_), Status::Ready) => {} // thread will be added to scheduler in stop() 
                 (_, Status::Ready) => self.scheduler.push(tid),
                 _ => {}
             }
@@ -159,30 +159,25 @@ impl ThreadPool {
                 _ => proc.status = status,
             }
             match proc.status {
-                Status::Exited(_) => self.exit_handler(tid, proc),
+                Status::Exited(_) => self.exit_handler(proc),
                 _ => {}
             }
         }
     }
 
-    pub fn get_status(&self, tid: Tid) -> Option<Status> {
-        if tid < self.threads.len() {
-            self.threads[tid].lock().as_ref().map(|p| p.status.clone())
-        } else {
-            None
-        }
-    }
-
-    /// Remove an exited proc `tid`.
-    pub fn remove(&self, tid: Tid) {
+    /// Try to remove an exited thread `tid`.
+    /// Return its exit code if success.
+    pub fn try_remove(&self, tid: Tid) -> Option<ExitCode> {
         let mut proc_lock = self.threads[tid].lock();
-        let proc = proc_lock.as_ref().expect("process not exist");
+        let proc = proc_lock.as_ref().expect("thread not exist");
         match proc.status {
-            Status::Exited(_) => {}
-            _ => panic!("can not remove non-exited process"),
+            Status::Exited(code) => {
+                // release the tid
+                *proc_lock = None;
+                Some(code)
+            },
+            _ => None,
         }
-        // release the tid
-        *proc_lock = None;
     }
 
     /// Sleep `tid` for `time` ticks.
@@ -203,7 +198,7 @@ impl ThreadPool {
         self.set_status(tid, Status::Exited(code));
     }
     /// Called when a thread exit
-    fn exit_handler(&self, _tid: Tid, proc: &mut Thread) {
+    fn exit_handler(&self, proc: &mut Thread) {
         // wake up waiter
         if let Some(waiter) = proc.waiter {
             self.wakeup(waiter);

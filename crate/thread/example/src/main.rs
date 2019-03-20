@@ -3,7 +3,6 @@
 #![feature(asm)]
 #![feature(alloc)]
 #![feature(naked_functions)]
-#![feature(panic_info_message)]
 #![feature(lang_items)]
 
 extern crate alloc;
@@ -33,21 +32,26 @@ pub extern "C" fn _start() -> ! {
     // init heap
     unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, HEAP_SIZE); }
     // init processor
-    let scheduler = Box::new(scheduler::RRScheduler::new(5));
+    let scheduler = scheduler::RRScheduler::new(5);
     let thread_pool = Arc::new(ThreadPool::new(scheduler, MAX_PROC_NUM));
     unsafe { processor().init(0, Thread::init(), thread_pool); }
     // init threads
     thread::spawn(|| {
         let tid = processor().tid();
-        serial_println!("I'm thread {}! yield...", tid);
+        serial_println!("[{}] yield", tid);
         thread::yield_now();
-        serial_println!("I'm thread {}! exit...", tid);
-    });
-    thread::spawn(|| {
-        let tid = processor().tid();
-        serial_println!("I'm thread {}! yield...", tid);
-        thread::yield_now();
-        serial_println!("I'm thread {}! exit...", tid);
+        serial_println!("[{}] spawn", tid);
+        let t2 = thread::spawn(|| {
+            let tid = processor().tid();
+            serial_println!("[{}] yield", tid);
+            thread::yield_now();
+            serial_println!("[{}] return 8", tid);
+            8
+        });
+        serial_println!("[{}] join", tid);
+        let ret = t2.join();
+        serial_println!("[{}] get {:?}", tid, ret);
+        serial_println!("[{}] exit", tid);
     });
     // run threads
     processor().run();
@@ -158,6 +162,9 @@ impl Context for Thread {
             : : : : "intel" "volatile" )
         }
     }
+
+    fn set_tid(&mut self, _tid: usize) {
+    }
 }
 
 /// Define global `Processor` for each core.
@@ -180,9 +187,7 @@ pub fn new_kernel_context(entry: extern fn(usize) -> !, arg0: usize) -> Box<Cont
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let location = info.location().unwrap();
-    let message = info.message().unwrap();
-    serial_println!("\nPANIC @ {}\n\t{}", location, message);
+    serial_println!("\n{}", info);
 
     unsafe { exit_qemu(); }
     loop {}
