@@ -1,15 +1,15 @@
-use alloc::sync::Arc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use core::cmp::min;
-use core::mem::{size_of};
+use core::mem::size_of;
 use core::slice;
 
 use bitflags::*;
-use device_tree::Node;
 use device_tree::util::SliceRead;
+use device_tree::Node;
 use log::*;
-use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
+use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
 use rcore_fs::dev::BlockDevice;
@@ -17,19 +17,18 @@ use rcore_fs::dev::BlockDevice;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, BLK_DRIVERS};
 use super::super::bus::virtio_mmio::*;
+use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
 
 pub struct VirtIOBlk {
     interrupt_parent: u32,
     interrupt: u32,
     header: usize,
     queue: VirtIOVirtqueue,
-    capacity: usize
+    capacity: usize,
 }
 
 pub struct VirtIOBlkDriver(Mutex<VirtIOBlk>);
-
 
 #[repr(C)]
 #[derive(Debug)]
@@ -48,7 +47,7 @@ struct VirtIOBlkReq {
 #[repr(C)]
 struct VirtIOBlkResp {
     data: [u8; VIRTIO_BLK_BLK_SIZE],
-    status: u8
+    status: u8,
 }
 
 const VIRTIO_BLK_T_IN: u32 = 0;
@@ -126,7 +125,12 @@ impl BlockDevice for VirtIOBlkDriver {
         req.reserved = 0;
         req.sector = block_id as u64;
         let input = [0; size_of::<VirtIOBlkResp>()];
-        let output = unsafe { slice::from_raw_parts(&req as *const VirtIOBlkReq as *const u8, size_of::<VirtIOBlkReq>()) };
+        let output = unsafe {
+            slice::from_raw_parts(
+                &req as *const VirtIOBlkReq as *const u8,
+                size_of::<VirtIOBlkReq>(),
+            )
+        };
         driver.queue.add_and_notify(&[&input], &[output], 0);
         driver.queue.get_block();
         let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkResp) };
@@ -163,7 +167,10 @@ pub fn virtio_blk_init(node: &Node) {
     // read configuration space
     let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOBlkConfig) };
     info!("Config: {:?}", config);
-    info!("Found a block device of size {}KB", config.capacity.read() / 2);
+    info!(
+        "Found a block device of size {}KB",
+        config.capacity.read() / 2
+    );
 
     // virtio 4.2.4 Legacy interface
     // configure two virtqueues: ingress and egress

@@ -14,15 +14,14 @@ fn hsv_to_rgb(h: u32, s: f32, v: f32) -> (f32, f32, f32) {
         3 => (p, q, v),
         4 => (t, p, v),
         5 => (v, p, q),
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
 pub fn mandelbrot(width: u32, height: u32, frame_buffer: *mut u32) {
     let size = width * height * 4;
-    let frame_buffer_data = unsafe {
-        slice::from_raw_parts_mut(frame_buffer as *mut u32, (size / 4) as usize)
-    };
+    let frame_buffer_data =
+        unsafe { slice::from_raw_parts_mut(frame_buffer as *mut u32, (size / 4) as usize) };
     for x in 0..width {
         for y in 0..height {
             let index = y * width + x;

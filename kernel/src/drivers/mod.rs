@@ -2,34 +2,35 @@ use alloc::prelude::*;
 use alloc::sync::Arc;
 
 use lazy_static::lazy_static;
-use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
+use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use spin::RwLock;
 
-use crate::sync::Condvar;
 use self::block::virtio_blk::VirtIOBlkDriver;
+use crate::sync::Condvar;
 
-mod device_tree;
-#[allow(dead_code)]
-pub mod bus;
-#[allow(dead_code)]
-pub mod net;
 #[allow(dead_code)]
 pub mod block;
+#[allow(dead_code)]
+pub mod bus;
+mod device_tree;
 #[allow(dead_code)]
 mod gpu;
 #[allow(dead_code)]
 mod input;
+#[allow(dead_code)]
+pub mod net;
+mod provider;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
     Net,
     Gpu,
     Input,
-    Block
+    Block,
 }
 
-pub trait Driver : Send + Sync {
+pub trait Driver: Send + Sync {
     // if interrupt belongs to this driver, handle it and return true
     // return false otherwise
     // irq number is provided when available
@@ -66,7 +67,6 @@ pub trait Driver : Send + Sync {
     }
 }
 
-
 lazy_static! {
     // NOTE: RwLock only write when initializing drivers
     pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
@@ -74,7 +74,7 @@ lazy_static! {
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<VirtIOBlkDriver>>> = RwLock::new(Vec::new());
 }
 
-lazy_static!{
+lazy_static! {
     pub static ref SOCKET_ACTIVITY: Condvar = Condvar::new();
 }
 

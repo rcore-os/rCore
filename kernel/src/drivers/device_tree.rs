@@ -24,7 +24,7 @@ struct DtbHeader {
 }
 
 pub fn init(dtb: usize) {
-    let header = unsafe {&*(dtb as *const DtbHeader)};
+    let header = unsafe { &*(dtb as *const DtbHeader) };
     let magic = u32::from_be(header.magic);
     if magic == DEVICE_TREE_MAGIC {
         let size = u32::from_be(header.size);

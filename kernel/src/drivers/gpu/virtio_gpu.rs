@@ -4,24 +4,24 @@ use alloc::sync::Arc;
 use core::slice;
 
 use bitflags::*;
-use device_tree::Node;
 use device_tree::util::SliceRead;
+use device_tree::Node;
 use log::*;
-use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
+use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::arch::cpu;
-use crate::HEAP_ALLOCATOR;
-use crate::memory::active_table;
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::arch::cpu;
+use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
+use super::super::{DeviceType, Driver, DRIVERS};
 use super::test::mandelbrot;
 
-const VIRTIO_GPU_EVENT_DISPLAY : u32 = 1 << 0;
+const VIRTIO_GPU_EVENT_DISPLAY: u32 = 1 << 0;
 
 struct VirtIOGpu {
     interrupt_parent: u32,
@@ -30,7 +30,7 @@ struct VirtIOGpu {
     queue_buffer: [usize; 2],
     frame_buffer: usize,
     rect: VirtIOGpuRect,
-    queues: [VirtIOVirtqueue; 2]
+    queues: [VirtIOVirtqueue; 2],
 }
 
 #[repr(C)]
@@ -38,7 +38,7 @@ struct VirtIOGpu {
 struct VirtIOGpuConfig {
     events_read: ReadOnly<u32>,
     events_clear: WriteOnly<u32>,
-    num_scanouts: Volatile<u32>
+    num_scanouts: Volatile<u32>,
 }
 
 bitflags! {
@@ -61,32 +61,32 @@ bitflags! {
     }
 }
 
-const VIRTIO_GPU_CMD_GET_DISPLAY_INFO : u32 = 0x100;
-const VIRTIO_GPU_CMD_RESOURCE_CREATE_2D : u32 = 0x101;
-const VIRTIO_GPU_CMD_RESOURCE_UNREF : u32 = 0x102;
-const VIRTIO_GPU_CMD_SET_SCANOUT : u32 = 0x103;
-const VIRTIO_GPU_CMD_RESOURCE_FLUSH : u32 = 0x104;
-const VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D : u32 = 0x105;
-const VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING : u32 = 0x106;
-const VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING : u32 = 0x107;
-const VIRTIO_GPU_CMD_GET_CAPSET_INFO : u32 = 0x108;
-const VIRTIO_GPU_CMD_GET_CAPSET : u32 = 0x109;
-const VIRTIO_GPU_CMD_GET_EDID : u32 = 0x10a;
+const VIRTIO_GPU_CMD_GET_DISPLAY_INFO: u32 = 0x100;
+const VIRTIO_GPU_CMD_RESOURCE_CREATE_2D: u32 = 0x101;
+const VIRTIO_GPU_CMD_RESOURCE_UNREF: u32 = 0x102;
+const VIRTIO_GPU_CMD_SET_SCANOUT: u32 = 0x103;
+const VIRTIO_GPU_CMD_RESOURCE_FLUSH: u32 = 0x104;
+const VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D: u32 = 0x105;
+const VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING: u32 = 0x106;
+const VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING: u32 = 0x107;
+const VIRTIO_GPU_CMD_GET_CAPSET_INFO: u32 = 0x108;
+const VIRTIO_GPU_CMD_GET_CAPSET: u32 = 0x109;
+const VIRTIO_GPU_CMD_GET_EDID: u32 = 0x10a;
 
-const VIRTIO_GPU_CMD_UPDATE_CURSOR : u32 = 0x300;
-const VIRTIO_GPU_CMD_MOVE_CURSOR : u32 = 0x301;
+const VIRTIO_GPU_CMD_UPDATE_CURSOR: u32 = 0x300;
+const VIRTIO_GPU_CMD_MOVE_CURSOR: u32 = 0x301;
 
-const VIRTIO_GPU_RESP_OK_NODATA : u32 = 0x1100;
-const VIRTIO_GPU_RESP_OK_DISPLAY_INFO : u32 = 0x1101;
-const VIRTIO_GPU_RESP_OK_CAPSET_INFO : u32 = 0x1102;
-const VIRTIO_GPU_RESP_OK_CAPSET : u32 = 0x1103;
-const VIRTIO_GPU_RESP_OK_EDID : u32 = 0x1104;
+const VIRTIO_GPU_RESP_OK_NODATA: u32 = 0x1100;
+const VIRTIO_GPU_RESP_OK_DISPLAY_INFO: u32 = 0x1101;
+const VIRTIO_GPU_RESP_OK_CAPSET_INFO: u32 = 0x1102;
+const VIRTIO_GPU_RESP_OK_CAPSET: u32 = 0x1103;
+const VIRTIO_GPU_RESP_OK_EDID: u32 = 0x1104;
 
-const VIRTIO_GPU_RESP_ERR_UNSPEC : u32 = 0x1200;
-const VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY : u32 = 0x1201;
-const VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID : u32 = 0x1202;
+const VIRTIO_GPU_RESP_ERR_UNSPEC: u32 = 0x1200;
+const VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY: u32 = 0x1201;
+const VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID: u32 = 0x1202;
 
-const VIRTIO_GPU_FLAG_FENCE : u32 = 1 << 0;
+const VIRTIO_GPU_FLAG_FENCE: u32 = 1 << 0;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -95,7 +95,7 @@ struct VirtIOGpuCtrlHdr {
     flags: u32,
     fence_id: u64,
     ctx_id: u32,
-    padding: u32
+    padding: u32,
 }
 
 impl VirtIOGpuCtrlHdr {
@@ -105,7 +105,7 @@ impl VirtIOGpuCtrlHdr {
             flags: 0,
             fence_id: 0,
             ctx_id: 0,
-            padding: 0
+            padding: 0,
         }
     }
 }
@@ -116,7 +116,7 @@ struct VirtIOGpuRect {
     x: u32,
     y: u32,
     width: u32,
-    height: u32
+    height: u32,
 }
 
 #[repr(C)]
@@ -125,7 +125,7 @@ struct VirtIOGpuRespDisplayInfo {
     header: VirtIOGpuCtrlHdr,
     rect: VirtIOGpuRect,
     enabled: u32,
-    flags: u32
+    flags: u32,
 }
 
 const VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM: u32 = 1;
@@ -137,7 +137,7 @@ struct VirtIOGpuResourceCreate2D {
     resource_id: u32,
     format: u32,
     width: u32,
-    height: u32
+    height: u32,
 }
 
 #[repr(C)]
@@ -148,7 +148,7 @@ struct VirtIOGpuResourceAttachBacking {
     nr_entries: u32, // always 1
     addr: u64,
     length: u32,
-    padding: u32
+    padding: u32,
 }
 
 #[repr(C)]
@@ -157,7 +157,7 @@ struct VirtIOGpuSetScanout {
     header: VirtIOGpuCtrlHdr,
     rect: VirtIOGpuRect,
     scanout_id: u32,
-    resource_id: u32
+    resource_id: u32,
 }
 
 #[repr(C)]
@@ -167,7 +167,7 @@ struct VirtIOGpuTransferToHost2D {
     rect: VirtIOGpuRect,
     offset: u64,
     resource_id: u32,
-    padding: u32
+    padding: u32,
 }
 
 #[repr(C)]
@@ -176,7 +176,7 @@ struct VirtIOGpuResourceFlush {
     header: VirtIOGpuCtrlHdr,
     rect: VirtIOGpuRect,
     resource_id: u32,
-    padding: u32
+    padding: u32,
 }
 
 const VIRTIO_QUEUE_TRANSMIT: usize = 0;
@@ -193,7 +193,7 @@ impl Driver for VirtIOGpuDriver {
     fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         // for simplicity
         if cpu::id() > 0 {
-            return false
+            return false;
         }
 
         let mut driver = self.0.lock();
@@ -222,33 +222,49 @@ impl Driver for VirtIOGpuDriver {
 }
 
 fn request(driver: &mut VirtIOGpu) {
-    let input = unsafe { slice::from_raw_parts(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *const u8, PAGE_SIZE) };
-    let output = unsafe { slice::from_raw_parts(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *const u8, PAGE_SIZE) };
+    let input = unsafe {
+        slice::from_raw_parts(
+            driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *const u8,
+            PAGE_SIZE,
+        )
+    };
+    let output = unsafe {
+        slice::from_raw_parts(
+            driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *const u8,
+            PAGE_SIZE,
+        )
+    };
     driver.queues[VIRTIO_QUEUE_TRANSMIT].add_and_notify(&[input], &[output], 0);
 }
 
 fn setup_framebuffer(driver: &mut VirtIOGpu) {
     // get display info
-    let request_get_display_info = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuCtrlHdr) };
+    let request_get_display_info =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuCtrlHdr) };
     *request_get_display_info = VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_GET_DISPLAY_INFO);
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_get_display_info = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuRespDisplayInfo) };
+    let response_get_display_info = unsafe {
+        &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuRespDisplayInfo)
+    };
     info!("response: {:?}", response_get_display_info);
     driver.rect = response_get_display_info.rect;
 
     // create resource 2d
-    let request_resource_create_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceCreate2D) };
+    let request_resource_create_2d = unsafe {
+        &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceCreate2D)
+    };
     *request_resource_create_2d = VirtIOGpuResourceCreate2D {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_CREATE_2D),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         format: VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM,
         width: response_get_display_info.rect.width,
-        height: response_get_display_info.rect.height
+        height: response_get_display_info.rect.height,
     };
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_resource_create_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    let response_resource_create_2d =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_resource_create_2d);
 
     // alloc continuous pages for the frame buffer
@@ -256,33 +272,42 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
     let frame_buffer = unsafe {
         HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size as usize, PAGE_SIZE).unwrap())
     } as usize;
-    mandelbrot(driver.rect.width, driver.rect.height, frame_buffer as *mut u32);
+    mandelbrot(
+        driver.rect.width,
+        driver.rect.height,
+        frame_buffer as *mut u32,
+    );
     driver.frame_buffer = frame_buffer;
-    let request_resource_attach_backing = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceAttachBacking) };
+    let request_resource_attach_backing = unsafe {
+        &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceAttachBacking)
+    };
     *request_resource_attach_backing = VirtIOGpuResourceAttachBacking {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         nr_entries: 1,
         addr: (frame_buffer - KERNEL_OFFSET + MEMORY_OFFSET) as u64,
         length: size,
-        padding: 0
+        padding: 0,
     };
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_resource_attach_backing = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    let response_resource_attach_backing =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_resource_attach_backing);
 
     // map frame buffer to screen
-    let request_set_scanout = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuSetScanout) };
+    let request_set_scanout =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuSetScanout) };
     *request_set_scanout = VirtIOGpuSetScanout {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_SET_SCANOUT),
         rect: response_get_display_info.rect,
         scanout_id: 0,
-        resource_id: VIRTIO_GPU_RESOURCE_ID
+        resource_id: VIRTIO_GPU_RESOURCE_ID,
     };
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_set_scanout = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    let response_set_scanout =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_set_scanout);
 
     flush_frame_buffer_to_screen(driver);
@@ -290,30 +315,36 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
 
 fn flush_frame_buffer_to_screen(driver: &mut VirtIOGpu) {
     // copy data from guest to host
-    let request_transfer_to_host_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuTransferToHost2D) };
+    let request_transfer_to_host_2d = unsafe {
+        &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuTransferToHost2D)
+    };
     *request_transfer_to_host_2d = VirtIOGpuTransferToHost2D {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D),
         rect: driver.rect,
         offset: 0,
         resource_id: VIRTIO_GPU_RESOURCE_ID,
-        padding: 0
+        padding: 0,
     };
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_transfer_to_host_2d = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    let response_transfer_to_host_2d =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_transfer_to_host_2d);
 
     // flush data to screen
-    let request_resource_flush = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceFlush) };
+    let request_resource_flush = unsafe {
+        &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceFlush)
+    };
     *request_resource_flush = VirtIOGpuResourceFlush {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_FLUSH),
         rect: driver.rect,
         resource_id: VIRTIO_GPU_RESOURCE_ID,
-        padding: 0
+        padding: 0,
     };
     request(driver);
     driver.queues[VIRTIO_QUEUE_TRANSMIT].get_block();
-    let response_resource_flush = unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
+    let response_resource_flush =
+        unsafe { &mut *(driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut VirtIOGpuCtrlHdr) };
     info!("response: {:?}", response_resource_flush);
 }
 
@@ -344,7 +375,7 @@ pub fn virtio_gpu_init(node: &Node) {
     let queue_num = 2;
     let queues = [
         VirtIOVirtqueue::new(header, VIRTIO_QUEUE_TRANSMIT, queue_num),
-        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_CURSOR, queue_num)
+        VirtIOVirtqueue::new(header, VIRTIO_QUEUE_CURSOR, queue_num),
     ];
     let mut driver = VirtIOGpu {
         interrupt: node.prop_u32("interrupts").unwrap(),
@@ -365,7 +396,10 @@ pub fn virtio_gpu_init(node: &Node) {
         debug!("buffer {} using page address {:#X}", buffer, page as usize);
     }
 
-    driver.header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
+    driver
+        .header
+        .status
+        .write(VirtIODeviceStatus::DRIVER_OK.bits());
 
     setup_framebuffer(&mut driver);
 

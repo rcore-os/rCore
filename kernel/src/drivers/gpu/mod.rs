@@ -1,2 +1,2 @@
-pub mod virtio_gpu;
 mod test;
+pub mod virtio_gpu;

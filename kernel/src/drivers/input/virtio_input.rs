@@ -1,25 +1,25 @@
 use alloc::prelude::*;
-use alloc::vec;
 use alloc::sync::Arc;
+use alloc::vec;
 use core::fmt;
 use core::mem::size_of;
 use core::mem::transmute_copy;
 use core::slice;
 
 use bitflags::*;
-use device_tree::Node;
 use device_tree::util::SliceRead;
+use device_tree::Node;
 use log::*;
-use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
+use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
 use crate::arch::cpu;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS};
 use super::super::bus::virtio_mmio::*;
+use super::super::{DeviceType, Driver, DRIVERS};
 
 struct VirtIOInput {
     interrupt_parent: u32,
@@ -46,7 +46,7 @@ struct VirtIOInputConfig {
     subsel: Volatile<u8>,
     size: u8,
     reversed: [u8; 5],
-    data: [u8; 32]
+    data: [u8; 32],
 }
 
 #[repr(C)]
@@ -56,7 +56,7 @@ struct VirtIOInputAbsInfo {
     max: u32,
     fuzz: u32,
     flat: u32,
-    res: u32
+    res: u32,
 }
 
 #[repr(C)]
@@ -65,7 +65,7 @@ struct VirtIOInputDevIDs {
     bustype: u16,
     vendor: u16,
     product: u16,
-    version: u16
+    version: u16,
 }
 
 #[repr(C)]
@@ -73,31 +73,23 @@ struct VirtIOInputDevIDs {
 struct VirtIOInputEvent {
     event_type: u16,
     code: u16,
-    value: u32
+    value: u32,
 }
 
 impl fmt::Display for VirtIOInputEvent {
     // linux event codes
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.event_type {
-            0 => {
-                match self.code {
-                    0 => write!(f, "SYN_REPORT"),
-                    _ => write!(f, "Unknown SYN code {}", self.code)
-                }
-            }
-            2 => {
-                match self.code {
-                    0 => {
-                        write!(f, "REL_X {}", self.value)
-                    }
-                    1 => {
-                        write!(f, "REL_Y {}", self.value)
-                    }
-                    _ => write!(f, "Unknown REL code {}", self.code)
-                }
-            }
-            _ => write!(f, "Unknown event type {}", self.event_type)
+            0 => match self.code {
+                0 => write!(f, "SYN_REPORT"),
+                _ => write!(f, "Unknown SYN code {}", self.code),
+            },
+            2 => match self.code {
+                0 => write!(f, "REL_X {}", self.value),
+                1 => write!(f, "REL_Y {}", self.value),
+                _ => write!(f, "Unknown REL code {}", self.code),
+            },
+            _ => write!(f, "Unknown event type {}", self.event_type),
         }
     }
 }
@@ -129,7 +121,7 @@ impl VirtIOInput {
     fn try_handle_interrupt(&mut self, _irq: Option<u32>) -> bool {
         // for simplicity
         if cpu::id() > 0 {
-            return false
+            return false;
         }
 
         // ensure header page is mapped
@@ -213,17 +205,25 @@ pub fn virtio_input_init(node: &Node) {
         header,
         queues,
         x: 0,
-        y: 0
+        y: 0,
     };
 
     let buffer = vec![VirtIOInputEvent::default(); queue_num];
     let input_buffers: &mut [VirtIOInputEvent] = Box::leak(buffer.into_boxed_slice());
     for i in 0..queue_num {
-        let buffer = unsafe { slice::from_raw_parts((&input_buffers[i]) as *const VirtIOInputEvent as *const u8, size_of::<VirtIOInputEvent>()) };
+        let buffer = unsafe {
+            slice::from_raw_parts(
+                (&input_buffers[i]) as *const VirtIOInputEvent as *const u8,
+                size_of::<VirtIOInputEvent>(),
+            )
+        };
         driver.queues[VIRTIO_QUEUE_EVENT].add(&[buffer], &[], 0);
     }
 
-    driver.header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());
+    driver
+        .header
+        .status
+        .write(VirtIODeviceStatus::DRIVER_OK.bits());
 
     let driver = Arc::new(VirtIOInputDriver(Mutex::new(driver)));
     DRIVERS.write().push(driver);
