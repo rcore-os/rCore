@@ -319,12 +319,7 @@ pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
             Err(e) => return Err(SysError::from(e)),
         }
     } else {
-        // TODO: remove "stdin:" "stdout:"
-        match path.as_str() {
-            "stdin:" => crate::fs::STDIN.clone() as Arc<INode>,
-            "stdout:" => crate::fs::STDOUT.clone() as Arc<INode>,
-            _ => proc.lookup_inode(&path)?,
-        }
+        proc.lookup_inode(&path)?
     };
 
     let fd = proc.get_free_fd();
@@ -502,12 +497,7 @@ pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
     let (new_dir_path, new_file_name) = split_path(&newpath);
     let old_dir_inode = proc.lookup_inode(old_dir_path)?;
     let new_dir_inode = proc.lookup_inode(new_dir_path)?;
-    // TODO: merge `rename` and `move` in VFS
-    if Arc::ptr_eq(&old_dir_inode, &new_dir_inode) {
-        old_dir_inode.rename(old_file_name, new_file_name)?;
-    } else {
-        old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
-    }
+    old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
 
@@ -523,6 +513,21 @@ pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
         return Err(SysError::EEXIST);
     }
     inode.create(file_name, FileType::Dir, mode as u32)?;
+    Ok(0)
+}
+
+pub fn sys_rmdir(path: *const u8) -> SysResult {
+    let proc = process();
+    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    info!("rmdir: path: {:?}", path);
+
+    let (dir_path, file_name) = split_path(&path);
+    let dir_inode = proc.lookup_inode(dir_path)?;
+    let file_inode = dir_inode.find(file_name)?;
+    if file_inode.metadata()?.type_ != FileType::Dir {
+        return Err(SysError::ENOTDIR);
+    }
+    dir_inode.unlink(file_name)?;
     Ok(0)
 }
 
@@ -546,6 +551,10 @@ pub fn sys_unlink(path: *const u8) -> SysResult {
 
     let (dir_path, file_name) = split_path(&path);
     let dir_inode = proc.lookup_inode(dir_path)?;
+    let file_inode = dir_inode.find(file_name)?;
+    if file_inode.metadata()?.type_ == FileType::Dir {
+        return Err(SysError::EISDIR);
+    }
     dir_inode.unlink(file_name)?;
     Ok(0)
 }
@@ -556,7 +565,6 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     let mut proc = process();
     proc.memory_set.check_mut_array(fds, 2)?;
     let (read, write) = Pipe::create_pair();
-    let read_fd = proc.get_free_fd();
 
     let read_fd = proc.get_free_fd();
     proc.files.insert(read_fd, FileLike::File(FileHandle::new(Arc::new(read), OpenOptions { read: true, write: false, append: false })));
@@ -571,6 +579,11 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
 
     info!("pipe: created rfd: {} wfd: {}", read_fd, write_fd);
 
+    Ok(0)
+}
+
+pub fn sys_sync() -> SysResult {
+    ROOT_INODE.fs().sync()?;
     Ok(0)
 }
 
@@ -856,7 +869,6 @@ impl StatMode {
             FileType::BlockDevice => StatMode::BLOCK,
             FileType::Socket => StatMode::SOCKET,
             FileType::NamedPipe => StatMode::FIFO,
-            _ => StatMode::NULL,
         };
         let mode = StatMode::from_bits_truncate(mode as u32);
         type_ | mode

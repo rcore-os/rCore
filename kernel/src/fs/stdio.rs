@@ -53,12 +53,12 @@ lazy_static! {
 macro_rules! impl_inode {
     () => {
         fn metadata(&self) -> Result<Metadata> { Err(FsError::NotSupported) }
-        fn sync(&self) -> Result<()> { Ok(()) }
+        fn sync_all(&self) -> Result<()> { Ok(()) }
+        fn sync_data(&self) -> Result<()> { Ok(()) }
         fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
         fn create(&self, _name: &str, _type_: FileType, _mode: u32) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn unlink(&self, _name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn link(&self, _name: &str, _other: &Arc<INode>) -> Result<()> { Err(FsError::NotDir) }
-        fn rename(&self, _old_name: &str, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }

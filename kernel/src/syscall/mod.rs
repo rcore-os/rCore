@@ -99,7 +99,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_GETPPID => sys_getppid(),
         SYS_SETPRIORITY => sys_set_priority(args[0]),
 //        SYS_SETRLIMIT => sys_setrlimit(),
-//        SYS_SYNC => sys_sync(),
+        SYS_SYNC => sys_sync(),
         SYS_REBOOT => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
         SYS_GETTID => sys_gettid(),
         SYS_FUTEX => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
@@ -183,10 +183,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
-        SYS_SYNC => {
-            warn!("sys_sync is unimplemented");
-            Ok(0)
-        }
         SYS_SET_TID_ADDRESS => {
             warn!("sys_set_tid_address is unimplemented");
             Ok(thread::current().id())
@@ -243,6 +239,7 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
         SYS_VFORK => sys_fork(tf),
         SYS_RENAME => sys_rename(args[0] as *const u8, args[1] as *const u8),
         SYS_MKDIR => sys_mkdir(args[0] as *const u8, args[1]),
+        SYS_RMDIR => sys_rmdir(args[0] as *const u8),
         SYS_LINK => sys_link(args[0] as *const u8, args[1] as *const u8),
         SYS_UNLINK => sys_unlink(args[0] as *const u8),
         SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),

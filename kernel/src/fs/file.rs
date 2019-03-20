@@ -36,10 +36,7 @@ impl FileHandle {
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        if !self.options.read {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
-        }
-        let len = self.inode.read_at(self.offset as usize, buf)?;
+        let len = self.read_at(self.offset as usize, buf)?;
         self.offset += len as u64;
         Ok(len)
     }
@@ -53,15 +50,12 @@ impl FileHandle {
     }
 
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        if !self.options.write {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
-        }
-        if self.options.append {
-            let info = self.inode.metadata()?;
-            self.offset = info.size as u64;
-        }
-        let len = self.inode.write_at(self.offset as usize, buf)?;
-        self.offset += len as u64;
+        let offset = match self.options.append {
+            true => self.inode.metadata()?.size as u64,
+            false => self.offset,
+        } as usize;
+        let len = self.write_at(offset, buf)?;
+        self.offset = (offset + len) as u64;
         Ok(len)
     }
 
@@ -91,12 +85,11 @@ impl FileHandle {
     }
 
     pub fn sync_all(&mut self) -> Result<()> {
-        self.inode.sync()
+        self.inode.sync_all()
     }
 
     pub fn sync_data(&mut self) -> Result<()> {
-        // TODO: add sync_data to VFS
-        self.inode.sync()
+        self.inode.sync_data()
     }
 
     pub fn metadata(&self) -> Result<Metadata> {
