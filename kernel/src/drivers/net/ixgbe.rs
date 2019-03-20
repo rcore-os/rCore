@@ -48,6 +48,10 @@ pub struct IXGBE {
 #[derive(Clone)]
 pub struct IXGBEDriver(Arc<Mutex<IXGBE>>);
 
+// On linux, use ip link set <dev> mtu <MTU - 18>
+const IXGBE_MTU: usize = 8000;
+const IXGBE_BUFFER_SIZE: usize = PAGE_SIZE * 2;
+
 const IXGBE_CTRL: usize = 0x00000 / 4;
 const IXGBE_STATUS: usize = 0x00008 / 4;
 const IXGBE_CTRL_EXT: usize = 0x00018 / 4;
@@ -85,6 +89,7 @@ const IXGBE_RXPBSIZE: usize = 0x03C00 / 4;
 const IXGBE_RXPBSIZE_END: usize = 0x03C20 / 4;
 const IXGBE_FCCFG: usize = 0x03D00 / 4;
 const IXGBE_HLREG0: usize = 0x04240 / 4;
+const IXGBE_MAXFRS: usize = 0x04268 / 4;
 const IXGBE_MFLCN: usize = 0x04294 / 4;
 const IXGBE_AUTOC: usize = 0x042A0 / 4;
 const IXGBE_LINKS: usize = 0x042A4 / 4;
@@ -354,7 +359,7 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn capabilities(&self) -> DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = 1536;
+        caps.max_transmission_unit = IXGBE_MTU; // max MTU
         caps.max_burst_size = Some(64);
         // IP Rx checksum is offloaded with RXCSUM
         caps.checksum.ipv4 = Checksum::Tx;
@@ -376,7 +381,7 @@ impl phy::TxToken for IXGBETxToken {
     where
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
-        let mut buffer = [0u8; PAGE_SIZE];
+        let mut buffer = [0u8; IXGBE_BUFFER_SIZE];
         let result = f(&mut buffer[..len]);
 
         let mut driver = (self.0).0.lock();
@@ -660,7 +665,7 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     // 2. Receive buffers of appropriate size should be allocated and pointers to these buffers should be stored in the descriptor ring.
     for i in 0..recv_queue_size {
         let buffer_page = unsafe {
-            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
+            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(IXGBE_BUFFER_SIZE, PAGE_SIZE).unwrap())
         } as usize;
         let buffer_page_pa = active_table().get_entry(buffer_page).unwrap().target();
         recv_queue[i].addr = buffer_page_pa as u64;
@@ -675,8 +680,8 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     ixgbe[IXGBE_RDLEN].write(PAGE_SIZE as u32); // RDLEN
 
     // 5. Program SRRCTL associated with this queue according to the size of the buffers and the required header control.
-    // Legacy descriptor, 4K buffer size
-    ixgbe[IXGBE_SRRCTL].write((ixgbe[IXGBE_SRRCTL].read() & !0xf) | (4 << 0));
+    // Legacy descriptor, 8K buffer size
+    ixgbe[IXGBE_SRRCTL].write((ixgbe[IXGBE_SRRCTL].read() & !0xf) | (8 << 0));
 
     ixgbe[IXGBE_RDH].write(0); // RDH
 
@@ -709,16 +714,17 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     // 4.6.8 Transmit Initialization
 
     // Program the HLREG0 register according to the required MAC behavior.
-    // TXCRCEN | RXCRCSTRP | TXPADEN | RXLNGTHERREN
-    // ixgbe[IXGBE_HLREG0].write(ixgbe[IXGBE_HLREG0].read() & !(1 << 0) & !(1 << 1));
+    // TXCRCEN | RXCRCSTRP | JUMBOEN | TXPADEN | RXLNGTHERREN
     ixgbe[IXGBE_HLREG0]
-        .write(ixgbe[IXGBE_HLREG0].read() | (1 << 0) | (1 << 1) | (1 << 10) | (1 << 27));
+        .write(ixgbe[IXGBE_HLREG0].read() | (1 << 0) | (1 << 1) | (1 << 2) | (1 << 10) | (1 << 27));
+    // Set max MTU
+    ixgbe[IXGBE_MAXFRS].write((IXGBE_MTU as u32) << 16);
 
     // The following steps should be done once per transmit queue:
     // 1. Allocate a region of memory for the transmit descriptor list.
     for i in 0..send_queue_size {
         let buffer_page = unsafe {
-            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
+            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(IXGBE_BUFFER_SIZE, PAGE_SIZE).unwrap())
         } as usize;
         let buffer_page_pa = active_table().get_entry(buffer_page).unwrap().target();
         send_queue[i].addr = buffer_page_pa as u64;

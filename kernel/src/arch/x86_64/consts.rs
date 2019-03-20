@@ -23,7 +23,7 @@ pub const KERNEL_SIZE: usize = PML4_SIZE;
 pub const KERNEL_HEAP_OFFSET: usize = KERNEL_OFFSET - PML4_SIZE;
 pub const KERNEL_HEAP_PML4: usize = (KERNEL_HEAP_OFFSET & PML4_MASK) / PML4_SIZE;
 /// Size of kernel heap
-pub const KERNEL_HEAP_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+pub const KERNEL_HEAP_SIZE: usize = 64 * 1024 * 1024; // 64 MB
 
 pub const MEMORY_OFFSET: usize = 0;
 
