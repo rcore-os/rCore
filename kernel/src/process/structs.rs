@@ -11,7 +11,6 @@ use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::fs::{FileHandle, OpenOptions};
 use crate::sync::Condvar;
-use crate::drivers::NET_DRIVERS;
 use crate::net::{SocketWrapper, SOCKETS};
 
 use super::abi::{self, ProcInitInfo};

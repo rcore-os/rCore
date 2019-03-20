@@ -1,7 +1,7 @@
 //! Syscalls for networking
 
 use super::*;
-use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
+use crate::drivers::SOCKET_ACTIVITY;
 use crate::net::{
     get_ephemeral_port, poll_ifaces, SocketType, SocketWrapper, TcpSocketState, UdpSocketState,
     SOCKETS,

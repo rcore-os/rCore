@@ -38,27 +38,35 @@ pub trait Driver : Send + Sync {
 
     // return the correspondent device type, see DeviceType
     fn device_type(&self) -> DeviceType;
-}
 
-pub trait NetDriver : Driver {
+    // Rust trait is still too restricted...
+    // network related drivers should implement these
     // get mac address for this device
-    fn get_mac(&self) -> EthernetAddress;
+    fn get_mac(&self) -> EthernetAddress {
+        unimplemented!("not a net driver")
+    }
 
     // get interface name for this device
-    fn get_ifname(&self) -> String;
+    fn get_ifname(&self) -> String {
+        unimplemented!("not a net driver")
+    }
 
     // get ipv4 address
-    fn ipv4_address(&self) -> Option<Ipv4Address>;
+    fn ipv4_address(&self) -> Option<Ipv4Address> {
+        unimplemented!("not a net driver")
+    }
 
     // manually trigger a poll, use it after sending packets
-    fn poll(&self);
+    fn poll(&self) {
+        unimplemented!("not a net driver")
+    }
 }
 
 
 lazy_static! {
     // NOTE: RwLock only write when initializing drivers
     pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
-    pub static ref NET_DRIVERS: RwLock<Vec<Arc<NetDriver>>> = RwLock::new(Vec::new());
+    pub static ref NET_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<VirtIOBlkDriver>>> = RwLock::new(Vec::new());
 }
 

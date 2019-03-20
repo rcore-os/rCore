@@ -1,6 +1,11 @@
 use crate::drivers::net::*;
-use x86_64::instructions::port::Port;
+use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
+use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::sync::Arc;
+use spin::Mutex;
+use core::cmp::Ordering;
+use x86_64::instructions::port::Port;
 
 const PCI_VENDOR: u32 = 0x00;
 const PCI_DEVICE: u32 = 0x02;
@@ -38,6 +43,28 @@ const PCI_BASE_ADDRESS_MEM_MASK: u32 = 0xfffffff0;
 
 #[derive(Copy, Clone)]
 pub struct PciTag(u32);
+
+
+impl Ord for PciTag {
+    fn cmp(&self, other: &PciTag) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for PciTag {
+    fn partial_cmp(&self, other: &PciTag) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for PciTag {
+}
+
+impl PartialEq for PciTag {
+    fn eq(&self, other: &PciTag) -> bool {
+        self.0 == other.0
+    }
+}
 
 impl PciTag {
     pub fn new(bus: u32, dev: u32, func: u32) -> PciTag {
@@ -135,9 +162,8 @@ impl PciTag {
                 max_base |= (max_base_hi as usize) << 32;
                 address_mark = !0;
             }
-            _ => unimplemented!("pci bar mem type")
+            _ => unimplemented!("pci bar mem type"),
         }
-
 
         if max_base == 0 {
             return None;
@@ -191,7 +217,6 @@ impl PciTag {
         }
     }
 
-
     /// Enable the pci tag and its interrupt
     /// Return assigned MSI interrupt number when applicable
     pub unsafe fn enable(&self) -> Option<u32> {
@@ -221,11 +246,18 @@ impl PciTag {
                 // enable MSI interrupt, assuming 64bit for now
                 let orig_ctrl = self.read(cap_ptr + PCI_MSI_CTRL_CAP, 4);
                 self.write(cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
-                debug!("MSI control {:#b}, enabling MSI interrupts", orig_ctrl >> 16);
+                debug!(
+                    "MSI control {:#b}, enabling MSI interrupts",
+                    orig_ctrl >> 16
+                );
                 msi_found = true;
                 break;
             }
-            debug!("PCI device has cap id {} at {:#X}", self.read(cap_ptr, 1), cap_ptr);
+            debug!(
+                "PCI device has cap id {} at {:#X}",
+                self.read(cap_ptr, 1),
+                cap_ptr
+            );
             cap_ptr = self.read(cap_ptr + 1, 1);
         }
 
@@ -235,7 +267,10 @@ impl PciTag {
             self.write(PCI_COMMAND, orig | 0xf);
             let line = self.read(PCI_INTERRUPT_LINE, 1);
             let pin = self.read(PCI_INTERRUPT_PIN, 1);
-            debug!("MSI not found, using PCI interrupt line {} pin {}", line, pin);
+            debug!(
+                "MSI not found, using PCI interrupt line {} pin {}",
+                line, pin
+            );
         }
 
         assigned_irq
@@ -260,11 +295,23 @@ pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
         } else if did == 0x10fb {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
-                let irq = unsafe {
-                    tag.enable()
-                };
-                ixgbe::ixgbe_init(name, irq, addr, len);
+                let irq = unsafe { tag.enable() };
+                PCI_DRIVERS.lock()
+                    .insert(tag, ixgbe::ixgbe_init(name, irq, addr, len));
             }
+        }
+    }
+}
+
+pub fn detach_driver(bus: u32, dev: u32, func: u32) -> bool {
+    match PCI_DRIVERS.lock().remove(&PciTag::new(bus, dev, func)) {
+        Some(driver) => {
+            DRIVERS.write().retain(|dri| !Arc::ptr_eq(&driver, dri));
+            NET_DRIVERS.write().retain(|dri| !Arc::ptr_eq(&driver, dri));
+            true
+        }
+        None => {
+            false
         }
     }
 }
@@ -312,4 +359,8 @@ pub fn find_device(vendor: u32, product: u32) -> Option<PciTag> {
         }
     }
     None
+}
+
+lazy_static! {
+    pub static ref PCI_DRIVERS: Arc<Mutex<BTreeMap<PciTag, Arc<Driver>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }

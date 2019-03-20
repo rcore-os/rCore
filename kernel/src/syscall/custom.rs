@@ -3,6 +3,8 @@ use rcore_memory::memory_set::handler::Linear;
 use rcore_memory::memory_set::MemoryAttr;
 use super::*;
 
+/// Allocate this PCI device to user space
+/// The kernel driver using the PCI device will be unloaded
 #[cfg(target_arch = "x86_64")]
 pub fn sys_map_pci_device(vendor: usize, product: usize) -> SysResult {
     use crate::drivers::bus::pci;

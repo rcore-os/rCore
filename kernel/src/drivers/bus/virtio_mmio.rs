@@ -1,20 +1,20 @@
-use alloc::{vec, vec::Vec};
 use alloc::alloc::{GlobalAlloc, Layout};
+use alloc::{vec, vec::Vec};
 use core::mem::size_of;
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
 
 use bitflags::*;
-use device_tree::Node;
 use device_tree::util::SliceRead;
+use device_tree::Node;
 use log::*;
-use rcore_memory::PAGE_SIZE;
 use rcore_memory::paging::PageTable;
+use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::HEAP_ALLOCATOR;
-use crate::memory::active_table;
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::memory::active_table;
+use crate::HEAP_ALLOCATOR;
 
 use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
@@ -25,28 +25,28 @@ use super::super::net::virtio_net;
 #[repr(C)]
 #[derive(Debug)]
 pub struct VirtIOHeader {
-    magic: ReadOnly<u32>, // 0x000
-    version: ReadOnly<u32>, // 0x004
-    device_id: ReadOnly<u32>, // 0x008
-    vendor_id: ReadOnly<u32>, // 0x00c
-    pub device_features: ReadOnly<u32>, // 0x010
+    magic: ReadOnly<u32>,                    // 0x000
+    version: ReadOnly<u32>,                  // 0x004
+    device_id: ReadOnly<u32>,                // 0x008
+    vendor_id: ReadOnly<u32>,                // 0x00c
+    pub device_features: ReadOnly<u32>,      // 0x010
     pub device_features_sel: WriteOnly<u32>, // 0x014
-    __r1: [ReadOnly<u32>; 2], 
-    pub driver_features: WriteOnly<u32>, // 0x020
+    __r1: [ReadOnly<u32>; 2],
+    pub driver_features: WriteOnly<u32>,     // 0x020
     pub driver_features_sel: WriteOnly<u32>, // 0x024
-    pub guest_page_size: WriteOnly<u32>, // 0x028
+    pub guest_page_size: WriteOnly<u32>,     // 0x028
     __r2: ReadOnly<u32>,
-    pub queue_sel: WriteOnly<u32>, // 0x030
+    pub queue_sel: WriteOnly<u32>,    // 0x030
     pub queue_num_max: ReadOnly<u32>, // 0x034
-    pub queue_num: WriteOnly<u32>, // 0x038
-    pub queue_align: WriteOnly<u32>, // 0x03c
-    pub queue_pfn: Volatile<u32>, // 0x040
-    queue_ready: Volatile<u32>, // new interface only
+    pub queue_num: WriteOnly<u32>,    // 0x038
+    pub queue_align: WriteOnly<u32>,  // 0x03c
+    pub queue_pfn: Volatile<u32>,     // 0x040
+    queue_ready: Volatile<u32>,       // new interface only
     __r3: [ReadOnly<u32>; 2],
     pub queue_notify: WriteOnly<u32>, // 0x050
     __r4: [ReadOnly<u32>; 3],
     pub interrupt_status: ReadOnly<u32>, // 0x060
-    pub interrupt_ack: WriteOnly<u32>, // 0x064
+    pub interrupt_ack: WriteOnly<u32>,   // 0x064
     __r5: [ReadOnly<u32>; 2],
     pub status: Volatile<u32>, // 0x070
     __r6: [ReadOnly<u32>; 3],
@@ -59,7 +59,7 @@ pub struct VirtIOHeader {
     queue_used_low: WriteOnly<u32>,
     queue_used_high: WriteOnly<u32>,
     __r9: [ReadOnly<u32>; 21],
-    config_generation: ReadOnly<u32>
+    config_generation: ReadOnly<u32>,
 }
 
 #[repr(C)]
@@ -68,9 +68,9 @@ pub struct VirtIOVirtqueue {
     queue_address: usize,
     queue_num: usize,
     queue: usize,
-    desc: usize, // *mut VirtIOVirtqueueDesc,
+    desc: usize,  // *mut VirtIOVirtqueueDesc,
     avail: usize, // *mut VirtIOVirtqueueAvailableRing,
-    used: usize, // *mut VirtIOVirtqueueUsedRing,
+    used: usize,  // *mut VirtIOVirtqueueUsedRing,
     desc_state: Vec<usize>,
     num_used: usize,
     free_head: usize,
@@ -90,16 +90,19 @@ impl VirtIOVirtqueue {
         let size = virtqueue_size(queue_num, align);
         assert!(size % align == 0);
         // alloc continuous pages
-        let address = unsafe {
-            HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size, align).unwrap())
-        } as usize;
+        let address =
+            unsafe { HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size, align).unwrap()) }
+                as usize;
 
         header.queue_num.write(queue_num as u32);
         header.queue_align.write(align as u32);
-        header.queue_pfn.write(((address - KERNEL_OFFSET + MEMORY_OFFSET) as u32) >> 12);
+        header
+            .queue_pfn
+            .write(((address - KERNEL_OFFSET + MEMORY_OFFSET) as u32) >> 12);
 
         // link desc together
-        let desc = unsafe { slice::from_raw_parts_mut(address as *mut VirtIOVirtqueueDesc, queue_num) };
+        let desc =
+            unsafe { slice::from_raw_parts_mut(address as *mut VirtIOVirtqueueDesc, queue_num) };
         for i in 0..(queue_num - 1) {
             desc[i].next.write((i + 1) as u16);
         }
@@ -133,25 +136,35 @@ impl VirtIOVirtqueue {
             return false;
         }
 
-        let desc = unsafe { slice::from_raw_parts_mut(self.desc as *mut VirtIOVirtqueueDesc, self.queue_num) };
+        let desc = unsafe {
+            slice::from_raw_parts_mut(self.desc as *mut VirtIOVirtqueueDesc, self.queue_num)
+        };
         let head = self.free_head;
         let mut prev = 0;
         let mut cur = self.free_head;
         for i in 0..output.len() {
             desc[cur].flags.write(VirtIOVirtqueueFlag::NEXT.bits());
-            desc[cur].addr.write(output[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+            desc[cur]
+                .addr
+                .write(output[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
             desc[cur].len.write(output[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
         }
         for i in 0..input.len() {
-            desc[cur].flags.write((VirtIOVirtqueueFlag::NEXT | VirtIOVirtqueueFlag::WRITE).bits());
-            desc[cur].addr.write(input[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+            desc[cur]
+                .flags
+                .write((VirtIOVirtqueueFlag::NEXT | VirtIOVirtqueueFlag::WRITE).bits());
+            desc[cur]
+                .addr
+                .write(input[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
             desc[cur].len.write(input[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
         }
-        desc[prev].flags.write(desc[prev].flags.read() & !(VirtIOVirtqueueFlag::NEXT.bits()));
+        desc[prev]
+            .flags
+            .write(desc[prev].flags.read() & !(VirtIOVirtqueueFlag::NEXT.bits()));
 
         self.num_used += input.len() + output.len();
         self.free_head = cur;
@@ -189,7 +202,7 @@ impl VirtIOVirtqueue {
     pub fn get(&mut self) -> Option<(Vec<&'static [u8]>, Vec<&'static [u8]>, usize, usize)> {
         let used = unsafe { &mut *(self.used as *mut VirtIOVirtqueueUsedRing) };
         if self.last_used_idx == used.idx.read() {
-            return None
+            return None;
         }
         // read barrier
         fence(Ordering::SeqCst);
@@ -202,13 +215,16 @@ impl VirtIOVirtqueue {
         self.desc_state[last_used_slot] = 0;
 
         let mut cur = index;
-        let desc = unsafe { slice::from_raw_parts_mut(self.desc as *mut VirtIOVirtqueueDesc, self.queue_num) };
+        let desc = unsafe {
+            slice::from_raw_parts_mut(self.desc as *mut VirtIOVirtqueueDesc, self.queue_num)
+        };
         let mut input = Vec::new();
         let mut output = Vec::new();
         loop {
             let flags = VirtIOVirtqueueFlag::from_bits_truncate(desc[cur].flags.read());
             let addr = desc[cur].addr.read() as u64 - MEMORY_OFFSET as u64 + KERNEL_OFFSET as u64;
-            let buffer = unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
+            let buffer =
+                unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
             if flags.contains(VirtIOVirtqueueFlag::WRITE) {
                 input.push(buffer);
             } else {
@@ -221,7 +237,7 @@ impl VirtIOVirtqueue {
             } else {
                 desc[cur].next.write(self.free_head as u16);
                 self.num_used -= 1;
-                break
+                break;
             }
         }
 
@@ -263,9 +279,11 @@ impl VirtIOHeader {
 
     pub fn write_driver_features(&mut self, driver_features: u64) {
         self.driver_features_sel.write(0); // driver features [0, 32)
-        self.driver_features.write((driver_features & 0xFFFFFFFF) as u32);
+        self.driver_features
+            .write((driver_features & 0xFFFFFFFF) as u32);
         self.driver_features_sel.write(1); // driver features [32, 64)
-        self.driver_features.write(((driver_features & 0xFFFFFFFF00000000) >> 32) as u32);
+        self.driver_features
+            .write(((driver_features & 0xFFFFFFFF00000000) >> 32) as u32);
     }
 }
 
@@ -286,7 +304,7 @@ pub struct VirtIOVirtqueueDesc {
     pub addr: Volatile<u64>,
     pub len: Volatile<u32>,
     pub flags: Volatile<u16>,
-    pub next: Volatile<u16>
+    pub next: Volatile<u16>,
 }
 
 bitflags! {
@@ -303,14 +321,14 @@ pub struct VirtIOVirtqueueAvailableRing {
     pub flags: Volatile<u16>,
     pub idx: Volatile<u16>,
     pub ring: [Volatile<u16>; 32], // actual size: queue_size
-    used_event: Volatile<u16> // unused
+    used_event: Volatile<u16>,     // unused
 }
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct VirtIOVirtqueueUsedElem {
     id: Volatile<u32>,
-    len: Volatile<u32>
+    len: Volatile<u32>,
 }
 
 #[repr(C)]
@@ -319,17 +337,19 @@ pub struct VirtIOVirtqueueUsedRing {
     pub flags: Volatile<u16>,
     pub idx: Volatile<u16>,
     pub ring: [VirtIOVirtqueueUsedElem; 32], // actual size: queue_size
-    avail_event: Volatile<u16> // unused
+    avail_event: Volatile<u16>,              // unused
 }
 
 // virtio 2.4.2 Legacy Interfaces: A Note on Virtqueue Layout
 pub fn virtqueue_size(num: usize, align: usize) -> usize {
-    (((size_of::<VirtIOVirtqueueDesc>() * num + size_of::<u16>() * (3 + num)) + align) & !(align-1)) +
-        (((size_of::<u16>() * 3 + size_of::<VirtIOVirtqueueUsedElem>() * num) + align) & !(align-1))
+    (((size_of::<VirtIOVirtqueueDesc>() * num + size_of::<u16>() * (3 + num)) + align)
+        & !(align - 1))
+        + (((size_of::<u16>() * 3 + size_of::<VirtIOVirtqueueUsedElem>() * num) + align)
+            & !(align - 1))
 }
 
 pub fn virtqueue_used_elem_offset(num: usize, align: usize) -> usize {
-    ((size_of::<VirtIOVirtqueueDesc>() * num + size_of::<u16>() * (3 + num)) + align) & !(align-1)
+    ((size_of::<VirtIOVirtqueueDesc>() * num + size_of::<u16>() * (3 + num)) + align) & !(align - 1)
 }
 
 pub fn virtio_probe(node: &Node) {
@@ -344,19 +364,27 @@ pub fn virtio_probe(node: &Node) {
         let version = header.version.read();
         let device_id = header.device_id.read();
         // only support legacy device
-        if magic == 0x74726976 && version == 1 && device_id != 0 { // "virt" magic
-            info!("Detected virtio device with vendor id {:#X}", header.vendor_id.read());
+        if magic == 0x74726976 && version == 1 && device_id != 0 {
+            // "virt" magic
+            info!(
+                "Detected virtio device with vendor id {:#X}",
+                header.vendor_id.read()
+            );
             info!("Device tree node {:?}", node);
             // virtio 3.1.1 Device Initialization
             header.status.write(0);
             header.status.write(VirtIODeviceStatus::ACKNOWLEDGE.bits());
-            if device_id == 1 { // net device
+            if device_id == 1 {
+                // net device
                 virtio_net::virtio_net_init(node);
-            } else if device_id == 2 { // blk device
+            } else if device_id == 2 {
+                // blk device
                 virtio_blk::virtio_blk_init(node);
-            } else if device_id == 16 { // gpu device
+            } else if device_id == 16 {
+                // gpu device
                 virtio_gpu::virtio_gpu_init(node);
-            } else if device_id == 18 { // input device
+            } else if device_id == 18 {
+                // input device
                 virtio_input::virtio_input_init(node);
             } else {
                 println!("Unrecognized virtio device {}", device_id);

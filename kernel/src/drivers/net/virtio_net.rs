@@ -24,7 +24,7 @@ use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;
-use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS};
+use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS};
 
 pub struct VirtIONet {
     interrupt_parent: u32,
@@ -64,19 +64,7 @@ impl Driver for VirtIONetDriver {
     fn device_type(&self) -> DeviceType {
         DeviceType::Net
     }
-}
 
-impl VirtIONet {
-    fn transmit_available(&self) -> bool {
-        self.queues[VIRTIO_QUEUE_TRANSMIT].can_add(1, 0)
-    }
-
-    fn receive_available(&self) -> bool {
-        self.queues[VIRTIO_QUEUE_RECEIVE].can_get()
-    }
-}
-
-impl NetDriver for VirtIONetDriver {
     fn get_mac(&self) -> EthernetAddress {
         self.0.lock().mac
     }
@@ -91,6 +79,16 @@ impl NetDriver for VirtIONetDriver {
 
     fn poll(&self) {
         unimplemented!()
+    }
+}
+
+impl VirtIONet {
+    fn transmit_available(&self) -> bool {
+        self.queues[VIRTIO_QUEUE_TRANSMIT].can_add(1, 0)
+    }
+
+    fn receive_available(&self) -> bool {
+        self.queues[VIRTIO_QUEUE_RECEIVE].can_get()
     }
 }
 

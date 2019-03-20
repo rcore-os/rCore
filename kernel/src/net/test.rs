@@ -1,4 +1,4 @@
-use crate::drivers::NetDriver;
+use crate::drivers::Driver;
 use crate::drivers::NET_DRIVERS;
 use crate::net::SOCKETS;
 use crate::thread;

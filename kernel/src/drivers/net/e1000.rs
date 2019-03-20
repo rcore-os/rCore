@@ -1,4 +1,5 @@
 //! Intel PRO/1000 Network Adapter i.e. e1000 network driver
+//! Datasheet: https://www.intel.ca/content/dam/doc/datasheet/82574l-gbe-controller-datasheet.pdf
 
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::format;
@@ -28,7 +29,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
 // At the beginning, all transmit descriptors have there status non-zero,
 // so we need to track whether we are using the descriptor for the first time.
@@ -121,9 +122,7 @@ impl Driver for E1000Interface {
     fn device_type(&self) -> DeviceType {
         DeviceType::Net
     }
-}
 
-impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }

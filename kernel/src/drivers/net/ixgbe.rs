@@ -1,4 +1,5 @@
 //! Intel 10Gb Network Adapter 82599 i.e. ixgbe network driver
+//! Datasheet: https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::prelude::*;
@@ -27,7 +28,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
-use super::super::{DeviceType, Driver, NetDriver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
 // At the beginning, all transmit descriptors have there status non-zero,
 // so we need to track whether we are using the descriptor for the first time.
@@ -215,9 +216,7 @@ impl Driver for IXGBEInterface {
     fn device_type(&self) -> DeviceType {
         DeviceType::Net
     }
-}
 
-impl NetDriver for IXGBEInterface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }
@@ -360,7 +359,7 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
     fn capabilities(&self) -> DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = IXGBE_MTU; // max MTU
-        caps.max_burst_size = Some(64);
+        caps.max_burst_size = Some(256);
         // IP Rx checksum is offloaded with RXCSUM
         caps.checksum.ipv4 = Checksum::Tx;
         caps
@@ -442,7 +441,7 @@ bitflags! {
     }
 }
 
-pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
+pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) -> Arc<IXGBEInterface> {
     assert_eq!(size_of::<IXGBESendDesc>(), 16);
     assert_eq!(size_of::<IXGBERecvDesc>(), 16);
 
@@ -796,5 +795,21 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) {
 
     let driver = Arc::new(ixgbe_iface);
     DRIVERS.write().push(driver.clone());
-    NET_DRIVERS.write().push(driver);
+    NET_DRIVERS.write().push(driver.clone());
+    driver
+}
+
+impl Drop for IXGBE {
+    fn drop(&mut self) {
+        unsafe {
+            HEAP_ALLOCATOR.dealloc(self.send_page as *mut u8, Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+            HEAP_ALLOCATOR.dealloc(self.recv_page as *mut u8, Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+            for send_buffer in self.send_buffers.iter() {
+                HEAP_ALLOCATOR.dealloc(*send_buffer as *mut u8, Layout::from_size_align(IXGBE_BUFFER_SIZE, PAGE_SIZE).unwrap());
+            }
+            for recv_buffer in self.recv_buffers.iter() {
+                HEAP_ALLOCATOR.dealloc(*recv_buffer as *mut u8, Layout::from_size_align(IXGBE_BUFFER_SIZE, PAGE_SIZE).unwrap());
+            }
+        }
+    }
 }
