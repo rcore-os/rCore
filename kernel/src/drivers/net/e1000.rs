@@ -16,7 +16,6 @@ use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, DeviceCapabilities};
-use smoltcp::socket::*;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
 use smoltcp::wire::*;
@@ -121,6 +120,10 @@ impl Driver for E1000Interface {
 
     fn device_type(&self) -> DeviceType {
         DeviceType::Net
+    }
+
+    fn get_id(&self) -> String {
+        format!("e1000")
     }
 
     fn get_mac(&self) -> EthernetAddress {

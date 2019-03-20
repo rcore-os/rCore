@@ -1,4 +1,5 @@
 use alloc::alloc::{GlobalAlloc, Layout};
+use alloc::string::String;
 use alloc::sync::Arc;
 use core::slice;
 
@@ -213,6 +214,10 @@ impl Driver for VirtIOGpuDriver {
 
     fn device_type(&self) -> DeviceType {
         DeviceType::Gpu
+    }
+
+    fn get_id(&self) -> String {
+        format!("virtio_gpu")
     }
 }
 

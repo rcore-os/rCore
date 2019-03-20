@@ -172,6 +172,10 @@ impl Driver for VirtIOInputDriver {
     fn device_type(&self) -> DeviceType {
         DeviceType::Input
     }
+
+    fn get_id(&self) -> String {
+        String::from("virtio_input")
+    }
 }
 
 pub fn virtio_input_init(node: &Node) {

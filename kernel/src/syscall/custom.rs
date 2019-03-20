@@ -9,11 +9,16 @@ use super::*;
 pub fn sys_map_pci_device(vendor: usize, product: usize) -> SysResult {
     use crate::drivers::bus::pci;
     info!(
-        "map_pci_device: vendor: {}, product: {}",
+        "map_pci_device: vendor: {:x}, product: {:x}",
         vendor, product
     );
+
     let tag = pci::find_device(vendor as u32, product as u32)
         .ok_or(SysError::ENOENT)?;
+    if pci::detach_driver(&tag) {
+        info!("Kernel driver detached");
+    }
+
     // Get BAR0 memory
     let (base, len) = unsafe { tag.get_bar_mem(0) }
         .ok_or(SysError::ENOENT)?;

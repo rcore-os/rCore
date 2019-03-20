@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use alloc::string::String;
 use core::cmp::min;
 use core::mem::{size_of};
 use core::slice;
@@ -106,6 +107,10 @@ impl Driver for VirtIOBlkDriver {
 
     fn device_type(&self) -> DeviceType {
         DeviceType::Block
+    }
+
+    fn get_id(&self) -> String {
+        format!("virtio_block")
     }
 }
 

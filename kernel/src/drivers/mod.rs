@@ -6,7 +6,7 @@ use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::socket::SocketSet;
 use spin::RwLock;
 
-use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
+use crate::sync::Condvar;
 use self::block::virtio_blk::VirtIOBlkDriver;
 
 mod device_tree;
@@ -38,6 +38,10 @@ pub trait Driver : Send + Sync {
 
     // return the correspondent device type, see DeviceType
     fn device_type(&self) -> DeviceType;
+
+    // get unique identifier for this device
+    // should be different for each instance
+    fn get_id(&self) -> String;
 
     // Rust trait is still too restricted...
     // network related drivers should implement these

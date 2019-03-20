@@ -145,8 +145,9 @@ const IXGBE_EEC: usize = 0x10010 / 4;
 pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
     driver: IXGBEDriver,
-    name: String,
+    ifname: String,
     irq: Option<u32>,
+    id: String,
 }
 
 impl Driver for IXGBEInterface {
@@ -180,10 +181,10 @@ impl Driver for IXGBEInterface {
                     let status = ixgbe[IXGBE_LINKS].read();
                     if status & (1 << 7) != 0 {
                         // link up
-                        info!("ixgbe: interface {} link up", &self.name);
+                        info!("ixgbe: interface {} link up", &self.ifname);
                     } else {
                         // link down
-                        info!("ixgbe: interface {} link down", &self.name);
+                        info!("ixgbe: interface {} link down", &self.ifname);
                     }
                 }
                 if icr & (1 << 0) != 0 {
@@ -217,12 +218,16 @@ impl Driver for IXGBEInterface {
         DeviceType::Net
     }
 
+    fn get_id(&self) -> String {
+        self.ifname.clone()
+    }
+
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }
 
     fn get_ifname(&self) -> String {
-        self.name.clone()
+        self.ifname.clone()
     }
 
     fn ipv4_address(&self) -> Option<Ipv4Address> {
@@ -789,7 +794,8 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) ->
     let ixgbe_iface = IXGBEInterface {
         iface: Mutex::new(iface),
         driver: net_driver.clone(),
-        name,
+        ifname: name.clone(),
+        id: name,
         irq,
     };
 
@@ -801,6 +807,28 @@ pub fn ixgbe_init(name: String, irq: Option<u32>, header: usize, size: usize) ->
 
 impl Drop for IXGBE {
     fn drop(&mut self) {
+        debug!("ixgbe: interface detaching");
+
+        if let None = active_table().get_entry(self.header) {
+            let mut current_addr = self.header;
+            while current_addr < self.header + self.size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+
+        let ixgbe = unsafe {
+            slice::from_raw_parts_mut(self.header as *mut Volatile<u32>, self.size / 4)
+        };
+        // 1. Disable interrupts.
+        ixgbe[IXGBE_EIMC].write(!0);
+        ixgbe[IXGBE_EIMC1].write(!0);
+        ixgbe[IXGBE_EIMC2].write(!0);
+
+        // 2. Issue a global reset.
+        // reset: LRST | RST
+        ixgbe[IXGBE_CTRL].write(1 << 3 | 1 << 26);
+        while ixgbe[IXGBE_CTRL].read() & (1 << 3 | 1 << 26) != 0 {}
         unsafe {
             HEAP_ALLOCATOR.dealloc(self.send_page as *mut u8, Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
             HEAP_ALLOCATOR.dealloc(self.recv_page as *mut u8, Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());

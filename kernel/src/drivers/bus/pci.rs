@@ -3,8 +3,8 @@ use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
-use spin::Mutex;
 use core::cmp::Ordering;
+use spin::Mutex;
 use x86_64::instructions::port::Port;
 
 const PCI_VENDOR: u32 = 0x00;
@@ -44,7 +44,6 @@ const PCI_BASE_ADDRESS_MEM_MASK: u32 = 0xfffffff0;
 #[derive(Copy, Clone)]
 pub struct PciTag(u32);
 
-
 impl Ord for PciTag {
     fn cmp(&self, other: &PciTag) -> Ordering {
         self.0.cmp(&other.0)
@@ -57,8 +56,7 @@ impl PartialOrd for PciTag {
     }
 }
 
-impl Eq for PciTag {
-}
+impl Eq for PciTag {}
 
 impl PartialEq for PciTag {
     fn eq(&self, other: &PciTag) -> bool {
@@ -296,23 +294,22 @@ pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some((addr, len)) = unsafe { tag.get_bar_mem(0) } {
                 let irq = unsafe { tag.enable() };
-                PCI_DRIVERS.lock()
+                PCI_DRIVERS
+                    .lock()
                     .insert(tag, ixgbe::ixgbe_init(name, irq, addr, len));
             }
         }
     }
 }
 
-pub fn detach_driver(bus: u32, dev: u32, func: u32) -> bool {
-    match PCI_DRIVERS.lock().remove(&PciTag::new(bus, dev, func)) {
+pub fn detach_driver(tag: &PciTag) -> bool {
+    match PCI_DRIVERS.lock().remove(tag) {
         Some(driver) => {
-            DRIVERS.write().retain(|dri| !Arc::ptr_eq(&driver, dri));
-            NET_DRIVERS.write().retain(|dri| !Arc::ptr_eq(&driver, dri));
+            DRIVERS.write().retain(|dri| dri.get_id() != driver.get_id());
+            NET_DRIVERS.write().retain(|dri| dri.get_id() != driver.get_id());
             true
         }
-        None => {
-            false
-        }
+        None => false,
     }
 }
 
@@ -362,5 +359,6 @@ pub fn find_device(vendor: u32, product: u32) -> Option<PciTag> {
 }
 
 lazy_static! {
-    pub static ref PCI_DRIVERS: Arc<Mutex<BTreeMap<PciTag, Arc<Driver>>>> = Arc::new(Mutex::new(BTreeMap::new()));
+    pub static ref PCI_DRIVERS: Arc<Mutex<BTreeMap<PciTag, Arc<Driver>>>> =
+        Arc::new(Mutex::new(BTreeMap::new()));
 }

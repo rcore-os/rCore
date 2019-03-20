@@ -65,6 +65,10 @@ impl Driver for VirtIONetDriver {
         DeviceType::Net
     }
 
+    fn get_id(&self) -> String {
+        format!("virtio_net")
+    }
+
     fn get_mac(&self) -> EthernetAddress {
         self.0.lock().mac
     }
