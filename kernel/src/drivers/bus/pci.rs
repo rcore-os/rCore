@@ -305,8 +305,12 @@ pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
 pub fn detach_driver(tag: &PciTag) -> bool {
     match PCI_DRIVERS.lock().remove(tag) {
         Some(driver) => {
-            DRIVERS.write().retain(|dri| dri.get_id() != driver.get_id());
-            NET_DRIVERS.write().retain(|dri| dri.get_id() != driver.get_id());
+            DRIVERS
+                .write()
+                .retain(|dri| dri.get_id() != driver.get_id());
+            NET_DRIVERS
+                .write()
+                .retain(|dri| dri.get_id() != driver.get_id());
             true
         }
         None => false,
