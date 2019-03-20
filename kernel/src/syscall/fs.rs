@@ -616,7 +616,10 @@ impl Process {
 fn split_path(path: &str) -> (&str, &str) {
     let mut split = path.trim_end_matches('/').rsplitn(2, '/');
     let file_name = split.next().unwrap();
-    let dir_path = split.next().unwrap_or(".");
+    let mut dir_path = split.next().unwrap_or(".");
+    if dir_path == "" {
+        dir_path = "/";
+    }
     (dir_path, file_name)
 }
 
