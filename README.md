@@ -37,9 +37,10 @@ $ cargo install cargo-xbuild bootimage
 
 ```bash
 $ git clone https://github.com/rcore-os/rCore.git --recursive
-$ cd rCore/kernel
-$ make sfsimg arch={riscv32,riscv64,x86_64,aarch64} # requires musl-cross-make
-$ make run arch={riscv32,riscv64,x86_64,aarch64}
+$ cd rCore/user
+$ make sfsimg arch={riscv32,riscv64,x86_64,aarch64} # requires x86_64-linux-musl-gcc or musl-gcc
+$ cd ../kernel
+$ make run arch={riscv32,riscv64,x86_64,aarch64} mode=release
 ```
 
 ## History
