@@ -196,6 +196,7 @@ dependencies = [
 [[package]]
 name = "isomorphic_drivers"
 version = "0.1.0"
+source = "git+https://github.com/rcore-os/isomorphic_drivers#4a6546922bc5b1255631840f63d6b8b595b39de9"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -315,7 +316,7 @@ dependencies = [
  "console-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "device_tree 1.0.3 (git+https://github.com/rcore-os/device_tree-rs)",
  "heapless 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "isomorphic_drivers 0.1.0",
+ "isomorphic_drivers 0.1.0 (git+https://github.com/rcore-os/isomorphic_drivers)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -611,6 +612,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
 "checksum hash32 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "12d790435639c06a7b798af9e1e331ae245b7ef915b92f70a39b4cf8c00686af"
 "checksum heapless 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "56b960caff1a46f1fb3c1eb05f0575ac21c6248364ebebde11b11116e099881c"
+"checksum isomorphic_drivers 0.1.0 (git+https://github.com/rcore-os/isomorphic_drivers)" = "<none>"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
 "checksum libc 0.2.50 (registry+https://github.com/rust-lang/crates.io-index)" = "aab692d7759f5cd8c859e169db98ae5b52c924add2af5fbbca11d12fefb567c1"
 "checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"

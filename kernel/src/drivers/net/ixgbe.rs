@@ -25,9 +25,9 @@ use volatile::Volatile;
 
 use crate::memory::active_table;
 use crate::net::SOCKETS;
+use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
-use crate::sync::FlagsGuard;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
@@ -37,6 +37,21 @@ struct IXGBEDriver {
     inner: ixgbe::IXGBEDriver,
     header: usize,
     size: usize,
+}
+
+impl Drop for IXGBEDriver {
+    fn drop(&mut self) {
+        let _ = FlagsGuard::no_irq_region();
+        let header = self.header;
+        let size = self.size;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+    }
 }
 
 pub struct IXGBEInterface {
@@ -225,7 +240,7 @@ pub fn ixgbe_init(
     let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
     let ethernet_addr = EthernetAddress::from_bytes(&ixgbe.get_mac().as_bytes());
 
-    let net_driver = IXGBEDriver{
+    let net_driver = IXGBEDriver {
         inner: ixgbe,
         header,
         size,
