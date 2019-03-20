@@ -238,6 +238,12 @@ impl Drop for FlagsGuard {
     }
 }
 
+impl FlagsGuard {
+    pub fn no_irq_region() -> Self {
+        Self(unsafe { interrupt::disable_and_store() })
+    }
+}
+
 impl MutexSupport for SpinNoIrq {
     type GuardData = FlagsGuard;
     fn new() -> Self {

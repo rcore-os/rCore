@@ -27,12 +27,17 @@ use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
+use crate::sync::FlagsGuard;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
 #[derive(Clone)]
-struct IXGBEDriver(ixgbe::IXGBEDriver);
+struct IXGBEDriver {
+    inner: ixgbe::IXGBEDriver,
+    header: usize,
+    size: usize,
+}
 
 pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
@@ -40,8 +45,6 @@ pub struct IXGBEInterface {
     ifname: String,
     irq: Option<u32>,
     id: String,
-    header: usize,
-    size: usize,
 }
 
 impl Driver for IXGBEInterface {
@@ -52,15 +55,18 @@ impl Driver for IXGBEInterface {
         }
 
         let handled = {
-            if let None = active_table().get_entry(self.header) {
-                let mut current_addr = self.header;
-                while current_addr < self.header + self.size {
+            let _ = FlagsGuard::no_irq_region();
+            let header = self.driver.header;
+            let size = self.driver.size;
+            if let None = active_table().get_entry(header) {
+                let mut current_addr = header;
+                while current_addr < header + size {
                     active_table().map_if_not_exists(current_addr, current_addr);
                     current_addr = current_addr + PAGE_SIZE;
                 }
             }
 
-            self.driver.0.try_handle_interrupt()
+            self.driver.inner.try_handle_interrupt()
         };
 
         if handled {
@@ -120,8 +126,18 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
     type TxToken = IXGBETxToken;
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
-        if self.0.can_send() {
-            if let Some(data) = self.0.recv() {
+        let _ = FlagsGuard::no_irq_region();
+        let header = self.header;
+        let size = self.size;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+        if self.inner.can_send() {
+            if let Some(data) = self.inner.recv() {
                 Some((IXGBERxToken(data), IXGBETxToken(self.clone())))
             } else {
                 None
@@ -132,7 +148,17 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        if self.0.can_send() {
+        let _ = FlagsGuard::no_irq_region();
+        let header = self.header;
+        let size = self.size;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+        if self.inner.can_send() {
             Some(IXGBETxToken(self.clone()))
         } else {
             None
@@ -163,10 +189,20 @@ impl phy::TxToken for IXGBETxToken {
     where
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
+        let _ = FlagsGuard::no_irq_region();
+        let header = self.0.header;
+        let size = self.0.size;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
         let mut buffer = [0u8; ixgbe::IXGBEDriver::get_mtu()];
         let result = f(&mut buffer[..len]);
         if result.is_ok() {
-            (self.0).0.send(&buffer[..len]);
+            (self.0).inner.send(&buffer[..len]);
         }
         result
     }
@@ -178,10 +214,22 @@ pub fn ixgbe_init(
     header: usize,
     size: usize,
 ) -> Arc<IXGBEInterface> {
+    let _ = FlagsGuard::no_irq_region();
+    if let None = active_table().get_entry(header) {
+        let mut current_addr = header;
+        while current_addr < header + size {
+            active_table().map_if_not_exists(current_addr, current_addr);
+            current_addr = current_addr + PAGE_SIZE;
+        }
+    }
     let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
     let ethernet_addr = EthernetAddress::from_bytes(&ixgbe.get_mac().as_bytes());
 
-    let net_driver = IXGBEDriver(ixgbe);
+    let net_driver = IXGBEDriver{
+        inner: ixgbe,
+        header,
+        size,
+    };
 
     let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
@@ -199,8 +247,6 @@ pub fn ixgbe_init(
         ifname: name.clone(),
         id: name,
         irq,
-        header,
-        size,
     };
 
     let driver = Arc::new(ixgbe_iface);
