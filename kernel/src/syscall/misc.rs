@@ -117,7 +117,9 @@ const LINUX_REBOOT_CMD_HALT: u32 = 0xcdef0123;
 pub fn sys_reboot(magic: u32, magic2: u32, cmd: u32, arg: *const u8) -> SysResult {
     // we will skip verifying magic
     if cmd == LINUX_REBOOT_CMD_HALT {
-        cpu::exit_in_qemu(1);
+        unsafe {
+            cpu::exit_in_qemu(1);
+        }
     }
     Ok(0)
 }
