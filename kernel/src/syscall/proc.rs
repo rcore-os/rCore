@@ -29,8 +29,8 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *m
     }
     {
         let proc = process();
-        proc.memory_set.check_mut_ptr(parent_tid)?;
-        proc.memory_set.check_mut_ptr(child_tid)?;
+        proc.vm.check_write_ptr(parent_tid)?;
+        proc.vm.check_write_ptr(child_tid)?;
     }
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
@@ -48,7 +48,7 @@ pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *m
 pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     info!("wait4: pid: {}, code: {:?}", pid, wstatus);
     if !wstatus.is_null() {
-        process().memory_set.check_mut_ptr(wstatus)?;
+        process().vm.check_write_ptr(wstatus)?;
     }
     #[derive(Debug)]
     enum WaitFor {
@@ -56,7 +56,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
         Pid(usize),
     }
     let target = match pid {
-        -1 => WaitFor::AnyChild,
+        -1 | 0 => WaitFor::AnyChild,
         p if p > 0 => WaitFor::Pid(p as usize),
         _ => unimplemented!(),
     };
@@ -99,7 +99,7 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
     let proc = process();
     let name = if name.is_null() { String::from("") } else {
-        unsafe { proc.memory_set.check_and_clone_cstr(name)? }
+        unsafe { proc.vm.check_and_clone_cstr(name)? }
     };
 
     if argv.is_null() {
@@ -109,9 +109,9 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     let mut args = Vec::new();
     unsafe {
         let mut current_argv = argv as *const *const u8;
-        proc.memory_set.check_ptr(current_argv)?;
+        proc.vm.check_read_ptr(current_argv)?;
         while !(*current_argv).is_null() {
-            let arg = proc.memory_set.check_and_clone_cstr(*current_argv)?;
+            let arg = proc.vm.check_and_clone_cstr(*current_argv)?;
             args.push(arg);
             current_argv = current_argv.add(1);
         }
@@ -129,7 +129,7 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table
-    unsafe { thread.proc.lock().memory_set.activate(); }
+    unsafe { thread.proc.lock().vm.activate(); }
 
     // Modify the TrapFrame
     *tf = unsafe { thread.context.get_init_tf() };
@@ -259,7 +259,7 @@ pub fn sys_exit_group(exit_code: usize) -> ! {
 }
 
 pub fn sys_nanosleep(req: *const TimeSpec) -> SysResult {
-    process().memory_set.check_ptr(req)?;
+    process().vm.check_read_ptr(req)?;
     let time = unsafe { req.read() };
     info!("nanosleep: time: {:#?}", time);
     thread::sleep(time.to_duration());

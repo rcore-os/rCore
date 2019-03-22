@@ -33,16 +33,16 @@ pub fn sys_mmap(
 
     if flags.contains(MmapFlags::FIXED) {
         // we have to map it to addr, so remove the old mapping first
-        proc.memory_set.pop_with_split(addr, addr + len);
+        proc.vm.pop_with_split(addr, addr + len);
     } else {
-        addr = proc.memory_set.find_free_area(addr, len);
+        addr = proc.vm.find_free_area(addr, len);
     }
 
     if flags.contains(MmapFlags::ANONYMOUS) {
         if flags.contains(MmapFlags::SHARED) {
             return Err(SysError::EINVAL);
         }
-        proc.memory_set.push(
+        proc.vm.push(
             addr,
             addr + len,
             prot.to_attr(),
@@ -66,11 +66,11 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
 
     // FIXME: properly set the attribute of the area
     //        now some mut ptr check is fault
-    let memory_area = proc.memory_set.iter().find(|area| area.contains(addr));
+    let memory_area = proc.vm.iter().find(|area| area.contains(addr));
     if memory_area.is_none() {
         return Err(SysError::ENOMEM);
     }
-    proc.memory_set.edit(|pt| {
+    proc.vm.edit(|pt| {
         for page in Page::range_of(addr, addr + len) {
             let entry = pt
                 .get_entry(page.start_address())
@@ -84,7 +84,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
 pub fn sys_munmap(addr: usize, len: usize) -> SysResult {
     info!("munmap addr={:#x}, size={:#x}", addr, len);
     let mut proc = process();
-    proc.memory_set.pop_with_split(addr, addr + len);
+    proc.vm.pop_with_split(addr, addr + len);
     Ok(0)
 }
 

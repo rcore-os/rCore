@@ -17,7 +17,7 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
         // we trust pid 0 process
         info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     }
-    proc.memory_set.check_mut_array(base, len)?;
+    proc.vm.check_write_array(base, len)?;
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_read_file(&mut proc, fd, base, len),
         Some(FileLike::Socket(_)) => sys_read_socket(&mut proc, fd, base, len),
@@ -31,7 +31,7 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
         // we trust pid 0 process
         info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     }
-    proc.memory_set.check_array(base, len)?;
+    proc.vm.check_read_array(base, len)?;
 
     match proc.files.get(&fd) {
         Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
@@ -43,7 +43,7 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
 pub fn sys_pread(fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResult {
     info!("pread: fd: {}, base: {:?}, len: {}, offset: {}", fd, base, len, offset);
     let mut proc = process();
-    proc.memory_set.check_mut_array(base, len)?;
+    proc.vm.check_write_array(base, len)?;
 
     let slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let len = proc.get_file(fd)?.read_at(offset, slice)?;
@@ -53,7 +53,7 @@ pub fn sys_pread(fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResu
 pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysResult {
     info!("pwrite: fd: {}, base: {:?}, len: {}, offset: {}", fd, base, len, offset);
     let mut proc = process();
-    proc.memory_set.check_array(base, len)?;
+    proc.vm.check_read_array(base, len)?;
 
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = proc.get_file(fd)?.write_at(offset, slice)?;
@@ -75,7 +75,7 @@ pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
     info!("poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}", ufds, nfds, timeout_msecs);
     let proc = process();
-    proc.memory_set.check_mut_array(ufds, nfds)?;
+    proc.vm.check_write_array(ufds, nfds)?;
 
     let polls = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
     for poll in polls.iter() {
@@ -148,11 +148,11 @@ struct FdSet {
 impl FdSet {
     /// Initialize a `FdSet` from pointer and number of fds
     /// Check if the array is large enough
-    fn new(proc: &Process, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
+    fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
         let mut saved = [0u32; MAX_FDSET_SIZE];
         if addr as usize != 0 {
             let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
-            proc.memory_set.check_mut_array(addr, len)?;
+            vm.check_write_array(addr, len)?;
             if len > MAX_FDSET_SIZE {
                 return Err(SysError::EINVAL);
             }
@@ -199,11 +199,11 @@ pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, t
     info!("select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}", nfds, read, write, err, timeout);
 
     let proc = process();
-    let mut read_fds = FdSet::new(&proc, read, nfds)?;
-    let mut write_fds = FdSet::new(&proc, write, nfds)?;
-    let mut err_fds = FdSet::new(&proc, err, nfds)?;
+    let mut read_fds = FdSet::new(&proc.vm, read, nfds)?;
+    let mut write_fds = FdSet::new(&proc.vm, write, nfds)?;
+    let mut err_fds = FdSet::new(&proc.vm, err, nfds)?;
     let timeout_msecs = if timeout as usize != 0 {
-        proc.memory_set.check_ptr(timeout)?;
+        proc.vm.check_read_ptr(timeout)?;
         unsafe { *timeout }.to_msec()
     } else {
         // infinity
@@ -269,7 +269,7 @@ pub fn sys_select(nfds: usize, read: *mut u32, write: *mut u32, err: *mut u32, t
 pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
     info!("readv: fd: {}, iov: {:?}, count: {}", fd, iov_ptr, iov_count);
     let mut proc = process();
-    let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set, true)?;
+    let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, true)?;
 
     // read all data to a buf
     let mut file = proc.get_file(fd)?.clone();
@@ -284,7 +284,7 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
     info!("writev: fd: {}, iov: {:?}, count: {}", fd, iov_ptr, iov_count);
     let mut proc = process();
-    let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.memory_set, false)?;
+    let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, false)?;
 
     let buf = iovs.read_all_to_vec();
     let len = buf.len();
@@ -298,7 +298,7 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
 
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
@@ -345,7 +345,7 @@ pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
     let proc = process();
-    proc.memory_set.check_mut_array(buf, len)?;
+    proc.vm.check_write_array(buf, len)?;
     if proc.cwd.len() + 1 > len {
         return Err(SysError::ERANGE);
     }
@@ -361,9 +361,9 @@ pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
-    info!("fstat: fd: {}", fd);
+    info!("fstat: fd: {}, stat_ptr: {:?}", fd, stat_ptr);
     let mut proc = process();
-    proc.memory_set.check_mut_ptr(stat_ptr)?;
+    proc.vm.check_write_ptr(stat_ptr)?;
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.metadata()?);
     // TODO: handle symlink
@@ -373,9 +373,9 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
 
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     let proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
-    proc.memory_set.check_mut_ptr(stat_ptr)?;
-    info!("lstat: path: {}", path);
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    proc.vm.check_write_ptr(stat_ptr)?;
+    info!("lstat: path: {:?}, stat_ptr: {:?}", path, stat_ptr);
 
     let inode = proc.lookup_inode(&path)?;
     let stat = Stat::from(inode.metadata()?);
@@ -412,7 +412,7 @@ pub fn sys_fdatasync(fd: usize) -> SysResult {
 
 pub fn sys_truncate(path: *const u8, len: usize) -> SysResult {
     let proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     info!("truncate: path: {:?}, len: {}", path, len);
     proc.lookup_inode(&path)?.resize(len)?;
     Ok(0)
@@ -427,7 +427,7 @@ pub fn sys_ftruncate(fd: usize, len: usize) -> SysResult {
 pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> SysResult {
     info!("getdents64: fd: {}, ptr: {:?}, buf_size: {}", fd, buf, buf_size);
     let mut proc = process();
-    proc.memory_set.check_mut_array(buf as *mut u8, buf_size)?;
+    proc.vm.check_write_array(buf as *mut u8, buf_size)?;
     let file = proc.get_file(fd)?;
     let info = file.metadata()?;
     if info.type_ != FileType::Dir {
@@ -468,7 +468,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 
 pub fn sys_chdir(path: *const u8) -> SysResult {
     let mut proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     info!("chdir: path: {:?}", path);
 
     let inode = proc.lookup_inode(&path)?;
@@ -489,8 +489,8 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
 
 pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
     let proc = process();
-    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
-    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
+    let oldpath = unsafe { proc.vm.check_and_clone_cstr(oldpath)? };
+    let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
     info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
@@ -503,7 +503,7 @@ pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
 
 pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
     let proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     // TODO: check pathname
     info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
 
@@ -518,7 +518,7 @@ pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
 
 pub fn sys_rmdir(path: *const u8) -> SysResult {
     let proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     info!("rmdir: path: {:?}", path);
 
     let (dir_path, file_name) = split_path(&path);
@@ -533,8 +533,8 @@ pub fn sys_rmdir(path: *const u8) -> SysResult {
 
 pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
     let proc = process();
-    let oldpath = unsafe { proc.memory_set.check_and_clone_cstr(oldpath)? };
-    let newpath = unsafe { proc.memory_set.check_and_clone_cstr(newpath)? };
+    let oldpath = unsafe { proc.vm.check_and_clone_cstr(oldpath)? };
+    let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
     info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
@@ -546,7 +546,7 @@ pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
 
 pub fn sys_unlink(path: *const u8) -> SysResult {
     let proc = process();
-    let path = unsafe { proc.memory_set.check_and_clone_cstr(path)? };
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     info!("unlink: path: {:?}", path);
 
     let (dir_path, file_name) = split_path(&path);
@@ -563,7 +563,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     info!("pipe: fds: {:?}", fds);
 
     let mut proc = process();
-    proc.memory_set.check_mut_array(fds, 2)?;
+    proc.vm.check_write_array(fds, 2)?;
     let (read, write) = Pipe::create_pair();
 
     let read_fd = proc.get_free_fd();
@@ -940,16 +940,16 @@ struct IoVecs(Vec<&'static mut [u8]>);
 
 impl IoVecs {
     fn check_and_new(iov_ptr: *const IoVec, iov_count: usize, vm: &MemorySet, readv: bool) -> Result<Self, SysError> {
-        vm.check_array(iov_ptr, iov_count)?;
+        vm.check_read_array(iov_ptr, iov_count)?;
         let iovs = unsafe { slice::from_raw_parts(iov_ptr, iov_count) }.to_vec();
         // check all bufs in iov
         for iov in iovs.iter() {
             if iov.len > 0 {
                 // skip empty iov
                 if readv {
-                    vm.check_mut_array(iov.base, iov.len as usize)?;
+                    vm.check_write_array(iov.base, iov.len as usize)?;
                 } else {
-                    vm.check_array(iov.base, iov.len as usize)?;
+                    vm.check_read_array(iov.base, iov.len as usize)?;
                 }
             }
         }

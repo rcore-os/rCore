@@ -43,23 +43,15 @@ pub trait PageTable {
         unsafe { (addr as *mut u8).write(data) }
     }
 
-    /// When 'vaddr' is not mapped, map it to 'paddr'.
+    /// When `vaddr` is not mapped, map it to `paddr`.
     fn map_if_not_exists(&mut self, vaddr: VirtAddr, paddr: usize) -> bool {
-        let entry = self.get_entry(vaddr);
-        match entry {
-            None => {
-                self.map(vaddr, paddr);
-                true
-            },
-            Some(page_table_entry) => {
-                if page_table_entry.present() {
-                    false
-                } else {
-                    self.map(vaddr, paddr);
-                    true
-                }
+        if let Some(entry) = self.get_entry(vaddr) {
+            if entry.present() {
+                return false;
             }
         }
+        self.map(vaddr, paddr);
+        true
     }
 }
 

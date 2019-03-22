@@ -141,11 +141,11 @@ pub fn sys_getsockopt(
         fd, level, optname, optval, optlen
     );
     let proc = process();
-    proc.memory_set.check_mut_ptr(optlen)?;
+    proc.vm.check_write_ptr(optlen)?;
     match level {
         SOL_SOCKET => match optname {
             SO_SNDBUF => {
-                proc.memory_set.check_mut_array(optval, 4)?;
+                proc.vm.check_write_array(optval, 4)?;
                 unsafe {
                     *(optval as *mut u32) = TCP_SENDBUF as u32;
                     *optlen = 4;
@@ -153,7 +153,7 @@ pub fn sys_getsockopt(
                 Ok(0)
             }
             SO_RCVBUF => {
-                proc.memory_set.check_mut_array(optval, 4)?;
+                proc.vm.check_write_array(optval, 4)?;
                 unsafe {
                     *(optval as *mut u32) = TCP_RECVBUF as u32;
                     *optlen = 4;
@@ -269,7 +269,7 @@ pub fn sys_sendto(
     );
 
     let mut proc = process();
-    proc.memory_set.check_array(base, len)?;
+    proc.vm.check_read_array(base, len)?;
 
     let wrapper = proc.get_socket(fd)?;
     let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
@@ -291,7 +291,7 @@ pub fn sys_recvfrom(
     );
 
     let mut proc = process();
-    proc.memory_set.check_mut_array(base, len)?;
+    proc.vm.check_write_array(base, len)?;
 
     let wrapper = proc.get_socket(fd)?;
     let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
@@ -674,7 +674,7 @@ fn sockaddr_to_endpoint(
     if len < size_of::<u16>() {
         return Err(SysError::EINVAL);
     }
-    proc.memory_set.check_array(addr as *const u8, len)?;
+    proc.vm.check_read_array(addr as *const u8, len)?;
     unsafe {
         match (*addr).family as usize {
             AF_INET => {
@@ -707,7 +707,7 @@ impl SockAddr {
             return Ok(0);
         }
 
-        proc.memory_set.check_mut_ptr(addr_len)?;
+        proc.vm.check_write_ptr(addr_len)?;
         let max_addr_len = *addr_len as usize;
         let full_len = match self.family as usize {
             AF_INET => size_of::<u16>() + size_of::<SockAddrIn>(),
@@ -717,8 +717,7 @@ impl SockAddr {
 
         let written_len = min(max_addr_len, full_len);
         if written_len > 0 {
-            proc.memory_set
-                .check_mut_array(addr as *mut u8, written_len)?;
+            proc.vm.check_write_array(addr as *mut u8, written_len)?;
             let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
             let target = slice::from_raw_parts_mut(addr as *mut u8, written_len);
             target.copy_from_slice(source);

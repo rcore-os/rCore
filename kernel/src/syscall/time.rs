@@ -78,7 +78,7 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, tz: *const u8) -> SysResult {
     }
 
     let proc = process();
-    proc.memory_set.check_mut_ptr(tv)?;
+    proc.vm.check_write_ptr(tv)?;
 
     let timeval = TimeVal::get_epoch();
     unsafe {
@@ -91,7 +91,7 @@ pub fn sys_clock_gettime(clock: usize, ts: *mut TimeSpec) -> SysResult {
     info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
 
     let proc = process();
-    proc.memory_set.check_mut_ptr(ts)?;
+    proc.vm.check_write_ptr(ts)?;
 
     let timespec = TimeSpec::get_epoch();
     unsafe {
@@ -104,7 +104,7 @@ pub fn sys_time(time: *mut u64) -> SysResult {
     let sec = get_epoch_usec() / USEC_PER_SEC;
     if time as usize != 0 {
         let proc = process();
-        proc.memory_set.check_mut_ptr(time)?;
+        proc.vm.check_write_ptr(time)?;
         unsafe {
             time.write(sec as u64);
         }
@@ -122,7 +122,7 @@ pub struct RUsage {
 pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
     info!("getrusage: who: {}, rusage: {:?}", who, rusage);
     let proc = process();
-    proc.memory_set.check_mut_ptr(rusage)?;
+    proc.vm.check_write_ptr(rusage)?;
 
     let tick_base = *TICK_BASE;
     let tick = unsafe { crate::trap::TICK as u64 };

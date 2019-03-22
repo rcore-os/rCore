@@ -48,24 +48,14 @@ impl MemoryArea {
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
     }
-    /// Check the pointer is within the readable memory
-    pub fn check_ptr<T>(&self, ptr: *const T) -> bool {
-        self.check_array(ptr, 1)
-    }
-    /// Check the pointer is within the writable memory
-    pub fn check_mut_ptr<T>(&self, ptr: *mut T) -> bool {
-        self.check_mut_array(ptr, 1)
-    }
     /// Check the array is within the readable memory
-    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> bool {
+    fn check_read_array<S>(&self, ptr: *const S, count: usize) -> bool {
         ptr as usize >= self.start_addr &&
-            unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
+            unsafe { ptr.add(count) as usize } <= self.end_addr
     }
     /// Check the array is within the writable memory
-    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> bool {
-        !self.attr.readonly &&
-            ptr as usize >= self.start_addr &&
-            unsafe { ptr.offset(count as isize) as usize } <= self.end_addr
+    fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> bool {
+        !self.attr.readonly && self.check_read_array(ptr, count)
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.
@@ -207,27 +197,23 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     /// Check the pointer is within the readable memory
-    pub fn check_ptr<S>(&self, ptr: *const S) -> VMResult<()> {
-        self.areas.iter()
-            .find(|area| area.check_ptr(ptr))
-            .map(|_|()).ok_or(VMError::InvalidPtr)
+    pub fn check_read_ptr<S>(&self, ptr: *const S) -> VMResult<()> {
+        self.check_read_array(ptr, 1)
     }
     /// Check the pointer is within the writable memory
-    pub fn check_mut_ptr<S>(&self, ptr: *mut S) -> VMResult<()> {
-        self.areas.iter()
-            .find(|area| area.check_mut_ptr(ptr))
-            .map(|_|()).ok_or(VMError::InvalidPtr)
+    pub fn check_write_ptr<S>(&self, ptr: *mut S) -> VMResult<()> {
+        self.check_write_array(ptr, 1)
     }
     /// Check the array is within the readable memory
-    pub fn check_array<S>(&self, ptr: *const S, count: usize) -> VMResult<()> {
+    pub fn check_read_array<S>(&self, ptr: *const S, count: usize) -> VMResult<()> {
         self.areas.iter()
-            .find(|area| area.check_array(ptr, count))
+            .find(|area| area.check_read_array(ptr, count))
             .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the array is within the writable memory
-    pub fn check_mut_array<S>(&self, ptr: *mut S, count: usize) -> VMResult<()> {
+    pub fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> VMResult<()> {
         self.areas.iter()
-            .find(|area| area.check_mut_array(ptr, count))
+            .find(|area| area.check_write_array(ptr, count))
             .map(|_|()).ok_or(VMError::InvalidPtr)
     }
     /// Check the null-end C string is within the readable memory, and is valid.

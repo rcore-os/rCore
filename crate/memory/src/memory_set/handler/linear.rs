@@ -13,7 +13,6 @@ impl MemoryHandler for Linear {
     fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = (addr as isize + self.offset) as PhysAddr;
         let entry = pt.map(addr, target);
-        entry.set_present(true);
         attr.apply(entry);
     }
 

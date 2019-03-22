@@ -13,7 +13,6 @@ impl<T: FrameAllocator> MemoryHandler for ByFrame<T> {
     fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = self.allocator.alloc().expect("failed to allocate frame");
         let entry = pt.map(addr, target);
-        entry.set_present(true);
         attr.apply(entry);
     }
 

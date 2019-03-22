@@ -85,7 +85,7 @@ impl fmt::Display for Pid {
 
 pub struct Process {
     // resources
-    pub memory_set: MemorySet,
+    pub vm: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
@@ -140,7 +140,7 @@ impl Thread {
             kstack: KernelStack::new(),
             clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
-                memory_set: MemorySet::new(),
+                vm: MemorySet::new(),
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
@@ -156,15 +156,15 @@ impl Thread {
 
     /// Make a new kernel thread starting from `entry` with `arg`
     pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Thread> {
-        let memory_set = MemorySet::new();
+        let vm = MemorySet::new();
         let kstack = KernelStack::new();
         Box::new(Thread {
-            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), memory_set.token()) },
+            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm.token()) },
             kstack,
             clear_child_tid: 0,
             // TODO: kernel thread should not have a process
             proc: Arc::new(Mutex::new(Process {
-                memory_set,
+                vm,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
@@ -199,7 +199,7 @@ impl Thread {
         }
 
         // Make page table
-        let (mut memory_set, entry_addr) = memory_set_from(&elf);
+        let (mut vm, entry_addr) = memory_set_from(&elf);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
@@ -209,11 +209,11 @@ impl Thread {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
                 false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
             };
-            memory_set.push(ustack_buttom, ustack_top,  MemoryAttr::default().user(), ByFrame::new(GlobalFrameAlloc), "user_stack");
+            vm.push(ustack_buttom, ustack_top,  MemoryAttr::default().user(), ByFrame::new(GlobalFrameAlloc), "user_stack");
             ustack_top
         };
         #[cfg(feature = "no_mmu")]
-        let mut ustack_top = memory_set.push(USER_STACK_SIZE).as_ptr() as usize + USER_STACK_SIZE;
+        let mut ustack_top = vm.push(USER_STACK_SIZE).as_ptr() as usize + USER_STACK_SIZE;
 
         let init_info = ProcInitInfo {
             args: args.map(|s| String::from(s)).collect(),
@@ -237,10 +237,10 @@ impl Thread {
             },
         };
         unsafe {
-            memory_set.with(|| { ustack_top = init_info.push_at(ustack_top) });
+            vm.with(|| { ustack_top = init_info.push_at(ustack_top) });
         }
 
-        trace!("{:#x?}", memory_set);
+        trace!("{:#x?}", vm);
 
         let kstack = KernelStack::new();
 
@@ -252,12 +252,12 @@ impl Thread {
         Box::new(Thread {
             context: unsafe {
                 Context::new_user_thread(
-                    entry_addr, ustack_top, kstack.top(), is32, memory_set.token())
+                    entry_addr, ustack_top, kstack.top(), is32, vm.token())
             },
             kstack,
             clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
-                memory_set,
+                vm,
                 files,
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
@@ -274,18 +274,18 @@ impl Thread {
     /// Fork a new process from current one
     pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
         // Clone memory set, make a new page table
-        let memory_set = self.proc.lock().memory_set.clone();
+        let vm = self.proc.lock().vm.clone();
         let files = self.proc.lock().files.clone();
         let cwd = self.proc.lock().cwd.clone();
         let parent = Some(self.proc.clone());
         debug!("fork: finish clone MemorySet");
 
         // MMU:   copy data to the new space
-        // NoMMU: coping data has been done in `memory_set.clone()`
+        // NoMMU: coping data has been done in `vm.clone()`
         #[cfg(not(feature = "no_mmu"))]
-        for area in memory_set.iter() {
+        for area in vm.iter() {
             let data = Vec::<u8>::from(unsafe { area.as_slice() });
-            unsafe { memory_set.with(|| {
+            unsafe { vm.with(|| {
                 area.as_slice_mut().copy_from_slice(data.as_slice())
             }) }
         }
@@ -302,11 +302,11 @@ impl Thread {
 
 
         Box::new(Thread {
-            context: unsafe { Context::new_fork(tf, kstack.top(), memory_set.token()) },
+            context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },
             kstack,
             clear_child_tid: 0,
             proc: Arc::new(Mutex::new(Process {
-                memory_set,
+                vm,
                 files,
                 cwd,
                 futexes: BTreeMap::default(),
@@ -323,7 +323,7 @@ impl Thread {
     /// Create a new thread in the same process.
     pub fn clone(&self, tf: &TrapFrame, stack_top: usize, tls: usize, clear_child_tid: usize) -> Box<Thread> {
         let kstack = KernelStack::new();
-        let token = self.proc.lock().memory_set.token();
+        let token = self.proc.lock().vm.token();
         Box::new(Thread {
             context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), token, tls) },
             kstack,

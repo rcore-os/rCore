@@ -102,7 +102,7 @@ impl Drop for KernelStack {
 #[cfg(not(feature = "no_mmu"))]
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
-    process().memory_set.handle_page_fault(addr)
+    process().vm.handle_page_fault(addr)
 }
 
 pub fn init_heap() {

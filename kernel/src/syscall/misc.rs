@@ -22,8 +22,8 @@ pub fn sys_uname(buf: *mut u8) -> SysResult {
     let offset = 65;
     let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
     let proc = process();
-    proc.memory_set
-        .check_mut_array(buf, strings.len() * offset)?;
+    proc.vm
+        .check_write_array(buf, strings.len() * offset)?;
 
     for i in 0..strings.len() {
         unsafe {
@@ -39,8 +39,8 @@ pub fn sys_sched_getaffinity(pid: usize, size: usize, mask: *mut u32) -> SysResu
         pid, size, mask
     );
     let proc = process();
-    proc.memory_set
-        .check_mut_array(mask, size / size_of::<u32>())?;
+    proc.vm
+        .check_write_array(mask, size / size_of::<u32>())?;
 
     // we only have 4 cpu at most.
     // so just set it.
@@ -52,7 +52,7 @@ pub fn sys_sched_getaffinity(pid: usize, size: usize, mask: *mut u32) -> SysResu
 
 pub fn sys_sysinfo(sys_info: *mut SysInfo) -> SysResult {
     let proc = process();
-    proc.memory_set.check_mut_ptr(sys_info)?;
+    proc.vm.check_write_ptr(sys_info)?;
 
     let sysinfo = SysInfo::default();
     unsafe { *sys_info = sysinfo };
@@ -76,13 +76,13 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
         return Err(SysError::EINVAL);
     }
     process()
-        .memory_set
-        .check_mut_ptr(uaddr as *mut AtomicI32)?;
+        .vm
+        .check_write_ptr(uaddr as *mut AtomicI32)?;
     let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
     let timeout = if timeout.is_null() {
         None
     } else {
-        process().memory_set.check_ptr(timeout)?;
+        process().vm.check_read_ptr(timeout)?;
         Some(unsafe { *timeout })
     };
 
