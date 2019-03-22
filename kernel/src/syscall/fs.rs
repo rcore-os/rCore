@@ -622,7 +622,7 @@ pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usiz
         return Ok(bytes_read);
     } else {
         let mut proc_mem = unsafe {&mut *proc_cell.get()};
-        proc_mem.vm.check_mut_ptr(offset)?;
+        proc_mem.vm.check_read_ptr(offset)?;
         let mut read_offset = unsafe {
             *offset
         };
