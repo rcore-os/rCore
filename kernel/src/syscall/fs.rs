@@ -2,6 +2,7 @@
 
 use core::mem::size_of;
 use core::cmp::min;
+use core::cell::UnsafeCell;
 use rcore_fs::vfs::Timespec;
 
 use crate::fs::*;
@@ -585,6 +586,70 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
 pub fn sys_sync() -> SysResult {
     ROOT_INODE.fs().sync()?;
     Ok(0)
+}
+
+pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usize) -> SysResult {
+    info!("sendfile: out: {}, in: {}, offset: {:?}, count: {}", out_fd, in_fd, offset, count);
+    let proc = process();
+    // We know it's save, pacify the borrow checker
+    let proc_cell = UnsafeCell::new(proc);
+    let proc_in = unsafe {&mut *proc_cell.get()};
+    let proc_out = unsafe {&mut *proc_cell.get()};
+    //let in_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(in_fd)?).get() };
+    //let out_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(out_fd)?).get() };
+    let in_file = proc_in.get_file(in_fd)?;
+    let out_file = proc_out.get_file(out_fd)?;
+    let mut buffer = [0u8; 1024];
+    if offset.is_null() {
+        // read from current file offset
+        let mut bytes_read = 0;
+        while bytes_read < count {
+            let len = min(buffer.len(), count - bytes_read);
+            let read_len = in_file.read(&mut buffer)?;
+            if read_len == 0 {
+                break;
+            }
+            bytes_read += read_len;
+            let mut bytes_written = 0;
+            while bytes_written < read_len {
+                let write_len = out_file.write(&buffer[bytes_written..])?;
+                if write_len == 0 {
+                    return Err(SysError::EBADF);
+                }
+                bytes_written += write_len;
+            }
+        }
+        return Ok(bytes_read);
+    } else {
+        let mut proc_mem = unsafe {&mut *proc_cell.get()};
+        proc_mem.vm.check_mut_ptr(offset)?;
+        let mut read_offset = unsafe {
+            *offset
+        };
+        // read from specified offset and write back
+        let mut bytes_read = 0;
+        while bytes_read < count {
+            let len = min(buffer.len(), count - bytes_read);
+            let read_len = in_file.read_at(read_offset, &mut buffer)?;
+            if read_len == 0 {
+                break;
+            }
+            bytes_read += read_len;
+            read_offset += read_len;
+            let mut bytes_written = 0;
+            while bytes_written < read_len {
+                let write_len = out_file.write(&buffer[bytes_written..])?;
+                if write_len == 0 {
+                    return Err(SysError::EBADF);
+                }
+                bytes_written += write_len;
+            }
+        }
+        unsafe {
+            *offset = read_offset;
+        }
+        return Ok(bytes_read);
+    }
 }
 
 impl Process {

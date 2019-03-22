@@ -105,7 +105,7 @@ bitflags! {
 
 impl Driver for VirtIOBlkDriver {
     fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
-        let mut driver = self.0.lock();
+        let driver = self.0.lock();
 
         // ensure header page is mapped
         active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
@@ -214,7 +214,7 @@ pub fn virtio_blk_init(node: &Node) {
     // configure two virtqueues: ingress and egress
     header.guest_page_size.write(PAGE_SIZE as u32); // one page
 
-    let mut driver = VirtIOBlkDriver(Mutex::new(VirtIOBlk {
+    let driver = VirtIOBlkDriver(Mutex::new(VirtIOBlk {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
         header: from as usize,

@@ -206,7 +206,7 @@ impl<'a> phy::Device<'a> for E1000Driver {
         let send_desc = &mut send_queue[index];
 
         let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
-        let mut recv_queue = unsafe {
+        let recv_queue = unsafe {
             slice::from_raw_parts_mut(driver.recv_page as *mut E1000RecvDesc, recv_queue_size)
         };
         let mut rdt = e1000[E1000_RDT].read();
@@ -296,7 +296,7 @@ impl phy::TxToken for E1000TxToken {
             slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
         };
         let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
-        let mut send_queue = unsafe {
+        let send_queue = unsafe {
             slice::from_raw_parts_mut(driver.send_page as *mut E1000SendDesc, send_queue_size)
         };
         let mut tdt = e1000[E1000_TDT].read();

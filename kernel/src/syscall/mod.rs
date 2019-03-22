@@ -66,6 +66,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_SCHED_YIELD => sys_yield(),
         SYS_NANOSLEEP => sys_nanosleep(args[0] as *const TimeSpec),
         SYS_GETPID => sys_getpid(),
+        SYS_SENDFILE => sys_sendfile(args[0], args[1], args[3] as *mut usize, args[4]),
         SYS_SOCKET => sys_socket(args[0], args[1], args[2]),
         SYS_CONNECT => sys_connect(args[0], args[1] as *const SockAddr, args[2]),
         SYS_ACCEPT => sys_accept(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
