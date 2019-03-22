@@ -238,6 +238,8 @@ pub fn ixgbe_init(
         }
     }
     let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
+    ixgbe.enable_irq();
+
     let ethernet_addr = EthernetAddress::from_bytes(&ixgbe.get_mac().as_bytes());
 
     let net_driver = IXGBEDriver {
