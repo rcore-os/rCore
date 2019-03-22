@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::cmp::min;
-use core::mem::size_of;
+use core::mem::{size_of, zeroed};
 use core::slice;
 
 use bitflags::*;
@@ -37,16 +37,30 @@ struct VirtIOBlkConfig {
 }
 
 #[repr(C)]
-#[derive(Default)]
-struct VirtIOBlkReq {
+#[derive(Debug, Default)]
+struct VirtIOBlkReadReq {
     req_type: u32,
     reserved: u32,
     sector: u64,
 }
 
 #[repr(C)]
-struct VirtIOBlkResp {
+struct VirtIOBlkWriteReq {
+    req_type: u32,
+    reserved: u32,
+    sector: u64,
     data: [u8; VIRTIO_BLK_BLK_SIZE],
+}
+
+#[repr(C)]
+struct VirtIOBlkReadResp {
+    data: [u8; VIRTIO_BLK_BLK_SIZE],
+    status: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Default)]
+struct VirtIOBlkWriteResp {
     status: u8,
 }
 
@@ -120,20 +134,20 @@ impl BlockDevice for VirtIOBlkDriver {
         // ensure header page is mapped
         active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
 
-        let mut req = VirtIOBlkReq::default();
+        let mut req = VirtIOBlkReadReq::default();
         req.req_type = VIRTIO_BLK_T_IN;
         req.reserved = 0;
         req.sector = block_id as u64;
-        let input = [0; size_of::<VirtIOBlkResp>()];
+        let input = [0; size_of::<VirtIOBlkReadResp>()];
         let output = unsafe {
             slice::from_raw_parts(
-                &req as *const VirtIOBlkReq as *const u8,
-                size_of::<VirtIOBlkReq>(),
+                &req as *const VirtIOBlkReadReq as *const u8,
+                size_of::<VirtIOBlkReadReq>(),
             )
         };
         driver.queue.add_and_notify(&[&input], &[output], 0);
         driver.queue.get_block();
-        let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkResp) };
+        let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkReadResp) };
         if resp.status == VIRTIO_BLK_S_OK {
             let len = min(buf.len(), VIRTIO_BLK_BLK_SIZE);
             buf[..len].clone_from_slice(&resp.data[..len]);
@@ -144,7 +158,31 @@ impl BlockDevice for VirtIOBlkDriver {
     }
 
     fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {
-        unimplemented!()
+        let mut driver = self.0.lock();
+        // ensure header page is mapped
+        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
+
+        let mut req: VirtIOBlkWriteReq = unsafe { zeroed() };
+        req.req_type = VIRTIO_BLK_T_OUT;
+        req.reserved = 0;
+        req.sector = block_id as u64;
+        let len = min(buf.len(), VIRTIO_BLK_BLK_SIZE);
+        req.data[..len].clone_from_slice(&buf[..len]);
+        let input = [0; size_of::<VirtIOBlkWriteResp>()];
+        let output = unsafe {
+            slice::from_raw_parts(
+                &req as *const VirtIOBlkWriteReq as *const u8,
+                size_of::<VirtIOBlkWriteReq>(),
+            )
+        };
+        driver.queue.add_and_notify(&[&input], &[output], 0);
+        driver.queue.get_block();
+        let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkWriteResp) };
+        if resp.status == VIRTIO_BLK_S_OK {
+            true
+        } else {
+            false
+        }
     }
 }
 
