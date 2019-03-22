@@ -72,7 +72,7 @@ impl MemoryArea {
             .map(|s| String::from(s))
     }
     /// Test whether this area is (page) overlap with area [`start_addr`, `end_addr`]
-    fn is_overlap_with(&self, start_addr: VirtAddr, end_addr: VirtAddr) -> bool {
+    pub fn is_overlap_with(&self, start_addr: VirtAddr, end_addr: VirtAddr) -> bool {
         let p0 = Page::of_addr(self.start_addr);
         let p1 = Page::of_addr(self.end_addr - 1) + 1;
         let p2 = Page::of_addr(start_addr);

@@ -84,7 +84,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
 
     // FIXME: properly set the attribute of the area
     //        now some mut ptr check is fault
-    let memory_area = proc.vm.iter().find(|area| area.contains(addr));
+    let memory_area = proc.vm.iter().find(|area| area.is_overlap_with(addr, addr + len));
     if memory_area.is_none() {
         return Err(SysError::ENOMEM);
     }
