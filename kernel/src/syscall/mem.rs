@@ -1,4 +1,4 @@
-use rcore_memory::memory_set::handler::Delay;
+use rcore_memory::memory_set::handler::{Delay, ByFrame};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::paging::PageTable;
 use rcore_memory::Page;
@@ -13,7 +13,7 @@ pub fn sys_mmap(
     len: usize,
     prot: usize,
     flags: usize,
-    fd: i32,
+    fd: usize,
     offset: usize,
 ) -> SysResult {
     let prot = MmapProt::from_bits_truncate(prot);
@@ -50,8 +50,26 @@ pub fn sys_mmap(
             "mmap",
         );
         return Ok(addr);
+    } else {
+        // only check
+        let _ = proc.get_file(fd)?;
+
+        // TODO: delay mmap file
+        proc.vm.push(
+            addr,
+            addr + len,
+            prot.to_attr(),
+            ByFrame::new(GlobalFrameAlloc),
+            "mmap",
+        );
+        let data = unsafe { slice::from_raw_parts_mut(addr as *mut u8, len) };
+        let file = proc.get_file(fd)?;
+        let read_len = file.read_at(offset, data)?;
+        if read_len != data.len() {
+            data[read_len..].iter_mut().map(|x| *x = 0);
+        }
+        return Ok(addr);
     }
-    unimplemented!()
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {

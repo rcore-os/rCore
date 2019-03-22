@@ -56,7 +56,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_CLOSE => sys_close(args[0]),
         SYS_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
         SYS_LSEEK => sys_lseek(args[0], args[1] as i64, args[2] as u8),
-        SYS_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4] as i32, args[5]),
+        SYS_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5]),
         SYS_MPROTECT => sys_mprotect(args[0], args[1], args[2]),
         SYS_MUNMAP => sys_munmap(args[0], args[1]),
         SYS_PREAD64 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),

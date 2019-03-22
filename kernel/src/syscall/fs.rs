@@ -588,7 +588,7 @@ pub fn sys_sync() -> SysResult {
 }
 
 impl Process {
-    fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
+    pub fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
         self.files.get_mut(&fd).ok_or(SysError::EBADF).and_then(|f| {
             match f {
                 FileLike::File(file) => Ok(file),
