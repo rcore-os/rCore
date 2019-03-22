@@ -25,7 +25,6 @@ use volatile::Volatile;
 use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
 use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};

@@ -2,7 +2,6 @@ use alloc::prelude::*;
 use alloc::sync::Arc;
 
 use lazy_static::lazy_static;
-use smoltcp::socket::SocketSet;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use spin::RwLock;
 

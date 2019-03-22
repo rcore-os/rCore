@@ -6,10 +6,11 @@ use spin::{Mutex, RwLock};
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
+use core::str;
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::fs::{FileHandle, OpenOptions};
+use crate::fs::{FileHandle, OpenOptions, INodeExt};
 use crate::sync::Condvar;
 use crate::net::{SocketWrapper, SOCKETS};
 
@@ -196,6 +197,33 @@ impl Thread {
             },
             header::Type::SharedObject => {},
             _ => panic!("ELF is not executable or shared object"),
+        }
+
+        if let Some(interp) = elf.program_iter().filter(|ph| ph.get_type() == Ok(Type::Interp)).next() {
+            let offset = interp.offset() as usize;
+            let size = interp.file_size() as usize - 1; // skip last '\0'
+            if offset + size < data.len() {
+                if let Ok(loader_path) = str::from_utf8(&data[offset..(offset+size)]) {
+                    if let Ok(inode) = crate::fs::ROOT_INODE.lookup(&loader_path[1..]) {
+                        if let Ok(buf) = inode.read_as_vec() {
+                            debug!("using loader {}", &loader_path);
+                            // Elf loader should not have INTERP
+                            // No infinite loop
+                            let mut new_args: Vec<&str> = args.collect();
+                            new_args.insert(0, loader_path);
+                            return Thread::new_user(buf.as_slice(), new_args.into_iter());
+                        } else {
+                            warn!("loader specified as {} but failed to read", &loader_path);
+                        }
+                    } else {
+                        warn!("loader specified as {} but not found", &loader_path);
+                    }
+                } else {
+                    warn!("loader specified but not found");
+                }
+            } else {
+                warn!("loader specified but invalid");
+            }
         }
 
         // Make page table

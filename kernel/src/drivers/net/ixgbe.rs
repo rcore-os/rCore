@@ -1,15 +1,10 @@
 //! Intel 10Gb Network Adapter 82599 i.e. ixgbe network driver
 //! Datasheet: https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 
-use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::prelude::*;
 use alloc::sync::Arc;
-use core::mem::size_of;
-use core::slice;
-use core::sync::atomic::{fence, Ordering};
 
 use alloc::collections::BTreeMap;
-use bitflags::*;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;
 use log::*;
 use rcore_memory::paging::PageTable;
