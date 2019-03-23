@@ -683,12 +683,12 @@ impl Process {
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path
             let abs_path = path.split_at(1).1; // skip start '/'
-            let inode = ROOT_INODE.lookup(abs_path)?;
+            let inode = ROOT_INODE.lookup_follow(abs_path, FOLLOW_MAX_DEPTH)?;
             Ok(inode)
         } else {
             // relative path
             let cwd = self.cwd.split_at(1).1; // skip start '/'
-            let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+            let inode = ROOT_INODE.lookup(cwd)?.lookup_follow(path, FOLLOW_MAX_DEPTH)?;
             Ok(inode)
         }
     }

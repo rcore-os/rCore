@@ -56,6 +56,8 @@ lazy_static! {
     };
 }
 
+pub const FOLLOW_MAX_DEPTH: usize = 1;
+
 pub trait INodeExt {
     fn read_as_vec(&self) -> Result<Vec<u8>>;
 }

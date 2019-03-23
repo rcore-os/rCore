@@ -6,11 +6,12 @@ use spin::{Mutex, RwLock};
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
+use rcore_fs::vfs::FileType;
 use core::str;
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::fs::{FileHandle, OpenOptions, INodeExt};
+use crate::fs::{FileHandle, OpenOptions, INodeExt, FOLLOW_MAX_DEPTH};
 use crate::sync::Condvar;
 use crate::net::{SocketWrapper, SOCKETS};
 
@@ -204,7 +205,8 @@ impl Thread {
             let size = interp.file_size() as usize - 1; // skip last '\0'
             if offset + size < data.len() {
                 if let Ok(loader_path) = str::from_utf8(&data[offset..(offset+size)]) {
-                    if let Ok(inode) = crate::fs::ROOT_INODE.lookup(&loader_path[1..]) {
+                    // assuming absolute path
+                    if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(&loader_path[1..], FOLLOW_MAX_DEPTH) {
                         if let Ok(buf) = inode.read_as_vec() {
                             debug!("using loader {}", &loader_path);
                             // Elf loader should not have INTERP
