@@ -11,19 +11,16 @@ use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, Checksum, DeviceCapabilities};
-use smoltcp::socket::*;
 use smoltcp::time::Instant;
 use smoltcp::wire::EthernetAddress;
 use smoltcp::wire::*;
 use smoltcp::Result;
-use volatile::Volatile;
 
 use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::sync::{MutexGuard, SpinNoIrq};
-use crate::HEAP_ALLOCATOR;
 
 use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 

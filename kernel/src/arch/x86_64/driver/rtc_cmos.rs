@@ -1,6 +1,5 @@
 //! Driver for x86 CMOS RTC clock
 use crate::arch::interrupt;
-use log::*;
 use x86_64::instructions::port::Port;
 
 const CMOS_ADDR: u16 = 0x70;

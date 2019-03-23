@@ -1,9 +1,6 @@
 use alloc::sync::Arc;
-use core::fmt;
-
 use crate::arch::rand;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
-use crate::process::structs::Process;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 

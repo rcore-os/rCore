@@ -66,7 +66,8 @@ pub fn sys_mmap(
         let file = proc.get_file(fd)?;
         let read_len = file.read_at(offset, data)?;
         if read_len != data.len() {
-            data[read_len..].iter_mut().map(|x| *x = 0);
+            // use count() to consume the iterator
+            data[read_len..].iter_mut().map(|x| *x = 0).count();
         }
         return Ok(addr);
     }

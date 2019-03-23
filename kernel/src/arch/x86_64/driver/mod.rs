@@ -1,5 +1,4 @@
 use once::*;
-use crate::arch::interrupt::{consts, enable_irq};
 
 pub mod vga;
 pub mod serial;

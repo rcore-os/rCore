@@ -184,6 +184,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("mount is unimplemented");
             Err(SysError::EACCES)
         }
+        SYS_UMOUNT2 => {
+            warn!("umount2 is unimplemented");
+            Err(SysError::EACCES)
+        }
         SYS_REBOOT => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
         SYS_GETTID => sys_gettid(),
         SYS_FUTEX => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),

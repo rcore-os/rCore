@@ -12,7 +12,6 @@ use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::phy::{self, DeviceCapabilities};
-use smoltcp::socket::SocketSet;
 use smoltcp::time::Instant;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::Result;
@@ -20,7 +19,6 @@ use volatile::{ReadOnly, Volatile};
 
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::sync::{MutexGuard, SpinNoIrq};
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;

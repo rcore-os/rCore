@@ -32,6 +32,14 @@ pub fn process() -> MutexGuard<'static, Process> {
     current_thread().proc.lock()
 }
 
+/// Get current process, ignoring its lock
+/// Only use this when necessary
+pub unsafe fn process_unsafe() -> MutexGuard<'static, Process> {
+    let thread = current_thread();
+    thread.proc.force_unlock();
+    thread.proc.lock()
+}
+
 /// Get current thread
 ///
 /// FIXME: It's obviously unsafe to get &mut !

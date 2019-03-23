@@ -4,7 +4,7 @@ use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
 use rcore_memory::*;
 pub use rcore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
-use crate::process::{process};
+use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
 use lazy_static::*;
 use log::*;
@@ -102,7 +102,11 @@ impl Drop for KernelStack {
 #[cfg(not(feature = "no_mmu"))]
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
-    process().vm.handle_page_fault(addr)
+
+    // This is safe as long as page fault never happens in page fault handler
+    unsafe {
+        process_unsafe().vm.handle_page_fault(addr)
+    }
 }
 
 pub fn init_heap() {

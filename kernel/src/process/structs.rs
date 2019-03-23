@@ -6,7 +6,6 @@ use spin::{Mutex, RwLock};
 use xmas_elf::{ElfFile, header, program::{Flags, Type}};
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
-use rcore_fs::vfs::FileType;
 use core::str;
 
 use crate::arch::interrupt::{Context, TrapFrame};

@@ -190,7 +190,14 @@ impl ThreadPool {
     }
 
     pub fn wakeup(&self, tid: Tid) {
-        self.set_status(tid, Status::Ready);
+        let mut proc_lock = self.threads[tid].lock();
+        if let Some(mut proc) = proc_lock.as_mut() {
+            trace!("thread {} {:?} -> {:?}", tid, proc.status, status);
+            if let Status::Sleeping = proc.status {
+                proc.status = Status::Ready;
+                self.scheduler.push(tid);
+            }
+        }
     }
 
     pub fn exit(&self, tid: Tid, code: ExitCode) {
