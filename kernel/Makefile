@@ -45,7 +45,7 @@ k210_lib := ../tools/k210/libkendryte.a
 export ARCH = $(arch)
 export BOARD = $(board)
 export SMP = $(smp)
-export SFSIMG = $(user_dir)/build/$(arch).img
+export SFSIMG = $(user_dir)/build/$(arch).qcow2
 ifeq ($(arch), aarch64)
 board := raspi3
 endif
