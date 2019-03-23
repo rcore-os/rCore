@@ -120,6 +120,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_fcntl is unimplemented");
             Ok(0)
         }
+        SYS_FLOCK => {
+            warn!("sys_flock is unimplemented");
+            Ok(0)
+        }
         SYS_FSYNC => sys_fsync(args[0]),
         SYS_FDATASYNC => sys_fdatasync(args[0]),
         SYS_TRUNCATE => sys_truncate(args[0] as *const u8, args[1]),
@@ -165,13 +169,21 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigaltstack is unimplemented");
             Ok(0)
         }
+        SYS_STATFS => {
+            warn!("statfs is unimplemented");
+            Err(SysError::EACCES)
+        }
         SYS_FSTATFS => {
-            warn!("fstat: not implemented");
+            warn!("fstatfs is unimplemented");
             Err(SysError::EACCES)
         }
         SYS_SETPRIORITY => sys_set_priority(args[0]),
 //        SYS_SETRLIMIT => sys_setrlimit(),
         SYS_SYNC => sys_sync(),
+        SYS_MOUNT => {
+            warn!("mount is unimplemented");
+            Err(SysError::EACCES)
+        }
         SYS_REBOOT => sys_reboot(args[0] as u32, args[1] as u32, args[2] as u32, args[3] as *const u8),
         SYS_GETTID => sys_gettid(),
         SYS_FUTEX => sys_futex(args[0], args[1] as u32, args[2] as i32, args[3] as *const TimeSpec),
