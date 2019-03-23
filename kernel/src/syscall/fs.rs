@@ -384,6 +384,23 @@ pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     Ok(0)
 }
 
+pub fn sys_readlink(path: *const u8, base: *mut u8, len: usize) -> SysResult {
+    let proc = process();
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    proc.vm.check_write_array(base, len)?;
+    info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
+
+    let inode = proc.lookup_inode(&path)?;
+    if inode.metadata()?.type_ == FileType::SymLink {
+        // TODO: recursive link resolution and loop detection
+        let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
+        let len = inode.read_at(0, &mut slice)?;
+        Ok(len)
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
 pub fn sys_lseek(fd: usize, offset: i64, whence: u8) -> SysResult {
     let pos = match whence {
         SEEK_SET => SeekFrom::Start(offset as u64),
@@ -441,7 +458,7 @@ pub fn sys_getdents64(fd: usize, buf: *mut LinuxDirent64, buf_size: usize) -> Sy
             r => r,
         }?;
         // TODO: get ino from dirent
-        let ok = writer.try_write(0, 0, &name);
+        let ok = writer.try_write(0, DirentType::from_type(&info.type_).bits(), &name);
         if !ok { break; }
     }
     Ok(writer.written_size)
@@ -796,6 +813,42 @@ impl DirentBufWriter {
         self.rest_size -= len;
         self.written_size += len;
         true
+    }
+}
+
+bitflags! {
+    pub struct DirentType: u8 {
+        const DT_UNKNOWN  = 0;
+        /// FIFO (named pipe)
+        const DT_FIFO = 1;
+        /// Character device
+        const DT_CHR  = 2;
+        /// Directory
+        const DT_DIR  = 4;
+        /// Block device
+        const DT_BLK = 6;
+        /// Regular file
+        const DT_REG = 8;
+        /// Symbolic link
+        const DT_LNK = 10;
+        /// UNIX domain socket
+        const DT_SOCK  = 12;
+        /// ???
+        const DT_WHT = 14;
+    }
+}
+
+impl DirentType {
+    fn from_type(type_: &FileType) -> Self {
+        match type_ {
+            FileType::File => Self::DT_REG,
+            FileType::Dir => Self::DT_DIR,
+            FileType::SymLink => Self::DT_LNK,
+            FileType::CharDevice => Self::DT_CHR,
+            FileType::BlockDevice => Self::DT_BLK,
+            FileType::Socket => Self::DT_SOCK,
+            FileType::NamedPipe => Self::DT_FIFO,
+        }
     }
 }
 

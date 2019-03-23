@@ -338,12 +338,12 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#38dab25178eb25abaab8e6d929af354a56158d5f"
+source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#47df4e1cc97f061fa6eadf66eaacf774d22bb806"
 
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#38dab25178eb25abaab8e6d929af354a56158d5f"
+source = "git+https://github.com/rcore-os/rcore-fs?branch=sefs#47df4e1cc97f061fa6eadf66eaacf774d22bb806"
 dependencies = [
  "bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",

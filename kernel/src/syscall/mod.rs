@@ -243,15 +243,12 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
         SYS_RMDIR => sys_rmdir(args[0] as *const u8),
         SYS_LINK => sys_link(args[0] as *const u8, args[1] as *const u8),
         SYS_UNLINK => sys_unlink(args[0] as *const u8),
+        SYS_READLINK => sys_readlink(args[0] as *const u8, args[1] as *mut u8, args[2]),
         SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
         SYS_TIME => sys_time(args[0] as *mut u64),
         SYS_ALARM => {
             warn!("sys_alarm is unimplemented");
             Ok(0)
-        }
-        SYS_READLINK => {
-            warn!("sys_readlink is unimplemented");
-            Err(SysError::ENOENT)
         }
         SYS_CHOWN => {
             warn!("sys_chown is unimplemented");

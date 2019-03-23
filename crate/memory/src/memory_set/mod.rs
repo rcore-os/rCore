@@ -301,7 +301,14 @@ impl<T: InactivePageTable> MemorySet<T> {
                     let new_area = MemoryArea { start_addr: area.start_addr, end_addr: start_addr, attr: area.attr, handler: area.handler, name: area.name };
                     self.areas.insert(i, new_area);
                 } else {
-                    unimplemented!("");
+                    // superset
+                    let area = self.areas.remove(i);
+                    let dead_area = MemoryArea { start_addr: start_addr, end_addr: end_addr, attr: area.attr, handler: area.handler.box_clone(), name: area.name };
+                    self.page_table.edit(|pt| dead_area.unmap(pt));
+                    let new_area_left = MemoryArea { start_addr: area.start_addr, end_addr: start_addr, attr: area.attr, handler: area.handler.box_clone(), name: area.name };
+                    self.areas.insert(i, new_area_left);
+                    let new_area_right = MemoryArea { start_addr: end_addr, end_addr: area.start_addr, attr: area.attr, handler: area.handler, name: area.name };
+                    self.areas.insert(i, new_area_right);
                 }
                 return;
             }
