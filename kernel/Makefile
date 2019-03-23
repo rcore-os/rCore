@@ -21,6 +21,7 @@
 #         | u540                Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   m_mode                      Only available on riscv32, build for M-Mode, without MMU
+#   pci_passthru                Only available on x86_64, passthrough the specified PCI device
 
 arch ?= riscv64
 board ?= none
@@ -29,6 +30,7 @@ LOG  ?= debug
 graphic ?= off
 smp  ?= 4
 m_mode ?=
+pci_passthru ?=
 
 target := $(arch)
 build_path := target/$(target)/$(mode)
@@ -68,11 +70,18 @@ qemu_net_opts := \
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=raw,file=$(SFSIMG),media=disk,cache=writeback \
+	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback \
 	-serial mon:stdio \
 	-device isa-debug-exit
+ifeq ($(pci_passthru), )
 qemu_net_opts += \
 	-device e1000e,netdev=net0
+else
+qemu_opts += \
+	-machine ubuntu,accel=kvm
+qemu_net_opts += \
+	-device vfio-pci,host=$(pci_passthru)
+endif
 
 else ifeq ($(arch), riscv32)
 qemu_opts += \

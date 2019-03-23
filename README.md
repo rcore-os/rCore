@@ -42,6 +42,7 @@ $ cd rCore/user
 $ make sfsimg arch={riscv32,riscv64,x86_64,aarch64} # requires x86_64-linux-musl-gcc or musl-gcc
 $ cd ../kernel
 $ make run arch={riscv32,riscv64,x86_64,aarch64} mode=release
+$ make run arch=x86_64 mode=release pci_passthru=0000:00:00.1 # for ixgbe real nic, find its pci (bus, dev, func) first
 ```
 
 ## History
