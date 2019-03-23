@@ -13,6 +13,7 @@ pub mod io;
 pub mod consts;
 pub mod timer;
 pub mod syscall;
+pub mod rand;
 
 static AP_CAN_INIT: AtomicBool = ATOMIC_BOOL_INIT;
 

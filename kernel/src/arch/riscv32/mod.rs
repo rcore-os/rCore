@@ -7,6 +7,7 @@ pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
 pub mod syscall;
+pub mod rand;
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 mod board;

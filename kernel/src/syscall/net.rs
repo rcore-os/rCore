@@ -26,6 +26,9 @@ const IPPROTO_TCP: usize = 6;
 const TCP_SENDBUF: usize = 512 * 1024; // 512K
 const TCP_RECVBUF: usize = 512 * 1024; // 512K
 
+const UDP_SENDBUF: usize = 64 * 1024; // 64K
+const UDP_RECVBUF: usize = 64 * 1024; // 64K
+
 pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResult {
     info!(
         "socket: domain: {}, socket_type: {}, protocol: {}",
@@ -58,10 +61,14 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
             SOCK_DGRAM => {
                 let fd = proc.get_free_fd();
 
-                let udp_rx_buffer =
-                    UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
-                let udp_tx_buffer =
-                    UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; 2048]);
+                let udp_rx_buffer = UdpSocketBuffer::new(
+                    vec![UdpPacketMetadata::EMPTY; 1024],
+                    vec![0; UDP_RECVBUF],
+                );
+                let udp_tx_buffer = UdpSocketBuffer::new(
+                    vec![UdpPacketMetadata::EMPTY; 1024],
+                    vec![0; UDP_SENDBUF],
+                );
                 let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
 
                 let udp_handle = SOCKETS.lock().add(udp_socket);
@@ -272,9 +279,14 @@ pub fn sys_sendto(
     proc.vm.check_read_array(base, len)?;
 
     let wrapper = proc.get_socket(fd)?;
-    let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    wrapper.write(&slice, Some(endpoint))
+    if addr.is_null() {
+        wrapper.write(&slice, None)
+    } else {
+        let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
+        info!("sys_sendto: sending to endpoint {:?}", endpoint);
+        wrapper.write(&slice, Some(endpoint))
+    }
 }
 
 pub fn sys_recvfrom(

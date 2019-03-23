@@ -25,6 +25,7 @@ Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+
 * [RISCV64 GNU toolchain](https://www.sifive.com/boards) (for riscv32/64)
 * [AArch64 GNU toolchain](https://cs140e.sergio.bz/assignments/0-blinky/) (for aarch64)
 * [musl-cross-make](https://github.com/richfelker/musl-cross-make) (for userland musl)
+* [libfuse-dev](https://github.com/libfuse/libfuse) (for userland image generation)
 
 See [Travis script](./.travis.yml) for details.
 

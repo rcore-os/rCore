@@ -9,6 +9,7 @@ pub mod cpu;
 pub mod driver;
 pub mod timer;
 pub mod syscall;
+pub mod rand;
 
 #[cfg(feature = "board_raspi3")]
 #[path = "board/raspi3/mod.rs"]

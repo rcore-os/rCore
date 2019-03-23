@@ -32,6 +32,7 @@ struct IXGBEDriver {
     inner: ixgbe::IXGBEDriver,
     header: usize,
     size: usize,
+    mtu: usize,
 }
 
 impl Drop for IXGBEDriver {
@@ -177,7 +178,9 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn capabilities(&self) -> DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = ixgbe::IXGBEDriver::get_mtu(); // max MTU
+        // do not use max MTU by default
+        //caps.max_transmission_unit = ixgbe::IXGBEDriver::get_mtu(); // max MTU
+        caps.max_transmission_unit = self.mtu;
         caps.max_burst_size = Some(256);
         // IP Rx checksum is offloaded with RXCSUM
         caps.checksum.ipv4 = Checksum::Tx;
@@ -241,14 +244,20 @@ pub fn ixgbe_init(
         inner: ixgbe,
         header,
         size,
+        mtu: 1500,
     };
 
     let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let iface = EthernetInterfaceBuilder::new(net_driver.clone())
+    let mut routes = Routes::new(BTreeMap::new());
+    routes
+        .add_default_ipv4_route(Ipv4Address::new(10, 0, 0, 1))
+        .unwrap();
+    let mut iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
         .ip_addrs(ip_addrs)
         .neighbor_cache(neighbor_cache)
+        .routes(routes)
         .finalize();
 
     info!("ixgbe: interface {} up", &name);

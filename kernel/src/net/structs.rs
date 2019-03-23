@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 use core::fmt;
 
+use crate::arch::rand;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::process::structs::Process;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -41,8 +42,11 @@ pub struct SocketWrapper {
 
 pub fn get_ephemeral_port() -> u16 {
     // TODO selects non-conflict high port
-    static mut EPHEMERAL_PORT: u16 = 49152;
+    static mut EPHEMERAL_PORT: u16 = 0;
     unsafe {
+        if EPHEMERAL_PORT == 0 {
+            EPHEMERAL_PORT = (49152 + rand::rand() % (65536 - 49152)) as u16;
+        }
         if EPHEMERAL_PORT == 65535 {
             EPHEMERAL_PORT = 49152;
         } else {
