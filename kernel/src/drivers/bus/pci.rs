@@ -136,9 +136,9 @@ impl PciTag {
         let mut max_base_lo = self.read(bar, 4);
         self.write(bar, base_lo);
 
-        let mut base = 0usize;
-        let mut max_base = 0usize;
-        let mut address_mark = 0usize;
+        let mut base;
+        let mut max_base;
+        let mut address_mark;
 
         // memory instead of io
         assert!(base_lo & PCI_BASE_ADDRESS_SPACE == PCI_BASE_ADDRESS_SPACE_MEMORY);

@@ -297,31 +297,63 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
     }
 }
 
+const AT_FDCWD: usize = -100isize as usize;
+
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
+    sys_openat(AT_FDCWD, path, flags, mode)
+}
+
+pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     let flags = OpenFlags::from_bits_truncate(flags);
-    info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
+    info!("openat: dir_fd: {}, path: {:?}, flags: {:?}, mode: {:#o}", dir_fd as isize, path, flags, mode);
 
     let inode =
-    if flags.contains(OpenFlags::CREATE) {
-        let (dir_path, file_name) = split_path(&path);
-        let dir_inode = proc.lookup_inode(dir_path)?;
-        match dir_inode.find(file_name) {
-            Ok(file_inode) => {
-                if flags.contains(OpenFlags::EXCLUSIVE) {
-                    return Err(SysError::EEXIST);
-                }
-                file_inode
-            },
-            Err(FsError::EntryNotFound) => {
-                dir_inode.create(file_name, FileType::File, mode as u32)?
+        if dir_fd == AT_FDCWD {
+            // from process cwd
+            if flags.contains(OpenFlags::CREATE) {
+                let (dir_path, file_name) = split_path(&path);
+                    // relative to cwd
+                    let dir_inode = proc.lookup_inode(dir_path)?;
+                    match dir_inode.find(file_name) {
+                        Ok(file_inode) => {
+                            if flags.contains(OpenFlags::EXCLUSIVE) {
+                                return Err(SysError::EEXIST);
+                            }
+                            file_inode
+                        },
+                        Err(FsError::EntryNotFound) => {
+                            dir_inode.create(file_name, FileType::File, mode as u32)?
+                        }
+                        Err(e) => return Err(SysError::from(e)),
+                    }
+            } else {
+                proc.lookup_inode(&path)?
             }
-            Err(e) => return Err(SysError::from(e)),
-        }
-    } else {
-        proc.lookup_inode(&path)?
-    };
+        } else {
+            // relative to dir_fd
+            let dir_file = proc.get_file(dir_fd)?;
+            if flags.contains(OpenFlags::CREATE) {
+                let (dir_path, file_name) = split_path(&path);
+                    // relative to cwd
+                    let dir_inode = dir_file.lookup_follow(dir_path, FOLLOW_MAX_DEPTH)?;
+                    match dir_inode.find(file_name) {
+                        Ok(file_inode) => {
+                            if flags.contains(OpenFlags::EXCLUSIVE) {
+                                return Err(SysError::EEXIST);
+                            }
+                            file_inode
+                        },
+                        Err(FsError::EntryNotFound) => {
+                            dir_inode.create(file_name, FileType::File, mode as u32)?
+                        }
+                        Err(e) => return Err(SysError::from(e)),
+                    }
+            } else {
+                dir_file.lookup_follow(&path, FOLLOW_MAX_DEPTH)?
+            }
+        };
 
     let fd = proc.get_free_fd();
 
@@ -506,15 +538,27 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
 }
 
 pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> SysResult {
-    let proc = process();
+    sys_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath)
+}
+
+pub fn sys_renameat(olddirfd: usize, oldpath: *const u8, newdirfd: usize, newpath: *const u8) -> SysResult {
+    let mut proc = process();
     let oldpath = unsafe { proc.vm.check_and_clone_cstr(oldpath)? };
     let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
-    info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+    info!("renameat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}", olddirfd, oldpath, newdirfd, newpath);
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = proc.lookup_inode(old_dir_path)?;
-    let new_dir_inode = proc.lookup_inode(new_dir_path)?;
+    let old_dir_inode = if olddirfd == AT_FDCWD {
+        proc.lookup_inode(old_dir_path)?
+    } else {
+        proc.get_file(olddirfd)?.lookup_follow(old_dir_path, FOLLOW_MAX_DEPTH)?
+    };
+    let new_dir_inode = if newdirfd == AT_FDCWD {
+        proc.lookup_inode(new_dir_path)?
+    } else {
+        proc.get_file(newdirfd)?.lookup_follow(new_dir_path, FOLLOW_MAX_DEPTH)?
+    };
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
@@ -622,7 +666,7 @@ pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usiz
         let mut bytes_read = 0;
         while bytes_read < count {
             let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read(&mut buffer)?;
+            let read_len = in_file.read(&mut buffer[..len])?;
             if read_len == 0 {
                 break;
             }
@@ -638,16 +682,16 @@ pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usiz
         }
         return Ok(bytes_read);
     } else {
-        let mut proc_mem = unsafe {&mut *proc_cell.get()};
+        let proc_mem = unsafe {&mut *proc_cell.get()};
         proc_mem.vm.check_read_ptr(offset)?;
         let mut read_offset = unsafe {
             *offset
         };
-        // read from specified offset and write back
+        // read from specified offset and write new offset back
         let mut bytes_read = 0;
         while bytes_read < count {
             let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read_at(read_offset, &mut buffer)?;
+            let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
             if read_len == 0 {
                 break;
             }

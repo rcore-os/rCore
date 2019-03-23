@@ -199,12 +199,12 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         SYS_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         SYS_EXIT_GROUP => sys_exit_group(args[0]),
-        SYS_OPENAT => sys_open(args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
+        SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
         SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
 //        SYS_MKNODAT => sys_mknod(),
         SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
         SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
-        SYS_RENAMEAT => sys_rename(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
+        SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
         SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
         SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
         // 280
@@ -418,7 +418,7 @@ impl From<VMError> for SysError {
 const SPIN_WAIT_TIMES: usize = 100;
 
 pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Option<T>) -> T {
-    for i in 0..SPIN_WAIT_TIMES {
+    for _i in 0..SPIN_WAIT_TIMES {
         if let Some(result) = action() {
             return result;
         }

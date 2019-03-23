@@ -96,6 +96,10 @@ impl FileHandle {
         self.inode.metadata()
     }
 
+    pub fn lookup_follow(&self, path: &str, max_follow: usize) -> Result<Arc<INode>> {
+        self.inode.lookup_follow(path, max_follow)
+    }
+
     pub fn read_entry(&mut self) -> Result<String> {
         if !self.options.read {
             return Err(FsError::InvalidParam);  // FIXME: => EBADF

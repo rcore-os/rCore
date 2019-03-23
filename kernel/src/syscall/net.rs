@@ -118,8 +118,8 @@ pub fn sys_setsockopt(
     fd: usize,
     level: usize,
     optname: usize,
-    optval: *const u8,
-    optlen: usize,
+    _optval: *const u8,
+    _optlen: usize,
 ) -> SysResult {
     info!(
         "setsockopt: fd: {}, level: {}, optname: {}",
@@ -266,7 +266,7 @@ pub fn sys_sendto(
     fd: usize,
     base: *const u8,
     len: usize,
-    flags: usize,
+    _flags: usize,
     addr: *const SockAddr,
     addr_len: usize,
 ) -> SysResult {
@@ -382,7 +382,7 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
                         tcp_state.is_listening = true;
                         Ok(0)
                     }
-                    Err(err) => Err(SysError::EINVAL),
+                    Err(_err) => Err(SysError::EINVAL),
                 }
             } else {
                 Ok(0)

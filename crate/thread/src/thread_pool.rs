@@ -217,6 +217,6 @@ impl ThreadPool {
 
 fn new_vec_default<T: Default>(size: usize) -> Vec<T> {
     let mut vec = Vec::new();
-    vec.resize_default(size);
+    vec.resize_with(size, Default::default);
     vec
 }

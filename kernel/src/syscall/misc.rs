@@ -79,7 +79,7 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
         .vm
         .check_write_ptr(uaddr as *mut AtomicI32)?;
     let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
-    let timeout = if timeout.is_null() {
+    let _timeout = if timeout.is_null() {
         None
     } else {
         process().vm.check_read_ptr(timeout)?;
@@ -114,7 +114,7 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
 
 
 const LINUX_REBOOT_CMD_HALT: u32 = 0xcdef0123;
-pub fn sys_reboot(magic: u32, magic2: u32, cmd: u32, arg: *const u8) -> SysResult {
+pub fn sys_reboot(_magic: u32, magic2: u32, cmd: u32, _arg: *const u8) -> SysResult {
     // we will skip verifying magic
     if cmd == LINUX_REBOOT_CMD_HALT {
         unsafe {

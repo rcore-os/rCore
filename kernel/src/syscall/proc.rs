@@ -98,7 +98,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
 pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8, tf: &mut TrapFrame) -> SysResult {
     info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
     let proc = process();
-    let name = if name.is_null() { String::from("") } else {
+    let _name = if name.is_null() { String::from("") } else {
         unsafe { proc.vm.check_and_clone_cstr(name)? }
     };
 
@@ -235,7 +235,7 @@ pub fn sys_exit(exit_code: usize) -> ! {
 
 /// Exit the current thread group (i.e. process)
 pub fn sys_exit_group(exit_code: usize) -> ! {
-    let mut proc = process();
+    let proc = process();
     info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
     // quit all threads
