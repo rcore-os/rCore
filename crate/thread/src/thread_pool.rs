@@ -192,7 +192,7 @@ impl ThreadPool {
     pub fn wakeup(&self, tid: Tid) {
         let mut proc_lock = self.threads[tid].lock();
         if let Some(mut proc) = proc_lock.as_mut() {
-            trace!("thread {} {:?} -> {:?}", tid, proc.status, status);
+            trace!("thread {} {:?} -> {:?}", tid, proc.status, Status::Ready);
             if let Status::Sleeping = proc.status {
                 proc.status = Status::Ready;
                 self.scheduler.push(tid);
