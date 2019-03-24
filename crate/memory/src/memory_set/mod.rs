@@ -280,12 +280,14 @@ impl<T: InactivePageTable> MemorySet<T> {
     */
     pub fn pop_with_split(&mut self, start_addr: VirtAddr, end_addr: VirtAddr) {
         assert!(start_addr <= end_addr, "invalid memory area");
-        for i in 0..self.areas.len() {
+        let mut i = 0;
+        while i < self.areas.len() {
             if self.areas[i].is_overlap_with(start_addr, end_addr) {
                 if self.areas[i].start_addr >= start_addr && self.areas[i].end_addr <= end_addr {
                     // subset
                     let area = self.areas.remove(i);
                     self.page_table.edit(|pt| area.unmap(pt));
+                    i -= 1;
                 } else if self.areas[i].start_addr >= start_addr && self.areas[i].start_addr < end_addr {
                     // prefix
                     let area = self.areas.remove(i);
@@ -307,11 +309,12 @@ impl<T: InactivePageTable> MemorySet<T> {
                     self.page_table.edit(|pt| dead_area.unmap(pt));
                     let new_area_left = MemoryArea { start_addr: area.start_addr, end_addr: start_addr, attr: area.attr, handler: area.handler.box_clone(), name: area.name };
                     self.areas.insert(i, new_area_left);
-                    let new_area_right = MemoryArea { start_addr: end_addr, end_addr: area.start_addr, attr: area.attr, handler: area.handler, name: area.name };
-                    self.areas.insert(i, new_area_right);
+                    let new_area_right = MemoryArea { start_addr: end_addr, end_addr: area.end_addr, attr: area.attr, handler: area.handler, name: area.name };
+                    self.areas.insert(i + 1, new_area_right);
+                    i += 1;
                 }
-                return;
             }
+            i += 1;
         }
     }
 

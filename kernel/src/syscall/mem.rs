@@ -47,7 +47,7 @@ pub fn sys_mmap(
             addr + len,
             prot.to_attr(),
             Delay::new(GlobalFrameAlloc),
-            "mmap",
+            "mmap_anon",
         );
         return Ok(addr);
     } else {
@@ -60,7 +60,7 @@ pub fn sys_mmap(
             addr + len,
             prot.to_attr(),
             ByFrame::new(GlobalFrameAlloc),
-            "mmap",
+            "mmap_file",
         );
         let data = unsafe { slice::from_raw_parts_mut(addr as *mut u8, len) };
         let file = proc.get_file(fd)?;

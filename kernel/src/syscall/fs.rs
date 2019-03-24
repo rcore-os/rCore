@@ -370,8 +370,11 @@ pub fn sys_close(fd: usize) -> SysResult {
 }
 
 pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
-    info!("access: path: {:?}, mode: {}", path, mode);
-    // TODO: check permissions based on uid/git
+    // TODO: check permissions based on uid/gid
+    let proc = process();
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    info!("access: path: {:?}, mode: {:#o}", path, mode);
+    let inode = proc.lookup_inode(&path)?;
     Ok(0)
 }
 
