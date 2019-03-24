@@ -373,14 +373,20 @@ pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
     // TODO: check permissions based on uid/gid
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
-    info!("access: path: {:?}, mode: {:#o}", path, mode);
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!("access: path: {:?}, mode: {:#o}", path, mode);
+    }
     let inode = proc.lookup_inode(&path)?;
     Ok(0)
 }
 
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
-    info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
     let proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!("getcwd: buf: {:?}, len: {:#x}", buf, len);
+    }
     proc.vm.check_write_array(buf, len)?;
     if proc.cwd.len() + 1 > len {
         return Err(SysError::ERANGE);
@@ -522,7 +528,10 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 pub fn sys_chdir(path: *const u8) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
-    info!("chdir: path: {:?}", path);
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!("chdir: path: {:?}", path);
+    }
 
     let inode = proc.lookup_inode(&path)?;
     let info = inode.metadata()?;
