@@ -1,7 +1,7 @@
 //! Syscalls for process
 
 use super::*;
-use crate::fs::{INodeExt, FOLLOW_MAX_DEPTH};
+use crate::fs::INodeExt;
 
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
@@ -120,7 +120,7 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
 
     // Read program file
     let path = args[0].as_str();
-    let inode = crate::fs::ROOT_INODE.lookup_follow(path, FOLLOW_MAX_DEPTH)?;
+    let inode = proc.lookup_inode(path)?;
     let buf = inode.read_as_vec()?;
 
     // Make new Thread

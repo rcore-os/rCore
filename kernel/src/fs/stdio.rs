@@ -64,6 +64,7 @@ macro_rules! impl_inode {
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
+        fn chmod(&self, _mode: u16) -> Result<()> { Ok(()) }
     };
 }
 

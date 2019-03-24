@@ -131,11 +131,15 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         // 80
         SYS_CHDIR => sys_chdir(args[0] as *const u8),
-        SYS_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
+        SYS_FCHOWN => {
+            warn!("sys_fchown is unimplemented");
+            Ok(0)
+        }
         SYS_UMASK => {
             warn!("sys_umask is unimplemented");
             Ok(0o777)
         }
+        SYS_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
 //        SYS_GETRLIMIT => sys_getrlimit(),
         SYS_GETRUSAGE => sys_getrusage(args[0], args[1] as *mut RUsage),
         SYS_SYSINFO => sys_sysinfo(args[0] as *mut SysInfo),
@@ -202,10 +206,16 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
         SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
 //        SYS_MKNODAT => sys_mknod(),
+        // 260
+        SYS_FCHOWNAT => {
+            warn!("sys_fchownat is unimplemented");
+            Ok(0)
+        },
         SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
         SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
         SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
         SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
+        SYS_SYMLINKAT => Err(SysError::EACCES),
         SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
         // 280
         SYS_UTIMENSAT => {
