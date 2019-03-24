@@ -17,10 +17,24 @@ impl WorkStealingScheduler {
 
 impl Scheduler for WorkStealingScheduler {
     fn push(&self, tid: usize) {
-        // TODO: push to random queue?
-        // now just push to cpu0
-        self.workers[0].push(tid);
-        trace!("work-stealing: cpu0 push thread {}", tid);
+        // not random, but uniform
+        // no sync, because we don't need to
+        static mut WORKER_CPU: usize = 0;
+        let n = self.workers.len();
+        let mut cpu = unsafe {
+            WORKER_CPU = WORKER_CPU + 1;
+            if WORKER_CPU >= n {
+                WORKER_CPU -= n;
+            }
+            WORKER_CPU
+        };
+
+        // potential racing, so we just check once more
+        if cpu >= n {
+            cpu -= n;
+        }
+        self.workers[cpu].push(tid);
+        trace!("work-stealing: cpu{} push thread {}", cpu, tid);
     }
 
     fn pop(&self, cpu_id: usize) -> Option<usize> {

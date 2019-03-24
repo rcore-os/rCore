@@ -54,11 +54,11 @@ impl Entry for MockEntry {
     fn swapped(&self) -> bool { self.swapped }
     fn set_swapped(&mut self, value: bool) { self.swapped = value; }
     fn user(&self) -> bool { unimplemented!() }
-    fn set_user(&mut self, value: bool) { unimplemented!() }
+    fn set_user(&mut self, _value: bool) { unimplemented!() }
     fn execute(&self) -> bool { unimplemented!() }
-    fn set_execute(&mut self, value: bool) { unimplemented!() }
-    fn mmio(&self) -> bool { unimplemented!() }
-    fn set_mmio(&mut self, value: bool) { unimplemented!() }
+    fn set_execute(&mut self, _value: bool) { unimplemented!() }
+    fn mmio(&self) -> u8 { unimplemented!() }
+    fn set_mmio(&mut self, _value: u8) { unimplemented!() }
 }
 
 type PageFaultHandler = Box<FnMut(&mut MockPageTable, VirtAddr)>;
