@@ -1,3 +1,9 @@
+//! Stride scheduler
+//! 
+//! Each task is assigned a priority. Each task has a running stride.
+//! The task with least stride is selected to run.
+//! When a task is rescheduled, its stride is added to proportional to 1 / priority.
+
 use super::*;
 
 pub struct StrideScheduler {

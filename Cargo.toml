@@ -6,4 +6,4 @@ members = [
     "crate/sync",
     "crate/thread",
 ]
-exclude = ["kernel"]
+exclude = ["kernel", "user/rust"]

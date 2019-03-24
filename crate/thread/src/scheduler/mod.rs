@@ -3,10 +3,12 @@ use alloc::{collections::BinaryHeap, vec::Vec};
 use log::*;
 use spin::Mutex;
 
+pub use self::o1::O1Scheduler;
 pub use self::rr::RRScheduler;
 pub use self::stride::StrideScheduler;
 pub use self::work_stealing::WorkStealingScheduler;
 
+mod o1;
 mod rr;
 mod stride;
 mod work_stealing;

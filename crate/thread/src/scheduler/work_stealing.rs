@@ -1,5 +1,10 @@
+//! Work stealing scheduler
+//!
+//! Each CPU has its own queue, and each CPU takes new jobs from its own queue.
+//! When its queue is empty, steal jobs from other CPU's queue.
+
 use super::*;
-use deque::{self, Stealer, Worker, Stolen};
+use deque::{self, Stealer, Stolen, Worker};
 
 pub struct WorkStealingScheduler {
     /// The ready queue of each processors
@@ -53,7 +58,12 @@ impl Scheduler for WorkStealingScheduler {
                     Stolen::Abort => {} // retry
                     Stolen::Empty => break,
                     Stolen::Data(tid) => {
-                        trace!("work-stealing: cpu{} steal thread {} from cpu{}", cpu_id, tid, other_id);
+                        trace!(
+                            "work-stealing: cpu{} steal thread {} from cpu{}",
+                            cpu_id,
+                            tid,
+                            other_id
+                        );
                         return Some(tid);
                     }
                 }
