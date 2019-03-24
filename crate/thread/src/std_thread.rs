@@ -113,6 +113,15 @@ pub fn park() {
     processor().yield_now();
 }
 
+/// Blocks unless or until the current thread's token is made available.
+/// Calls `f` before thread yields. Can be used to avoid racing.
+pub fn park_action(f: impl FnOnce()) {
+    trace!("park:");
+    processor().manager().sleep(current().id(), 0);
+    f();
+    processor().yield_now();
+}
+
 /// A handle to a thread.
 pub struct Thread {
     tid: usize,

@@ -262,6 +262,7 @@ pub fn sys_nanosleep(req: *const TimeSpec) -> SysResult {
     process().vm.check_read_ptr(req)?;
     let time = unsafe { req.read() };
     info!("nanosleep: time: {:#?}", time);
+    // TODO: handle spurious wakeup
     thread::sleep(time.to_duration());
     Ok(0)
 }
