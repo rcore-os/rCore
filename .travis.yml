@@ -4,7 +4,7 @@ dist: xenial
 
 language: rust
 
-rust: nightly-2019-02-16
+rust: nightly-2019-03-05
 
 os:
   - linux
@@ -53,6 +53,8 @@ install:
   - if [ $TRAVIS_OS_NAME = linux ]; then
       wget https://download.qemu.org/qemu-3.1.0.tar.xz && tar xvJf qemu-3.1.0.tar.xz > /dev/null && cd qemu-3.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
       export PATH=$PATH:$PWD/qemu-3.1.0/$ARCH-softmmu;
+      sudo apt update;
+      sudo apt install libfuse-dev;
     fi
 
 before_script:
