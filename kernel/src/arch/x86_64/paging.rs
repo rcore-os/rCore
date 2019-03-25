@@ -4,8 +4,13 @@ use rcore_memory::paging::*;
 use x86_64::instructions::tlb;
 use x86_64::PhysAddr;
 use x86_64::registers::control::{Cr3, Cr3Flags};
-use x86_64::structures::paging::{Mapper, PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, Page, PageRange, PhysFrame as Frame, Size4KiB};
+use x86_64::structures::paging::{
+    page_table::{PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF},
+    mapper::{Mapper, RecursivePageTable},
+    page::{Page, PageRange, Size4KiB},
+    frame::PhysFrame as Frame,
+    FrameAllocator, FrameDeallocator
+};
 use log::*;
 
 pub trait PageExt {
