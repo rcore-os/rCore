@@ -1,9 +1,4 @@
-use riscv::register::{
-    sstatus as xstatus,
-    sscratch as xscratch,
-    stvec as xtvec,
-};
-use riscv::register::{mcause, mepc, sie, mie};
+use riscv::register::*;
 use crate::drivers::DRIVERS;
 pub use self::context::*;
 use log::*;
@@ -22,17 +17,14 @@ pub fn init() {
     unsafe {
         // Set sscratch register to 0, indicating to exception vector that we are
         // presently executing in the kernel
-        xscratch::write(0);
+        sscratch::write(0);
         // Set the exception vector address
-        xtvec::write(trap_entry as usize, xtvec::TrapMode::Direct);
+        stvec::write(trap_entry as usize, stvec::TrapMode::Direct);
         // Enable IPI
         sie::set_ssoft();
         // Enable external interrupt
         if super::cpu::id() == super::BOOT_HART_ID {
             sie::set_sext();
-            // NOTE: In M-mode: mie.MSIE is set by BBL.
-            //                  mie.MEIE can not be set in QEMU v3.0
-            //                  (seems like a bug)
         }
     }
     info!("interrupt: init end");
@@ -44,13 +36,13 @@ pub fn init() {
 */
 #[inline]
 pub unsafe fn enable() {
-    xstatus::set_sie();
+    sstatus::set_sie();
 }
 
 #[inline]
 pub unsafe fn disable_and_store() -> usize {
-    let e = xstatus::read().sie() as usize;
-    xstatus::clear_sie();
+    let e = sstatus::read().sie() as usize;
+    sstatus::clear_sie();
     e
 }
 
@@ -75,19 +67,12 @@ pub unsafe fn restore(flags: usize) {
 */
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use self::mcause::{Trap, Interrupt as I, Exception as E};
+    use self::scause::{Trap, Interrupt as I, Exception as E};
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
     match tf.scause.cause() {
-        // M-mode only
-        Trap::Interrupt(I::MachineExternal) => external(),
-        Trap::Interrupt(I::MachineSoft) => ipi(),
-        Trap::Interrupt(I::MachineTimer) => timer(),
-        Trap::Exception(E::MachineEnvCall) => sbi(tf),
-
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::IllegalInstruction) => illegal_inst(tf),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
         Trap::Exception(E::LoadPageFault) => page_fault(tf),
         Trap::Exception(E::StorePageFault) => page_fault(tf),
@@ -95,12 +80,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         _ => crate::trap::error(tf),
     }
     trace!("Interrupt end");
-}
-
-/// Call BBL SBI functions for M-mode kernel
-fn sbi(tf: &mut TrapFrame) {
-    (super::BBL.mcall_trap)(tf.x.as_ptr(), tf.scause.bits(), tf.sepc);
-    tf.sepc += 4;
 }
 
 fn external() {
@@ -159,17 +138,6 @@ fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4;   // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
     tf.x[10] = ret as usize;
-}
-
-/*
-* @param:
-*   TrapFrame: the Trapframe for the illegal inst exception
-* @brief:
-*   process IllegalInstruction exception
-*/
-fn illegal_inst(tf: &mut TrapFrame) {
-    (super::BBL.illegal_insn_trap)(tf.x.as_ptr(), tf.scause.bits(), tf.sepc);
-    tf.sepc = mepc::read();
 }
 
 /*

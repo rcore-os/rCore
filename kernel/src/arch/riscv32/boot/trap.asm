@@ -1,10 +1,4 @@
 # Constants / Macros defined in Rust code:
-#   xscratch
-#   xstatus
-#   xepc
-#   xcause
-#   xtval
-#   XRET
 #   XLENB
 #   LOAD
 #   STORE
@@ -14,10 +8,10 @@
     # If coming from userspace, preserve the user stack pointer and load
     # the kernel stack pointer. If we came from the kernel, sscratch
     # will contain 0, and we should continue on the current stack.
-    csrrw sp, (xscratch), sp
+    csrrw sp, sscratch, sp
     bnez sp, trap_from_user
 trap_from_kernel:
-    csrr sp, (xscratch)
+    csrr sp, sscratch
     STORE gp, -1
     # sscratch = previous-sp, sp = kernel-sp
 trap_from_user:
@@ -60,11 +54,11 @@ trap_from_user:
 
     # get sp, sstatus, sepc, stval, scause
     # set sscratch = 0
-    csrrw s0, (xscratch), x0
-    csrr s1, (xstatus)
-    csrr s2, (xepc)
-    csrr s3, (xtval)
-    csrr s4, (xcause)
+    csrrw s0, sscratch, x0
+    csrr s1, sstatus
+    csrr s2, sepc
+    csrr s3, stval
+    csrr s4, scause
     # store sp, sstatus, sepc, sbadvaddr, scause
     STORE s0, 2
     STORE s1, 32
@@ -76,16 +70,16 @@ trap_from_user:
 .macro RESTORE_ALL
     LOAD s1, 32             # s1 = sstatus
     LOAD s2, 33             # s2 = sepc
-    TEST_BACK_TO_KERNEL
+    andi s0, s1, 1 << 8     # sstatus.SPP = 1
     bnez s0, _to_kernel     # s0 = back to kernel?
 _to_user:
     addi s0, sp, 37*XLENB
-    csrw (xscratch), s0     # sscratch = kernel-sp
+    csrw sscratch, s0     # sscratch = kernel-sp
     STORE gp, 36            # store hartid from gp to sp[36]
 _to_kernel:
     # restore sstatus, sepc
-    csrw (xstatus), s1
-    csrw (xepc), s2
+    csrw sstatus, s1
+    csrw sepc, s2
 
     # restore x registers except x2 (sp)
     LOAD x1, 1
@@ -132,4 +126,4 @@ trap_entry:
 trap_return:
     RESTORE_ALL
     # return from supervisor call
-    XRET
+    sret

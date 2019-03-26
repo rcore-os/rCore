@@ -1,67 +1,58 @@
 use riscv::register::{
-    sstatus as xstatus,
-    sstatus::Sstatus as Xstatus,
-    mcause::Mcause,
+    sstatus,
+    sstatus::Sstatus,
+    scause::Scause,
 };
 
+/// Saved registers on a trap.
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
-    pub x: [usize; 32], // general registers
-    pub sstatus: Xstatus, // Supervisor Status Register
-    pub sepc: usize, // Supervisor exception program counter, save the trap virtual address (here is used to save the process program entry addr?)
-    pub stval: usize, // Supervisor trap value
-    pub scause: Mcause, // scause register: record the cause of exception/interrupt/trap
-    pub _hartid: usize, // reserve space
+    /// General registers
+    pub x: [usize; 32],
+    /// Supervisor Status
+    pub sstatus: Sstatus,
+    /// Supervisor Exception Program Counter
+    pub sepc: usize,
+    /// Supervisor Trap Value
+    pub stval: usize,
+    /// Supervisor Cause
+    pub scause: Scause,
+    /// Reserve space for hartid
+    pub _hartid: usize,
 }
 
-/// Generate the trapframe for building new thread in kernel
 impl TrapFrame {
-    /*
-    * @param:
-    *   entry: program entry for the thread
-    *   arg: a0
-    *   sp: stack top
-    * @brief:
-    *   generate a trapfram for building a new kernel thread
-    * @retval:
-    *   the trapframe for new kernel thread
-    */
+    /// Constructs TrapFrame for a new kernel thread.
+    ///
+    /// The new thread starts at function `entry` with an usize argument `arg`.
+    /// The stack pointer will be set to `sp`.
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[10] = arg; // a0
         tf.x[2] = sp;
         tf.sepc = entry as usize;
-        tf.sstatus = xstatus::read();
-        {
-            tf.sstatus.set_spie(true);
-            tf.sstatus.set_sie(false);
-            tf.sstatus.set_spp(xstatus::SPP::Supervisor);
-        }
+        tf.sstatus = sstatus::read();
+        tf.sstatus.set_spie(true);
+        tf.sstatus.set_sie(false);
+        tf.sstatus.set_spp(sstatus::SPP::Supervisor);
         tf
     }
 
-    /*
-    * @param:
-    *   entry_addr: program entry for the thread
-    *   sp: stack top
-    * @brief:
-    *   generate a trapfram for building a new user thread
-    * @retval:
-    *   the trapframe for new user thread
-    */
+    /// Constructs TrapFrame for a new user thread.
+    ///
+    /// The new thread starts at `entry_addr`.
+    /// The stack pointer will be set to `sp`.
     fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[2] = sp;
         tf.sepc = entry_addr;
-        tf.sstatus = xstatus::read();
-        {
-            tf.sstatus.set_spie(true);
-            tf.sstatus.set_sie(false);
-            tf.sstatus.set_spp(xstatus::SPP::User);
-        }
+        tf.sstatus = sstatus::read();
+        tf.sstatus.set_spie(true);
+        tf.sstatus.set_sie(false);
+        tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }
 }
@@ -85,12 +76,12 @@ impl Debug for TrapFrame {
             .field("sstatus", &self.sstatus)
             .field("sepc", &self.sepc)
             .field("stval", &self.stval)
-            .field("scause", &self.scause)
+            .field("scause", &self.scause.cause())
             .finish()
     }
 }
 
-/// kernel stack contents for a new thread
+/// Kernel stack contents for a new thread
 #[derive(Debug)]
 #[repr(C)]
 pub struct InitStack {
@@ -99,18 +90,11 @@ pub struct InitStack {
 }
 
 impl InitStack {
-    /*
-    * @param:
-    *   stack_top: the pointer to kernel stack stop
-    * @brief:
-    *   save the InitStack on the kernel stack stop
-    * @retval:
-    *   a Context with ptr in it
-    */
+    /// Push the InitStack on the stack and transfer to a Context.
     unsafe fn push_at(self, stack_top: usize) -> Context {
-        let ptr = (stack_top as *mut Self).offset(-1); //real kernel stack top
+        let ptr = (stack_top as *mut Self).sub(1); //real kernel stack top
         *ptr = self;
-        Context(ptr as usize)
+        Context { sp: ptr as usize }
     }
 }
 
@@ -118,24 +102,32 @@ extern {
     fn trap_return();
 }
 
+/// Saved registers for kernel context switches.
 #[derive(Debug, Default)]
 #[repr(C)]
 struct ContextData {
+    /// Return address
     ra: usize,
+    /// Page table token
     satp: usize,
+    /// Callee-saved registers
     s: [usize; 12],
 }
 
 impl ContextData {
     fn new(satp: usize) -> Self {
-        // satp(asid) just like cr3, save the physical address for Page directory?
         ContextData { ra: trap_return as usize, satp, ..ContextData::default() }
     }
 }
 
-/// A struct only contain one usize element
+/// Context of a kernel thread.
 #[derive(Debug)]
-pub struct Context(usize);
+#[repr(C)]
+pub struct Context {
+    /// The stack pointer of the suspended thread.
+    /// A `ContextData` is stored here.
+    sp: usize,
+}
 
 impl Context {
     /// Switch to another kernel thread.
@@ -208,66 +200,43 @@ impl Context {
         : : : : "volatile" )
     }
 
-    /*
-    * @brief:
-    *   generate a null Context
-    * @retval:
-    *   a null Context
-    */
+    /// Constructs a null Context for the current running thread.
     pub unsafe fn null() -> Self {
-        Context(0)
+        Context { sp: 0 }
     }
 
-    /*
-    * @param:
-    *   entry: program entry for the thread
-    *   arg: a0
-    *   kstack_top: kernel stack top
-    *   cr3: cr3 register, save the physical address of Page directory
-    * @brief:
-    *   generate the content of kernel stack for the new kernel thread and save it's address at kernel stack top - 1
-    * @retval:
-    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
-    */
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
+    /// Constructs Context for a new kernel thread.
+    ///
+    /// The new thread starts at function `entry` with an usize argument `arg`.
+    /// The stack pointer will be set to `kstack_top`.
+    /// The SATP register will be set to `satp`.
+    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, satp: usize) -> Self {
         InitStack {
-            context: ContextData::new(cr3),
+            context: ContextData::new(satp),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
         }.push_at(kstack_top)
     }
 
-    /*
-    * @param:
-    *   entry_addr: program entry for the thread
-    *   ustack_top: user stack top
-    *   kstack_top: kernel stack top
-    *   is32: whether the cpu is 32 bit or not
-    *   cr3: cr3 register, save the physical address of Page directory
-    * @brief:
-    *   generate the content of kernel stack for the new user thread and save it's address at kernel stack top - 1
-    * @retval:
-    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
-    */
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, cr3: usize) -> Self {
+    /// Constructs Context for a new user thread.
+    ///
+    /// The new thread starts at `entry_addr`.
+    /// The stack pointer of user and kernel mode will be set to `ustack_top`, `kstack_top`.
+    /// The SATP register will be set to `satp`.
+    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, satp: usize) -> Self {
         InitStack {
-            context: ContextData::new(cr3),
+            context: ContextData::new(satp),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
         }.push_at(kstack_top)
     }
 
-    /*
-    * @param:
-    *   TrapFrame: the trapframe of the forked process(thread)
-    *   kstack_top: kernel stack top
-    *   cr3: cr3 register, save the physical address of Page directory
-    * @brief:
-    *   fork and generate a new process(thread) Context according to the TrapFrame and save it's address at kernel stack top - 1
-    * @retval:
-    *   a Context struct with the pointer to the kernel stack top - 1 as its only element
-    */
-    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
+    /// Fork a user process and get the new Context.
+    ///
+    /// The stack pointer in kernel mode will be set to `kstack_top`.
+    /// The SATP register will be set to `satp`.
+    /// All the other registers are same as the original.
+    pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, satp: usize) -> Self {
         InitStack {
-            context: ContextData::new(cr3),
+            context: ContextData::new(satp),
             tf: {
                 let mut tf = tf.clone();
                 // fork function's ret value, the new process is 0
@@ -277,9 +246,16 @@ impl Context {
         }.push_at(kstack_top)
     }
 
-    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, cr3: usize, tls: usize) -> Self {
+    /// Fork a user thread and get the new Context.
+    ///
+    /// The stack pointer in kernel mode will be set to `kstack_top`.
+    /// The SATP register will be set to `satp`.
+    /// The new user stack will be set to `ustack_top`.
+    /// The new thread pointer will be set to `tls`.
+    /// All the other registers are same as the original.
+    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, satp: usize, tls: usize) -> Self {
         InitStack {
-            context: ContextData::new(cr3),
+            context: ContextData::new(satp),
             tf: {
                 let mut tf = tf.clone();
                 tf.x[2] = ustack_top;   // sp
@@ -290,9 +266,8 @@ impl Context {
         }.push_at(kstack_top)
     }
 
-    /// Called at a new user context
-    /// To get the init TrapFrame in sys_exec
+    /// Used for getting the init TrapFrame of a new user context in `sys_exec`.
     pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.0 as *const InitStack)).tf.clone()
+        (*(self.sp as *const InitStack)).tf.clone()
     }
 }
