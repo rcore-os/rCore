@@ -8,7 +8,7 @@ rust: nightly-2019-03-05
 
 os:
   - linux
-  - osx
+  # - osx # too slow and hard to fix, skip it for now
 
 cache:
   cargo: true
@@ -31,6 +31,7 @@ env:
 
 allow_failures:
     matrix:
+        - ARCH="aarch64"
         - os: osx
 
 install:
