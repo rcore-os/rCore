@@ -1,10 +1,12 @@
 #!/bin/bash
+cd ../kernel && make sfsimg arch=riscv32 && cd ../tests
 for f in *.cmd
 do
     echo testing $f begin
     (
         cd ../kernel
-        exec timeout 10s make runtest arch=riscv64 init=$(cat ../tests/$f)
+        make build arch=riscv32 init=$(cat ../tests/$f)
+        exec timeout 10s make justruntest arch=riscv32 init=$(cat ../tests/$f)
     ) &
 
     pid=$!
