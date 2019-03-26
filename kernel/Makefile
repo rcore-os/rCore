@@ -1,3 +1,10 @@
+# Commands:
+#   make build                  Build
+#   make run                    Build and run in QEMU
+#   make justrun                Run the last build
+#   make doc                    Generate docs
+#   make asm                    Open the deassemble file of the last build
+#   make header                 Open 'objdump -h' of the last build
 #   make addr2line              Use addr2line to recover line info in backtrace
 #   make clean                  Clean
 #
