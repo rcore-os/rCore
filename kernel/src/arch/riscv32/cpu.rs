@@ -9,10 +9,7 @@ pub unsafe fn set_cpu_id(cpu_id: usize) {
 
 pub fn id() -> usize {
     let cpu_id;
-    #[cfg(not(feature = "m_mode"))]
     unsafe { asm!("mv $0, gp" : "=r"(cpu_id)); }
-    #[cfg(feature = "m_mode")]
-    unsafe { asm!("csrr $0, mhartid" : "=r"(cpu_id)); }
     cpu_id
 }
 

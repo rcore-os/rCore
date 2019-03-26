@@ -192,7 +192,6 @@ impl Thread {
 
         match elf.header.pt2.type_().as_type() {
             header::Type::Executable => {
-//                #[cfg(feature = "no_mmu")]
 //                panic!("ELF is not shared object");
             },
             header::Type::SharedObject => {},
@@ -232,7 +231,6 @@ impl Thread {
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
-        #[cfg(not(feature = "no_mmu"))]
         let mut ustack_top = {
             let (ustack_buttom, ustack_top) = match is32 {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
@@ -241,8 +239,6 @@ impl Thread {
             vm.push(ustack_buttom, ustack_top,  MemoryAttr::default().user(), ByFrame::new(GlobalFrameAlloc), "user_stack");
             ustack_top
         };
-        #[cfg(feature = "no_mmu")]
-        let mut ustack_top = vm.push(USER_STACK_SIZE).as_ptr() as usize + USER_STACK_SIZE;
 
         let init_info = ProcInitInfo {
             args: args.map(|s| String::from(s)).collect(),
@@ -311,7 +307,6 @@ impl Thread {
 
         // MMU:   copy data to the new space
         // NoMMU: coping data has been done in `vm.clone()`
-        #[cfg(not(feature = "no_mmu"))]
         for area in vm.iter() {
             let data = Vec::<u8>::from(unsafe { area.as_slice() });
             unsafe { vm.with(|| {
@@ -397,12 +392,6 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
         .filter(|ph| ph.get_type() == Ok(Type::Load))
         .map(|ph| ph.virtual_addr() + ph.mem_size()).max().unwrap() as usize;
     let va_size = va_end - va_begin;
-    #[cfg(feature = "no_mmu")]
-    let target = ms.push(va_size);
-    #[cfg(feature = "no_mmu")]
-    { entry = entry - va_begin + target.as_ptr() as usize; }
-    #[cfg(feature = "board_k210")]
-    { entry += 0x40000000; }
 
     for ph in elf.program_iter() {
         if ph.get_type() != Ok(Type::Load) {
@@ -414,11 +403,6 @@ fn memory_set_from(elf: &ElfFile<'_>) -> (MemorySet, usize) {
         let mem_size = ph.mem_size() as usize;
 
         // Get target slice
-        #[cfg(feature = "no_mmu")]
-        let target = &mut target[virt_addr - va_begin..virt_addr - va_begin + mem_size];
-        #[cfg(feature = "no_mmu")]
-        debug!("area @ {:?}, size = {:#x}", target.as_ptr(), mem_size);
-        #[cfg(not(feature = "no_mmu"))]
         let target = {
             ms.push(virt_addr, virt_addr + mem_size, ph.flags().to_attr(), ByFrame::new(GlobalFrameAlloc), "");
             unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }

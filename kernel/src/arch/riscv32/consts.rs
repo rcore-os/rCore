@@ -22,23 +22,16 @@ pub const KERNEL_P2_INDEX: usize = (KERNEL_OFFSET >> 12 >> 10) & 0x3ff;
 #[cfg(target_arch = "riscv64")]
 pub const KERNEL_P4_INDEX: usize = (KERNEL_OFFSET >> 12 >> 9 >> 9 >> 9) & 0o777;
 
-#[cfg(feature = "board_k210")]
-pub const KERNEL_HEAP_SIZE: usize = 0x0010_0000;
-#[cfg(not(feature = "board_k210"))]
 pub const KERNEL_HEAP_SIZE: usize = 0x00a0_0000;
 
-#[cfg(feature = "board_k210")]
-pub const MEMORY_OFFSET: usize = 0x4000_0000;
 #[cfg(target_arch = "riscv32")]
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
-#[cfg(all(target_arch = "riscv64", not(feature = "board_k210")))]
+#[cfg(target_arch = "riscv64")]
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
 
 #[cfg(target_arch = "riscv32")]
 pub const MEMORY_END: usize = 0x8100_0000;
-#[cfg(feature = "board_k210")]
-pub const MEMORY_END: usize = 0x4060_0000;
-#[cfg(all(target_arch = "riscv64", not(feature = "board_k210")))]
+#[cfg(target_arch = "riscv64")]
 pub const MEMORY_END: usize = 0x8100_0000;
 
 // FIXME: rv64 `sh` and `ls` will crash if stack top > 0x80000000 ???

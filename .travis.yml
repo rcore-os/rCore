@@ -24,12 +24,14 @@ addons:
 env:
   matrix:
     - ARCH="riscv64"
-    - ARCH="riscv64" OPTS="board=k210"
     - ARCH="riscv64" OPTS="board=u540"
     - ARCH="riscv32"
-    - ARCH="riscv32" OPTS="m_mode=1"
     - ARCH="x86_64"
     - ARCH="aarch64"
+
+allow_failures:
+    matrix:
+        - os: osx
 
 install:
   - if [ $ARCH = riscv32 ] || [ $ARCH = riscv64 ]; then
@@ -45,11 +47,24 @@ install:
       wget https://developer.arm.com/-/media/Files/downloads/gnu-a/8.2-2018.11/$FILE.tar.xz;
       tar -xvf $FILE.tar.xz;
       export PATH=$PATH:$PWD/$FILE/bin;
+      wget https://musl.cc/aarch64-linux-musl-cross.tgz;
+      tar -xvf aarch64-linux-musl-cross.tgz;
+      export PATH=$PATH:$PWD/aarch64-linux-musl-cross/bin;
     elif [ $TRAVIS_OS_NAME = osx ]; then
       brew tap SergioBenitez/osxct;
       brew install aarch64-none-elf;
     fi;
     fi
+  - if [ $ARCH = x86_64 ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    sudo apt update;
+    sudo apt install linux-headers-$(uname -r);
+    wget https://musl.cc/x86_64-linux-musl-cross.tgz;
+    tar -xvf x86_64-linux-musl-cross.tgz;
+    export PATH=$PATH:$PWD/x86_64-linux-musl-cross/bin;
+    fi;
+    fi
+
   - if [ $TRAVIS_OS_NAME = linux ]; then
       wget https://download.qemu.org/qemu-3.1.0.tar.xz && tar xvJf qemu-3.1.0.tar.xz > /dev/null && cd qemu-3.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
       export PATH=$PATH:$PWD/qemu-3.1.0/$ARCH-softmmu:$PWD/qemu-3.1.0;

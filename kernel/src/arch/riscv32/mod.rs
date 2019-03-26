@@ -61,20 +61,6 @@ const BOOT_HART_ID: usize = 0;
 const BOOT_HART_ID: usize = 1;
 
 /// Constant & Macro for `trap.asm`
-#[cfg(feature = "m_mode")]
-global_asm!("
-    .equ xstatus,   0x300
-    .equ xscratch,  0x340
-    .equ xepc,      0x341
-    .equ xcause,    0x342
-    .equ xtval,     0x343
-    .macro XRET\n mret\n .endm
-    .macro TEST_BACK_TO_KERNEL  // s0 == back to kernel?
-        li   s3, 3 << 11
-        and  s0, s1, s3         // mstatus.MPP = 3
-    .endm
-");
-#[cfg(not(feature = "m_mode"))]
 global_asm!("
     .equ xstatus,   0x100
     .equ xscratch,  0x140
@@ -111,8 +97,6 @@ global_asm!(r"
 ");
 
 
-#[cfg(feature = "board_k210")]
-global_asm!(include_str!("board/k210/boot.asm"));
 global_asm!(include_str!("boot/entry.asm"));
 global_asm!(include_str!("boot/trap.asm"));
 

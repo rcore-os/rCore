@@ -17,10 +17,6 @@ authors = [
 ]
 
 [features]
-# Disable paging (for riscv)
-no_mmu = []
-# Kernel in M-mode (for riscv)
-m_mode = ["no_mmu"]
 # Page table sv39 or sv48 (for riscv64)
 sv39 = []
 board_u540 = ["sv39", "link_user"]
@@ -28,8 +24,6 @@ board_u540 = ["sv39", "link_user"]
 nographic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
-# (for riscv64)
-board_k210 = ["m_mode"]
 # Hard link user program
 link_user = []
 

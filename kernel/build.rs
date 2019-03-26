@@ -17,10 +17,6 @@ fn main() {
 		"riscv32" => {
 		}
 		"riscv64" => {
-			if board == "k210" {
-				println!("cargo:rustc-link-search=native={}", "../tools/k210");
-				println!("cargo:rustc-link-lib=static=kendryte");
-			}
 		}
 		"aarch64" => {
 		}

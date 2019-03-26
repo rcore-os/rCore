@@ -1,10 +1,3 @@
-#[cfg(feature = "m_mode")]
-use riscv::register::{
-    mstatus as xstatus,
-    mscratch as xscratch,
-    mtvec as xtvec,
-};
-#[cfg(not(feature = "m_mode"))]
 use riscv::register::{
     sstatus as xstatus,
     sscratch as xscratch,
@@ -36,9 +29,6 @@ pub fn init() {
         sie::set_ssoft();
         // Enable external interrupt
         if super::cpu::id() == super::BOOT_HART_ID {
-            #[cfg(feature = "m_mode")]
-            mie::set_mext();
-            #[cfg(not(feature = "m_mode"))]
             sie::set_sext();
             // NOTE: In M-mode: mie.MSIE is set by BBL.
             //                  mie.MEIE can not be set in QEMU v3.0
@@ -54,28 +44,10 @@ pub fn init() {
 */
 #[inline]
 pub unsafe fn enable() {
-    #[cfg(feature = "m_mode")]
-    xstatus::set_mie();
-    #[cfg(not(feature = "m_mode"))]
     xstatus::set_sie();
 }
 
-/*
-* @brief:
-*   store and disable interrupt
-* @retbal:
-*   a usize value store the origin sie
-*/
 #[inline]
-#[cfg(feature = "m_mode")]
-pub unsafe fn disable_and_store() -> usize {
-    let e = xstatus::read().mie() as usize;
-    xstatus::clear_mie();
-    e
-}
-
-#[inline]
-#[cfg(not(feature = "m_mode"))]
 pub unsafe fn disable_and_store() -> usize {
     let e = xstatus::read().sie() as usize;
     xstatus::clear_sie();

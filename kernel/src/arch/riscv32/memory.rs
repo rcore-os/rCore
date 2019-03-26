@@ -6,21 +6,10 @@ use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
 use riscv::register::satp;
 
-#[cfg(feature = "no_mmu")]
-pub fn init(_dtb: usize) {
-    init_heap();
-
-    let heap_bottom = end as usize;
-    let heap_size = MEMORY_END - heap_bottom;
-    unsafe { crate::memory::MEMORY_ALLOCATOR.lock().init(heap_bottom, heap_size); }
-    info!("available memory: [{:#x}, {:#x})", heap_bottom, MEMORY_END);
-}
-
 /*
 * @brief:
 *   Init the mermory management module, allow memory access and set up page table and init heap and frame allocator
 */
-#[cfg(not(feature = "no_mmu"))]
 pub fn init(dtb: usize) {
     unsafe { sstatus::set_sum(); }  // Allow user memory access
     // initialize heap and Frame allocator
@@ -69,7 +58,6 @@ fn init_frame_allocator() {
 }
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
-#[cfg(not(feature = "no_mmu"))]
 fn remap_the_kernel(dtb: usize) {
     let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
     let mut ms = MemorySet::new_bare();

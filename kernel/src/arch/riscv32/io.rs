@@ -19,36 +19,16 @@ impl Write for SerialPort {
 }
 
 fn putchar(c: u8) {
-    if cfg!(feature = "board_k210") {
-        unsafe {
-            while TXDATA.read_volatile() & (1 << 31) != 0 {}
-            (TXDATA as *mut u8).write_volatile(c as u8);
+    if cfg!(feature = "board_u540") {
+        if c == b'\n' {
+            sbi::console_putchar(b'\r' as usize);
         }
-    } else if cfg!(feature = "m_mode") {
-        (super::BBL.mcall_console_putchar)(c);
-    } else {
-        if cfg!(feature = "board_u540") {
-            if c == b'\n' {
-                sbi::console_putchar(b'\r' as usize);
-            }
-        }
-        sbi::console_putchar(c as usize);
     }
+    sbi::console_putchar(c as usize);
 }
 
 pub fn getchar() -> char {
-    let c = if cfg!(feature = "board_k210") {
-        loop {
-            let rxdata = unsafe { RXDATA.read_volatile() };
-            if rxdata & (1 << 31) == 0 {
-                break rxdata as u8;
-            }
-        }
-    } else if cfg!(feature = "m_mode") {
-        (super::BBL.mcall_console_getchar)() as u8
-    } else {
-        sbi::console_getchar() as u8
-    };
+    let c = sbi::console_getchar() as u8;
 
     match c {
         255 => '\0',   // null

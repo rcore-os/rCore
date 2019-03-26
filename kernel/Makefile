@@ -1,10 +1,3 @@
-# Commands:
-#   make build                  Build
-#   make run                    Build and run in QEMU
-#   make justrun                Run the last build
-#   make doc                    Generate docs
-#   make asm                    Open the deassemble file of the last build
-#   make header                 Open 'objdump -h' of the last build
 #   make addr2line              Use addr2line to recover line info in backtrace
 #   make clean                  Clean
 #
@@ -17,10 +10,8 @@
 #   smp     = 1 | 2 | ...           SMP core number
 #   graphic = on | off              enable/disable qemu graphical output
 #   board   = none                Running on QEMU
-#         | k210                Only available on riscv64, build without bbl, run on K210
 #         | u540                Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   m_mode                      Only available on riscv32, build for M-Mode, without MMU
 #   pci_passthru                Only available on x86_64, passthrough the specified PCI device
 
 arch ?= riscv64
@@ -29,7 +20,6 @@ mode ?= debug
 LOG  ?= debug
 graphic ?= off
 smp  ?= 4
-m_mode ?=
 pci_passthru ?=
 
 target := $(arch)
@@ -41,7 +31,6 @@ bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
-k210_lib := ../tools/k210/libkendryte.a
 
 ### export environments ###
 export ARCH = $(arch)
@@ -51,11 +40,6 @@ export SFSIMG = $(user_dir)/build/$(arch).qcow2
 ifeq ($(arch), aarch64)
 board := raspi3
 endif
-ifeq ($(board), k210)
-m_mode := 1
-endif
-# crate 'process' use this to set interrupt (MIE or SIE)
-export M_MODE = $(m_mode)
 
 ifeq ($(arch), aarch64)
 graphic := on
@@ -87,27 +71,19 @@ else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
 	-kernel $(kernel_img) \
-	-drive file=$(SFSIMG),format=raw,id=sfs \
+	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
-
-ifdef m_mode
-qemu_opts += -cpu rv32imacu-nommu
-endif
 
 else ifeq ($(arch), riscv64)
 qemu_opts += \
 	-machine virt \
 	-kernel $(kernel_img) \
-	-drive file=$(SFSIMG),format=raw,id=sfs \
+	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
-
-ifdef m_mode
-qemu_opts += -cpu rv64imacu-nommu
-endif
 
 else ifeq ($(arch), aarch64)
 qemu_opts += \
@@ -136,11 +112,6 @@ raspi3_timer ?= generic
 ifeq ($(raspi3_timer), generic)
 features += raspi3_use_generic_timer
 endif
-endif
-
-ifdef m_mode
-features += no_mmu m_mode
-riscv_pk_args := --enable-boot-machine
 endif
 
 ifeq ($(board), u540)
@@ -248,9 +219,6 @@ ifeq ($(arch), riscv32)
 	make -j && \
 	cp bbl $(abspath $@)
 else ifeq ($(arch), riscv64)
-ifeq ($(board), k210)
-	@$(objcopy) $(kernel) --strip-all -O binary $@
-else
 	@mkdir -p target/$(target)/bbl && \
 	cd target/$(target)/bbl && \
 	$(bbl_path)/configure \
@@ -261,7 +229,6 @@ else
 		--with-payload=$(abspath $(kernel)) && \
 	make -j && \
 	cp bbl $(abspath $@)
-endif
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
 endif
@@ -277,12 +244,7 @@ else ifeq ($(arch), riscv32)
 		src/arch/riscv32/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), riscv64)
-ifeq ($(board), k210)
-	@[[ -f $(k210_lib) ]] || wget https://github.com/wangrunji0408/RustOS/releases/download/v0.1/libkendryte.a -O $(k210_lib)
-	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
-else
 	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
-endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
@@ -314,13 +276,6 @@ install: $(kernel_img)
 	sudo umount $(sd_card)
 endif
 
-endif
-
-ifeq ($(board), k210)
-.PHONY:
-install: $(kernel_img)
-	## baudrate no more than 600000
-	@python3 ../tools/k210/kflash.py $(kernel_img) -b 600000
 endif
 
 ifeq ($(board), u540)

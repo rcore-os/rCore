@@ -10,11 +10,7 @@ use lazy_static::*;
 use log::*;
 use buddy_system_allocator::LockedHeap;
 
-#[cfg(not(feature = "no_mmu"))]
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
-
-#[cfg(feature = "no_mmu")]
-pub type MemorySet = rcore_memory::no_mmu::MemorySet<NoMMUSupportImpl>;
 
 // x86_64 support up to 64G memory
 #[cfg(target_arch = "x86_64")]
@@ -99,7 +95,6 @@ impl Drop for KernelStack {
 
 /// Handle page fault at `addr`.
 /// Return true to continue, false to halt.
-#[cfg(not(feature = "no_mmu"))]
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
 
@@ -118,18 +113,3 @@ pub fn init_heap() {
 
 /// Allocator for the rest memory space on NO-MMU case.
 pub static MEMORY_ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-#[derive(Debug, Clone, Copy)]
-pub struct NoMMUSupportImpl;
-
-impl rcore_memory::no_mmu::NoMMUSupport for NoMMUSupportImpl {
-    type Alloc = LockedHeap;
-    fn allocator() -> &'static Self::Alloc {
-        &MEMORY_ALLOCATOR
-    }
-}
-
-#[cfg(feature = "no_mmu")]
-pub fn handle_page_fault(_addr: usize) -> bool {
-    unreachable!()
-}
