@@ -6,10 +6,7 @@ use log::*;
 #[path = "context.rs"]
 mod context;
 
-/*
-* @brief:
-*   initialize the interrupt status
-*/
+/// Initialize interrupt
 pub fn init() {
     extern {
         fn trap_entry();
@@ -30,15 +27,13 @@ pub fn init() {
     info!("interrupt: init end");
 }
 
-/*
-* @brief:
-*   enable interrupt
-*/
+/// Enable interrupt
 #[inline]
 pub unsafe fn enable() {
     sstatus::set_sie();
 }
 
+/// Disable interrupt and return current interrupt status
 #[inline]
 pub unsafe fn disable_and_store() -> usize {
     let e = sstatus::read().sie() as usize;
@@ -46,12 +41,7 @@ pub unsafe fn disable_and_store() -> usize {
     e
 }
 
-/*
-* @param:
-*   flags: input flag
-* @brief:
-*   enable interrupt if flags != 0
-*/
+/// Enable interrupt if `flags` != 0
 #[inline]
 pub unsafe fn restore(flags: usize) {
     if flags != 0 {
@@ -59,12 +49,9 @@ pub unsafe fn restore(flags: usize) {
     }
 }
 
-/*
-* @param:
-*   TrapFrame: the trapFrame of the Interrupt/Exception/Trap to be processed
-* @brief:
-*   process the Interrupt/Exception/Trap
-*/
+/// Dispatch and handle interrupt.
+///
+/// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     use self::scause::{Trap, Interrupt as I, Exception as E};
@@ -119,33 +106,17 @@ fn ipi() {
     super::sbi::clear_ipi();
 }
 
-/*
-* @brief:
-*   process timer interrupt
-*/
 fn timer() {
     super::timer::set_next();
     crate::trap::timer();
 }
 
-/*
-* @param:
-*   TrapFrame: the Trapframe for the syscall
-* @brief:
-*   process syscall
-*/
 fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4;   // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
     tf.x[10] = ret as usize;
 }
 
-/*
-* @param:
-*   TrapFrame: the Trapframe for the page fault exception
-* @brief:
-*   process page fault exception
-*/
 fn page_fault(tf: &mut TrapFrame) {
     let addr = tf.stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);

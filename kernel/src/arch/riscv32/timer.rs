@@ -2,19 +2,11 @@ use riscv::register::*;
 use super::sbi;
 use log::*;
 
-/*
-* @brief: 
-*   get timer cycle for 64 bit cpu
-*/ 
 #[cfg(target_pointer_width = "64")]
 pub fn get_cycle() -> u64 {
     time::read() as u64
 }
 
-/*
-* @brief: 
-*   get timer cycle for 32 bit cpu
-*/ 
 #[cfg(target_pointer_width = "32")]
 pub fn get_cycle() -> u64 {
     loop {
@@ -32,10 +24,7 @@ pub fn read_epoch() -> u64 {
     0
 }
 
-/*
-* @brief: 
-*   enable supervisor timer interrupt and set next timer interrupt
-*/
+/// Enable timer interrupt
 pub fn init() {
     // Enable supervisor timer interrupt
     unsafe { sie::set_stimer(); }
@@ -43,10 +32,7 @@ pub fn init() {
     info!("timer: init end");
 }
 
-/*
-* @brief: 
-*   set the next timer interrupt
-*/
+/// Set the next timer interrupt
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;

@@ -25,15 +25,7 @@ fn init_frame_allocator() {
     ba.insert(to_range(start, end));
     info!("FrameAllocator init end");
 
-    /*
-     * @param:
-     *   start: start address
-     *   end: end address
-     * @brief:
-     *   transform the memory address to the page number
-     * @retval:
-     *   the page number range from start address to end address
-     */
+    /// Transform memory area `[start, end)` to integer range for `FrameAllocator`
     fn to_range(start: usize, end: usize) -> Range<usize> {
         let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
         let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;

@@ -6,10 +6,7 @@ use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
 use riscv::register::satp;
 
-/*
-* @brief:
-*   Init the mermory management module, allow memory access and set up page table and init heap and frame allocator
-*/
+/// Initialize the memory management module
 pub fn init(dtb: usize) {
     unsafe { sstatus::set_sum(); }  // Allow user memory access
     // initialize heap and Frame allocator
@@ -26,10 +23,6 @@ pub fn init_other() {
     }
 }
 
-/*
-* @brief:
-*   Init frame allocator, here use a BitAlloc implemented by segment tree.
-*/
 fn init_frame_allocator() {
     use bit_allocator::BitAlloc;
     use core::ops::Range;
@@ -40,15 +33,7 @@ fn init_frame_allocator() {
 
     info!("frame allocator: init end");
 
-    /*
-    * @param:
-    *   start: start address
-    *   end: end address
-    * @brief:
-    *   transform the memory address to the page number
-    * @retval:
-    *   the page number range from start address to end address
-    */
+    /// Transform memory area `[start, end)` to integer range for `FrameAllocator`
     fn to_range(start: usize, end: usize) -> Range<usize> {
         let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
         let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;

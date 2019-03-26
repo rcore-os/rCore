@@ -53,7 +53,7 @@ impl PageTable for ActivePageTable {
 
 impl PageTableExt for ActivePageTable {}
 
-// define the ROOT_PAGE_TABLE, and the virtual address of it?
+/// The virtual address of root page table
 #[cfg(target_arch = "riscv32")]
 const ROOT_PAGE_TABLE: *mut RvPageTable =
     ((RECURSIVE_INDEX     << 12 << 10) |
@@ -149,10 +149,6 @@ impl InactivePageTable for InactivePageTable0 {
         InactivePageTable0 { root_frame: frame }
     }
 
-    /*
-    * @brief:
-    *   map the kernel code memory address (p2 page table) in the new inactive page table according the current active page table
-    */
     #[cfg(target_arch = "riscv32")]
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *ROOT_PAGE_TABLE };
@@ -215,13 +211,6 @@ impl InactivePageTable for InactivePageTable0 {
         unsafe { sfence_vma_all(); }
     }
 
-    /*
-    * @param:
-    *   f: a function to do something with the temporary modified activate page table
-    * @brief:
-    *   temporarily make current `active_table`'s recursive entry point to
-    *    `this` inactive table, so we can modify this inactive page table.
-    */
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
         let target = satp::read().frame().start_address().as_usize();
         active_table().with_temporary_map(target, |active_table, root_table: &mut RvPageTable| {
