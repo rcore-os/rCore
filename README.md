@@ -1,6 +1,6 @@
 # rCore
 
-[![Build Status](https://travis-ci.org/oscourse-tsinghua/rcore_plus.svg?branch=master)](https://travis-ci.org/oscourse-tsinghua/rcore_plus)
+[![Build Status](https://travis-ci.org/rcore-os/rCore.svg?branch=master)](https://travis-ci.org/rcore-os/rCore)
 
 Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 

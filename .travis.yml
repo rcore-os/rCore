@@ -29,8 +29,8 @@ env:
     - ARCH="x86_64"
     - ARCH="aarch64"
 
-allow_failures:
-    matrix:
+matrix:
+    allow_failures:
         - env: ARCH="aarch64"
         - os: osx
 
