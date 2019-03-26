@@ -62,8 +62,7 @@ endif
 
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(smp) \
-	-append "test=biscuit/fork"
+	-smp cores=$(smp)
 qemu_net_opts := \
 	-netdev type=tap,id=net0,script=no,downscript=no
 

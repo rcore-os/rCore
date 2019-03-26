@@ -31,7 +31,7 @@ env:
 
 allow_failures:
     matrix:
-        - ARCH="aarch64"
+        - env: ARCH="aarch64"
         - os: osx
 
 install:
@@ -83,4 +83,6 @@ before_script:
 script:
   - cd user && make sfsimg arch=$ARCH && cd ..
   - cd kernel && make build arch=$ARCH $OPTS && cd ..
-  - cd tests && ./test.sh && cd ..
+  - if [ $ARCH = riscv64 ]; then
+        cd tests && ./test.sh && cd ..;
+    fi

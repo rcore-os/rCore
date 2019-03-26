@@ -200,7 +200,7 @@ impl Thread {
         // Check interpreter
         if let Ok(loader_path) = elf.get_interpreter() {
             // assuming absolute path
-            if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(&loader_path[1..], FOLLOW_MAX_DEPTH) {
+            if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(loader_path, FOLLOW_MAX_DEPTH) {
                 if let Ok(buf) = inode.read_as_vec() {
                     debug!("using loader {}", &loader_path);
                     // Elf loader should not have INTERP
@@ -426,10 +426,14 @@ impl ElfExt for ElfFile<'_> {
         let header = self.program_iter()
             .filter(|ph| ph.get_type() == Ok(Type::Interp))
             .next().ok_or("no interp header")?;
-        let data = match header.get_data(self)? {
+        let mut data = match header.get_data(self)? {
             SegmentData::Undefined(data) => data,
             _ => unreachable!(),
         };
+        // skip NULL
+        while let Some(0) = data.last() {
+            data = &data[..data.len()-1];
+        }
         let path = str::from_utf8(data)
             .map_err(|_| "failed to convert to utf8")?;
         Ok(path)
