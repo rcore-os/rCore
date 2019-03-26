@@ -73,6 +73,26 @@ install:
       sudo apt install libfuse-dev;
     fi
 
+  - if [ $ARCH = riscv32 ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    sudo apt update;
+    sudo apt install linux-headers-$(uname -r);
+    wget https://musl.cc/riscv32-linux-musl-cross.tgz;
+    tar -xvf riscv32-linux-musl-cross.tgz;
+    export PATH=$PATH:$PWD/riscv32-linux-musl-cross/bin;
+    fi;
+    fi
+  - if [ $ARCH = riscv64 ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    sudo apt update;
+    sudo apt install linux-headers-$(uname -r);
+    wget https://musl.cc/riscv64-linux-musl-cross.tgz;
+    tar -xvf riscv64-linux-musl-cross.tgz;
+    export PATH=$PATH:$PWD/riscv64-linux-musl-cross/bin;
+    fi;
+    fi
+
+
 before_script:
   - rustup component add rust-src
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)

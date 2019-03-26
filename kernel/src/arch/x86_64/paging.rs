@@ -11,6 +11,7 @@ use x86_64::structures::paging::{
     frame::PhysFrame as Frame,
     FrameAllocator, FrameDeallocator
 };
+use crate::consts::KERNEL_OFFSET;
 use log::*;
 
 pub trait PageExt {
@@ -69,7 +70,9 @@ impl PageTable for ActivePageTable {
     }
 }
 
-impl PageTableExt for ActivePageTable {}
+impl PageTableExt for ActivePageTable {
+    const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
+}
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {

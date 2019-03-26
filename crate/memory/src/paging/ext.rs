@@ -3,6 +3,9 @@
 use super::*;
 
 pub trait PageTableExt: PageTable {
+    // Take some special care here.
+    // TEMP_PAGE_ADDR mapping might be overwritten in the `f` below.
+    // So this should be really high in kernel space when necessary.
     const TEMP_PAGE_ADDR: VirtAddr = 0xcafeb000;
 
     fn with_temporary_map<T, D>(&mut self, target: PhysAddr, f: impl FnOnce(&mut Self, &mut D) -> T) -> T {
