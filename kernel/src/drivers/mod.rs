@@ -86,3 +86,8 @@ pub fn init(dtb: usize) {
 pub fn init() {
     bus::pci::init();
 }
+
+lazy_static! {
+    // Write only once at boot
+    pub static ref CMDLINE: RwLock<String> = RwLock::new(String::new());
+}

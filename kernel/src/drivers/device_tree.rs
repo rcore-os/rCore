@@ -1,8 +1,10 @@
 use core::slice;
+use alloc::string::String;
 
 use device_tree::{DeviceTree, Node};
 
 use super::bus::virtio_mmio::virtio_probe;
+use super::CMDLINE;
 
 const DEVICE_TREE_MAGIC: u32 = 0xd00dfeed;
 
@@ -11,6 +13,12 @@ fn walk_dt_node(dt: &Node) {
         // TODO: query this from table
         if compatible == "virtio,mmio" {
             virtio_probe(dt);
+        }
+    }
+    if let Ok(bootargs) = dt.prop_str("bootargs") {
+        if bootargs.len() > 0 {
+            info!("Kernel cmdline: {}", bootargs);
+            *CMDLINE.write() = String::from(bootargs);
         }
     }
     for child in dt.children.iter() {

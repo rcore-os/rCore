@@ -26,6 +26,8 @@ board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 # Hard link user program
 link_user = []
+# Run cmdline instead of user shell, useful for automatic testing
+run_cmdline = []
 
 [profile.dev]
 # MUST >= 1 : Enable RVO to avoid stack overflow

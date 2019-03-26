@@ -2,6 +2,12 @@
 #   make build                  Build
 #   make run                    Build and run in QEMU
 #   make justrun                Run the last build
+#   make runnet                 Build and run in QEMU with nic
+#   make justrunnet             Run the last build with nic
+#   make runui                  Build and run in QEMU with gui
+#   make justrunui              Run the last build with gui
+#   make runtest                Build and run in QEMU with specified program
+#   make justruntest            Run the last build with specified program
 #   make doc                    Generate docs
 #   make asm                    Open the deassemble file of the last build
 #   make header                 Open 'objdump -h' of the last build
@@ -19,7 +25,8 @@
 #   board   = none                Running on QEMU
 #         | u540                Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   pci_passthru                Only available on x86_64, passthrough the specified PCI device
+#   pci_passthru = 0000:00:00.1 Only available on x86_64, passthrough the specified PCI device
+#   init = /bin/ls              Only available on riscv64, run specified program instead of user shell
 
 arch ?= riscv64
 board ?= none
@@ -28,6 +35,7 @@ LOG  ?= debug
 graphic ?= off
 smp  ?= 4
 pci_passthru ?=
+init ?=
 
 target := $(arch)
 build_path := target/$(target)/$(mode)
@@ -54,7 +62,8 @@ endif
 
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(smp)
+	-smp cores=$(smp) \
+	-append "test=biscuit/fork"
 qemu_net_opts := \
 	-netdev type=tap,id=net0,script=no,downscript=no
 
@@ -112,6 +121,10 @@ ifneq ($(graphic), on)
 features += nographic
 endif
 
+ifneq ($(init), )
+features += run_cmdline
+endif
+
 ifeq ($(board), raspi3)
 # qemu only has generic timer
 # TODO: configure system/generic timer automatically
@@ -162,7 +175,7 @@ gdb := $(prefix)gdb
 strip := $(prefix)strip
 export CC = $(cc)
 
-.PHONY: all clean run build asm doc justrun debug kernel sfsimg install runnet
+.PHONY: all clean build asm doc  debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
 
 all: kernel
 
@@ -177,6 +190,7 @@ doc:
 run: build justrun
 runnet: build justrunnet
 runui: build justrunui
+runtest: build justruntest
 
 justrun:
 	@qemu-system-$(arch) $(qemu_opts)
@@ -188,6 +202,9 @@ justrunui: build
 	@qemu-system-$(arch) $(qemu_opts) \
 		-device virtio-gpu-device \
 		-device virtio-mouse-device
+
+justruntest: build
+	@qemu-system-$(arch) $(qemu_opts) --append $(init) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
