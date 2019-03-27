@@ -51,8 +51,8 @@ smoltcp = { version = "0.5.0", default-features = false, features = ["alloc", "l
 bit-allocator = { path = "../crate/bit-allocator" }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { path = "../crate/thread" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", branch = "sefs" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", branch = "sefs" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { git = "https://github.com/rcore-os/bootloader" }
