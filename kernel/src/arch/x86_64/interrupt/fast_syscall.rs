@@ -1,9 +1,8 @@
-/// `syscall` instruction
-
-use x86_64::registers::model_specific::*;
-use core::mem::transmute;
 use super::super::gdt;
 use super::TrapFrame;
+use core::mem::transmute;
+/// `syscall` instruction
+use x86_64::registers::model_specific::*;
 
 pub fn init() {
     unsafe {
@@ -26,7 +25,7 @@ pub fn init() {
     }
 }
 
-extern {
+extern "C" {
     fn syscall_entry();
 }
 

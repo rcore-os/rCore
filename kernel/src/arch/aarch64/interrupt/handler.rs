@@ -1,8 +1,8 @@
 //! Trap handler
 
-use crate::arch::board::irq::handle_irq;
 use super::context::TrapFrame;
 use super::syndrome::{Fault, Syndrome};
+use crate::arch::board::irq::handle_irq;
 
 use aarch64::regs::*;
 use log::*;

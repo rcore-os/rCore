@@ -6,17 +6,17 @@
 use log::*;
 extern crate alloc;
 
-pub mod paging;
-pub mod cow;
-pub mod swap;
-pub mod memory_set;
 mod addr;
+pub mod cow;
+pub mod memory_set;
 pub mod no_mmu;
+pub mod paging;
+pub mod swap;
 
 pub use crate::addr::*;
 
 pub enum VMError {
-    InvalidPtr
+    InvalidPtr,
 }
 
 pub type VMResult<T> = Result<T, VMError>;

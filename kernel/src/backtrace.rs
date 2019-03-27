@@ -52,8 +52,16 @@ pub fn backtrace() {
         let mut current_pc = lr();
         let mut current_fp = fp();
         let mut stack_num = 0;
-        while current_pc >= stext as usize && current_pc <= etext as usize && current_fp as usize != 0 {
-            println!("#{} {:#018X} fp {:#018X}", stack_num, current_pc - size_of::<usize>(), current_fp);
+        while current_pc >= stext as usize
+            && current_pc <= etext as usize
+            && current_fp as usize != 0
+        {
+            println!(
+                "#{} {:#018X} fp {:#018X}",
+                stack_num,
+                current_pc - size_of::<usize>(),
+                current_fp
+            );
             stack_num = stack_num + 1;
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
             {
@@ -72,8 +80,9 @@ pub fn backtrace() {
                 // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
                 // size = 512 pages
                 current_fp = *(current_fp as *const usize).offset(0);
-                if current_fp >= 0x0000_57ac_0000_0000 + 512 * PAGE_SIZE - size_of::<usize>() &&
-                    current_fp <= 0xffff_ff00_0000_0000 {
+                if current_fp >= 0x0000_57ac_0000_0000 + 512 * PAGE_SIZE - size_of::<usize>()
+                    && current_fp <= 0xffff_ff00_0000_0000
+                {
                     break;
                 }
                 current_pc = *(current_fp as *const usize).offset(1);

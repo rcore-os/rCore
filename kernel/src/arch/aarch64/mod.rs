@@ -1,15 +1,15 @@
 //! Entrance and initialization for aarch64.
 
-pub mod io;
-pub mod paging;
-pub mod memory;
-pub mod interrupt;
 pub mod consts;
 pub mod cpu;
 pub mod driver;
-pub mod timer;
-pub mod syscall;
+pub mod interrupt;
+pub mod io;
+pub mod memory;
+pub mod paging;
 pub mod rand;
+pub mod syscall;
+pub mod timer;
 
 #[cfg(feature = "board_raspi3")]
 #[path = "board/raspi3/mod.rs"]

@@ -36,7 +36,7 @@ pub const Error: u8 = 19;
 pub const Spurious: u8 = 31;
 
 // PCI Interrupts
-// See https://gist.github.com/mcastelino/4acda7c2407f1c51e68f3f994d8ffc98 
+// See https://gist.github.com/mcastelino/4acda7c2407f1c51e68f3f994d8ffc98
 pub const PIRQA: u8 = 16;
 pub const PIRQB: u8 = 17;
 pub const PIRQC: u8 = 18;

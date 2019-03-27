@@ -1,11 +1,11 @@
 //! TrapFrame and context definitions for aarch64.
 
-use spin::Mutex;
-use lazy_static::lazy_static;
-use aarch64::barrier;
 use aarch64::addr::PhysAddr;
-use aarch64::paging::PhysFrame;
 use aarch64::asm::{tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write_asid};
+use aarch64::barrier;
+use aarch64::paging::PhysFrame;
+use lazy_static::lazy_static;
+use spin::Mutex;
 
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
@@ -23,7 +23,7 @@ pub struct TrapFrame {
 
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
-    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
+    fn new_kernel_thread(entry: extern "C" fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x0 = arg;
@@ -65,7 +65,7 @@ impl InitStack {
     }
 }
 
-extern {
+extern "C" {
     fn __trapret();
 }
 
@@ -78,7 +78,10 @@ struct ContextData {
 
 impl ContextData {
     fn new() -> Self {
-        ContextData { lr: __trapret as usize, ..ContextData::default() }
+        ContextData {
+            lr: __trapret as usize,
+            ..ContextData::default()
+        }
     }
 }
 
@@ -99,7 +102,7 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    unsafe extern fn __switch(_self_stack: &mut usize, _target_stack: &mut usize) {
+    unsafe extern "C" fn __switch(_self_stack: &mut usize, _target_stack: &mut usize) {
         asm!(
         "
         mov x10, #-(12 * 8)
@@ -144,17 +147,30 @@ impl Context {
         }
     }
 
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, ttbr: usize) -> Self {
+    pub unsafe fn new_kernel_thread(
+        entry: extern "C" fn(usize) -> !,
+        arg: usize,
+        kstack_top: usize,
+        ttbr: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
-        }.push_at(kstack_top, ttbr)
+        }
+        .push_at(kstack_top, ttbr)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, ttbr: usize) -> Self {
+    pub unsafe fn new_user_thread(
+        entry_addr: usize,
+        ustack_top: usize,
+        kstack_top: usize,
+        _is32: bool,
+        ttbr: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
-        }.push_at(kstack_top, ttbr)
+        }
+        .push_at(kstack_top, ttbr)
     }
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, ttbr: usize) -> Self {
         InitStack {
@@ -164,9 +180,16 @@ impl Context {
                 tf.x0 = 0;
                 tf
             },
-        }.push_at(kstack_top, ttbr)
+        }
+        .push_at(kstack_top, ttbr)
     }
-    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, ttbr: usize, tls: usize) -> Self {
+    pub unsafe fn new_clone(
+        tf: &TrapFrame,
+        ustack_top: usize,
+        kstack_top: usize,
+        ttbr: usize,
+        tls: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(),
             tf: {
@@ -176,14 +199,14 @@ impl Context {
                 tf.x0 = 0;
                 tf
             },
-        }.push_at(kstack_top, ttbr)
+        }
+        .push_at(kstack_top, ttbr)
     }
     /// Called at a new user context
     /// To get the init TrapFrame in sys_exec
     pub unsafe fn get_init_tf(&self) -> TrapFrame {
         (*(self.stack_top as *const InitStack)).tf.clone()
     }
-
 }
 
 const ASID_MASK: u16 = 0xffff;
@@ -199,7 +222,10 @@ struct AsidAllocator(Asid);
 
 impl AsidAllocator {
     fn new() -> Self {
-        AsidAllocator(Asid { value: 0, generation: 1 })
+        AsidAllocator(Asid {
+            value: 0,
+            generation: 1,
+        })
     }
 
     fn alloc(&mut self, old_asid: Asid) -> Asid {

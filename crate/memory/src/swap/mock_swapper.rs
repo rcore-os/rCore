@@ -17,7 +17,7 @@ pub struct MockSwapper {
 impl Swapper for MockSwapper {
     fn swap_out(&mut self, data: &[u8]) -> Result<usize, ()> {
         let id = self.alloc_id();
-        let mut slice: [u8; PAGE_SIZE] = unsafe{ uninitialized() };
+        let mut slice: [u8; PAGE_SIZE] = unsafe { uninitialized() };
         slice.copy_from_slice(data);
         self.map.insert(id, slice);
         Ok(id)
@@ -27,7 +27,7 @@ impl Swapper for MockSwapper {
         if !self.map.contains_key(&token) {
             return Err(());
         }
-        let mut slice: [u8; PAGE_SIZE] = unsafe{ uninitialized() };
+        let mut slice: [u8; PAGE_SIZE] = unsafe { uninitialized() };
         slice.copy_from_slice(data);
         self.map.insert(token, slice);
         Ok(())
@@ -43,11 +43,11 @@ impl Swapper for MockSwapper {
 
 impl MockSwapper {
     /*
-    **  @brief  allocate an unused id for location on the mock device
-    **  @retval usize                the allocated location id
-    */
+     **  @brief  allocate an unused id for location on the mock device
+     **  @retval usize                the allocated location id
+     */
     fn alloc_id(&self) -> usize {
-        (0 .. 100usize).find(|i| !self.map.contains_key(i)).unwrap()
+        (0..100usize).find(|i| !self.map.contains_key(i)).unwrap()
     }
 }
 
@@ -64,8 +64,8 @@ mod test {
     #[test]
     fn swap_out_in() {
         let mut swapper = MockSwapper::default();
-        let mut data: [u8; 4096] = unsafe{ uninitialized() };
-        let data1: [u8; 4096] = unsafe{ uninitialized() };
+        let mut data: [u8; 4096] = unsafe { uninitialized() };
+        let data1: [u8; 4096] = unsafe { uninitialized() };
         let token = swapper.swap_out(&data1).unwrap();
         swapper.swap_in(token, &mut data).unwrap();
         assert_data_eq(&data, &data1);
@@ -74,9 +74,9 @@ mod test {
     #[test]
     fn swap_update() {
         let mut swapper = MockSwapper::default();
-        let mut data: [u8; 4096] = unsafe{ uninitialized() };
-        let data1: [u8; 4096] = unsafe{ uninitialized() };
-        let data2: [u8; 4096] = unsafe{ uninitialized() };
+        let mut data: [u8; 4096] = unsafe { uninitialized() };
+        let data1: [u8; 4096] = unsafe { uninitialized() };
+        let data2: [u8; 4096] = unsafe { uninitialized() };
         let token = swapper.swap_out(&data1).unwrap();
         swapper.swap_update(token, &data2).unwrap();
         swapper.swap_in(token, &mut data).unwrap();
@@ -86,7 +86,7 @@ mod test {
     #[test]
     fn invalid_token() {
         let mut swapper = MockSwapper::default();
-        let mut data: [u8; 4096] = unsafe{ uninitialized() };
+        let mut data: [u8; 4096] = unsafe { uninitialized() };
         assert_eq!(swapper.swap_in(0, &mut data), Err(()));
     }
 }

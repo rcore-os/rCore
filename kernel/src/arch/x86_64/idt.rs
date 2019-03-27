@@ -1,5 +1,5 @@
-use x86_64::structures::idt::*;
 use lazy_static::lazy_static;
+use x86_64::structures::idt::*;
 
 pub fn init() {
     IDT.load();
@@ -8,7 +8,7 @@ pub fn init() {
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         use crate::arch::interrupt::consts::*;
-		use crate::arch::gdt::DOUBLE_FAULT_IST_INDEX;
+        use crate::arch::gdt::DOUBLE_FAULT_IST_INDEX;
         use x86_64::PrivilegeLevel;
         use core::mem::transmute;
 
@@ -37,9 +37,9 @@ lazy_static! {
     };
 }
 
-extern {
+extern "C" {
     /// 中断向量表
     /// 符号定义在 [trap.asm](boot/trap.asm)
     //noinspection RsStaticConstNaming
-    static __vectors: [extern fn(); 256];
+    static __vectors: [extern "C" fn(); 256];
 }

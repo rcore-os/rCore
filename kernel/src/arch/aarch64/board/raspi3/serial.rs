@@ -1,8 +1,8 @@
 use bcm2837::mini_uart::{MiniUart, MiniUartInterruptId};
-use lazy_static::lazy_static;
 use core::fmt;
-use spin::Mutex;
+use lazy_static::lazy_static;
 use once::*;
+use spin::Mutex;
 
 /// Struct to get a global SerialPort interface
 pub struct SerialPort {

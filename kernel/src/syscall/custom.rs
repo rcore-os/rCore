@@ -1,7 +1,7 @@
 //! Custom nonstandard syscalls
+use super::*;
 use rcore_memory::memory_set::handler::Linear;
 use rcore_memory::memory_set::MemoryAttr;
-use super::*;
 
 /// Allocate this PCI device to user space
 /// The kernel driver using the PCI device will be unloaded
@@ -13,15 +13,13 @@ pub fn sys_map_pci_device(vendor: usize, product: usize) -> SysResult {
         vendor, product
     );
 
-    let tag = pci::find_device(vendor as u32, product as u32)
-        .ok_or(SysError::ENOENT)?;
+    let tag = pci::find_device(vendor as u32, product as u32).ok_or(SysError::ENOENT)?;
     if pci::detach_driver(&tag) {
         info!("Kernel driver detached");
     }
 
     // Get BAR0 memory
-    let (base, len) = unsafe { tag.get_bar_mem(0) }
-        .ok_or(SysError::ENOENT)?;
+    let (base, len) = unsafe { tag.get_bar_mem(0) }.ok_or(SysError::ENOENT)?;
 
     let mut proc = process();
     let virt_addr = proc.vm.find_free_area(0, len);

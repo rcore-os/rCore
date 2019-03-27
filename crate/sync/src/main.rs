@@ -1,9 +1,9 @@
 //! entrance to test the communication in processes with solving five philosophers problem
 
-mod mutex;
 mod monitor;
+mod mutex;
 
 fn main() {
-//    mutex::main();
+    //    mutex::main();
     monitor::main();
 }

@@ -1,13 +1,13 @@
 //! Raspberry PI 3 Model B/B+
 
-use once::*;
 use bcm2837::atags::Atags;
+use once::*;
 
 pub mod fb;
 pub mod irq;
-pub mod timer;
-pub mod serial;
 pub mod mailbox;
+pub mod serial;
+pub mod timer;
 
 pub const IO_REMAP_BASE: usize = bcm2837::consts::IO_BASE;
 pub const IO_REMAP_END: usize = bcm2837::consts::KERNEL_OFFSET + 0x4000_1000;

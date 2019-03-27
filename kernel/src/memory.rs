@@ -1,14 +1,14 @@
-pub use crate::arch::paging::*;
-use bit_allocator::BitAlloc;
-use crate::consts::MEMORY_OFFSET;
 use super::HEAP_ALLOCATOR;
-use rcore_memory::*;
-pub use rcore_memory::memory_set::{MemoryArea, MemoryAttr, handler::*};
+pub use crate::arch::paging::*;
+use crate::consts::MEMORY_OFFSET;
 use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
+use bit_allocator::BitAlloc;
+use buddy_system_allocator::LockedHeap;
 use lazy_static::*;
 use log::*;
-use buddy_system_allocator::LockedHeap;
+pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
+use rcore_memory::*;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 
@@ -25,7 +25,8 @@ pub type FrameAlloc = bit_allocator::BitAlloc4K;
 pub type FrameAlloc = bit_allocator::BitAlloc1M;
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::default());
+    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
+        SpinNoIrqLock::new(FrameAlloc::default());
 }
 
 /// The only way to get active page table
@@ -46,21 +47,25 @@ pub fn active_table() -> ActivePageTable {
     unsafe { ActivePageTable::new() }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct GlobalFrameAlloc;
 
 impl FrameAllocator for GlobalFrameAlloc {
     fn alloc(&self) -> Option<usize> {
         // get the real address of the alloc frame
-        let ret = FRAME_ALLOCATOR.lock().alloc().map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+        let ret = FRAME_ALLOCATOR
+            .lock()
+            .alloc()
+            .map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
         trace!("Allocate frame: {:x?}", ret);
         ret
         // TODO: try to swap out when alloc failed
     }
     fn dealloc(&self, target: usize) {
         trace!("Deallocate frame: {:x}", target);
-        FRAME_ALLOCATOR.lock().dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
+        FRAME_ALLOCATOR
+            .lock()
+            .dealloc((target - MEMORY_OFFSET) / PAGE_SIZE);
     }
 }
 
@@ -77,7 +82,8 @@ const STACK_SIZE: usize = 0x8000;
 impl KernelStack {
     pub fn new() -> Self {
         use alloc::alloc::{alloc, Layout};
-        let bottom = unsafe{ alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
+        let bottom =
+            unsafe { alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
         KernelStack(bottom)
     }
     pub fn top(&self) -> usize {
@@ -88,10 +94,14 @@ impl KernelStack {
 impl Drop for KernelStack {
     fn drop(&mut self) {
         use alloc::alloc::{dealloc, Layout};
-        unsafe{ dealloc(self.0 as _, Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()); }
+        unsafe {
+            dealloc(
+                self.0 as _,
+                Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap(),
+            );
+        }
     }
 }
-
 
 /// Handle page fault at `addr`.
 /// Return true to continue, false to halt.
@@ -99,15 +109,17 @@ pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
 
     // This is safe as long as page fault never happens in page fault handler
-    unsafe {
-        process_unsafe().vm.handle_page_fault(addr)
-    }
+    unsafe { process_unsafe().vm.handle_page_fault(addr) }
 }
 
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
     static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
-    unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
+    unsafe {
+        HEAP_ALLOCATOR
+            .lock()
+            .init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE);
+    }
     info!("heap init end");
 }
 

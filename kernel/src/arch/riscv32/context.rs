@@ -1,8 +1,4 @@
-use riscv::register::{
-    sstatus,
-    sstatus::Sstatus,
-    scause::Scause,
-};
+use riscv::register::{scause::Scause, sstatus, sstatus::Sstatus};
 
 /// Saved registers on a trap.
 #[derive(Clone)]
@@ -27,7 +23,7 @@ impl TrapFrame {
     ///
     /// The new thread starts at function `entry` with an usize argument `arg`.
     /// The stack pointer will be set to `sp`.
-    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
+    fn new_kernel_thread(entry: extern "C" fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.x[10] = arg; // a0
@@ -57,17 +53,17 @@ impl TrapFrame {
     }
 }
 
-use core::fmt::{Debug, Formatter, Error};
+use core::fmt::{Debug, Error, Formatter};
 impl Debug for TrapFrame {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         struct Regs<'a>(&'a [usize; 32]);
         impl<'a> Debug for Regs<'a> {
             fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
                 const REG_NAME: [&str; 32] = [
-                    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
-                    "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
-                    "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
-                    "t3", "t4", "t5", "t6"];
+                    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2",
+                    "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9",
+                    "s10", "s11", "t3", "t4", "t5", "t6",
+                ];
                 f.debug_map().entries(REG_NAME.iter().zip(self.0)).finish()
             }
         }
@@ -98,7 +94,7 @@ impl InitStack {
     }
 }
 
-extern {
+extern "C" {
     fn trap_return();
 }
 
@@ -116,7 +112,11 @@ struct ContextData {
 
 impl ContextData {
     fn new(satp: usize) -> Self {
-        ContextData { ra: trap_return as usize, satp, ..ContextData::default() }
+        ContextData {
+            ra: trap_return as usize,
+            satp,
+            ..ContextData::default()
+        }
     }
 }
 
@@ -137,25 +137,29 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    pub unsafe extern fn switch(&mut self, _target: &mut Self) {
+    pub unsafe extern "C" fn switch(&mut self, _target: &mut Self) {
         #[cfg(target_arch = "riscv32")]
-        asm!(r"
+        asm!(
+            r"
         .equ XLENB, 4
         .macro Load reg, mem
             lw \reg, \mem
         .endm
         .macro Store reg, mem
             sw \reg, \mem
-        .endm");
+        .endm"
+        );
         #[cfg(target_arch = "riscv64")]
-        asm!(r"
+        asm!(
+            r"
         .equ XLENB, 8
         .macro Load reg, mem
             ld \reg, \mem
         .endm
         .macro Store reg, mem
             sd \reg, \mem
-        .endm");
+        .endm"
+        );
         asm!("
         // save from's registers
         addi  sp, sp, (-XLENB*14)
@@ -210,11 +214,17 @@ impl Context {
     /// The new thread starts at function `entry` with an usize argument `arg`.
     /// The stack pointer will be set to `kstack_top`.
     /// The SATP register will be set to `satp`.
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, satp: usize) -> Self {
+    pub unsafe fn new_kernel_thread(
+        entry: extern "C" fn(usize) -> !,
+        arg: usize,
+        kstack_top: usize,
+        satp: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Constructs Context for a new user thread.
@@ -222,11 +232,18 @@ impl Context {
     /// The new thread starts at `entry_addr`.
     /// The stack pointer of user and kernel mode will be set to `ustack_top`, `kstack_top`.
     /// The SATP register will be set to `satp`.
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, satp: usize) -> Self {
+    pub unsafe fn new_user_thread(
+        entry_addr: usize,
+        ustack_top: usize,
+        kstack_top: usize,
+        _is32: bool,
+        satp: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Fork a user process and get the new Context.
@@ -243,7 +260,8 @@ impl Context {
                 tf.x[10] = 0; // a0
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Fork a user thread and get the new Context.
@@ -253,17 +271,24 @@ impl Context {
     /// The new user stack will be set to `ustack_top`.
     /// The new thread pointer will be set to `tls`.
     /// All the other registers are same as the original.
-    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, satp: usize, tls: usize) -> Self {
+    pub unsafe fn new_clone(
+        tf: &TrapFrame,
+        ustack_top: usize,
+        kstack_top: usize,
+        satp: usize,
+        tls: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(satp),
             tf: {
                 let mut tf = tf.clone();
-                tf.x[2] = ustack_top;   // sp
+                tf.x[2] = ustack_top; // sp
                 tf.x[4] = tls; // tp
-                tf.x[10] = 0;  // a0
+                tf.x[10] = 0; // a0
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Used for getting the init TrapFrame of a new user context in `sys_exec`.

@@ -1,7 +1,7 @@
 //! Interrupt and exception for aarch64.
 
-mod handler;
 mod context;
+mod handler;
 mod syndrome;
 
 use aarch64::regs::*;

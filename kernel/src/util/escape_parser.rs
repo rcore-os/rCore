@@ -1,9 +1,9 @@
 //! ANSI escape sequences parser
 //! (ref: https://en.wikipedia.org/wiki/ANSI_escape_code)
 
-use heapless::Vec;
-use heapless::consts::U8;
 use super::color::ConsoleColor;
+use heapless::consts::U8;
+use heapless::Vec;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,7 +44,9 @@ impl CharacterAttribute {
             27 => self.reverse = false,
             29 => self.strikethrough = false,
             30...37 | 90...97 => self.foreground = ConsoleColor::from_console_code(code).unwrap(),
-            40...47 | 100...107 => self.background = ConsoleColor::from_console_code(code - 10).unwrap(),
+            40...47 | 100...107 => {
+                self.background = ConsoleColor::from_console_code(code - 10).unwrap()
+            }
             _ => { /* unimplemented!() */ }
         }
     }

@@ -1,6 +1,6 @@
-use alloc::collections::VecDeque;
 use super::*;
 use crate::thread;
+use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -47,7 +47,8 @@ impl Condvar {
     }
 
     pub fn wait<'a, T, S>(&self, guard: MutexGuard<'a, T, S>) -> MutexGuard<'a, T, S>
-        where S: MutexSupport
+    where
+        S: MutexSupport,
     {
         let mutex = guard.mutex;
         drop(guard);
@@ -68,7 +69,7 @@ impl Condvar {
     /// Notify up to `n` waiters.
     /// Return the number of waiters that were woken up.
     pub fn notify_n(&self, n: usize) -> usize {
-        let mut count  = 0;
+        let mut count = 0;
         while count < n {
             if let Some(t) = self.wait_queue.lock().pop_front() {
                 t.unpark();

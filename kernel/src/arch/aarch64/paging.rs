@@ -1,11 +1,13 @@
 //! Page table implementations for aarch64.
-use rcore_memory::paging::*;
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
-use aarch64::{PhysAddr, VirtAddr};
-use aarch64::paging::{Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable};
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB};
 use aarch64::paging::memory_attribute::*;
+use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB};
+use aarch64::paging::{
+    Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable,
+};
+use aarch64::{PhysAddr, VirtAddr};
 use log::*;
+use rcore_memory::paging::*;
 // Depends on kernel
 use crate::consts::{KERNEL_OFFSET, KERNEL_PML4, RECURSIVE_INDEX};
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
@@ -18,8 +20,16 @@ impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
-        self.0.map_to(Page::of_addr(addr as u64), Frame::of_addr(target as u64), flags, attr, &mut FrameAllocatorForAarch64)
-            .unwrap().flush();
+        self.0
+            .map_to(
+                Page::of_addr(addr as u64),
+                Frame::of_addr(target as u64),
+                flags,
+                attr,
+                &mut FrameAllocatorForAarch64,
+            )
+            .unwrap()
+            .flush();
         self.get_entry(addr).expect("fail to get entry")
     }
 
@@ -30,7 +40,8 @@ impl PageTable for ActivePageTable {
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         // get p1 entry
-        let entry_addr = ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39) | (vaddr & KERNEL_OFFSET);
+        let entry_addr =
+            ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39) | (vaddr & KERNEL_OFFSET);
         Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
     }
 }
@@ -39,12 +50,12 @@ impl PageTableExt for ActivePageTable {
     const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
 }
 
-const ROOT_PAGE_TABLE: *mut Aarch64PageTable =
-    (KERNEL_OFFSET |
-     (RECURSIVE_INDEX << 39) |
-     (RECURSIVE_INDEX << 30) |
-     (RECURSIVE_INDEX << 21) |
-     (RECURSIVE_INDEX << 12)) as *mut Aarch64PageTable;
+const ROOT_PAGE_TABLE: *mut Aarch64PageTable = (KERNEL_OFFSET
+    | (RECURSIVE_INDEX << 39)
+    | (RECURSIVE_INDEX << 30)
+    | (RECURSIVE_INDEX << 21)
+    | (RECURSIVE_INDEX << 12))
+    as *mut Aarch64PageTable;
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
@@ -66,38 +77,63 @@ impl Entry for PageEntry {
         tlb_invalidate(addr);
     }
 
-    fn present(&self) -> bool { self.0.flags().contains(EF::VALID) }
-    fn accessed(&self) -> bool { self.0.flags().contains(EF::AF) }
-    fn writable(&self) -> bool { self.0.flags().contains(EF::WRITE) }
-    fn dirty(&self) -> bool { self.hw_dirty() && self.sw_dirty() }
+    fn present(&self) -> bool {
+        self.0.flags().contains(EF::VALID)
+    }
+    fn accessed(&self) -> bool {
+        self.0.flags().contains(EF::AF)
+    }
+    fn writable(&self) -> bool {
+        self.0.flags().contains(EF::WRITE)
+    }
+    fn dirty(&self) -> bool {
+        self.hw_dirty() && self.sw_dirty()
+    }
 
-    fn clear_accessed(&mut self) { self.as_flags().remove(EF::AF); }
-    fn clear_dirty(&mut self)
-    {
+    fn clear_accessed(&mut self) {
+        self.as_flags().remove(EF::AF);
+    }
+    fn clear_dirty(&mut self) {
         self.as_flags().remove(EF::DIRTY);
         self.as_flags().insert(EF::AP_RO);
     }
-    fn set_writable(&mut self, value: bool)
-    {
+    fn set_writable(&mut self, value: bool) {
         self.as_flags().set(EF::AP_RO, !value);
         self.as_flags().set(EF::WRITE, value);
     }
-    fn set_present(&mut self, value: bool) { self.as_flags().set(EF::VALID, value); }
-    fn target(&self) -> usize { self.0.addr().as_u64() as usize }
+    fn set_present(&mut self, value: bool) {
+        self.as_flags().set(EF::VALID, value);
+    }
+    fn target(&self) -> usize {
+        self.0.addr().as_u64() as usize
+    }
     fn set_target(&mut self, target: usize) {
         self.0.modify_addr(PhysAddr::new(target as u64));
     }
-    fn writable_shared(&self) -> bool { self.0.flags().contains(EF::WRITABLE_SHARED) }
-    fn readonly_shared(&self) -> bool { self.0.flags().contains(EF::READONLY_SHARED) }
+    fn writable_shared(&self) -> bool {
+        self.0.flags().contains(EF::WRITABLE_SHARED)
+    }
+    fn readonly_shared(&self) -> bool {
+        self.0.flags().contains(EF::READONLY_SHARED)
+    }
     fn set_shared(&mut self, writable: bool) {
         let flags = self.as_flags();
         flags.set(EF::WRITABLE_SHARED, writable);
         flags.set(EF::READONLY_SHARED, !writable);
     }
-    fn clear_shared(&mut self) { self.as_flags().remove(EF::WRITABLE_SHARED | EF::READONLY_SHARED); }
-    fn user(&self) -> bool { self.0.flags().contains(EF::AP_EL0) }
-    fn swapped(&self) -> bool { self.0.flags().contains(EF::SWAPPED) }
-    fn set_swapped(&mut self, value: bool) { self.as_flags().set(EF::SWAPPED, value); }
+    fn clear_shared(&mut self) {
+        self.as_flags()
+            .remove(EF::WRITABLE_SHARED | EF::READONLY_SHARED);
+    }
+    fn user(&self) -> bool {
+        self.0.flags().contains(EF::AP_EL0)
+    }
+    fn swapped(&self) -> bool {
+        self.0.flags().contains(EF::SWAPPED)
+    }
+    fn set_swapped(&mut self, value: bool) {
+        self.as_flags().set(EF::SWAPPED, value);
+    }
     fn set_user(&mut self, value: bool) {
         self.as_flags().set(EF::AP_EL0, value);
         self.as_flags().set(EF::nG, value); // set non-global to use ASID
@@ -140,9 +176,15 @@ impl Entry for PageEntry {
 }
 
 impl PageEntry {
-    fn read_only(&self) -> bool { self.0.flags().contains(EF::AP_RO) }
-    fn hw_dirty(&self) -> bool { self.writable() && !self.read_only() }
-    fn sw_dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
+    fn read_only(&self) -> bool {
+        self.0.flags().contains(EF::AP_RO)
+    }
+    fn hw_dirty(&self) -> bool {
+        self.writable() && !self.read_only()
+    }
+    fn sw_dirty(&self) -> bool {
+        self.0.flags().contains(EF::DIRTY)
+    }
     fn as_flags(&mut self) -> &mut EF {
         unsafe { &mut *(self as *mut _ as *mut EF) }
     }
@@ -168,7 +210,11 @@ impl InactivePageTable for InactivePageTable0 {
         active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
             table.zero();
             // set up recursive mapping for the table
-            table[RECURSIVE_INDEX].set_frame(frame.clone(), EF::default(), MairNormal::attr_value());
+            table[RECURSIVE_INDEX].set_frame(
+                frame.clone(),
+                EF::default(),
+                MairNormal::attr_value(),
+            );
         });
         InactivePageTable0 { p4_frame: frame }
     }
@@ -179,7 +225,11 @@ impl InactivePageTable for InactivePageTable0 {
         assert!(!e0.is_unused());
 
         self.edit(|_| {
-            table[KERNEL_PML4].set_frame(Frame::containing_address(e0.addr()), EF::default(), MairNormal::attr_value());
+            table[KERNEL_PML4].set_frame(
+                Frame::containing_address(e0.addr()),
+                EF::default(),
+                MairNormal::attr_value(),
+            );
         });
     }
 
@@ -201,24 +251,31 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
         let target = ttbr_el1_read(1).start_address().as_u64() as usize;
-        active_table().with_temporary_map(target, |active_table, p4_table: &mut Aarch64PageTable| {
-            let backup = p4_table[RECURSIVE_INDEX].clone();
-            let old_frame = ttbr_el1_read(0);
+        active_table().with_temporary_map(
+            target,
+            |active_table, p4_table: &mut Aarch64PageTable| {
+                let backup = p4_table[RECURSIVE_INDEX].clone();
+                let old_frame = ttbr_el1_read(0);
 
-            // overwrite recursive mapping
-            p4_table[RECURSIVE_INDEX].set_frame(self.p4_frame.clone(), EF::default(), MairNormal::attr_value());
-            ttbr_el1_write(0, self.p4_frame.clone());
-            tlb_invalidate_all();
+                // overwrite recursive mapping
+                p4_table[RECURSIVE_INDEX].set_frame(
+                    self.p4_frame.clone(),
+                    EF::default(),
+                    MairNormal::attr_value(),
+                );
+                ttbr_el1_write(0, self.p4_frame.clone());
+                tlb_invalidate_all();
 
-            // execute f in the new context
-            let ret = f(active_table);
+                // execute f in the new context
+                let ret = f(active_table);
 
-            // restore recursive mapping to original p4 table
-            p4_table[RECURSIVE_INDEX] = backup;
-            ttbr_el1_write(0, old_frame);
-            tlb_invalidate_all();
-            ret
-        })
+                // restore recursive mapping to original p4 table
+                p4_table[RECURSIVE_INDEX] = backup;
+                ttbr_el1_write(0, old_frame);
+                tlb_invalidate_all();
+                ret
+            },
+        )
     }
 }
 

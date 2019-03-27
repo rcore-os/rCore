@@ -61,15 +61,17 @@ struct SimpleLogger;
 
 impl Log for SimpleLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-       true
+        true
     }
     fn log(&self, record: &Record) {
-        static DISABLED_TARGET: &[&str] = &[
-        ];
+        static DISABLED_TARGET: &[&str] = &[];
         if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
-//            let target = record.target();
-//            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
-            print_in_color(format_args!("[{:>5}] {}\n", record.level(), record.args()), ConsoleColor::from(record.level()));
+            //            let target = record.target();
+            //            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
+            print_in_color(
+                format_args!("[{:>5}] {}\n", record.level(), record.args()),
+                ConsoleColor::from(record.level()),
+            );
         }
     }
     fn flush(&self) {}

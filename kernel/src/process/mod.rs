@@ -1,13 +1,13 @@
 pub use self::structs::*;
-pub use rcore_thread::*;
-use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use crate::arch::cpu;
+use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
 use alloc::{boxed::Box, sync::Arc};
-use spin::MutexGuard;
 use log::*;
+pub use rcore_thread::*;
+use spin::MutexGuard;
 
-pub mod structs;
 mod abi;
+pub mod structs;
 
 pub fn init() {
     // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
@@ -25,7 +25,16 @@ pub fn init() {
     info!("process: init end");
 }
 
-static PROCESSORS: [Processor; MAX_CPU_NUM] = [Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new(), Processor::new()];
+static PROCESSORS: [Processor; MAX_CPU_NUM] = [
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+    Processor::new(),
+];
 
 /// Get current process
 pub fn process() -> MutexGuard<'static, Process> {
@@ -45,12 +54,9 @@ pub unsafe fn process_unsafe() -> MutexGuard<'static, Process> {
 /// FIXME: It's obviously unsafe to get &mut !
 pub fn current_thread() -> &'static mut Thread {
     use core::mem::transmute;
-    let (process, _): (&mut Thread, *const ()) = unsafe {
-        transmute(processor().context())
-    };
+    let (process, _): (&mut Thread, *const ()) = unsafe { transmute(processor().context()) };
     process
 }
-
 
 // Implement dependencies for std::thread
 
@@ -60,6 +66,6 @@ pub fn processor() -> &'static Processor {
 }
 
 #[no_mangle]
-pub fn new_kernel_context(entry: extern fn(usize) -> !, arg: usize) -> Box<Context> {
+pub fn new_kernel_context(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<Context> {
     Thread::new_kernel(entry, arg)
 }

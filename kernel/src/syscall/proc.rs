@@ -16,9 +16,18 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 ///   and thread pointer will be set to `newtls`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
-pub fn sys_clone(flags: usize, newsp: usize, parent_tid: *mut u32, child_tid: *mut u32, newtls: usize, tf: &TrapFrame) -> SysResult {
-    info!("clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
-        flags, newsp, parent_tid, child_tid, newtls);
+pub fn sys_clone(
+    flags: usize,
+    newsp: usize,
+    parent_tid: *mut u32,
+    child_tid: *mut u32,
+    newtls: usize,
+    tf: &TrapFrame,
+) -> SysResult {
+    info!(
+        "clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        flags, newsp, parent_tid, child_tid, newtls
+    );
     if flags == 0x4111 {
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
@@ -64,41 +73,61 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
         let mut proc = process();
         // check child_exit_code
         let find = match target {
-            WaitFor::AnyChild => proc.child_exit_code
-                .iter().next().map(|(&pid, &code)| (pid, code)),
-            WaitFor::Pid(pid) => proc.child_exit_code
-                .get(&pid).map(|&code| (pid, code)),
+            WaitFor::AnyChild => proc
+                .child_exit_code
+                .iter()
+                .next()
+                .map(|(&pid, &code)| (pid, code)),
+            WaitFor::Pid(pid) => proc.child_exit_code.get(&pid).map(|&code| (pid, code)),
         };
         // if found, return
         if let Some((pid, exit_code)) = find {
             proc.child_exit_code.remove(&pid);
             if !wstatus.is_null() {
-                unsafe { wstatus.write(exit_code as i32); }
+                unsafe {
+                    wstatus.write(exit_code as i32);
+                }
             }
             return Ok(pid);
         }
         // if not, check pid
-        let children: Vec<_> = proc.children.iter()
+        let children: Vec<_> = proc
+            .children
+            .iter()
             .filter_map(|weak| weak.upgrade())
             .collect();
         let invalid = match target {
             WaitFor::AnyChild => children.len() == 0,
-            WaitFor::Pid(pid) => children.iter().find(|p| p.lock().pid.get() == pid).is_none(),
+            WaitFor::Pid(pid) => children
+                .iter()
+                .find(|p| p.lock().pid.get() == pid)
+                .is_none(),
         };
         if invalid {
             return Err(SysError::ECHILD);
         }
-        info!("wait: thread {} -> {:?}, sleep", thread::current().id(), target);
+        info!(
+            "wait: thread {} -> {:?}, sleep",
+            thread::current().id(),
+            target
+        );
         let condvar = proc.child_exit.clone();
         drop(proc); // must release lock of current process
         condvar._wait();
     }
 }
 
-pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8, tf: &mut TrapFrame) -> SysResult {
+pub fn sys_exec(
+    name: *const u8,
+    argv: *const *const u8,
+    envp: *const *const u8,
+    tf: &mut TrapFrame,
+) -> SysResult {
     info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
     let proc = process();
-    let _name = if name.is_null() { String::from("") } else {
+    let _name = if name.is_null() {
+        String::from("")
+    } else {
         unsafe { proc.vm.check_and_clone_cstr(name)? }
     };
 
@@ -129,7 +158,9 @@ pub fn sys_exec(name: *const u8, argv: *const *const u8, envp: *const *const u8,
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table
-    unsafe { thread.proc.lock().vm.activate(); }
+    unsafe {
+        thread.proc.lock().vm.activate();
+    }
 
     // Modify the TrapFrame
     *tf = unsafe { thread.context.get_init_tf() };
@@ -148,7 +179,12 @@ pub fn sys_yield() -> SysResult {
 
 /// Kill the process
 pub fn sys_kill(pid: usize, sig: usize) -> SysResult {
-    info!("kill: {} killed: {} with sig {}", thread::current().id(), pid, sig);
+    info!(
+        "kill: {} killed: {} with sig {}",
+        thread::current().id(),
+        pid,
+        sig
+    );
     let current_pid = process().pid.get().clone();
     if current_pid == pid {
         // killing myself
@@ -223,7 +259,9 @@ pub fn sys_exit(exit_code: usize) -> ! {
     //        it has memory access so we can't move it to Thread::drop?
     let clear_child_tid = current_thread().clear_child_tid;
     if clear_child_tid != 0 {
-        unsafe { (clear_child_tid as *mut u32).write(0); }
+        unsafe {
+            (clear_child_tid as *mut u32).write(0);
+        }
         let queue = process().get_futex(clear_child_tid);
         queue.notify_one();
     }

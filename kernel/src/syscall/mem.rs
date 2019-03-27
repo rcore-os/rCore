@@ -1,4 +1,4 @@
-use rcore_memory::memory_set::handler::{Delay, ByFrame};
+use rcore_memory::memory_set::handler::{ByFrame, Delay};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::paging::PageTable;
 use rcore_memory::Page;
@@ -85,7 +85,10 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
 
     // FIXME: properly set the attribute of the area
     //        now some mut ptr check is fault
-    let memory_area = proc.vm.iter().find(|area| area.is_overlap_with(addr, addr + len));
+    let memory_area = proc
+        .vm
+        .iter()
+        .find(|area| area.is_overlap_with(addr, addr + len));
     if memory_area.is_none() {
         return Err(SysError::ENOMEM);
     }

@@ -1,7 +1,7 @@
 //! Input/output for aarch64.
 
-use super::driver::serial::*;
 use super::driver::console::CONSOLE;
+use super::driver::serial::*;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {

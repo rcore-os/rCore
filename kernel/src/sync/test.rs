@@ -2,12 +2,12 @@
 //!
 //! The code is borrowed from [RustDoc - Dining Philosophers](https://doc.rust-lang.org/1.6.0/book/dining-philosophers.html)
 
-use alloc::{sync::Arc, vec::Vec};
-use core::time::Duration;
 use crate::sync::Condvar;
 use crate::sync::ThreadLock as Mutex;
 use crate::thread;
 use alloc::vec;
+use alloc::{sync::Arc, vec::Vec};
+use core::time::Duration;
 use log::*;
 
 struct Philosopher {
@@ -18,11 +18,7 @@ struct Philosopher {
 
 impl Philosopher {
     fn new(name: &'static str, left: usize, right: usize) -> Philosopher {
-        Philosopher {
-            name,
-            left,
-            right,
-        }
+        Philosopher { name, left, right }
     }
 
     fn eat(&self, table: &Arc<Table>) {
@@ -92,18 +88,21 @@ fn philosopher(table: Arc<Table>) {
         Philosopher::new("5", 0, 4),
     ];
 
-    let handles: Vec<_> = philosophers.into_iter().map(|p| {
-        let table = table.clone();
-        trace!("philosopher start");
+    let handles: Vec<_> = philosophers
+        .into_iter()
+        .map(|p| {
+            let table = table.clone();
+            trace!("philosopher start");
 
-        thread::spawn(move || {
-            for i in 0..5 {
-                p.think();
-                p.eat(&table);
-                println!("{} iter {} end.", p.name, i);
-            }
+            thread::spawn(move || {
+                for i in 0..5 {
+                    p.think();
+                    p.eat(&table);
+                    println!("{} iter {} end.", p.name, i);
+                }
+            })
         })
-    }).collect();
+        .collect();
     trace!("philosopher starting finish");
 
     for h in handles {
@@ -116,7 +115,13 @@ pub fn philosopher_using_mutex() {
     println!("philosophers using mutex");
 
     let table = Arc::new(MutexTable {
-        forks: vec![Mutex::new(()), Mutex::new(()), Mutex::new(()), Mutex::new(()), Mutex::new(())]
+        forks: vec![
+            Mutex::new(()),
+            Mutex::new(()),
+            Mutex::new(()),
+            Mutex::new(()),
+            Mutex::new(()),
+        ],
     });
     philosopher(table);
 }
@@ -126,7 +131,13 @@ pub fn philosopher_using_monitor() {
 
     let table = Arc::new(MonitorTable {
         fork_status: Mutex::new(vec![false; 5]),
-        fork_condvar: vec![Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new()],
+        fork_condvar: vec![
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+        ],
     });
     philosopher(table);
 }

@@ -1,9 +1,9 @@
 // Copy from Redox
 
-use x86_64::instructions::port::Port;
-use spin::Mutex;
-use once::*;
 use log::*;
+use once::*;
+use spin::Mutex;
+use x86_64::instructions::port::Port;
 
 static MASTER: Mutex<Pic> = Mutex::new(Pic::new(0x20));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(0xA0));
@@ -19,7 +19,7 @@ pub fn disable() {
 
 pub unsafe fn init() {
     assert_has_not_been_called!("pic::init must be called only once");
-    
+
     let mut master = MASTER.lock();
     let mut slave = SLAVE.lock();
 
@@ -53,7 +53,7 @@ pub unsafe fn init() {
 pub fn enable_irq(irq: u8) {
     match irq {
         _ if irq < 8 => MASTER.lock().mask_set(irq),
-        _ if irq < 16 => SLAVE.lock().mask_set(irq-8),
+        _ if irq < 16 => SLAVE.lock().mask_set(irq - 8),
         _ => panic!("irq not in 0..16"),
     }
 }
@@ -80,7 +80,9 @@ impl Pic {
     }
 
     fn ack(&mut self) {
-        unsafe { self.cmd.write(0x20); }
+        unsafe {
+            self.cmd.write(0x20);
+        }
     }
 
     fn mask_set(&mut self, irq: u8) {

@@ -51,10 +51,14 @@ pub struct ScreenChar {
 }
 
 impl ScreenChar {
-    pub fn new(ascii_char: u8, foreground_color: ConsoleColor, background_color: ConsoleColor) -> Self {
+    pub fn new(
+        ascii_char: u8,
+        foreground_color: ConsoleColor,
+        background_color: ConsoleColor,
+    ) -> Self {
         ScreenChar {
             ascii_char,
-            color_code: ColorCode::new(foreground_color, background_color)
+            color_code: ColorCode::new(foreground_color, background_color),
         }
     }
 }
@@ -69,7 +73,7 @@ pub struct VgaBuffer {
 impl VgaBuffer {
     pub fn clear(&mut self) {
         let blank = ScreenChar::new(b' ', ConsoleColor::White, ConsoleColor::Black);
-        for row in 0 .. BUFFER_HEIGHT {
+        for row in 0..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 self.chars[row][col].write(blank);
             }
@@ -95,10 +99,10 @@ impl VgaBuffer {
 }
 
 lazy_static! {
-	pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
-	    // VGA virtual address is specified at bootloader
-		VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xf0000000) as *mut VgaBuffer) })
-	);
+    pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
+        // VGA virtual address is specified at bootloader
+        VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xf0000000) as *mut VgaBuffer) })
+    );
 }
 
 pub struct VgaWriter {
@@ -135,7 +139,8 @@ impl BaseConsole for VgaWriter {
         pos.row.bound(self.get_height());
         pos.col.bound(self.get_width());
         self.pos = pos;
-        self.buffer.set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
+        self.buffer
+            .set_cursor_at(pos.row.0 as usize, pos.col.0 as usize);
         Ok(())
     }
 
@@ -180,7 +185,8 @@ impl AsciiConsole for VgaWriter {
             ascii_char: ch,
             color_code: self.color_code,
         };
-        self.buffer.write(pos.row.0 as usize, pos.col.0 as usize, screen_char);
+        self.buffer
+            .write(pos.row.0 as usize, pos.col.0 as usize, screen_char);
         Ok(())
     }
 
@@ -221,8 +227,7 @@ impl AsciiConsole for VgaWriter {
                 0x1b => Some(SpecialChar::Escape),
                 0x7f => Some(SpecialChar::Delete),
                 0x08 => Some(SpecialChar::Backspace),
-                _ if !(ch.is_ascii_graphic() || ch == b' ')
-                    => Some(SpecialChar::Delete),   // ignore non-graphic ascii
+                _ if !(ch.is_ascii_graphic() || ch == b' ') => Some(SpecialChar::Delete), // ignore non-graphic ascii
                 _ => None,
             },
             _ => None,
@@ -246,7 +251,6 @@ impl VgaWriter {
 
 impl fmt::Write for VgaWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s.as_bytes())
-            .map_err(|_| fmt::Error)
+        self.write_string(s.as_bytes()).map_err(|_| fmt::Error)
     }
 }

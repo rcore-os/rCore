@@ -8,12 +8,12 @@
 
 extern crate alloc;
 
-mod thread_pool;
+mod interrupt;
 mod processor;
 pub mod scheduler;
 pub mod std_thread;
+mod thread_pool;
 mod timer;
-mod interrupt;
 
-pub use crate::thread_pool::*;
 pub use crate::processor::Processor;
+pub use crate::thread_pool::*;

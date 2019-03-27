@@ -66,17 +66,21 @@
 
 use super::consts::*;
 use super::TrapFrame;
-use log::*;
-use bitflags::*;
 use crate::drivers::DRIVERS;
+use bitflags::*;
+use log::*;
 
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub extern fn rust_trap(tf: &mut TrapFrame) {
-    trace!("Interrupt: {:#x} @ CPU{}", tf.trap_num, super::super::cpu::id());
+pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+    trace!(
+        "Interrupt: {:#x} @ CPU{}",
+        tf.trap_num,
+        super::super::cpu::id()
+    );
     // Dispatch
     match tf.trap_num as u8 {
         Breakpoint => breakpoint(),
@@ -99,7 +103,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
                         }
                     }
                     warn!("unhandled external IRQ number: {}", irq);
-                },
+                }
             }
         }
         Syscall32 => syscall32(tf),
@@ -120,7 +124,9 @@ fn double_fault(tf: &TrapFrame) {
 
 fn page_fault(tf: &mut TrapFrame) {
     let addr: usize;
-    unsafe { asm!("mov %cr2, $0" : "=r" (addr)); }
+    unsafe {
+        asm!("mov %cr2, $0" : "=r" (addr));
+    }
 
     bitflags! {
         struct PageError: u8 {
@@ -197,7 +203,7 @@ fn invalid_opcode(tf: &mut TrapFrame) {
     let opcode = unsafe { (tf.rip as *mut u16).read() };
     const SYSCALL_OPCODE: u16 = 0x05_0f;
     if opcode == SYSCALL_OPCODE {
-        tf.rip += 2;    // must before syscall
+        tf.rip += 2; // must before syscall
         syscall(tf);
     } else {
         crate::trap::error(tf);
@@ -209,7 +215,7 @@ fn error(tf: &TrapFrame) {
 }
 
 #[no_mangle]
-pub unsafe extern fn set_return_rsp(tf: *const TrapFrame) {
+pub unsafe extern "C" fn set_return_rsp(tf: *const TrapFrame) {
     use crate::arch::gdt::Cpu;
     Cpu::current().set_ring0_rsp(tf.add(1) as usize);
 }

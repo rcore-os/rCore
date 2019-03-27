@@ -80,8 +80,16 @@ impl<T: BitAlloc> BitAllocCascade16<T> {
         assert!(start <= end);
         assert!(end <= Self::CAP);
         for i in start / T::CAP..=(end - 1) / T::CAP {
-            let begin = if start / T::CAP == i { start % T::CAP } else { 0 };
-            let end = if end / T::CAP == i { end % T::CAP } else { T::CAP };
+            let begin = if start / T::CAP == i {
+                start % T::CAP
+            } else {
+                0
+            };
+            let end = if end / T::CAP == i {
+                end % T::CAP
+            } else {
+                T::CAP
+            };
             f(&mut self.sub[i], begin..end);
             self.bitset.set_bit(i, self.sub[i].any());
         }

@@ -1,8 +1,8 @@
-use alloc::sync::Arc;
 use crate::arch::rand;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
+use alloc::sync::Arc;
 
 use smoltcp::socket::*;
 use smoltcp::wire::*;

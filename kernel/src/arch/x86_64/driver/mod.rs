@@ -1,12 +1,12 @@
 use once::*;
 
-pub mod vga;
-pub mod serial;
-pub mod pic;
-pub mod keyboard;
-pub mod pit;
 pub mod ide;
+pub mod keyboard;
+pub mod pic;
+pub mod pit;
 pub mod rtc_cmos;
+pub mod serial;
+pub mod vga;
 
 pub fn init() {
     assert_has_not_been_called!();

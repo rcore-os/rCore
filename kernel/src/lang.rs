@@ -1,19 +1,20 @@
 // Rust language features implementations
 
-use core::panic::PanicInfo;
-use core::alloc::Layout;
-use log::*;
 use crate::backtrace;
+use core::alloc::Layout;
+use core::panic::PanicInfo;
+use log::*;
 
-#[lang = "eh_personality"] 
-extern fn eh_personality() {
-}
+#[lang = "eh_personality"]
+extern "C" fn eh_personality() {}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     error!("\n\n{}", info);
     backtrace::backtrace();
-    loop { crate::arch::cpu::halt() }
+    loop {
+        crate::arch::cpu::halt()
+    }
 }
 
 #[lang = "oom"]

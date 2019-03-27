@@ -1,11 +1,11 @@
-use bit_allocator::BitAlloc;
 use crate::consts::KERNEL_OFFSET;
+use bit_allocator::BitAlloc;
 // Depends on kernel
-use crate::memory::{FRAME_ALLOCATOR, init_heap, active_table};
 use super::{BootInfo, MemoryRegionType};
-use rcore_memory::paging::*;
-use once::*;
+use crate::memory::{active_table, init_heap, FRAME_ALLOCATOR};
 use log::*;
+use once::*;
+use rcore_memory::paging::*;
 
 pub fn init(boot_info: &BootInfo) {
     assert_has_not_been_called!("memory::init must be called only once");
@@ -20,7 +20,9 @@ fn init_frame_allocator(boot_info: &BootInfo) {
     let mut ba = FRAME_ALLOCATOR.lock();
     for region in boot_info.memory_map.iter() {
         if region.region_type == MemoryRegionType::Usable {
-            ba.insert(region.range.start_frame_number as usize..region.range.end_frame_number as usize);
+            ba.insert(
+                region.range.start_frame_number as usize..region.range.end_frame_number as usize,
+            );
         }
     }
 }
@@ -28,7 +30,11 @@ fn init_frame_allocator(boot_info: &BootInfo) {
 fn init_device_vm_map() {
     let mut page_table = active_table();
     // IOAPIC
-    page_table.map(KERNEL_OFFSET + 0xfec00000, 0xfec00000).update();
+    page_table
+        .map(KERNEL_OFFSET + 0xfec00000, 0xfec00000)
+        .update();
     // LocalAPIC
-    page_table.map(KERNEL_OFFSET + 0xfee00000, 0xfee00000).update();
+    page_table
+        .map(KERNEL_OFFSET + 0xfee00000, 0xfee00000)
+        .update();
 }
