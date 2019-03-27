@@ -31,7 +31,6 @@ env:
 
 matrix:
     allow_failures:
-        - env: ARCH="aarch64"
         - os: osx
 
 install:

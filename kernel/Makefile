@@ -54,10 +54,7 @@ export SMP = $(smp)
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
 ifeq ($(arch), aarch64)
 board := raspi3
-endif
-
-ifeq ($(arch), aarch64)
-graphic := on
+export SFSIMG = $(user_dir)/build/$(arch).img
 endif
 
 ### qemu options ###
