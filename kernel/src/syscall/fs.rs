@@ -273,8 +273,7 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
     let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, true)?;
 
     // read all data to a buf
-    let mut file = proc.get_file(fd)?.clone();
-    drop(proc);
+    let mut file = proc.get_file(fd)?;
     let mut buf = iovs.new_buf(true);
     let len = file.read(buf.as_mut_slice())?;
     // copy data to user
