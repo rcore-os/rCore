@@ -135,3 +135,40 @@ pub struct SysInfo {
     freehigh: u64,
     mem_unit: u32,
 }
+
+const RLIMIT_NOFILE: usize = 7;
+
+pub fn sys_prlimit64(
+    pid: usize,
+    resource: usize,
+    new_limit: *const RLimit,
+    old_limit: *mut RLimit,
+) -> SysResult {
+    let proc = process();
+    info!(
+        "prlimit64: pid: {}, resource: {}, new_limit: {:x?}, old_limit: {:x?}",
+        pid, resource, new_limit, old_limit
+    );
+    match resource {
+        RLIMIT_NOFILE => {
+            if !old_limit.is_null() {
+                proc.vm.check_write_ptr(old_limit)?;
+                unsafe {
+                    *old_limit = RLimit {
+                        cur: 1024,
+                        max: 1024,
+                    };
+                }
+            }
+            Ok(0)
+        }
+        _ => Err(SysError::ENOSYS),
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct RLimit {
+    cur: u64, // soft limit
+    max: u64, // hard limit
+}
