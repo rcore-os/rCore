@@ -78,7 +78,10 @@ impl PageTable for ActivePageTable {
 }
 
 impl PageTableExt for ActivePageTable {
-    const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
+    // FIXME: the default value 0xcafebe000 is so low that allocation might overwrite it sometimes.
+    // However, putting it to KERNEL_OFFSET | 0xcafeb000 has unintended effects.
+    // Someone needs to reconsider this and use an ultimate solution.
+    // const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
 }
 
 impl ActivePageTable {

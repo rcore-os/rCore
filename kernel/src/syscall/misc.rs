@@ -2,6 +2,7 @@ use super::*;
 use crate::arch::cpu;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
+use crate::consts::USER_STACK_SIZE;
 
 pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
     const ARCH_SET_FS: i32 = 0x1002;
@@ -136,7 +137,10 @@ pub struct SysInfo {
     mem_unit: u32,
 }
 
+const RLIMIT_STACK: usize = 3;
+const RLIMIT_RSS: usize = 5;
 const RLIMIT_NOFILE: usize = 7;
+const RLIMIT_AS: usize = 9;
 
 pub fn sys_prlimit64(
     pid: usize,
@@ -150,6 +154,18 @@ pub fn sys_prlimit64(
         pid, resource, new_limit, old_limit
     );
     match resource {
+        RLIMIT_STACK => {
+            if !old_limit.is_null() {
+                proc.vm.check_write_ptr(old_limit)?;
+                unsafe {
+                    *old_limit = RLimit {
+                        cur: USER_STACK_SIZE as u64,
+                        max: USER_STACK_SIZE as u64,
+                    };
+                }
+            }
+            Ok(0)
+        }
         RLIMIT_NOFILE => {
             if !old_limit.is_null() {
                 proc.vm.check_write_ptr(old_limit)?;
@@ -157,6 +173,19 @@ pub fn sys_prlimit64(
                     *old_limit = RLimit {
                         cur: 1024,
                         max: 1024,
+                    };
+                }
+            }
+            Ok(0)
+        },
+        RLIMIT_RSS | RLIMIT_AS => {
+            if !old_limit.is_null() {
+                proc.vm.check_write_ptr(old_limit)?;
+                unsafe {
+                    // 1GB
+                    *old_limit = RLimit {
+                        cur: 1024 * 1024 * 1024,
+                        max: 1024 * 1024 * 1024,
                     };
                 }
             }

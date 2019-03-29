@@ -161,6 +161,15 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         // 80
         SYS_CHDIR => sys_chdir(args[0] as *const u8),
+        // 90
+        SYS_CHMOD => {
+            warn!("sys_chmod is unimplemented");
+            Ok(0)
+        }
+        SYS_FCHMOD => {
+            warn!("sys_fchmod is unimplemented");
+            Ok(0)
+        }
         SYS_FCHOWN => {
             warn!("sys_fchown is unimplemented");
             Ok(0)

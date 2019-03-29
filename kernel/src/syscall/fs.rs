@@ -1147,9 +1147,9 @@ impl From<Metadata> for Stat {
     }
 }
 
-const SEEK_SET: u8 = 1;
-const SEEK_CUR: u8 = 2;
-const SEEK_END: u8 = 4;
+const SEEK_SET: u8 = 0;
+const SEEK_CUR: u8 = 1;
+const SEEK_END: u8 = 2;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]

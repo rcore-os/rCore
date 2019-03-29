@@ -68,6 +68,7 @@ qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
 	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback \
 	-serial mon:stdio \
+	-m 4G \
 	-device isa-debug-exit
 ifeq ($(pci_passthru), )
 qemu_net_opts += \
@@ -307,4 +308,4 @@ endif
 
 .PHONY:
 addr2line:
-	@python3 ../tools/addr2line.py $(prefix)addr2line $(arch)
+	@python3 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)

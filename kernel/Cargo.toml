@@ -30,8 +30,8 @@ link_user = []
 run_cmdline = []
 
 [profile.dev]
-# MUST >= 1 : Enable RVO to avoid stack overflow
-opt-level = 1
+# MUST >= 2 : Enable RVO to avoid stack overflow
+opt-level = 2
 
 [dependencies]
 log = "0.4"
