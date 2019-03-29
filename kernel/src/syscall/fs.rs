@@ -19,11 +19,10 @@ pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
         info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     }
     proc.vm.check_write_array(base, len)?;
-    match proc.files.get(&fd) {
-        Some(FileLike::File(_)) => sys_read_file(&mut proc, fd, base, len),
-        Some(FileLike::Socket(_)) => sys_read_socket(&mut proc, fd, base, len),
-        None => Err(SysError::EINVAL),
-    }
+    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
+    let file_like = proc.get_file_like(fd)?;
+    let len = file_like.read(slice)?;
+    Ok(len)
 }
 
 pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
@@ -33,12 +32,10 @@ pub fn sys_write(fd: usize, base: *const u8, len: usize) -> SysResult {
         info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
     }
     proc.vm.check_read_array(base, len)?;
-
-    match proc.files.get(&fd) {
-        Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, base, len),
-        Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, base, len),
-        None => Err(SysError::EINVAL),
-    }
+    let slice = unsafe { slice::from_raw_parts(base, len) };
+    let file_like = proc.get_file_like(fd)?;
+    let len = file_like.write(slice)?;
+    Ok(len)
 }
 
 pub fn sys_pread(fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResult {
@@ -64,18 +61,6 @@ pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysR
 
     let slice = unsafe { slice::from_raw_parts(base, len) };
     let len = proc.get_file(fd)?.write_at(offset, slice)?;
-    Ok(len)
-}
-
-pub fn sys_read_file(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
-    let slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let len = proc.get_file(fd)?.read(slice)?;
-    Ok(len)
-}
-
-pub fn sys_write_file(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
-    let slice = unsafe { slice::from_raw_parts(base, len) };
-    let len = proc.get_file(fd)?.write(slice)?;
     Ok(len)
 }
 
@@ -110,8 +95,8 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
                         events = events + 1;
                     }
                 }
-                Some(FileLike::Socket(wrapper)) => {
-                    let (input, output, err) = poll_socket(&wrapper);
+                Some(FileLike::Socket(socket)) => {
+                    let (input, output, err) = socket.poll();
                     if err {
                         poll.revents = poll.revents | PE::HUP;
                         events = events + 1;
@@ -146,61 +131,6 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
     }
 }
 
-const FD_PER_ITEM: usize = 8 * size_of::<u32>();
-const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
-
-struct FdSet {
-    addr: *mut u32,
-    nfds: usize,
-    saved: [u32; MAX_FDSET_SIZE],
-}
-
-impl FdSet {
-    /// Initialize a `FdSet` from pointer and number of fds
-    /// Check if the array is large enough
-    fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
-        let mut saved = [0u32; MAX_FDSET_SIZE];
-        if addr as usize != 0 {
-            let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
-            vm.check_write_array(addr, len)?;
-            if len > MAX_FDSET_SIZE {
-                return Err(SysError::EINVAL);
-            }
-            let slice = unsafe { slice::from_raw_parts_mut(addr, len) };
-
-            // save the fdset, and clear it
-            for i in 0..len {
-                saved[i] = slice[i];
-                slice[i] = 0;
-            }
-        }
-
-        Ok(FdSet { addr, nfds, saved })
-    }
-
-    /// Try to set fd in `FdSet`
-    /// Return true when `FdSet` is valid, and false when `FdSet` is bad (i.e. null pointer)
-    /// Fd should be less than nfds
-    fn set(&mut self, fd: usize) -> bool {
-        if self.addr as usize != 0 {
-            assert!(fd < self.nfds);
-            unsafe {
-                *self.addr.add(fd / 8 / size_of::<u32>()) |= 1 << (fd % (8 * size_of::<u32>()));
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Check to see fd is see in original `FdSet`
-    /// Fd should be less than nfds
-    fn is_set(&mut self, fd: usize) -> bool {
-        assert!(fd < self.nfds);
-        self.saved[fd / 8 / size_of::<u32>()] & (1 << (fd % (8 * size_of::<u32>()))) != 0
-    }
-}
-
 pub fn sys_select(
     nfds: usize,
     read: *mut u32,
@@ -230,9 +160,9 @@ pub fn sys_select(
     loop {
         let proc = process();
         let mut events = 0;
-        for (fd, file) in proc.files.iter() {
+        for (fd, file_like) in proc.files.iter() {
             if *fd < nfds {
-                match file {
+                match file_like {
                     FileLike::File(_) => {
                         // FIXME: assume it is stdin for now
                         if STDIN.can_read() {
@@ -242,8 +172,8 @@ pub fn sys_select(
                             }
                         }
                     }
-                    FileLike::Socket(wrapper) => {
-                        let (input, output, err) = poll_socket(&wrapper);
+                    FileLike::Socket(socket) => {
+                        let (input, output, err) = socket.poll();
                         if err && err_fds.is_set(*fd) {
                             err_fds.set(*fd);
                             events = events + 1;
@@ -290,9 +220,9 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
     let mut iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, true)?;
 
     // read all data to a buf
-    let mut file = proc.get_file(fd)?;
+    let file_like = proc.get_file_like(fd)?;
     let mut buf = iovs.new_buf(true);
-    let len = file.read(buf.as_mut_slice())?;
+    let len = file_like.read(buf.as_mut_slice())?;
     // copy data to user
     iovs.write_all_from_slice(&buf[..len]);
     Ok(len)
@@ -309,14 +239,10 @@ pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResu
     let buf = iovs.read_all_to_vec();
     let len = buf.len();
 
-    match proc.files.get(&fd) {
-        Some(FileLike::File(_)) => sys_write_file(&mut proc, fd, buf.as_ptr(), len),
-        Some(FileLike::Socket(_)) => sys_write_socket(&mut proc, fd, buf.as_ptr(), len),
-        None => Err(SysError::EINVAL),
-    }
+    let file_like = proc.get_file_like(fd)?;
+    let len = file_like.write(buf.as_slice())?;
+    Ok(len)
 }
-
-const AT_FDCWD: usize = -100isize as usize;
 
 pub fn sys_open(path: *const u8, flags: usize, mode: usize) -> SysResult {
     sys_openat(AT_FDCWD, path, flags, mode)
@@ -539,18 +465,9 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     // close fd2 first if it is opened
     proc.files.remove(&fd2);
 
-    match proc.files.get(&fd1) {
-        Some(FileLike::File(file)) => {
-            let new_file = FileLike::File(file.clone());
-            proc.files.insert(fd2, new_file);
-            Ok(fd2)
-        }
-        Some(FileLike::Socket(wrapper)) => {
-            let new_wrapper = wrapper.clone();
-            sys_dup2_socket(&mut proc, new_wrapper, fd2)
-        }
-        None => Err(SysError::EINVAL),
-    }
+    let file_like = proc.get_file_like(fd1)?.clone();
+    proc.files.insert(fd2, file_like);
+    Ok(fd2)
 }
 
 pub fn sys_chdir(path: *const u8) -> SysResult {
@@ -785,14 +702,14 @@ pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usiz
 }
 
 impl Process {
+    pub fn get_file_like(&mut self, fd: usize) -> Result<&mut FileLike, SysError> {
+        self.files.get_mut(&fd).ok_or(SysError::EBADF)
+    }
     pub fn get_file(&mut self, fd: usize) -> Result<&mut FileHandle, SysError> {
-        self.files
-            .get_mut(&fd)
-            .ok_or(SysError::EBADF)
-            .and_then(|f| match f {
-                FileLike::File(file) => Ok(file),
-                _ => Err(SysError::EBADF),
-            })
+        match self.get_file_like(fd)? {
+            FileLike::File(file) => Ok(file),
+            _ => Err(SysError::EBADF),
+        }
     }
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
         debug!("lookup_inode: cwd {} path {}", self.cwd, path);
@@ -1250,3 +1167,60 @@ bitflags! {
         const INVAL = 0x0020;
     }
 }
+
+const FD_PER_ITEM: usize = 8 * size_of::<u32>();
+const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
+
+struct FdSet {
+    addr: *mut u32,
+    nfds: usize,
+    saved: [u32; MAX_FDSET_SIZE],
+}
+
+impl FdSet {
+    /// Initialize a `FdSet` from pointer and number of fds
+    /// Check if the array is large enough
+    fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
+        let mut saved = [0u32; MAX_FDSET_SIZE];
+        if addr as usize != 0 {
+            let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
+            vm.check_write_array(addr, len)?;
+            if len > MAX_FDSET_SIZE {
+                return Err(SysError::EINVAL);
+            }
+            let slice = unsafe { slice::from_raw_parts_mut(addr, len) };
+
+            // save the fdset, and clear it
+            for i in 0..len {
+                saved[i] = slice[i];
+                slice[i] = 0;
+            }
+        }
+
+        Ok(FdSet { addr, nfds, saved })
+    }
+
+    /// Try to set fd in `FdSet`
+    /// Return true when `FdSet` is valid, and false when `FdSet` is bad (i.e. null pointer)
+    /// Fd should be less than nfds
+    fn set(&mut self, fd: usize) -> bool {
+        if self.addr as usize != 0 {
+            assert!(fd < self.nfds);
+            unsafe {
+                *self.addr.add(fd / 8 / size_of::<u32>()) |= 1 << (fd % (8 * size_of::<u32>()));
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check to see fd is see in original `FdSet`
+    /// Fd should be less than nfds
+    fn is_set(&mut self, fd: usize) -> bool {
+        assert!(fd < self.nfds);
+        self.saved[fd / 8 / size_of::<u32>()] & (1 << (fd % (8 * size_of::<u32>()))) != 0
+    }
+}
+
+const AT_FDCWD: usize = -100isize as usize;

@@ -7,11 +7,13 @@ use rcore_fs_sfs::SimpleFileSystem;
 use crate::arch::driver::ide;
 
 pub use self::file::*;
+pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::stdio::{STDIN, STDOUT};
 
 mod device;
 mod file;
+mod file_like;
 mod pipe;
 mod stdio;
 
