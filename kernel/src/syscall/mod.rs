@@ -161,11 +161,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         // 80
         SYS_CHDIR => sys_chdir(args[0] as *const u8),
-        // 90
-        SYS_CHMOD => {
-            warn!("sys_chmod is unimplemented");
-            Ok(0)
-        }
         SYS_FCHMOD => {
             warn!("sys_fchmod is unimplemented");
             Ok(0)
@@ -341,6 +336,11 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
         SYS_LINK => sys_link(args[0] as *const u8, args[1] as *const u8),
         SYS_UNLINK => sys_unlink(args[0] as *const u8),
         SYS_READLINK => sys_readlink(args[0] as *const u8, args[1] as *mut u8, args[2]),
+        // 90
+        SYS_CHMOD => {
+            warn!("sys_chmod is unimplemented");
+            Ok(0)
+        }
         SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
         SYS_TIME => sys_time(args[0] as *mut u64),
         SYS_ALARM => {
