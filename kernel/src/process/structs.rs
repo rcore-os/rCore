@@ -5,7 +5,7 @@ use core::str;
 use log::*;
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
-use spin::{Mutex, RwLock};
+use spin::RwLock;
 use xmas_elf::{
     header,
     program::{Flags, SegmentData, Type},
@@ -13,10 +13,10 @@ use xmas_elf::{
 };
 
 use crate::arch::interrupt::{Context, TrapFrame};
-use crate::fs::{FileHandle, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
+use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::net::{SocketWrapper, SOCKETS};
-use crate::sync::Condvar;
+use crate::net::{Socket, SOCKETS};
+use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 
@@ -28,21 +28,6 @@ pub struct Thread {
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
     pub proc: Arc<Mutex<Process>>,
-}
-
-#[derive(Clone)]
-pub enum FileLike {
-    File(FileHandle),
-    Socket(SocketWrapper),
-}
-
-impl fmt::Debug for FileLike {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FileLike::File(_) => write!(f, "File"),
-            FileLike::Socket(wrapper) => write!(f, "{:?}", wrapper),
-        }
-    }
 }
 
 /// Pid type
@@ -342,13 +327,6 @@ impl Thread {
 
         debug!("fork: temporary copy data!");
         let kstack = KernelStack::new();
-
-        let mut sockets = SOCKETS.lock();
-        for (_fd, file) in files.iter() {
-            if let FileLike::Socket(wrapper) = file {
-                sockets.retain(wrapper.handle);
-            }
-        }
 
         Box::new(Thread {
             context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },

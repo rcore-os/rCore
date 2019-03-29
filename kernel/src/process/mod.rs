@@ -1,10 +1,10 @@
 pub use self::structs::*;
 use crate::arch::cpu;
 use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
+use crate::sync::{MutexGuard, SpinNoIrq};
 use alloc::{boxed::Box, sync::Arc};
 use log::*;
 pub use rcore_thread::*;
-use spin::MutexGuard;
 
 mod abi;
 pub mod structs;
@@ -37,13 +37,13 @@ static PROCESSORS: [Processor; MAX_CPU_NUM] = [
 ];
 
 /// Get current process
-pub fn process() -> MutexGuard<'static, Process> {
+pub fn process() -> MutexGuard<'static, Process, SpinNoIrq> {
     current_thread().proc.lock()
 }
 
 /// Get current process, ignoring its lock
 /// Only use this when necessary
-pub unsafe fn process_unsafe() -> MutexGuard<'static, Process> {
+pub unsafe fn process_unsafe() -> MutexGuard<'static, Process, SpinNoIrq> {
     let thread = current_thread();
     thread.proc.force_unlock();
     thread.proc.lock()
