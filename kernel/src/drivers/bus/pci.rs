@@ -1,4 +1,5 @@
 use crate::drivers::net::*;
+use crate::drivers::block::*;
 use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -129,7 +130,7 @@ impl PciTag {
     // linux/drivers/pci/probe.c pci_read_bases
     // return (addr, len)
     pub unsafe fn get_bar_mem(&self, bar_number: u32) -> Option<(usize, usize)> {
-        assert!(bar_number <= 4);
+        assert!(bar_number <= 6);
         let bar = PCI_BAR0 + 4 * bar_number;
         let mut base_lo = self.read(bar, 4);
         self.write(bar, 0xffffffff);
@@ -297,6 +298,14 @@ pub fn init_driver(name: String, vid: u32, did: u32, tag: PciTag) {
                 PCI_DRIVERS
                     .lock()
                     .insert(tag, ixgbe::ixgbe_init(name, irq, addr, len));
+            }
+        } else if did == 0x2922 {
+            // 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]
+            if let Some((addr, len)) = unsafe { tag.get_bar_mem(5) } {
+                let irq = unsafe { tag.enable() };
+                PCI_DRIVERS
+                    .lock()
+                    .insert(tag, ahci::ahci_init(irq, addr, len));
             }
         }
     }
