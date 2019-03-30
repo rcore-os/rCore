@@ -15,7 +15,7 @@ use crate::sync::FlagsGuard;
 use bitflags::*;
 use log::*;
 use rcore_memory::paging::PageTable;
-use rcore_memory::PAGE_SIZE;
+use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
 use volatile::Volatile;
 
 use rcore_fs::dev::BlockDevice;
@@ -30,10 +30,10 @@ pub struct AHCI {
     header: usize,
     size: usize,
     rfis: usize,
-    cmd_list: usize,
-    cmd_table: usize,
-    data: usize,
-    port_addr: usize,
+    cmd_list: &'static mut [AHCICommandHeader],
+    cmd_table: &'static mut AHCICommandTable,
+    data: &'static mut [u8],
+    port: &'static mut AHCIPort,
 }
 
 pub struct AHCIDriver(Mutex<AHCI>);
@@ -201,19 +201,7 @@ pub struct ATAIdentifyPacket {
 
 impl Driver for AHCIDriver {
     fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
-        let driver = self.0.lock();
-
-        // ensure header page is mapped
-        let header = driver.header as usize;
-        let size = driver.size as usize;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-        return false;
+        false
     }
 
     fn device_type(&self) -> DeviceType {
@@ -226,31 +214,13 @@ impl Driver for AHCIDriver {
 
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
-        // ensure header page is mapped
-        let header = driver.header as usize;
-        let size = driver.size as usize;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-        let port = unsafe { &mut *(driver.port_addr as *mut AHCIPort) };
-        let cmd_headers = unsafe {
-            slice::from_raw_parts_mut(
-                driver.cmd_list as *mut AHCICommandHeader,
-                PAGE_SIZE / size_of::<AHCICommandHeader>(),
-            )
-        };
-        cmd_headers[0].prdbc = 0;
-        cmd_headers[0].pwa_cfl = 0;
 
-        let cmd_table = unsafe { &mut *(driver.cmd_table as *mut AHCICommandTable) };
+        driver.cmd_list[0].prdbc = 0;
+        driver.cmd_list[0].pwa_cfl = 0;
+
         let len = min(BLOCK_SIZE, buf.len());
-        let data = unsafe { slice::from_raw_parts(driver.data as *const u8, len) };
 
-        let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+        let fis = unsafe { &mut *(driver.cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
         // Register FIS from HBA to device
         fis.fis_type = FIS_REG_H2D;
         fis.cflags = 1 << 7;
@@ -270,16 +240,16 @@ impl Driver for AHCIDriver {
         fis.lba_4 = (block_id >> 32) as u8;
         fis.lba_5 = (block_id >> 40) as u8;
 
-        port.ci.write(1 << 0);
+        driver.port.ci.write(1 << 0);
 
         loop {
-            let ci = port.ci.read();
+            let ci = driver.port.ci.read();
             if (ci & (1 << 0)) == 0 {
                 break;
             }
         }
 
-        (&mut buf[..len]).clone_from_slice(&data);
+        buf[..len].clone_from_slice(&driver.data[0..len]);
         return true;
     }
 
@@ -288,31 +258,13 @@ impl Driver for AHCIDriver {
             return false;
         }
         let mut driver = self.0.lock();
-        // ensure header page is mapped
-        let header = driver.header as usize;
-        let size = driver.size as usize;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-        let port = unsafe { &mut *(driver.port_addr as *mut AHCIPort) };
-        let cmd_headers = unsafe {
-            slice::from_raw_parts_mut(
-                driver.cmd_list as *mut AHCICommandHeader,
-                PAGE_SIZE / size_of::<AHCICommandHeader>(),
-            )
-        };
-        cmd_headers[0].prdbc = 0;
-        cmd_headers[0].pwa_cfl = 1 << 6; // devic write
 
-        let cmd_table = unsafe { &mut *(driver.cmd_table as *mut AHCICommandTable) };
-        let data = unsafe { slice::from_raw_parts_mut(driver.data as *mut u8, BLOCK_SIZE) };
-        data.clone_from_slice(&buf[..BLOCK_SIZE]);
+        driver.cmd_list[0].prdbc = 0;
+        driver.cmd_list[0].pwa_cfl = 1 << 6; // devic write
 
-        let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+        driver.data[0..BLOCK_SIZE].clone_from_slice(&buf[..BLOCK_SIZE]);
+
+        let fis = unsafe { &mut *(driver.cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
         // Register FIS from HBA to device
         fis.fis_type = FIS_REG_H2D;
         fis.cflags = 1 << 7;
@@ -333,10 +285,10 @@ impl Driver for AHCIDriver {
         fis.lba_4 = (block_id >> 32) as u8;
         fis.lba_5 = (block_id >> 40) as u8;
 
-        port.ci.write(1 << 0);
+        driver.port.ci.write(1 << 0);
 
         loop {
-            let ci = port.ci.read();
+            let ci = driver.port.ci.read();
             if (ci & (1 << 0)) == 0 {
                 break;
             }
@@ -349,7 +301,7 @@ const BLOCK_SIZE: usize = 512;
 
 fn from_ata_string(data: &[u8]) -> String {
     let mut swapped_data = Vec::new();
-    assert!(data.len() % 2 == 0);
+    assert_eq!(data.len() % 2, 0);
     for i in (0..data.len()).step_by(2) {
         swapped_data.push(data[i + 1]);
         swapped_data.push(data[i]);
@@ -357,13 +309,15 @@ fn from_ata_string(data: &[u8]) -> String {
     return String::from_utf8(swapped_data).unwrap();
 }
 
+/// Allocate consequent physical frames for DMA
+fn alloc_dma(page_num: usize) -> (VirtAddr, PhysAddr) {
+    let layout = Layout::from_size_align(PAGE_SIZE * page_num, PAGE_SIZE).unwrap();
+    let vaddr = unsafe { alloc_zeroed(layout) } as usize;
+    let paddr = active_table().get_entry(vaddr).unwrap().target();
+    (vaddr, paddr)
+}
+
 pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver> {
-    let _ = FlagsGuard::no_irq_region();
-    let mut current_addr = header;
-    while current_addr < header + size {
-        active_table().map_if_not_exists(current_addr, current_addr);
-        current_addr = current_addr + PAGE_SIZE;
-    }
     let ghc = unsafe { &mut *(header as *mut AHCIGHC) };
 
     // AHCI Enable
@@ -390,27 +344,12 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
             // Disable Port First
             port.cmd.write(port.cmd.read() & !(1 << 4 | 1 << 0));
 
-            let rfis_va =
-                unsafe { alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) }
-                    as usize;
-            let rfis_pa = active_table().get_entry(rfis_va).unwrap().target();
+            let (rfis_va, rfis_pa) = alloc_dma(1);
+            let (cmd_list_va, cmd_list_pa) = alloc_dma(1);
+            let (cmd_table_va, cmd_table_pa) = alloc_dma(1);
+            let (data_va, data_pa) = alloc_dma(1);
 
-            let cmd_list_va =
-                unsafe { alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) }
-                    as usize;
-            let cmd_list_pa = active_table().get_entry(cmd_list_va).unwrap().target();
-
-            let cmd_table_va =
-                unsafe { alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) }
-                    as usize;
-            let cmd_table_pa = active_table().get_entry(cmd_table_va).unwrap().target();
-
-            let data_va =
-                unsafe { alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) }
-                    as usize;
-            let data_pa = active_table().get_entry(data_va).unwrap().target();
-
-            let cmd_headers = unsafe {
+            let cmd_list = unsafe {
                 slice::from_raw_parts_mut(
                     cmd_list_va as *mut AHCICommandHeader,
                     PAGE_SIZE / size_of::<AHCICommandHeader>(),
@@ -423,10 +362,10 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
             cmd_table.prdt[0].dbau = (data_pa >> 32) as u32;
             cmd_table.prdt[0].dbc_i = (BLOCK_SIZE - 1) as u32;
 
-            cmd_headers[0].ctba0 = cmd_table_pa as u32;
-            cmd_headers[0].ctba_u0 = (cmd_table_pa >> 32) as u32;
-            cmd_headers[0].prdtl = 1;
-            cmd_headers[0].prdbc = 0;
+            cmd_list[0].ctba0 = cmd_table_pa as u32;
+            cmd_list[0].ctba_u0 = (cmd_table_pa >> 32) as u32;
+            cmd_list[0].prdtl = 1;
+            cmd_list[0].prdbc = 0;
 
             port.clb.write(cmd_list_pa as u32);
             port.clbu.write((cmd_list_pa >> 32) as u32);
@@ -480,14 +419,16 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
                 );
             }
 
+            let data = unsafe { slice::from_raw_parts_mut(data_va as *mut u8, BLOCK_SIZE) };
+
             let driver = AHCIDriver(Mutex::new(AHCI {
                 header,
                 size,
                 rfis: rfis_va,
-                cmd_list: cmd_list_va,
-                cmd_table: cmd_table_va,
-                data: data_va,
-                port_addr: addr,
+                cmd_list,
+                cmd_table,
+                data,
+                port,
             }));
 
             let driver = Arc::new(driver);

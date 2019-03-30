@@ -1,11 +1,14 @@
+use crate::consts::KERNEL_OFFSET;
 use crate::drivers::block::*;
 use crate::drivers::net::*;
 use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
+use crate::memory::active_table;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::cmp::Ordering;
 use pci::*;
+use rcore_memory::{paging::PageTable, PAGE_SIZE};
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 
@@ -126,9 +129,12 @@ pub fn init_driver(dev: &PCIDevice) {
             // 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]
             if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[5] {
                 let irq = unsafe { enable(dev.loc) };
+                assert!(len as usize <= PAGE_SIZE);
+                let vaddr = KERNEL_OFFSET + addr as usize;
+                active_table().map(vaddr, addr as usize);
                 PCI_DRIVERS
                     .lock()
-                    .insert(dev.loc, ahci::ahci_init(irq, addr as usize, len as usize));
+                    .insert(dev.loc, ahci::ahci_init(irq, vaddr, len as usize));
             }
         }
         _ => {}
