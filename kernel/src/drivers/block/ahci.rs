@@ -359,15 +359,12 @@ fn from_ata_string(data: &[u8]) -> String {
 
 pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver> {
     let _ = FlagsGuard::no_irq_region();
-    if let None = active_table().get_entry(header) {
-        let mut current_addr = header;
-        while current_addr < header + size {
-            active_table().map_if_not_exists(current_addr, current_addr);
-            current_addr = current_addr + PAGE_SIZE;
-        }
+    let mut current_addr = header;
+    while current_addr < header + size {
+        active_table().map_if_not_exists(current_addr, current_addr);
+        current_addr = current_addr + PAGE_SIZE;
     }
     let ghc = unsafe { &mut *(header as *mut AHCIGHC) };
-    debug!("header {:?}", ghc.cap);
 
     // AHCI Enable
     ghc.ghc.write(ghc.ghc.read() | (1 << 13));
