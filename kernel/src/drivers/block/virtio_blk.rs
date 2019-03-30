@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::cmp::min;
@@ -14,6 +15,7 @@ use volatile::Volatile;
 
 use rcore_fs::dev::BlockDevice;
 
+use crate::drivers::BlockDriver;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
@@ -125,11 +127,8 @@ impl Driver for VirtIOBlkDriver {
     fn get_id(&self) -> String {
         format!("virtio_block")
     }
-}
 
-impl BlockDevice for VirtIOBlkDriver {
-    const BLOCK_SIZE_LOG2: u8 = 9; // 512
-    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> bool {
+    fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
         // ensure header page is mapped
         active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
@@ -157,7 +156,7 @@ impl BlockDevice for VirtIOBlkDriver {
         }
     }
 
-    fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {
+    fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
         let mut driver = self.0.lock();
         // ensure header page is mapped
         active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
@@ -226,5 +225,5 @@ pub fn virtio_blk_init(node: &Node) {
 
     let driver = Arc::new(driver);
     DRIVERS.write().push(driver.clone());
-    BLK_DRIVERS.write().push(driver);
+    BLK_DRIVERS.write().push(Arc::new(BlockDriver(driver)));
 }

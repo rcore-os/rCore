@@ -66,7 +66,9 @@ qemu_net_opts := \
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback \
+	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
+	-device ahci,id=ahci0 \
+	-device ide-drive,drive=sfsimg,bus=ahci0.0 \
 	-serial mon:stdio \
 	-m 4G \
 	-device isa-debug-exit

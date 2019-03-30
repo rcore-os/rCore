@@ -20,7 +20,6 @@ use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::sync::{MutexGuard, SpinNoIrq};
 
 use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 

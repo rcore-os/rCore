@@ -2,19 +2,17 @@
 //!
 //! Spec: https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf
 
-use alloc::alloc::{alloc_zeroed, GlobalAlloc, Layout};
+use alloc::alloc::{alloc_zeroed, Layout};
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::min;
-use core::mem::{size_of, zeroed};
+use core::mem::size_of;
 use core::slice;
-use core::str;
 
 use crate::sync::FlagsGuard;
 use bitflags::*;
-use device_tree::util::SliceRead;
-use device_tree::Node;
 use log::*;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
@@ -22,10 +20,10 @@ use volatile::Volatile;
 
 use rcore_fs::dev::BlockDevice;
 
+use crate::drivers::BlockDriver;
 use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
 
 pub struct AHCI {
@@ -35,10 +33,12 @@ pub struct AHCI {
     cmd_list: usize,
     cmd_table: usize,
     data: usize,
+    port_addr: usize,
 }
 
 pub struct AHCIDriver(Mutex<AHCI>);
 
+// AHCI
 // 3.1 Generic Host Control
 #[repr(C)]
 pub struct AHCIGHC {
@@ -86,6 +86,7 @@ bitflags! {
     }
 }
 
+// AHCI
 // 3.3 Port Registers (one set per port)
 #[repr(C)]
 pub struct AHCIPort {
@@ -109,6 +110,7 @@ pub struct AHCIPort {
     devslp: Volatile<u32>,
 }
 
+// AHCi
 // 4.2.1 Received FIS Structure
 #[repr(C)]
 pub struct AHCIRFIS {
@@ -120,6 +122,7 @@ pub struct AHCIRFIS {
     reserved: [u8; 0x60],
 }
 
+// AHCI
 // 4.2.2 Command List Structure
 #[repr(C)]
 pub struct AHCICommandHeader {
@@ -132,6 +135,7 @@ pub struct AHCICommandHeader {
     reservec: [u32; 4],
 }
 
+// AHCI
 // 4.2.3 Command Table
 #[repr(C)]
 pub struct AHCICommandTable {
@@ -150,40 +154,49 @@ pub struct AHCIPRD {
     dbc_i: u32,
 }
 
+const FIS_REG_H2D: u8 = 0x27;
+
+const CMD_READ_DMA_EXT: u8 = 0x25;
+const CMD_WRITE_DMA_EXT: u8 = 0x35;
+const CMD_IDENTIFY_DEVICE: u8 = 0xec;
+
 // https://wiki.osdev.org/AHCI
+// SATA
+// Figure 5-2: Register FIS - Host to Device
 #[repr(C)]
 #[derive(Default)]
-pub struct AHCIFISRegH2D {
+pub struct SATAFISRegH2D {
     fis_type: u8,
     cflags: u8,
     command: u8,
     feature_lo: u8,
-    lba_0: u8,
-    lba_1: u8,
-    lba_2: u8,
-    device: u8,
-    lba_3: u8,
-    lba_4: u8,
-    lba_5: u8,
+    lba_0: u8, // LBA 7:0
+    lba_1: u8, // LBA 15:8
+    lba_2: u8, // LBA 23:16
+    dev_head: u8,
+    lba_3: u8, // LBA 31:24
+    lba_4: u8, // LBA 39:32
+    lba_5: u8, // LBA 47:40
     feature_hi: u8,
-    count_lo: u8,
-    count_hi: u8,
-    icc: u8,
-    control: u8,
     sector_count_lo: u8,
     sector_count_hi: u8,
+    reserved: u8,
+    control: u8,
 }
 
+// ATA8-ACS
 // Table 29 IDENTIFY DEVICE data
 #[repr(C)]
-pub struct AHCIIdentifyPacket {
+pub struct ATAIdentifyPacket {
     _1: [u16; 10],
     serial: [u8; 20], // words 10-19
     _2: [u16; 3],
     firmware: [u8; 8], // words 23-26
     model: [u8; 40],   // words 27-46
-    _3: [u16; 16],
+    _3: [u16; 13],
     lba_sectors: u32, // words 60-61
+    _4: [u16; 38],
+    lba48_sectors: u64, // words 100-103
 }
 
 impl Driver for AHCIDriver {
@@ -191,8 +204,15 @@ impl Driver for AHCIDriver {
         let driver = self.0.lock();
 
         // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-        unimplemented!();
+        let header = driver.header as usize;
+        let size = driver.size as usize;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
         return false;
     }
 
@@ -203,25 +223,129 @@ impl Driver for AHCIDriver {
     fn get_id(&self) -> String {
         format!("ahci")
     }
+
+    fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
+        let mut driver = self.0.lock();
+        // ensure header page is mapped
+        let header = driver.header as usize;
+        let size = driver.size as usize;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+        let port = unsafe { &mut *(driver.port_addr as *mut AHCIPort) };
+        let cmd_headers = unsafe {
+            slice::from_raw_parts_mut(
+                driver.cmd_list as *mut AHCICommandHeader,
+                PAGE_SIZE / size_of::<AHCICommandHeader>(),
+            )
+        };
+        cmd_headers[0].prdbc = 0;
+        cmd_headers[0].pwa_cfl = 0;
+
+        let cmd_table = unsafe { &mut *(driver.cmd_table as *mut AHCICommandTable) };
+        let len = min(BLOCK_SIZE, buf.len());
+        let data = unsafe { slice::from_raw_parts(driver.data as *const u8, len) };
+
+        let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+        // Register FIS from HBA to device
+        fis.fis_type = FIS_REG_H2D;
+        fis.cflags = 1 << 7;
+
+        // 7.25 READ DMA EXT - 25h, DMA
+        fis.command = CMD_READ_DMA_EXT;
+        fis.sector_count_lo = 1;
+        fis.sector_count_hi = 0;
+        fis.dev_head = 0x40; // LBA
+        fis.control = 0x80; // LBA48
+
+        let block_id = block_id as u64; // avoid problems on riscv32
+        fis.lba_0 = block_id as u8;
+        fis.lba_1 = (block_id >> 8) as u8;
+        fis.lba_2 = (block_id >> 16) as u8;
+        fis.lba_3 = (block_id >> 24) as u8;
+        fis.lba_4 = (block_id >> 32) as u8;
+        fis.lba_5 = (block_id >> 40) as u8;
+
+        port.ci.write(1 << 0);
+
+        loop {
+            let ci = port.ci.read();
+            if (ci & (1 << 0)) == 0 {
+                break;
+            }
+        }
+
+        (&mut buf[..len]).clone_from_slice(&data);
+        return true;
+    }
+
+    fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
+        if buf.len() < BLOCK_SIZE {
+            return false;
+        }
+        let mut driver = self.0.lock();
+        // ensure header page is mapped
+        let header = driver.header as usize;
+        let size = driver.size as usize;
+        if let None = active_table().get_entry(header) {
+            let mut current_addr = header;
+            while current_addr < header + size {
+                active_table().map_if_not_exists(current_addr, current_addr);
+                current_addr = current_addr + PAGE_SIZE;
+            }
+        }
+        let port = unsafe { &mut *(driver.port_addr as *mut AHCIPort) };
+        let cmd_headers = unsafe {
+            slice::from_raw_parts_mut(
+                driver.cmd_list as *mut AHCICommandHeader,
+                PAGE_SIZE / size_of::<AHCICommandHeader>(),
+            )
+        };
+        cmd_headers[0].prdbc = 0;
+        cmd_headers[0].pwa_cfl = 1 << 6; // devic write
+
+        let cmd_table = unsafe { &mut *(driver.cmd_table as *mut AHCICommandTable) };
+        let data = unsafe { slice::from_raw_parts_mut(driver.data as *mut u8, BLOCK_SIZE) };
+        data.clone_from_slice(&buf[..BLOCK_SIZE]);
+
+        let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+        // Register FIS from HBA to device
+        fis.fis_type = FIS_REG_H2D;
+        fis.cflags = 1 << 7;
+
+        // ATA8-ACS
+        // 7.63 WRITE DMA EXT - 35h, DMA
+        fis.command = CMD_WRITE_DMA_EXT;
+        fis.sector_count_lo = 1;
+        fis.sector_count_hi = 0;
+        fis.dev_head = 0x40; // LBA
+        fis.control = 0x80; // LBA48
+
+        let block_id = block_id as u64; // avoid problems on riscv32
+        fis.lba_0 = block_id as u8;
+        fis.lba_1 = (block_id >> 8) as u8;
+        fis.lba_2 = (block_id >> 16) as u8;
+        fis.lba_3 = (block_id >> 24) as u8;
+        fis.lba_4 = (block_id >> 32) as u8;
+        fis.lba_5 = (block_id >> 40) as u8;
+
+        port.ci.write(1 << 0);
+
+        loop {
+            let ci = port.ci.read();
+            if (ci & (1 << 0)) == 0 {
+                break;
+            }
+        }
+        return true;
+    }
 }
 
 const BLOCK_SIZE: usize = 512;
-impl BlockDevice for AHCIDriver {
-    const BLOCK_SIZE_LOG2: u8 = 9; // 512
-    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> bool {
-        let mut driver = self.0.lock();
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-        unimplemented!()
-    }
-
-    fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {
-        let mut driver = self.0.lock();
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-        unimplemented!()
-    }
-}
 
 fn from_ata_string(data: &[u8]) -> String {
     let mut swapped_data = Vec::new();
@@ -327,39 +451,55 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
                 warn!("port is not connected to external drive?");
             }
 
-            let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut AHCIFISRegH2D) };
-            // Register FIS from host to device
-            fis.fis_type = 0x27;
+            let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+            // Register FIS from HBA to device
+            fis.fis_type = FIS_REG_H2D;
             fis.cflags = 1 << 7;
 
             // 7.15 IDENTIFY DEVICE - ECh, PIO Data-In
-            fis.command = 0xec; // ide identify
+            fis.command = CMD_IDENTIFY_DEVICE;
             fis.sector_count_lo = 1;
 
             debug!("issued identify command");
             port.ci.write(1 << 0);
 
             loop {
-                let stat = port.tfd.read();
                 let ci = port.ci.read();
-                if stat & 0x80 == 0 || (ci & (1 << 0)) == 0 {
+                if (ci & (1 << 0)) == 0 {
                     break;
                 }
             }
 
-            let identify_data = unsafe { &*(data_va as *mut AHCIIdentifyPacket) };
+            let identify_data = unsafe { &*(data_va as *mut ATAIdentifyPacket) };
 
             unsafe {
                 debug!(
-                    "{:?} {:?} {:?} {}",
-                    from_ata_string(&identify_data.serial),
-                    from_ata_string(&identify_data.firmware),
-                    from_ata_string(&identify_data.model),
-                    identify_data.lba_sectors
+                    "Found ATA Device serial {} firmware {} model {} sectors 24bit={} 48bit={}",
+                    from_ata_string(&identify_data.serial).trim_end(),
+                    from_ata_string(&identify_data.firmware).trim_end(),
+                    from_ata_string(&identify_data.model).trim_end(),
+                    identify_data.lba_sectors,
+                    identify_data.lba48_sectors,
                 );
             }
 
-            break;
+            let driver = AHCIDriver(Mutex::new(AHCI {
+                header,
+                size,
+                rfis: rfis_va,
+                cmd_list: cmd_list_va,
+                cmd_table: cmd_table_va,
+                data: data_va,
+                port_addr: addr,
+            }));
+
+            let driver = Arc::new(driver);
+            DRIVERS.write().push(driver.clone());
+            BLK_DRIVERS
+                .write()
+                .push(Arc::new(BlockDriver(driver.clone())));
+
+            return driver;
         }
     }
 

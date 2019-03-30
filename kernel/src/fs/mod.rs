@@ -37,15 +37,15 @@ lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
         #[cfg(not(feature = "link_user"))]
         let device = {
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
             {
                 crate::drivers::BLK_DRIVERS.read().iter()
-                    .next().expect("VirtIOBlk not found")
+                    .next().expect("Block device not found")
                     .clone()
             }
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(target_arch = "aarch64")]
             {
-                Arc::new(ide::IDE::new(1))
+                unimplemented!()
             }
         };
         #[cfg(feature = "link_user")]
