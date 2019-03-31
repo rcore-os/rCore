@@ -15,7 +15,7 @@
 #   make clean                  Clean
 #
 # Options:
-#   arch    = x86_64 | riscv32 | riscv64 | aarch64
+#   arch    = x86_64 | riscv32 | riscv64 | aarch64 | mipsel
 #   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
@@ -155,6 +155,8 @@ else ifeq ($(arch), riscv32)
 prefix := riscv64-unknown-elf-
 else ifeq ($(arch), riscv64)
 prefix := riscv64-unknown-elf-
+else ifeq ($(arch), mipsel)
+prefix ?= mipsel-linux-gnu-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 ifeq (,$(shell which $(prefix)ld))
@@ -251,6 +253,9 @@ else ifeq ($(arch), riscv64)
 	cp bbl $(abspath $@)
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
+else ifeq ($(arch), mipsel)
+	# TODO write mipsel bootloader
+	false
 endif
 
 kernel:
@@ -270,6 +275,8 @@ else ifeq ($(arch), riscv64)
 		src/arch/riscv32/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), aarch64)
+	@cargo xbuild $(build_args)
+else ifeq ($(arch), mipsel)
 	@cargo xbuild $(build_args)
 endif
 
