@@ -1,5 +1,5 @@
 pub mod io;
-pub mod interrupt;
+//pub mod interrupt;
 pub mod timer;
 pub mod paging;
 pub mod memory;

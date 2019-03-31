@@ -61,3 +61,32 @@ pub unsafe fn restore(flags: usize) {
 pub unsafe fn enable_and_wfi() {
     asm!("msr daifclr, #2; wfi" :::: "volatile");
 }
+
+#[inline(always)]
+#[cfg(target_arch = "mips")]
+pub unsafe fn disable_and_store() -> usize {
+    let cp0_status: usize;
+    asm!("mfc0 $0, $$12;" : "=r"(cp0_status) ::: "volatile");
+    let cp0_status_new = cp0_status & !1;
+    asm!("mtc0 $0, $$12;" : : "r"(cp0_status_new) :: "volatile");
+    cp0_status & 1
+}
+
+#[inline(always)]
+#[cfg(target_arch = "mips")]
+pub unsafe fn restore(flags: usize) {
+    let cp0_status: usize;
+    asm!("mfc0 $0, $$12;" : "=r"(cp0_status) ::: "volatile");
+    let cp0_status_new = cp0_status | flags;
+    asm!("mtc0 $0, $$12;" : : "r"(cp0_status_new) :: "volatile");
+}
+
+#[inline(always)]
+#[cfg(target_arch = "mips")]
+pub unsafe fn enable_and_wfi() {
+    let cp0_status: usize;
+    asm!("mfc0 $0, $$12;" : "=r"(cp0_status) ::: "volatile");
+    let cp0_status_new = cp0_status | 1;
+    asm!("mtc0 $0, $$12; wait;" : : "r"(cp0_status_new) :: "volatile");
+}
+

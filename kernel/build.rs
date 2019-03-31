@@ -18,6 +18,8 @@ fn main() {
 		}
 		"riscv64" => {
 		}
+		"mipsel" => {
+		}
 		"aarch64" => {
 		}
 		_ => panic!("Unknown arch {}", arch),
