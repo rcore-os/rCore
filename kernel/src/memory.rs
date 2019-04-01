@@ -17,7 +17,7 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 pub type FrameAlloc = bit_allocator::BitAlloc16M;
 
 // RISCV has 8M memory
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
 pub type FrameAlloc = bit_allocator::BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory

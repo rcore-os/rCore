@@ -1,5 +1,4 @@
 use core::fmt::{Write, Result, Arguments};
-use super::sbi;
 
 struct SerialPort;
 
@@ -19,16 +18,12 @@ impl Write for SerialPort {
 }
 
 fn putchar(c: u8) {
-    if cfg!(feature = "board_u540") {
-        if c == b'\n' {
-            sbi::console_putchar(b'\r' as usize);
-        }
-    }
-    sbi::console_putchar(c as usize);
+    // TODO: output to uart
 }
 
 pub fn getchar() -> char {
-    let c = sbi::console_getchar() as u8;
+    // TODO: get char from uart
+    let c = 0 as u8;
 
     match c {
         255 => '\0',   // null
@@ -37,7 +32,8 @@ pub fn getchar() -> char {
 }
 
 pub fn getchar_option() -> Option<char> {
-    let c = sbi::console_getchar() as isize;
+    // TODO: get char from uart
+    let c = 0 as u8;
     match c {
         -1 => None,
         c => Some(c as u8 as char),

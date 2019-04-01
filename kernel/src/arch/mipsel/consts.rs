@@ -1,10 +1,6 @@
-// Physical address available on THINPAD:
-// [0x80000000, 0x80800000]
+/// Platform specific constants
 
-pub const KERNEL_OFFSET: usize = 0xC000_0000;
-
-#[cfg(target_arch = "riscv32")]
-pub const KERNEL_P2_INDEX: usize = (KERNEL_OFFSET >> 12 >> 10) & 0x3ff;
+pub const KERNEL_OFFSET: usize = 0x80100000;
 
 pub const KERNEL_HEAP_SIZE: usize = 0x00a0_0000;
 

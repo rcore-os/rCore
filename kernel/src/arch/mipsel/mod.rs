@@ -42,10 +42,9 @@ pub extern fn rust_main() -> ! {
 
     crate::logging::init();
     interrupt::init();
-    memory::init(dtb);
+    memory::init();
     timer::init();
-    // TODO: initialize device with dtb
-    // crate::drivers::init(dtb);
+    crate::drivers::init(dtb_start);
     crate::process::init();
 
     // TODO: start other CPU

@@ -1,26 +1,18 @@
 use core::mem;
-use riscv::{addr::*, register::sstatus};
 use rcore_memory::PAGE_SIZE;
 use log::*;
 use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
-use riscv::register::satp;
 
 /// Initialize the memory management module
-pub fn init(dtb: usize) {
-    unsafe { sstatus::set_sum(); }  // Allow user memory access
+pub fn init() {
     // initialize heap and Frame allocator
     init_frame_allocator();
     init_heap();
-    // remap the kernel use 4K page
-    remap_the_kernel(dtb);
 }
 
 pub fn init_other() {
-    unsafe {
-        sstatus::set_sum();         // Allow user memory access
-        asm!("csrw satp, $0; sfence.vma" :: "r"(SATP) :: "volatile");
-    }
+    // TODO: init other CPU cores
 }
 
 fn init_frame_allocator() {
@@ -40,26 +32,6 @@ fn init_frame_allocator() {
         assert!(page_start < page_end, "illegal range for frame allocator");
         page_start..page_end
     }
-}
-
-/// Remap the kernel memory address with 4K page recorded in p1 page table
-fn remap_the_kernel(dtb: usize) {
-    let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
-    let mut ms = MemorySet::new_bare();
-    ms.push(stext as usize, etext as usize, MemoryAttr::default().execute().readonly(), Linear::new(offset), "text");
-    ms.push(sdata as usize, edata as usize, MemoryAttr::default(), Linear::new(offset), "data");
-    ms.push(srodata as usize, erodata as usize, MemoryAttr::default().readonly(), Linear::new(offset), "rodata");
-    ms.push(bootstack as usize, bootstacktop as usize, MemoryAttr::default(), Linear::new(offset), "stack");
-    ms.push(sbss as usize, ebss as usize, MemoryAttr::default(), Linear::new(offset), "bss");
-    ms.push(dtb, dtb + super::consts::MAX_DTB_SIZE, MemoryAttr::default().readonly(), Linear::new(offset), "dts");
-    // map PLIC for HiFiveU
-    let offset = -(KERNEL_OFFSET as isize);
-    ms.push(KERNEL_OFFSET + 0x0C00_2000, KERNEL_OFFSET + 0x0C00_2000 + PAGE_SIZE, MemoryAttr::default(), Linear::new(offset), "plic0");
-    ms.push(KERNEL_OFFSET + 0x0C20_2000, KERNEL_OFFSET + 0x0C20_2000 + PAGE_SIZE, MemoryAttr::default(), Linear::new(offset), "plic1");
-    unsafe { ms.activate(); }
-    unsafe { SATP = ms.token(); }
-    mem::forget(ms);
-    info!("remap kernel end");
 }
 
 // First core stores its SATP here.
