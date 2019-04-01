@@ -2,8 +2,10 @@
 
 	.set noat
 	.set noreorder
-    .section .text
+    .section .text.ebase
     .globl trap_entry
+
+.org 0x0
 trap_entry:
 # +0x000: TLB-miss vector
 	b general_trap_vec
@@ -18,10 +20,9 @@ general_trap_vec:
 	nop  # delayslot
 
 trap_from_user:
-	# TODO: load kstack, we can use k0 to store something
-	# la     k0, address_of_kstack
-	# addiu  sp, k0, size_of_kstack
-	nop
+	# load kstack, we can use k0 to store something
+	la     k0, kernel_stack
+	la     sp, kernel_stack_top
 
 trap_from_kernel:
 	/* 
@@ -92,7 +93,7 @@ trap_from_kernel:
 
 	# prepare to call rust_trap
 	jal rust_trap
-	addiu a0, sp, 16             /* set argument */
+	addiu a0, sp, 16             /* set argument (trapframe) */
 
 	.globl trap_return
 trap_return:
@@ -148,3 +149,10 @@ trap_return:
 	eret
 	nop
 
+    .section .bss.stack
+    .align 12  #PGSHIFT
+    .global kernel_stack
+kernel_stack:
+    .space 1024 * 16 # 16KB for kernel stack
+    .global kernel_stack_top
+kernel_stack_top:

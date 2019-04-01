@@ -13,3 +13,5 @@ Cargo.lock
 
 # for eclipse
 .project
+
+.vscode

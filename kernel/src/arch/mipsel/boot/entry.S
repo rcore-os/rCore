@@ -5,9 +5,22 @@
     .globl _start
 
 _start:
-	la sp, bootstacktop
-    la gp, _gp
+    # setup stack and gp
+	la    sp, bootstacktop
+    la    gp, _gp
 
+    # set ebase
+    la    t0, trap_entry
+    mfc0  t1, 15 # C0_EBASE
+    or    t1, t1, t0
+    mtc0  t1, 15
+
+    # exit bootstrap mode
+    mfc0  t0, 12 # C0_STATUS
+    andi  t0, t0, 0xFFBFFFFF # set BEV (bit 22) to 0
+    mtc0  t0, 12
+
+    # directly jump to main function
     b rust_main
 	nop
 
