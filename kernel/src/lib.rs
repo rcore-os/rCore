@@ -41,7 +41,7 @@ mod backtrace;
 #[path = "arch/x86_64/mod.rs"]
 pub mod arch;
 
-#[cfg(target_arch = "mipsel")]
+#[cfg(target_arch = "mips")]
 #[path = "arch/mipsel/mod.rs"]
 pub mod arch;
 
