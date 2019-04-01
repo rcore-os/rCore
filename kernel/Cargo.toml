@@ -69,7 +69,7 @@ riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 aarch64 = { git = "https://github.com/rcore-os/aarch64" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
 
-[target.'cfg(target_arch = "mipsel")'.dependencies]
+[target.'cfg(target_arch = "mips")'.dependencies]
 mips = "^0.1.0"
 
 [package.metadata.bootimage]
