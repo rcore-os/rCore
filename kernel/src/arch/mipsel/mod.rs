@@ -1,5 +1,5 @@
 pub mod io;
-//pub mod interrupt;
+pub mod interrupt;
 pub mod timer;
 pub mod paging;
 pub mod memory;
@@ -11,7 +11,6 @@ pub mod rand;
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 mod board;
-mod sbi;
 
 use log::*;
 
