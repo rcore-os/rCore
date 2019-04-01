@@ -1,0 +1,44 @@
+/dts-v1/;
+
+
+/ {
+	model = "qemu malta";
+	compatible = "qemu,malta";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+	chosen {
+		stdio = &uart2;
+	};
+
+    aliases { };
+
+    cpu_intc: interrupt-controller {
+		compatible = "mti,cpu-interrupt-controller";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+	};
+
+	main_memory: memory@0 {
+        device_type = "memory";
+		reg = <0x00000000 0x10000000>;
+	};
+
+	uart2: serial@bf000900 {
+		compatible = "ns16550a";
+		reg = <0xbf000900 0x40>;
+		reg-shift = <3>;
+		clock-frequency = <1843200>;
+        /* The CBUS UART is attached to the MIPS CPU INT2 pin, ie interrupt 4 */
+        interrupt-parent = <&cpu_intc>;
+        interrupts = <4>;
+	};
+
+	nor0: flash@be000000 {
+		compatible = "cfi-flash";
+		reg = <0xbe000000 0x00400000>;
+	};
+
+    // TODO: add graphics and ethernet adapter
+
+};

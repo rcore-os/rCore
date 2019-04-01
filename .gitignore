@@ -1,6 +1,8 @@
 build
 target
 /kernel/src/arch/x86_64/interrupt/vector.asm
+/kernel/src/arch/*/boot/dtb.S
+*.dtb
 
 Cargo.lock
 !kernel/Cargo.lock
