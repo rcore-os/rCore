@@ -1,23 +1,27 @@
-use riscv::register::{
-    sstatus,
-    sstatus::Sstatus,
-    scause::Scause,
-};
+use mips::registers;
 
 /// Saved registers on a trap.
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
-    /// General registers
-    pub x: [usize; 32],
-    /// Supervisor Status
-    pub sstatus: Sstatus,
-    /// Supervisor Exception Program Counter
-    pub sepc: usize,
-    /// Supervisor Trap Value
-    pub stval: usize,
-    /// Supervisor Cause
-    pub scause: Scause,
+    /// CP0 status register
+    pub status: usize;
+    /// CP0 cause register
+    pub cause: usize;
+    /// CP0 EPC register
+    pub epc: usize;
+    /// CP0 vaddr register
+    pub vaddr: usize;
+    /// HI/LO registers
+    pub hi, lo: usize;
+    /// General registers 1-7
+    pub at, v0, v1, a0, a1, a2, a3: u32;
+    /// General registers 8-15
+    pub t0, t1, t2, t3, t4, t5, t6, t7: u32;  
+    /// General registers 16-23
+    pub s0, s1, s2, s3, s4, s5, s6, s7: u32;
+    /// General registers 24-31
+    pub t8, t9, k0, k1, gp, sp, fp, ra: u32;
     /// Reserve space for hartid
     pub _hartid: usize,
 }

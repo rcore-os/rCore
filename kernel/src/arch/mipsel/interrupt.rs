@@ -1,4 +1,5 @@
 use mips::interrupts::*;
+use mips::registers::*;
 use crate::drivers::DRIVERS;
 pub use self::context::*;
 use log::*;
@@ -8,6 +9,7 @@ mod context;
 
 /// Initialize interrupt
 pub fn init() {
+    // TODO
  //   extern {
  //       fn trap_entry();
  //   }
@@ -30,23 +32,23 @@ pub fn init() {
 /// Enable interrupt
 #[inline]
 pub unsafe fn enable() {
- //   sstatus::set_sie();
+    interrupts::enable();
 }
 
 /// Disable interrupt and return current interrupt status
 #[inline]
 pub unsafe fn disable_and_store() -> usize {
-  //  let e = sstatus::read().sie() as usize;
-  //  sstatus::clear_sie();
-  //  e
+    let e = cp0::status::read_u32() & 1;
+    interrupts::disable();
+    e
 }
 
 /// Enable interrupt if `flags` != 0
 #[inline]
 pub unsafe fn restore(flags: usize) {
-  //  if flags != 0 {
-  //      enable();
-  //  }
+    if flags != 0 {
+        enable();
+    }
 }
 
 /// Dispatch and handle interrupt.
@@ -54,22 +56,24 @@ pub unsafe fn restore(flags: usize) {
 /// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-  //  use self::scause::{Trap, Interrupt as I, Exception as E};
-  //  trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
-  //  match tf.scause.cause() {
-  //      Trap::Interrupt(I::SupervisorExternal) => external(),
-  //      Trap::Interrupt(I::SupervisorSoft) => ipi(),
-  //      Trap::Interrupt(I::SupervisorTimer) => timer(),
-  //      Trap::Exception(E::UserEnvCall) => syscall(tf),
-  //      Trap::Exception(E::LoadPageFault) => page_fault(tf),
-  //      Trap::Exception(E::StorePageFault) => page_fault(tf),
-  //      Trap::Exception(E::InstructionPageFault) => page_fault(tf),
-  //      _ => crate::trap::error(tf),
-  //  }
-  //  trace!("Interrupt end");
+    // TODO
+    use self::scause::{Trap, Interrupt as I, Exception as E};
+    // trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
+    match tf.scause.cause() {
+        Trap::Interrupt(I::SupervisorExternal) => external(),
+        Trap::Interrupt(I::SupervisorSoft) => ipi(),
+        Trap::Interrupt(I::SupervisorTimer) => timer(),
+        Trap::Exception(E::UserEnvCall) => syscall(tf),
+        Trap::Exception(E::LoadPageFault) => page_fault(tf),
+        Trap::Exception(E::StorePageFault) => page_fault(tf),
+        Trap::Exception(E::InstructionPageFault) => page_fault(tf),
+        _ => crate::trap::error(tf),
+    }
+    trace!("Interrupt end");
 }
 
 fn external() {
+    // TODO
     #[cfg(feature = "board_u540")]
     unsafe { super::board::handle_external_interrupt(); }
 
@@ -83,6 +87,7 @@ fn external() {
 }
 
 fn try_process_serial() -> bool {
+    // TODO
     match super::io::getchar_option() {
         Some(ch) => {
             crate::trap::serial(ch);
@@ -93,6 +98,7 @@ fn try_process_serial() -> bool {
 }
 
 fn try_process_drivers() -> bool {
+    // TODO
     for driver in DRIVERS.read().iter() {
         if driver.try_handle_interrupt(None) == true {
             return true
@@ -102,8 +108,9 @@ fn try_process_drivers() -> bool {
 }
 
 fn ipi() {
+    // TODO
     debug!("IPI");
-    super::sbi::clear_ipi();
+//    super::sbi::clear_ipi();
 }
 
 fn timer() {
@@ -112,12 +119,14 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
+    // TODO
     tf.sepc += 4;   // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
     tf.x[10] = ret as usize;
 }
 
 fn page_fault(tf: &mut TrapFrame) {
+    // TODO
     let addr = tf.stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
