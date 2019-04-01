@@ -3,8 +3,10 @@
 	.set noreorder
     .section .text.entry
     .globl _start
+
 _start:
 	la sp, bootstacktop
+    la gp, _gp
 
     b rust_main
 	nop

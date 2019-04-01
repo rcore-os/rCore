@@ -42,18 +42,24 @@ build_path := target/$(target)/$(mode)
 kernel := $(build_path)/rcore
 kernel_img := $(build_path)/kernel.img
 bootimage := $(build_path)/bootimage.bin
+dtb := src/arch/$(arch)/boot/dts/$(board).dtb
 bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 
+ifeq ($(arch), aarch64)
+board := raspi3
+
+ifeq ($(arch), mipsel)
+board := malta
+
 ### export environments ###
 export ARCH = $(arch)
 export BOARD = $(board)
 export SMP = $(smp)
+export DTB = $(dtb)
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
-ifeq ($(arch), aarch64)
-board := raspi3
 export SFSIMG = $(user_dir)/build/$(arch).img
 endif
 
@@ -98,6 +104,13 @@ qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), aarch64)
+qemu_opts += \
+	-machine $(board) \
+	-serial null -serial mon:stdio \
+	-kernel $(kernel_img)
+endif
+
+else ifeq ($(arch), mipsel)
 qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
@@ -171,9 +184,10 @@ cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
 strip := $(prefix)strip
+dtc := dtc
 export CC = $(cc)
 
-.PHONY: all clean build asm doc  debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
+.PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
 
 all: kernel
 
@@ -220,8 +234,18 @@ header:
 sym:
 	@$(objdump) -t $(kernel) | less
 
+### device tree process ###
+
+%.dtb: %.dts
+	$(dtc) -I dts -O dtb -o $@ $<
+
+### bootloader and kernel image ###
+
 $(bootloader): $(kernel)
 ifeq ($(arch), aarch64)
+	need_bootloader := true
+endif
+ifeq ($(need_bootloader), true)
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped
 	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
@@ -254,11 +278,12 @@ else ifeq ($(arch), riscv64)
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
 else ifeq ($(arch), mipsel)
-	# TODO write mipsel bootloader
-	false
+	# qemu-system-mipsel accepts ELF file only, so don't use objcopy
+	@cp $(kernel) $(kernel)_orig
+	@$(strip) $(kernel) -o $(kernel)
 endif
 
-kernel:
+kernel: $(dtb)
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)

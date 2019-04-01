@@ -8,41 +8,48 @@ pub mod consts;
 pub mod cpu;
 pub mod syscall;
 pub mod rand;
-#[cfg(feature = "board_u540")]
-#[path = "board/u540/mod.rs"]
-mod board;
 
 use log::*;
+use mips::registers;
+use mips::instructions;
+
+extern "C" {
+    fn _dtb_start();
+    fn _dtb_end();
+}
 
 #[no_mangle]
-pub extern fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
-    // An initial recursive page table has been set by BBL (shared by all cores)
+pub extern fn rust_main() -> ! {
 
-    unsafe { cpu::set_cpu_id(hartid); }
+    // unsafe { cpu::set_cpu_id(hartid); }
 
-    if hartid != BOOT_HART_ID {
-        while unsafe { !cpu::has_started(hartid) }  { }
-        println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
-        others_main();
-        //other_main -> !
+    let ebase = cp0::ebase::read_u32();
+    let cpu_id = ebase & 0x3ff;
+    let dtb_start = _dtb_start as usize;
+    let dtb_end = _dtb_end as usize;
+
+    if cpu_id != BOOT_CPU_ID {
+        // TODO: run others_main on other CPU
+        // while unsafe { !cpu::has_started(hartid) }  { }
+        // println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
+        // others_main();
+        loop {}
     }
 
     unsafe { memory::clear_bss(); }
 
-    println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
+    println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 
     crate::logging::init();
     interrupt::init();
     memory::init(dtb);
     timer::init();
-    // FIXME: init driver on u540
-    #[cfg(not(feature = "board_u540"))]
-    crate::drivers::init(dtb);
-    #[cfg(feature = "board_u540")]
-    unsafe { board::init_external_interrupt(); }
+    // TODO: initialize device with dtb
+    // crate::drivers::init(dtb);
     crate::process::init();
 
-    unsafe { cpu::start_others(hart_mask); }
+    // TODO: start other CPU
+    // unsafe { cpu::start_others(hart_mask); }
     crate::kmain();
 }
 
@@ -53,35 +60,8 @@ fn others_main() -> ! {
     crate::kmain();
 }
 
-#[cfg(not(feature = "board_u540"))]
-const BOOT_HART_ID: usize = 0;
-#[cfg(feature = "board_u540")]
-const BOOT_HART_ID: usize = 1;
-
-/// Constant & Macro for `trap.asm`
-#[cfg(target_arch = "riscv32")]
-global_asm!(r"
-    .equ XLENB,     4
-    .equ XLENb,     32
-    .macro LOAD a1, a2
-        lw \a1, \a2*XLENB(sp)
-    .endm
-    .macro STORE a1, a2
-        sw \a1, \a2*XLENB(sp)
-    .endm
-");
-#[cfg(target_arch = "riscv64")]
-global_asm!(r"
-    .equ XLENB,     8
-    .equ XLENb,     64
-    .macro LOAD a1, a2
-        ld \a1, \a2*XLENB(sp)
-    .endm
-    .macro STORE a1, a2
-        sd \a1, \a2*XLENB(sp)
-    .endm
-");
-
+const BOOT_CPU_ID: usize = 0;
 
 global_asm!(include_str!("boot/entry.S"));
 global_asm!(include_str!("boot/trap.S"));
+global_asm!(include_str!("boot/dtb.S"));
