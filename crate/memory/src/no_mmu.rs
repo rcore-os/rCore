@@ -1,5 +1,5 @@
+use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::vec::Vec;
-use alloc::alloc::{Layout, GlobalAlloc};
 use core::marker::PhantomData;
 
 pub trait NoMMUSupport {
@@ -28,8 +28,12 @@ impl<S: NoMMUSupport> MemorySet<S> {
         slice
     }
     // empty impls
-    pub fn with<T>(&self, f: impl FnOnce() -> T) -> T { f() }
-    pub fn token(&self) -> usize { 0 }
+    pub fn with<T>(&self, f: impl FnOnce() -> T) -> T {
+        f()
+    }
+    pub fn token(&self) -> usize {
+        0
+    }
     pub unsafe fn activate(&self) {}
 }
 
@@ -44,7 +48,11 @@ impl<S: NoMMUSupport> MemoryArea<S> {
     fn new(size: usize) -> Self {
         let layout = Layout::from_size_align(size, 1).unwrap();
         let ptr = unsafe { S::allocator().alloc(layout) } as usize;
-        MemoryArea { ptr, layout, support: PhantomData }
+        MemoryArea {
+            ptr,
+            layout,
+            support: PhantomData,
+        }
     }
     unsafe fn as_buf(&self) -> &'static mut [u8] {
         core::slice::from_raw_parts_mut(self.ptr as *mut u8, self.layout.size())

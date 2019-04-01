@@ -1,9 +1,9 @@
-use core::fmt;
 use core::default::Default;
+use core::fmt;
 
 #[derive(Clone)]
 #[repr(C)]
-pub struct FpState([u8; 16+512]);
+pub struct FpState([u8; 16 + 512]);
 
 impl fmt::Debug for FpState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -13,10 +13,9 @@ impl fmt::Debug for FpState {
 
 impl Default for FpState {
     fn default() -> Self {
-        FpState([0u8; 16+512])
+        FpState([0u8; 16 + 512])
     }
 }
-
 
 #[derive(Debug, Clone, Default)]
 #[repr(C)]
@@ -62,7 +61,7 @@ pub struct TrapFrame {
 
 /// 用于在内核栈中构造新线程的中断帧
 impl TrapFrame {
-    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, rsp: usize) -> Self {
+    fn new_kernel_thread(entry: extern "C" fn(usize) -> !, arg: usize, rsp: usize) -> Self {
         use crate::arch::gdt;
         let mut tf = TrapFrame::default();
         tf.rdi = arg;
@@ -77,7 +76,11 @@ impl TrapFrame {
     fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
         use crate::arch::gdt;
         let mut tf = TrapFrame::default();
-        tf.cs = if is32 { gdt::UCODE32_SELECTOR.0 } else { gdt::UCODE_SELECTOR.0 } as usize;
+        tf.cs = if is32 {
+            gdt::UCODE32_SELECTOR.0
+        } else {
+            gdt::UCODE_SELECTOR.0
+        } as usize;
         tf.rip = entry_addr;
         tf.ss = gdt::UDATA32_SELECTOR.0 as usize;
         tf.rsp = rsp;
@@ -105,7 +108,11 @@ struct ContextData {
 
 impl ContextData {
     fn new(cr3: usize) -> Self {
-        ContextData { rip: trap_ret as usize, cr3, ..ContextData::default() }
+        ContextData {
+            rip: trap_ret as usize,
+            cr3,
+            ..ContextData::default()
+        }
     }
 }
 
@@ -125,7 +132,7 @@ impl InitStack {
     }
 }
 
-extern {
+extern "C" {
     fn trap_ret();
 }
 
@@ -142,7 +149,7 @@ impl Context {
     /// Pop all callee-saved registers, then return to the target.
     #[naked]
     #[inline(never)]
-    pub unsafe extern fn switch(&mut self, _target: &mut Self) {
+    pub unsafe extern "C" fn switch(&mut self, _target: &mut Self) {
         asm!(
         "
         // push rip (by caller)
@@ -180,17 +187,30 @@ impl Context {
         Context(0)
     }
 
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, cr3: usize) -> Self {
+    pub unsafe fn new_kernel_thread(
+        entry: extern "C" fn(usize) -> !,
+        arg: usize,
+        kstack_top: usize,
+        cr3: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, is32: bool, cr3: usize) -> Self {
+    pub unsafe fn new_user_thread(
+        entry_addr: usize,
+        ustack_top: usize,
+        kstack_top: usize,
+        is32: bool,
+        cr3: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, cr3: usize) -> Self {
         InitStack {
@@ -200,9 +220,16 @@ impl Context {
                 tf.rax = 0;
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
-    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, cr3: usize, tls: usize) -> Self {
+    pub unsafe fn new_clone(
+        tf: &TrapFrame,
+        ustack_top: usize,
+        kstack_top: usize,
+        cr3: usize,
+        tls: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(cr3),
             tf: {
@@ -212,7 +239,8 @@ impl Context {
                 tf.rax = 0;
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
     /// Called at a new user context
     /// To get the init TrapFrame in sys_exec

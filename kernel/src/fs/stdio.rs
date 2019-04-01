@@ -67,16 +67,20 @@ impl INode for Stdin {
         buf[0] = self.pop() as u8;
         Ok(1)
     }
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> { unimplemented!() }
+    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
+        unimplemented!()
+    }
     impl_inode!();
 }
 
 impl INode for Stdout {
-    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> { unimplemented!() }
+    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
+        unimplemented!()
+    }
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         use core::str;
         //we do not care the utf-8 things, we just want to print it!
-        let s = unsafe{ str::from_utf8_unchecked(buf) };
+        let s = unsafe { str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
     }

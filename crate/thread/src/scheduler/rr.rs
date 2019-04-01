@@ -36,7 +36,9 @@ impl RRScheduler {
             max_time_slice,
             infos: Vec::default(),
         };
-        RRScheduler { inner: Mutex::new(inner) }
+        RRScheduler {
+            inner: Mutex::new(inner),
+        }
     }
 }
 
@@ -63,7 +65,7 @@ impl RRSchedulerInner {
                 self.infos[tid].present = false;
                 self._list_remove(tid);
                 Some(tid - 1)
-            },
+            }
         };
         trace!("rr pop {:?}", ret);
         ret

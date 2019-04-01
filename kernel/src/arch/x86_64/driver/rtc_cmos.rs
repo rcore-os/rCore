@@ -61,7 +61,8 @@ pub fn read_epoch() -> u64 {
             month = month - 2;
         }
 
-        let result = ((((year / 4 - year / 100 + year / 400 + 367 * month / 12 + day) + year * 365
+        let result = ((((year / 4 - year / 100 + year / 400 + 367 * month / 12 + day)
+            + year * 365
             - 719499)
             * 24
             + hour)

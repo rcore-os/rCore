@@ -1,6 +1,6 @@
-use alloc::{sync::Arc, sync::Weak, collections::VecDeque};
 use super::Condvar;
 use super::SpinLock as Mutex;
+use alloc::{collections::VecDeque, sync::Arc, sync::Weak};
 
 struct Channel<T> {
     deque: Mutex<VecDeque<T>>,
@@ -26,7 +26,7 @@ pub struct Receiver<T> {
 
 unsafe impl<T: Send> Send for Receiver<T> {}
 
-impl<T> ! Sync for Receiver<T> {}
+impl<T> !Sync for Receiver<T> {}
 
 #[derive(Debug)]
 pub struct RecvError;
@@ -54,7 +54,7 @@ pub struct Sender<T> {
 
 unsafe impl<T: Send> Send for Sender<T> {}
 
-impl<T> ! Sync for Sender<T> {}
+impl<T> !Sync for Sender<T> {}
 
 #[derive(Debug)]
 pub struct SendError<T>(pub T);
@@ -78,7 +78,9 @@ impl<T> Sender<T> {
 /// Creates a new asynchronous channel, returning the sender/receiver halves.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let channel = Arc::new(Channel::<T>::default());
-    let sender = Sender { inner: Arc::downgrade(&channel) };
+    let sender = Sender {
+        inner: Arc::downgrade(&channel),
+    };
     let receiver = Receiver { inner: channel };
     (sender, receiver)
 }
@@ -86,9 +88,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 pub mod test {
     //! Copied from std::mpsc::test
 
-    use alloc::boxed::Box;
     use super::*;
     use crate::thread;
+    use alloc::boxed::Box;
 
     fn smoke() {
         let (tx, rx) = channel::<i32>();

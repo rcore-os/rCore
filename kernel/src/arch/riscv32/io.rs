@@ -1,5 +1,5 @@
-use core::fmt::{Write, Result, Arguments};
 use super::sbi;
+use core::fmt::{Arguments, Result, Write};
 
 struct SerialPort;
 
@@ -31,7 +31,7 @@ pub fn getchar() -> char {
     let c = sbi::console_getchar() as u8;
 
     match c {
-        255 => '\0',   // null
+        255 => '\0', // null
         c => c as char,
     }
 }

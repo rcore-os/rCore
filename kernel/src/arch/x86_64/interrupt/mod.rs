@@ -1,12 +1,12 @@
 pub mod consts;
+pub mod fast_syscall;
 mod handler;
 mod trapframe;
-pub mod fast_syscall;
 
-pub use self::trapframe::*;
 pub use self::handler::*;
-use apic::*;
+pub use self::trapframe::*;
 use crate::consts::KERNEL_OFFSET;
+use apic::*;
 
 #[inline(always)]
 pub unsafe fn enable() {

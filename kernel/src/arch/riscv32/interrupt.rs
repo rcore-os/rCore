@@ -1,14 +1,14 @@
-use riscv::register::*;
-use crate::drivers::DRIVERS;
 pub use self::context::*;
+use crate::drivers::DRIVERS;
 use log::*;
+use riscv::register::*;
 
 #[path = "context.rs"]
 mod context;
 
 /// Initialize interrupt
 pub fn init() {
-    extern {
+    extern "C" {
         fn trap_entry();
     }
     unsafe {
@@ -53,9 +53,13 @@ pub unsafe fn restore(flags: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use self::scause::{Trap, Interrupt as I, Exception as E};
-    trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
+pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+    use self::scause::{Exception as E, Interrupt as I, Trap};
+    trace!(
+        "Interrupt @ CPU{}: {:?} ",
+        super::cpu::id(),
+        tf.scause.cause()
+    );
     match tf.scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
@@ -71,13 +75,15 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 
 fn external() {
     #[cfg(feature = "board_u540")]
-    unsafe { super::board::handle_external_interrupt(); }
+    unsafe {
+        super::board::handle_external_interrupt();
+    }
 
     // true means handled, false otherwise
     let handlers = [try_process_serial, try_process_drivers];
     for handler in handlers.iter() {
         if handler() == true {
-            break
+            break;
         }
     }
 }
@@ -88,17 +94,17 @@ fn try_process_serial() -> bool {
             crate::trap::serial(ch);
             true
         }
-        None => false
+        None => false,
     }
 }
 
 fn try_process_drivers() -> bool {
     for driver in DRIVERS.read().iter() {
         if driver.try_handle_interrupt(None) == true {
-            return true
+            return true;
         }
     }
-    return false
+    return false;
 }
 
 fn ipi() {
@@ -112,8 +118,12 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    tf.sepc += 4;   // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
+    tf.sepc += 4; // Must before syscall, because of fork.
+    let ret = crate::syscall::syscall(
+        tf.x[17],
+        [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]],
+        tf,
+    );
     tf.x[10] = ret as usize;
 }
 

@@ -1,6 +1,6 @@
-use x86_64::instructions::port::Port;
 use log::*;
 use once::*;
+use x86_64::instructions::port::Port;
 
 pub fn init() {
     assert_has_not_been_called!("pit::init must be called only once");
@@ -39,7 +39,7 @@ impl Pit {
     }
 }
 
-const TIMER_FREQ    : u32 = 1193182;
-const TIMER_SEL0    : u8 = 0x00;                    // select counter 0
-const TIMER_RATEGEN : u8 = 0x04;                    // mode 2, rate generator
-const TIMER_16BIT   : u8 = 0x30;                    // r/w counter 16 bits, LSB first
+const TIMER_FREQ: u32 = 1193182;
+const TIMER_SEL0: u8 = 0x00; // select counter 0
+const TIMER_RATEGEN: u8 = 0x04; // mode 2, rate generator
+const TIMER_16BIT: u8 = 0x30; // r/w counter 16 bits, LSB first

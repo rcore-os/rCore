@@ -30,8 +30,8 @@ link_user = []
 run_cmdline = []
 
 [profile.dev]
-# MUST >= 1 : Enable RVO to avoid stack overflow
-opt-level = 1
+# MUST >= 2 : Enable RVO to avoid stack overflow
+opt-level = 2
 
 [dependencies]
 log = "0.4"
@@ -51,8 +51,8 @@ smoltcp = { version = "0.5.0", default-features = false, features = ["alloc", "l
 bit-allocator = { path = "../crate/bit-allocator" }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { path = "../crate/thread" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", branch = "sefs" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", branch = "sefs" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { git = "https://github.com/rcore-os/bootloader" }

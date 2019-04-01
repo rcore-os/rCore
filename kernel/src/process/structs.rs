@@ -1,18 +1,22 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec, sync::Weak};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
 use core::fmt;
 
+use core::str;
 use log::*;
-use spin::{Mutex, RwLock};
-use xmas_elf::{ElfFile, header, program::{Flags, Type, SegmentData}};
 use rcore_memory::PAGE_SIZE;
 use rcore_thread::Tid;
-use core::str;
+use spin::RwLock;
+use xmas_elf::{
+    header,
+    program::{Flags, SegmentData, Type},
+    ElfFile,
+};
 
 use crate::arch::interrupt::{Context, TrapFrame};
+use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::fs::{FileHandle, OpenOptions, INodeExt, FOLLOW_MAX_DEPTH};
-use crate::sync::Condvar;
-use crate::net::{SocketWrapper, SOCKETS};
+use crate::net::{Socket, SOCKETS};
+use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 
@@ -24,24 +28,6 @@ pub struct Thread {
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
     pub proc: Arc<Mutex<Process>>,
-}
-
-
-#[derive(Clone)]
-pub enum FileLike {
-    File(FileHandle),
-    Socket(SocketWrapper)
-}
-
-impl fmt::Debug for FileLike {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FileLike::File(_) => write!(f, "File"),
-            FileLike::Socket(wrapper) => {
-                write!(f, "{:?}", wrapper)
-            },
-        }
-    }
 }
 
 /// Pid type
@@ -104,7 +90,8 @@ pub struct Process {
 
 /// Records the mapping between pid and Process struct.
 lazy_static! {
-    pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> = RwLock::new(BTreeMap::new());
+    pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> =
+        RwLock::new(BTreeMap::new());
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -128,7 +115,9 @@ impl rcore_thread::Context for Thread {
         }
         // add it to threads
         proc.threads.push(tid);
-        PROCESSES.write().insert(proc.pid.get(), Arc::downgrade(&self.proc));
+        PROCESSES
+            .write()
+            .insert(proc.pid.get(), Arc::downgrade(&self.proc));
     }
 }
 
@@ -156,7 +145,7 @@ impl Thread {
     }
 
     /// Make a new kernel thread starting from `entry` with `arg`
-    pub fn new_kernel(entry: extern fn(usize) -> !, arg: usize) -> Box<Thread> {
+    pub fn new_kernel(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<Thread> {
         let vm = MemorySet::new();
         let kstack = KernelStack::new();
         Box::new(Thread {
@@ -174,14 +163,15 @@ impl Thread {
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new()
+                child_exit_code: BTreeMap::new(),
             })),
         })
     }
 
     /// Make a new user process from ELF `data`
     pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Thread>
-        where Iter: Iterator<Item=&'a str>
+    where
+        Iter: Iterator<Item = &'a str>,
     {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
@@ -192,8 +182,8 @@ impl Thread {
 
         // Check ELF type
         match elf.header.pt2.type_().as_type() {
-            header::Type::Executable => {},
-            header::Type::SharedObject => {},
+            header::Type::Executable => {}
+            header::Type::SharedObject => {}
             _ => panic!("ELF is not executable or shared object"),
         }
 
@@ -220,13 +210,19 @@ impl Thread {
         let mut vm = elf.make_memory_set();
 
         // User stack
-        use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE, USER32_STACK_OFFSET};
+        use crate::consts::{USER32_STACK_OFFSET, USER_STACK_OFFSET, USER_STACK_SIZE};
         let mut ustack_top = {
             let (ustack_buttom, ustack_top) = match is32 {
                 true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
                 false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
             };
-            vm.push(ustack_buttom, ustack_top,  MemoryAttr::default().user(), ByFrame::new(GlobalFrameAlloc), "user_stack");
+            vm.push(
+                ustack_buttom,
+                ustack_top,
+                MemoryAttr::default().user(),
+                ByFrame::new(GlobalFrameAlloc),
+                "user_stack",
+            );
             ustack_top
         };
 
@@ -246,7 +242,7 @@ impl Thread {
             },
         };
         unsafe {
-            vm.with(|| { ustack_top = init_info.push_at(ustack_top) });
+            vm.with(|| ustack_top = init_info.push_at(ustack_top));
         }
 
         trace!("{:#x?}", vm);
@@ -254,16 +250,45 @@ impl Thread {
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
-        files.insert(0, FileLike::File(FileHandle::new(crate::fs::STDIN.clone(), OpenOptions { read: true, write: false, append: false })));
-        files.insert(1, FileLike::File(FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false })));
-        files.insert(2, FileLike::File(FileHandle::new(crate::fs::STDOUT.clone(), OpenOptions { read: false, write: true, append: false })));
+        files.insert(
+            0,
+            FileLike::File(FileHandle::new(
+                crate::fs::STDIN.clone(),
+                OpenOptions {
+                    read: true,
+                    write: false,
+                    append: false,
+                },
+            )),
+        );
+        files.insert(
+            1,
+            FileLike::File(FileHandle::new(
+                crate::fs::STDOUT.clone(),
+                OpenOptions {
+                    read: false,
+                    write: true,
+                    append: false,
+                },
+            )),
+        );
+        files.insert(
+            2,
+            FileLike::File(FileHandle::new(
+                crate::fs::STDOUT.clone(),
+                OpenOptions {
+                    read: false,
+                    write: true,
+                    append: false,
+                },
+            )),
+        );
 
         let entry_addr = elf.header.pt2.entry_point() as usize;
 
         Box::new(Thread {
             context: unsafe {
-                Context::new_user_thread(
-                    entry_addr, ustack_top, kstack.top(), is32, vm.token())
+                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), is32, vm.token())
             },
             kstack,
             clear_child_tid: 0,
@@ -277,7 +302,7 @@ impl Thread {
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new()
+                child_exit_code: BTreeMap::new(),
             })),
         })
     }
@@ -297,20 +322,11 @@ impl Thread {
         // NoMMU: coping data has been done in `vm.clone()`
         for area in vm.iter() {
             let data = Vec::<u8>::from(unsafe { area.as_slice() });
-            unsafe { vm.with(|| {
-                area.as_slice_mut().copy_from_slice(data.as_slice())
-            }) }
+            unsafe { vm.with(|| area.as_slice_mut().copy_from_slice(data.as_slice())) }
         }
 
         debug!("fork: temporary copy data!");
         let kstack = KernelStack::new();
-
-        let mut sockets = SOCKETS.lock();
-        for (_fd, file) in files.iter() {
-            if let FileLike::Socket(wrapper) = file {
-                sockets.retain(wrapper.handle);
-            }
-        }
 
         Box::new(Thread {
             context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },
@@ -326,13 +342,19 @@ impl Thread {
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new()
+                child_exit_code: BTreeMap::new(),
             })),
         })
     }
 
     /// Create a new thread in the same process.
-    pub fn clone(&self, tf: &TrapFrame, stack_top: usize, tls: usize, clear_child_tid: usize) -> Box<Thread> {
+    pub fn clone(
+        &self,
+        tf: &TrapFrame,
+        stack_top: usize,
+        tls: usize,
+        clear_child_tid: usize,
+    ) -> Box<Thread> {
         let kstack = KernelStack::new();
         let token = self.proc.lock().vm.token();
         Box::new(Thread {
@@ -371,7 +393,9 @@ impl ToMemoryAttr for Flags {
     fn to_attr(&self) -> MemoryAttr {
         let mut flags = MemoryAttr::default().user();
         // FIXME: handle readonly
-        if self.is_execute() { flags = flags.execute(); }
+        if self.is_execute() {
+            flags = flags.execute();
+        }
         flags
     }
 }
@@ -406,7 +430,13 @@ impl ElfExt for ElfFile<'_> {
 
             // Get target slice
             let target = {
-                ms.push(virt_addr, virt_addr + mem_size, ph.flags().to_attr(), ByFrame::new(GlobalFrameAlloc), "");
+                ms.push(
+                    virt_addr,
+                    virt_addr + mem_size,
+                    ph.flags().to_attr(),
+                    ByFrame::new(GlobalFrameAlloc),
+                    "",
+                );
                 unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
             };
             // Copy data
@@ -423,29 +453,34 @@ impl ElfExt for ElfFile<'_> {
     }
 
     fn get_interpreter(&self) -> Result<&str, &str> {
-        let header = self.program_iter()
+        let header = self
+            .program_iter()
             .filter(|ph| ph.get_type() == Ok(Type::Interp))
-            .next().ok_or("no interp header")?;
+            .next()
+            .ok_or("no interp header")?;
         let mut data = match header.get_data(self)? {
             SegmentData::Undefined(data) => data,
             _ => unreachable!(),
         };
         // skip NULL
         while let Some(0) = data.last() {
-            data = &data[..data.len()-1];
+            data = &data[..data.len() - 1];
         }
-        let path = str::from_utf8(data)
-            .map_err(|_| "failed to convert to utf8")?;
+        let path = str::from_utf8(data).map_err(|_| "failed to convert to utf8")?;
         Ok(path)
     }
 
     fn get_phdr_vaddr(&self) -> Option<u64> {
-        if let Some(phdr) = self.program_iter()
-            .find(|ph| ph.get_type() == Ok(Type::Phdr)) {
+        if let Some(phdr) = self
+            .program_iter()
+            .find(|ph| ph.get_type() == Ok(Type::Phdr))
+        {
             // if phdr exists in program header, use it
             Some(phdr.virtual_addr())
-        } else if let Some(elf_addr) = self.program_iter()
-            .find(|ph| ph.get_type() == Ok(Type::Load) && ph.offset() == 0) {
+        } else if let Some(elf_addr) = self
+            .program_iter()
+            .find(|ph| ph.get_type() == Ok(Type::Load) && ph.offset() == 0)
+        {
             // otherwise, check if elf is loaded from the beginning, then phdr can be inferred.
             Some(elf_addr.virtual_addr() + self.header.pt2.ph_offset())
         } else {

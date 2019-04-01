@@ -2,18 +2,17 @@
 //!
 //! Implemented for every architecture, used by OS.
 
-use super::*;
+pub use self::ext::*;
 #[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
-pub use self::ext::*;
+use super::*;
 
+mod ext;
 #[cfg(test)]
 mod mock_page_table;
-mod ext;
-
 
 pub trait PageTable {
-//    type Entry: Entry;
+    //    type Entry: Entry;
 
     /// Map a page of virual address `addr` to the frame of physics address `target`
     /// Return the page table entry of the mapped virual address

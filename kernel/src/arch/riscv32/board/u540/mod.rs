@@ -10,7 +10,8 @@ pub unsafe fn init_external_interrupt() {
 /// Claim and complete external interrupt by reading and writing to
 /// PLIC Interrupt Claim/Complete Register.
 pub unsafe fn handle_external_interrupt() {
-    const HART1_S_MODE_INTERRUPT_CLAIM_COMPLETE: *mut u32 = (KERNEL_OFFSET + 0x0C20_2004) as *mut u32;
+    const HART1_S_MODE_INTERRUPT_CLAIM_COMPLETE: *mut u32 =
+        (KERNEL_OFFSET + 0x0C20_2004) as *mut u32;
     // claim
     let source = HART1_S_MODE_INTERRUPT_CLAIM_COMPLETE.read();
     // complete

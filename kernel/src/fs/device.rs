@@ -1,7 +1,7 @@
 //! Implement Device
 
-use spin::RwLock;
 use rcore_fs::dev::*;
+use spin::RwLock;
 
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
@@ -9,9 +9,12 @@ use crate::arch::driver::ide;
 pub struct MemBuf(RwLock<&'static mut [u8]>);
 
 impl MemBuf {
-    pub unsafe fn new(begin: unsafe extern fn(), end: unsafe extern fn()) -> Self {
+    pub unsafe fn new(begin: unsafe extern "C" fn(), end: unsafe extern "C" fn()) -> Self {
         use core::slice;
-        MemBuf(RwLock::new(slice::from_raw_parts_mut(begin as *mut u8, end as usize - begin as usize)))
+        MemBuf(RwLock::new(slice::from_raw_parts_mut(
+            begin as *mut u8,
+            end as usize - begin as usize,
+        )))
     }
 }
 
@@ -36,7 +39,8 @@ impl BlockDevice for ide::IDE {
     fn read_at(&self, block_id: usize, buf: &mut [u8]) -> bool {
         use core::slice;
         assert!(buf.len() >= ide::BLOCK_SIZE);
-        let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
+        let buf =
+            unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, ide::BLOCK_SIZE / 4) };
         self.read(block_id as u64, 1, buf).is_ok()
     }
     fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {

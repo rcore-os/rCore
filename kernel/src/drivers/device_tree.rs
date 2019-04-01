@@ -1,5 +1,5 @@
-use core::slice;
 use alloc::string::String;
+use core::slice;
 
 use device_tree::{DeviceTree, Node};
 

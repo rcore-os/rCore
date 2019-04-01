@@ -16,10 +16,26 @@ pub struct IDE {
 impl IDE {
     pub fn new(num: u8) -> Self {
         let ide = match num {
-            0 => IDE { num: 0, base: 0x1f0, ctrl: 0x3f4 },
-            1 => IDE { num: 1, base: 0x1f0, ctrl: 0x3f4 },
-            2 => IDE { num: 2, base: 0x170, ctrl: 0x374 },
-            3 => IDE { num: 3, base: 0x170, ctrl: 0x374 },
+            0 => IDE {
+                num: 0,
+                base: 0x1f0,
+                ctrl: 0x3f4,
+            },
+            1 => IDE {
+                num: 1,
+                base: 0x1f0,
+                ctrl: 0x3f4,
+            },
+            2 => IDE {
+                num: 2,
+                base: 0x170,
+                ctrl: 0x374,
+            },
+            3 => IDE {
+                num: 3,
+                base: 0x170,
+                ctrl: 0x374,
+            },
             _ => panic!("ide number should be 0,1,2,3"),
         };
         ide.init();
@@ -103,14 +119,17 @@ impl IDE {
             port::outb(self.base + ISA_SECTOR, (sector & 0xFF) as u8);
             port::outb(self.base + ISA_CYL_LO, ((sector >> 8) & 0xFF) as u8);
             port::outb(self.base + ISA_CYL_HI, ((sector >> 16) & 0xFF) as u8);
-            port::outb(self.base + ISA_SDH, 0xE0 | ((self.num & 1) << 4) | (((sector >> 24) & 0xF) as u8));
+            port::outb(
+                self.base + ISA_SDH,
+                0xE0 | ((self.num & 1) << 4) | (((sector >> 24) & 0xF) as u8),
+            );
         }
     }
 }
 
 const SECTOR_SIZE: usize = 128;
-const MAX_DMA_SECTORS: usize = 0x1F_F000 / SECTOR_SIZE;    // Limited by sector count (and PRDT entries)
-// 512 PDRT entries, assume maximum fragmentation = 512 * 4K max = 2^21 = 2MB per transfer
+const MAX_DMA_SECTORS: usize = 0x1F_F000 / SECTOR_SIZE; // Limited by sector count (and PRDT entries)
+                                                        // 512 PDRT entries, assume maximum fragmentation = 512 * 4K max = 2^21 = 2MB per transfer
 
 const ISA_DATA: u16 = 0x00;
 const ISA_ERROR: u16 = 0x01;

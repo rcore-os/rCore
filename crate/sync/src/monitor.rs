@@ -1,7 +1,7 @@
 //! solve the five philosophers problem with monitor
 
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
-use std::sync::{Mutex, Condvar, Arc};
 use std::time::Duration;
 
 struct Philosopher {
@@ -57,7 +57,13 @@ struct Table {
 pub fn main() {
     let table = Arc::new(Table {
         fork_status: Mutex::new(vec![false; 5]),
-        fork_condvar: vec![Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new(), Condvar::new()],
+        fork_condvar: vec![
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+            Condvar::new(),
+        ],
     });
 
     let philosophers = vec![
@@ -68,16 +74,19 @@ pub fn main() {
         Philosopher::new("5", 0, 4),
     ];
 
-    let handles: Vec<_> = philosophers.into_iter().map(|p| {
-        let table = table.clone();
+    let handles: Vec<_> = philosophers
+        .into_iter()
+        .map(|p| {
+            let table = table.clone();
 
-        thread::spawn(move || {
-            for _ in 0..5 {
-                p.think();
-                p.eat(&table);
-            }
+            thread::spawn(move || {
+                for _ in 0..5 {
+                    p.think();
+                    p.eat(&table);
+                }
+            })
         })
-    }).collect();
+        .collect();
 
     for h in handles {
         h.join().unwrap();

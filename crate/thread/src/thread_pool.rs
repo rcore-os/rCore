@@ -1,9 +1,9 @@
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use spin::{Mutex, MutexGuard};
-use log::*;
 use crate::scheduler::Scheduler;
 use crate::timer::Timer;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use log::*;
+use spin::{Mutex, MutexGuard};
 
 struct Thread {
     status: Status,
@@ -105,13 +105,12 @@ impl ThreadPool {
     /// The manager first mark it `Running`,
     /// then take out and return its Context.
     pub(crate) fn run(&self, cpu_id: usize) -> Option<(Tid, Box<Context>)> {
-        self.scheduler.pop(cpu_id)
-            .map(|tid| {
-                let mut proc_lock = self.threads[tid].lock();
-                let mut proc = proc_lock.as_mut().expect("thread not exist");
-                proc.status = Status::Running(cpu_id);
-                (tid, proc.context.take().expect("context not exist"))
-            })
+        self.scheduler.pop(cpu_id).map(|tid| {
+            let mut proc_lock = self.threads[tid].lock();
+            let mut proc = proc_lock.as_mut().expect("thread not exist");
+            proc.status = Status::Running(cpu_id);
+            (tid, proc.context.take().expect("context not exist"))
+        })
     }
 
     /// Called by Processor to finish running a thread
@@ -150,7 +149,7 @@ impl ThreadPool {
                 (Status::Ready, _) => panic!("can not remove a thread from ready queue"),
                 (Status::Exited(_), _) => panic!("can not set status for a exited thread"),
                 (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
-                (Status::Running(_), Status::Ready) => {} // thread will be added to scheduler in stop() 
+                (Status::Running(_), Status::Ready) => {} // thread will be added to scheduler in stop()
                 (_, Status::Ready) => self.scheduler.push(tid),
                 _ => {}
             }
@@ -175,7 +174,7 @@ impl ThreadPool {
                 // release the tid
                 *proc_lock = None;
                 Some(code)
-            },
+            }
             _ => None,
         }
     }

@@ -116,7 +116,7 @@ pub fn sys_time(time: *mut u64) -> SysResult {
 #[repr(C)]
 pub struct RUsage {
     utime: TimeVal,
-    stime: TimeVal
+    stime: TimeVal,
 }
 
 pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
@@ -136,10 +136,8 @@ pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
         stime: TimeVal {
             sec: usec / USEC_PER_SEC,
             usec: usec % USEC_PER_SEC,
-        }
+        },
     };
-    unsafe {
-        *rusage = new_rusage
-    };
+    unsafe { *rusage = new_rusage };
     Ok(0)
 }

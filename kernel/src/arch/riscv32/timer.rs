@@ -1,6 +1,6 @@
-use riscv::register::*;
 use super::sbi;
 use log::*;
+use riscv::register::*;
 
 #[cfg(target_pointer_width = "64")]
 pub fn get_cycle() -> u64 {
@@ -27,7 +27,9 @@ pub fn read_epoch() -> u64 {
 /// Enable timer interrupt
 pub fn init() {
     // Enable supervisor timer interrupt
-    unsafe { sie::set_stimer(); }
+    unsafe {
+        sie::set_stimer();
+    }
     set_next();
     info!("timer: init end");
 }

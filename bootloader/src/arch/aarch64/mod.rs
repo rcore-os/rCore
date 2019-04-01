@@ -75,7 +75,7 @@ fn enable_mmu() {
         TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
         TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable +
         TCR_EL1::EPD1::EnableTTBR1Walks +
-        TCR_EL1::A1::UseTTBR1ASID +
+        TCR_EL1::A1::UseTTBR0ASID +
         TCR_EL1::T1SZ.val(16) +
 
         TCR_EL1::TG0::KiB_4 +

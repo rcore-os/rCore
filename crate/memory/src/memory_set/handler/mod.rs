@@ -7,7 +7,7 @@ pub trait MemoryHandler: Debug + 'static {
     /// Map `addr` in the page table
     /// Should set page flags here instead of in page_fault_handler
     fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr);
-    
+
     /// Map `addr` in the page table eagerly (i.e. no delay allocation)
     /// Should set page flags here instead of in page_fault_handler
     fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
@@ -34,11 +34,11 @@ pub trait FrameAllocator: Debug + Clone + 'static {
     fn dealloc(&self, target: PhysAddr);
 }
 
-mod linear;
 mod byframe;
 mod delay;
+mod linear;
 //mod swap;
 
-pub use self::linear::Linear;
 pub use self::byframe::ByFrame;
 pub use self::delay::Delay;
+pub use self::linear::Linear;

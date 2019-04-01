@@ -26,19 +26,18 @@
 //! `MutexSupport`提供了若干接口，它们会在操作锁的不同时间点被调用。
 //! 注意这个接口实际是取了几种实现的并集，并不是很通用。
 
+use super::Condvar;
 use crate::arch::interrupt;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
-use super::Condvar;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
 pub type ThreadLock<T> = Mutex<T, Condvar>;
 
-pub struct Mutex<T: ?Sized, S: MutexSupport>
-{
+pub struct Mutex<T: ?Sized, S: MutexSupport> {
     lock: AtomicBool,
     support: S,
     data: UnsafeCell<T>,
@@ -47,8 +46,7 @@ pub struct Mutex<T: ?Sized, S: MutexSupport>
 /// A guard to which the protected data can be accessed
 ///
 /// When the guard falls out of scope it will release the lock.
-pub struct MutexGuard<'a, T: ?Sized + 'a, S: MutexSupport + 'a>
-{
+pub struct MutexGuard<'a, T: ?Sized + 'a, S: MutexSupport + 'a> {
     pub(super) mutex: &'a Mutex<T, S>,
     support_guard: S::GuardData,
 }
@@ -58,8 +56,7 @@ unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for Mutex<T, S> {}
 
 unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for Mutex<T, S> {}
 
-impl<T, S: MutexSupport> Mutex<T, S>
-{
+impl<T, S: MutexSupport> Mutex<T, S> {
     /// Creates a new spinlock wrapping the supplied data.
     ///
     /// May be used statically:
@@ -93,8 +90,7 @@ impl<T, S: MutexSupport> Mutex<T, S>
     }
 }
 
-impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
-{
+impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
     fn obtain_lock(&self) {
         while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
             // Wait until the lock looks unlocked before retrying
@@ -119,8 +115,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     /// }
     ///
     /// ```
-    pub fn lock(&self) -> MutexGuard<T, S>
-    {
+    pub fn lock(&self) -> MutexGuard<T, S> {
         let support_guard = S::before_lock();
         self.obtain_lock();
         MutexGuard {
@@ -155,11 +150,14 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S>
     }
 }
 
-impl<T: ?Sized + fmt::Debug, S: MutexSupport + fmt::Debug> fmt::Debug for Mutex<T, S>
-{
+impl<T: ?Sized + fmt::Debug, S: MutexSupport + fmt::Debug> fmt::Debug for Mutex<T, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_lock() {
-            Some(guard) => write!(f, "Mutex {{ data: {:?}, support: {:?} }}", &*guard, self.support),
+            Some(guard) => write!(
+                f,
+                "Mutex {{ data: {:?}, support: {:?} }}",
+                &*guard, self.support
+            ),
             None => write!(f, "Mutex {{ <locked>, support: {:?} }}", self.support),
         }
     }
@@ -171,19 +169,20 @@ impl<T: ?Sized + Default, S: MutexSupport> Default for Mutex<T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S>
-{
+impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S> {
     type Target = T;
-    fn deref(&self) -> &T { unsafe { &*self.mutex.data.get() } }
+    fn deref(&self) -> &T {
+        unsafe { &*self.mutex.data.get() }
+    }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S>
-{
-    fn deref_mut(&mut self) -> &mut T { unsafe { &mut *self.mutex.data.get() } }
+impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.mutex.data.get() }
+    }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S>
-{
+impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S> {
     /// The dropping of the MutexGuard will release the lock it was created from.
     fn drop(&mut self) {
         self.mutex.lock.store(false, Ordering::Release);
@@ -210,15 +209,17 @@ pub struct Spin;
 impl MutexSupport for Spin {
     type GuardData = ();
 
-    fn new() -> Self { Spin }
+    fn new() -> Self {
+        Spin
+    }
     fn cpu_relax(&self) {
         unsafe {
             #[cfg(target_arch = "x86_64")]
-                asm!("pause" :::: "volatile");
+            asm!("pause" :::: "volatile");
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-                asm!("nop" :::: "volatile");
+            asm!("nop" :::: "volatile");
             #[cfg(target_arch = "aarch64")]
-                asm!("yield" :::: "volatile");
+            asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {}
@@ -252,11 +253,11 @@ impl MutexSupport for SpinNoIrq {
     fn cpu_relax(&self) {
         unsafe {
             #[cfg(target_arch = "x86_64")]
-                asm!("pause" :::: "volatile");
+            asm!("pause" :::: "volatile");
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-                asm!("nop" :::: "volatile");
+            asm!("nop" :::: "volatile");
             #[cfg(target_arch = "aarch64")]
-                asm!("yield" :::: "volatile");
+            asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {

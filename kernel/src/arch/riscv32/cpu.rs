@@ -9,7 +9,9 @@ pub unsafe fn set_cpu_id(cpu_id: usize) {
 
 pub fn id() -> usize {
     let cpu_id;
-    unsafe { asm!("mv $0, gp" : "=r"(cpu_id)); }
+    unsafe {
+        asm!("mv $0, gp" : "=r"(cpu_id));
+    }
     cpu_id
 }
 

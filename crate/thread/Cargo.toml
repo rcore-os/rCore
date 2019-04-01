@@ -8,4 +8,4 @@ edition = "2018"
 [dependencies]
 log = "0.4"
 spin = "0.5"
-deque = { git = "https://github.com/wangrunji0408/deque.git", branch = "no_std" }
+deque = { git = "https://github.com/rcore-os/deque.git", branch = "no_std" }

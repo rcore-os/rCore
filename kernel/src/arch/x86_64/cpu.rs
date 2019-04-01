@@ -14,7 +14,10 @@ pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
 }
 
 pub fn id() -> usize {
-    CpuId::new().get_feature_info().unwrap().initial_local_apic_id() as usize
+    CpuId::new()
+        .get_feature_info()
+        .unwrap()
+        .initial_local_apic_id() as usize
 }
 
 pub fn send_ipi(cpu_id: usize) {
@@ -31,7 +34,7 @@ pub fn init() {
     unsafe {
         asm!("mov %cr4, $0" : "=r" (value));
         // OSFXSR | OSXMMEXCPT
-        value |= 1 << 9 | 1 << 10 ;
+        value |= 1 << 9 | 1 << 10;
         asm!("mov $0, %cr4" :: "r" (value) : "memory");
         Cr0::update(|cr0| {
             cr0.remove(Cr0Flags::EMULATE_COPROCESSOR);

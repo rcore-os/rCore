@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc};
 
-use rcore_fs::vfs::{Metadata, INode, Result, FsError};
+use rcore_fs::vfs::{FsError, INode, Metadata, Result};
 
 #[derive(Clone)]
 pub struct FileHandle {
@@ -43,7 +43,7 @@ impl FileHandle {
 
     pub fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         if !self.options.read {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let len = self.inode.read_at(offset, buf)?;
         Ok(len)
@@ -61,7 +61,7 @@ impl FileHandle {
 
     pub fn write_at(&mut self, offset: usize, buf: &[u8]) -> Result<usize> {
         if !self.options.write {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let len = self.inode.write_at(offset, buf)?;
         Ok(len)
@@ -78,7 +78,7 @@ impl FileHandle {
 
     pub fn set_len(&mut self, len: u64) -> Result<()> {
         if !self.options.write {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         self.inode.resize(len as usize)?;
         Ok(())
@@ -102,7 +102,7 @@ impl FileHandle {
 
     pub fn read_entry(&mut self) -> Result<String> {
         if !self.options.read {
-            return Err(FsError::InvalidParam);  // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let name = self.inode.get_entry(self.offset as usize)?;
         self.offset += 1;

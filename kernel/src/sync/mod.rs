@@ -54,8 +54,8 @@ pub use self::condvar::*;
 pub use self::mutex::*;
 pub use self::semaphore::*;
 
-mod mutex;
 mod condvar;
-mod semaphore;
 pub mod mpsc;
+mod mutex;
+mod semaphore;
 pub mod test;

@@ -2,32 +2,13 @@
 
 use super::*;
 use crate::drivers::SOCKET_ACTIVITY;
-use crate::net::{
-    get_ephemeral_port, poll_ifaces, SocketType, SocketWrapper, TcpSocketState, UdpSocketState,
-    SOCKETS,
-};
+use crate::fs::FileLike;
+use crate::net::{RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS};
+use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
+use alloc::boxed::Box;
 use core::cmp::min;
 use core::mem::size_of;
-use smoltcp::socket::*;
 use smoltcp::wire::*;
-
-const AF_UNIX: usize = 1;
-const AF_INET: usize = 2;
-
-const SOCK_STREAM: usize = 1;
-const SOCK_DGRAM: usize = 2;
-const SOCK_RAW: usize = 3;
-const SOCK_TYPE_MASK: usize = 0xf;
-
-const IPPROTO_IP: usize = 0;
-const IPPROTO_ICMP: usize = 1;
-const IPPROTO_TCP: usize = 6;
-
-const TCP_SENDBUF: usize = 512 * 1024; // 512K
-const TCP_RECVBUF: usize = 512 * 1024; // 512K
-
-const UDP_SENDBUF: usize = 64 * 1024; // 64K
-const UDP_RECVBUF: usize = 64 * 1024; // 64K
 
 pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResult {
     info!(
@@ -35,83 +16,18 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
         domain, socket_type, protocol
     );
     let mut proc = process();
-    match domain {
+    let socket: Box<dyn Socket> = match domain {
         AF_INET | AF_UNIX => match socket_type & SOCK_TYPE_MASK {
-            SOCK_STREAM => {
-                let fd = proc.get_free_fd();
-
-                let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; TCP_RECVBUF]);
-                let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; TCP_SENDBUF]);
-                let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-
-                let tcp_handle = SOCKETS.lock().add(tcp_socket);
-                proc.files.insert(
-                    fd,
-                    FileLike::Socket(SocketWrapper {
-                        handle: tcp_handle,
-                        socket_type: SocketType::Tcp(TcpSocketState {
-                            local_endpoint: None,
-                            is_listening: false,
-                        }),
-                    }),
-                );
-
-                Ok(fd)
-            }
-            SOCK_DGRAM => {
-                let fd = proc.get_free_fd();
-
-                let udp_rx_buffer = UdpSocketBuffer::new(
-                    vec![UdpPacketMetadata::EMPTY; 1024],
-                    vec![0; UDP_RECVBUF],
-                );
-                let udp_tx_buffer = UdpSocketBuffer::new(
-                    vec![UdpPacketMetadata::EMPTY; 1024],
-                    vec![0; UDP_SENDBUF],
-                );
-                let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
-
-                let udp_handle = SOCKETS.lock().add(udp_socket);
-                proc.files.insert(
-                    fd,
-                    FileLike::Socket(SocketWrapper {
-                        handle: udp_handle,
-                        socket_type: SocketType::Udp(UdpSocketState {
-                            remote_endpoint: None,
-                        }),
-                    }),
-                );
-
-                Ok(fd)
-            }
-            SOCK_RAW => {
-                let fd = proc.get_free_fd();
-
-                let raw_rx_buffer =
-                    RawSocketBuffer::new(vec![RawPacketMetadata::EMPTY; 2], vec![0; 2048]);
-                let raw_tx_buffer =
-                    RawSocketBuffer::new(vec![RawPacketMetadata::EMPTY; 2], vec![0; 2048]);
-                let raw_socket = RawSocket::new(
-                    IpVersion::Ipv4,
-                    IpProtocol::from(protocol as u8),
-                    raw_rx_buffer,
-                    raw_tx_buffer,
-                );
-
-                let raw_handle = SOCKETS.lock().add(raw_socket);
-                proc.files.insert(
-                    fd,
-                    FileLike::Socket(SocketWrapper {
-                        handle: raw_handle,
-                        socket_type: SocketType::Raw,
-                    }),
-                );
-                Ok(fd)
-            }
-            _ => Err(SysError::EINVAL),
+            SOCK_STREAM => Box::new(TcpSocketState::new()),
+            SOCK_DGRAM => Box::new(UdpSocketState::new()),
+            SOCK_RAW => Box::new(RawSocketState::new(protocol as u8)),
+            _ => return Err(SysError::EINVAL),
         },
-        _ => Err(SysError::EAFNOSUPPORT),
-    }
+        _ => return Err(SysError::EAFNOSUPPORT),
+    };
+    let fd = proc.get_free_fd();
+    proc.files.insert(fd, FileLike::Socket(socket));
+    Ok(fd)
 }
 
 pub fn sys_setsockopt(
@@ -128,13 +44,6 @@ pub fn sys_setsockopt(
     warn!("sys_setsockopt is unimplemented");
     Ok(0)
 }
-
-const SOL_SOCKET: usize = 1;
-const SO_SNDBUF: usize = 7;
-const SO_RCVBUF: usize = 8;
-const SO_LINGER: usize = 13;
-
-const TCP_CONGESTION: usize = 13;
 
 pub fn sys_getsockopt(
     fd: usize,
@@ -154,7 +63,7 @@ pub fn sys_getsockopt(
             SO_SNDBUF => {
                 proc.vm.check_write_array(optval, 4)?;
                 unsafe {
-                    *(optval as *mut u32) = TCP_SENDBUF as u32;
+                    *(optval as *mut u32) = crate::net::TCP_SENDBUF as u32;
                     *optlen = 4;
                 }
                 Ok(0)
@@ -162,7 +71,7 @@ pub fn sys_getsockopt(
             SO_RCVBUF => {
                 proc.vm.check_write_array(optval, 4)?;
                 unsafe {
-                    *(optval as *mut u32) = TCP_RECVBUF as u32;
+                    *(optval as *mut u32) = crate::net::TCP_RECVBUF as u32;
                     *optlen = 4;
                 }
                 Ok(0)
@@ -177,24 +86,6 @@ pub fn sys_getsockopt(
     }
 }
 
-impl Process {
-    fn get_socket(&mut self, fd: usize) -> Result<SocketWrapper, SysError> {
-        let file = self.files.get_mut(&fd).ok_or(SysError::EBADF)?;
-        match file {
-            FileLike::Socket(wrapper) => Ok(wrapper.clone()),
-            _ => Err(SysError::ENOTSOCK),
-        }
-    }
-
-    fn get_socket_mut(&mut self, fd: usize) -> Result<&mut SocketWrapper, SysError> {
-        let file = self.files.get_mut(&fd).ok_or(SysError::EBADF)?;
-        match file {
-            FileLike::Socket(ref mut wrapper) => Ok(wrapper),
-            _ => Err(SysError::ENOTSOCK),
-        }
-    }
-}
-
 pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
     info!(
         "sys_connect: fd: {}, addr: {:?}, addr_len: {}",
@@ -202,64 +93,10 @@ pub fn sys_connect(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResu
     );
 
     let mut proc = process();
-
     let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
-
-    let wrapper = &mut proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-        let temp_port = get_ephemeral_port();
-
-        match socket.connect(endpoint, temp_port) {
-            Ok(()) => {
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
-
-                // wait for connection result
-                loop {
-                    poll_ifaces();
-
-                    let mut sockets = SOCKETS.lock();
-                    let socket = sockets.get::<TcpSocket>(wrapper.handle);
-                    if socket.state() == TcpState::SynSent {
-                        // still connecting
-                        drop(socket);
-                        drop(sockets);
-                        debug!("poll for connection wait");
-                        SOCKET_ACTIVITY._wait();
-                    } else if socket.state() == TcpState::Established {
-                        break Ok(0);
-                    } else {
-                        break Err(SysError::ECONNREFUSED);
-                    }
-                }
-            }
-            Err(_) => Err(SysError::ENOBUFS),
-        }
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        wrapper.socket_type = SocketType::Udp(UdpSocketState {
-            remote_endpoint: Some(endpoint),
-        });
-        Ok(0)
-    } else {
-        unimplemented!("socket type")
-    }
-}
-
-pub fn sys_write_socket(proc: &mut Process, fd: usize, base: *const u8, len: usize) -> SysResult {
-    let wrapper = proc.get_socket(fd)?;
-    let slice = unsafe { slice::from_raw_parts(base, len) };
-    wrapper.write(&slice, None)
-}
-
-pub fn sys_read_socket(proc: &mut Process, fd: usize, base: *mut u8, len: usize) -> SysResult {
-    let wrapper = proc.get_socket(fd)?;
-    let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let (result, _) = wrapper.read(&mut slice);
-    result
+    let socket = proc.get_socket(fd)?;
+    socket.connect(endpoint)?;
+    Ok(0)
 }
 
 pub fn sys_sendto(
@@ -278,15 +115,16 @@ pub fn sys_sendto(
     let mut proc = process();
     proc.vm.check_read_array(base, len)?;
 
-    let wrapper = proc.get_socket(fd)?;
     let slice = unsafe { slice::from_raw_parts(base, len) };
-    if addr.is_null() {
-        wrapper.write(&slice, None)
+    let endpoint = if addr.is_null() {
+        None
     } else {
         let endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
         info!("sys_sendto: sending to endpoint {:?}", endpoint);
-        wrapper.write(&slice, Some(endpoint))
-    }
+        Some(endpoint)
+    };
+    let socket = proc.get_socket(fd)?;
+    socket.write(&slice, endpoint)
 }
 
 pub fn sys_recvfrom(
@@ -305,9 +143,9 @@ pub fn sys_recvfrom(
     let mut proc = process();
     proc.vm.check_write_array(base, len)?;
 
-    let wrapper = proc.get_socket(fd)?;
+    let socket = proc.get_socket(fd)?;
     let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
-    let (result, endpoint) = wrapper.read(&mut slice);
+    let (result, endpoint) = socket.read(&mut slice);
 
     if result.is_ok() && !addr.is_null() {
         let sockaddr_in = SockAddr::from(endpoint);
@@ -319,45 +157,15 @@ pub fn sys_recvfrom(
     result
 }
 
-impl Clone for SocketWrapper {
-    fn clone(&self) -> Self {
-        let mut sockets = SOCKETS.lock();
-        sockets.retain(self.handle);
-
-        SocketWrapper {
-            handle: self.handle.clone(),
-            socket_type: self.socket_type.clone(),
-        }
-    }
-}
-
 pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
     info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, addr_len);
     let mut proc = process();
 
     let mut endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
-    if endpoint.port == 0 {
-        endpoint.port = get_ephemeral_port();
-    }
     info!("sys_bind: fd: {} bind to {}", fd, endpoint);
 
-    let wrapper = &mut proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        wrapper.socket_type = SocketType::Tcp(TcpSocketState {
-            local_endpoint: Some(endpoint),
-            is_listening: false,
-        });
-        Ok(0)
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let mut socket = sockets.get::<UdpSocket>(wrapper.handle);
-        match socket.bind(endpoint) {
-            Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EINVAL),
-        }
-    } else {
-        Err(SysError::EINVAL)
-    }
+    let socket = proc.get_socket(fd)?;
+    socket.bind(endpoint)
 }
 
 pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
@@ -366,48 +174,16 @@ pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
     // open multiple sockets for each connection
     let mut proc = process();
 
-    let wrapper = proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(ref mut tcp_state) = wrapper.socket_type {
-        if tcp_state.is_listening {
-            // it is ok to listen twice
-            Ok(0)
-        } else if let Some(local_endpoint) = tcp_state.local_endpoint {
-            let mut sockets = SOCKETS.lock();
-            let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-            info!("socket {} listening on {:?}", fd, local_endpoint);
-            if !socket.is_listening() {
-                match socket.listen(local_endpoint) {
-                    Ok(()) => {
-                        tcp_state.is_listening = true;
-                        Ok(0)
-                    }
-                    Err(_err) => Err(SysError::EINVAL),
-                }
-            } else {
-                Ok(0)
-            }
-        } else {
-            Err(SysError::EINVAL)
-        }
-    } else {
-        Err(SysError::EINVAL)
-    }
+    let socket = proc.get_socket(fd)?;
+    socket.listen()
 }
 
 pub fn sys_shutdown(fd: usize, how: usize) -> SysResult {
     info!("sys_shutdown: fd: {} how: {}", fd, how);
     let mut proc = process();
 
-    let wrapper = proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let mut socket = sockets.get::<TcpSocket>(wrapper.handle);
-        socket.close();
-        Ok(0)
-    } else {
-        Err(SysError::EINVAL)
-    }
+    let socket = proc.get_socket(fd)?;
+    socket.shutdown()
 }
 
 pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
@@ -419,75 +195,19 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
     // open multiple sockets for each connection
     let mut proc = process();
 
-    let wrapper = proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(tcp_state) = wrapper.socket_type.clone() {
-        if let Some(endpoint) = tcp_state.local_endpoint {
-            loop {
-                let mut sockets = SOCKETS.lock();
-                let socket = sockets.get::<TcpSocket>(wrapper.handle);
+    let socket = proc.get_socket(fd)?;
+    let (new_socket, remote_endpoint) = socket.accept()?;
 
-                if socket.is_active() {
-                    let remote_endpoint = socket.remote_endpoint();
-                    drop(socket);
+    let new_fd = proc.get_free_fd();
+    proc.files.insert(new_fd, FileLike::Socket(new_socket));
 
-                    // move the current one to new_fd
-                    // create a new one in fd
-                    let new_fd = proc.get_free_fd();
-
-                    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; TCP_RECVBUF]);
-                    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; TCP_SENDBUF]);
-                    let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-                    tcp_socket.listen(endpoint).unwrap();
-
-                    let tcp_handle = sockets.add(tcp_socket);
-
-                    let mut orig_socket = proc
-                        .files
-                        .insert(
-                            fd,
-                            FileLike::Socket(SocketWrapper {
-                                handle: tcp_handle,
-                                socket_type: SocketType::Tcp(tcp_state),
-                            }),
-                        )
-                        .unwrap();
-
-                    if let FileLike::Socket(ref mut wrapper) = orig_socket {
-                        if let SocketType::Tcp(ref mut state) = wrapper.socket_type {
-                            state.is_listening = false;
-                        } else {
-                            panic!("impossible");
-                        }
-                    } else {
-                        panic!("impossible");
-                    }
-                    proc.files.insert(new_fd, orig_socket);
-
-                    if !addr.is_null() {
-                        let sockaddr_in = SockAddr::from(remote_endpoint);
-                        unsafe {
-                            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-                        }
-                    }
-
-                    drop(sockets);
-                    drop(proc);
-                    poll_ifaces();
-                    return Ok(new_fd);
-                }
-
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
-                SOCKET_ACTIVITY._wait()
-            }
-        } else {
-            Err(SysError::EINVAL)
+    if !addr.is_null() {
+        let sockaddr_in = SockAddr::from(remote_endpoint);
+        unsafe {
+            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
         }
-    } else {
-        debug!("bad socket type {:?}", wrapper);
-        Err(SysError::EINVAL)
     }
+    Ok(new_fd)
 }
 
 pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
@@ -502,44 +222,13 @@ pub fn sys_getsockname(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         return Err(SysError::EINVAL);
     }
 
-    let wrapper = proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(state) = &wrapper.socket_type {
-        if let Some(endpoint) = state.local_endpoint {
-            let sockaddr_in = SockAddr::from(endpoint);
-            unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-            }
-            Ok(0)
-        } else {
-            let mut sockets = SOCKETS.lock();
-            let socket = sockets.get::<TcpSocket>(wrapper.handle);
-            let endpoint = socket.local_endpoint();
-            if endpoint.port != 0 {
-                let sockaddr_in = SockAddr::from(socket.local_endpoint());
-                unsafe {
-                    sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-                }
-                Ok(0)
-            } else {
-                Err(SysError::EINVAL)
-            }
-        }
-    } else if let SocketType::Udp(_) = &wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let socket = sockets.get::<UdpSocket>(wrapper.handle);
-        let endpoint = socket.endpoint();
-        if endpoint.port != 0 {
-            let sockaddr_in = SockAddr::from(endpoint);
-            unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-            }
-            Ok(0)
-        } else {
-            Err(SysError::EINVAL)
-        }
-    } else {
-        Err(SysError::EINVAL)
+    let socket = proc.get_socket(fd)?;
+    let endpoint = socket.endpoint().ok_or(SysError::EINVAL)?;
+    let sockaddr_in = SockAddr::from(endpoint);
+    unsafe {
+        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
     }
+    Ok(0)
 }
 
 pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
@@ -556,81 +245,22 @@ pub fn sys_getpeername(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> Sy
         return Err(SysError::EINVAL);
     }
 
-    let wrapper = proc.get_socket_mut(fd)?;
-    if let SocketType::Tcp(_) = wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-        if socket.is_open() {
-            let remote_endpoint = socket.remote_endpoint();
-            let sockaddr_in = SockAddr::from(remote_endpoint);
-            unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-            }
-            Ok(0)
-        } else {
-            Err(SysError::EINVAL)
-        }
-    } else if let SocketType::Udp(state) = &wrapper.socket_type {
-        if let Some(endpoint) = state.remote_endpoint {
-            let sockaddr_in = SockAddr::from(endpoint);
-            unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
-            }
-            Ok(0)
-        } else {
-            Err(SysError::EINVAL)
-        }
-    } else {
-        Err(SysError::EINVAL)
+    let socket = proc.get_socket(fd)?;
+    let remote_endpoint = socket.remote_endpoint().ok_or(SysError::EINVAL)?;
+    let sockaddr_in = SockAddr::from(remote_endpoint);
+    unsafe {
+        sockaddr_in.write_to(&mut proc, addr, addr_len)?;
     }
+    Ok(0)
 }
 
-/// Check socket state
-/// return (in, out, err)
-pub fn poll_socket(wrapper: &SocketWrapper) -> (bool, bool, bool) {
-    let mut input = false;
-    let mut output = false;
-    let mut err = false;
-    if let SocketType::Tcp(state) = wrapper.socket_type.clone() {
-        let mut sockets = SOCKETS.lock();
-        let socket = sockets.get::<TcpSocket>(wrapper.handle);
-
-        if state.is_listening && socket.is_active() {
-            // a new connection
-            input = true;
-        } else if !socket.is_open() {
-            err = true;
-        } else {
-            if socket.can_recv() {
-                input = true;
-            }
-
-            if socket.can_send() {
-                output = true;
-            }
+impl Process {
+    fn get_socket(&mut self, fd: usize) -> Result<&mut Box<dyn Socket>, SysError> {
+        match self.get_file_like(fd)? {
+            FileLike::Socket(socket) => Ok(socket),
+            _ => Err(SysError::EBADF),
         }
-    } else if let SocketType::Udp(_) = wrapper.socket_type {
-        let mut sockets = SOCKETS.lock();
-        let socket = sockets.get::<UdpSocket>(wrapper.handle);
-
-        if socket.can_recv() {
-            input = true;
-        }
-
-        if socket.can_send() {
-            output = true;
-        }
-    } else {
-        unimplemented!()
     }
-
-    (input, output, err)
-}
-
-pub fn sys_dup2_socket(proc: &mut Process, wrapper: SocketWrapper, fd: usize) -> SysResult {
-    proc.files.insert(fd, FileLike::Socket(wrapper));
-    Ok(fd)
 }
 
 // cancel alignment
@@ -738,3 +368,22 @@ impl SockAddr {
         return Ok(0);
     }
 }
+
+const AF_UNIX: usize = 1;
+const AF_INET: usize = 2;
+
+const SOCK_STREAM: usize = 1;
+const SOCK_DGRAM: usize = 2;
+const SOCK_RAW: usize = 3;
+const SOCK_TYPE_MASK: usize = 0xf;
+
+const IPPROTO_IP: usize = 0;
+const IPPROTO_ICMP: usize = 1;
+const IPPROTO_TCP: usize = 6;
+
+const SOL_SOCKET: usize = 1;
+const SO_SNDBUF: usize = 7;
+const SO_RCVBUF: usize = 8;
+const SO_LINGER: usize = 13;
+
+const TCP_CONGESTION: usize = 13;

@@ -1,9 +1,9 @@
+use crate::interrupt;
+use crate::thread_pool::*;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use log::*;
 use core::cell::UnsafeCell;
-use crate::thread_pool::*;
-use crate::interrupt;
+use log::*;
 
 /// Thread executor
 ///
@@ -25,7 +25,9 @@ struct ProcessorInner {
 
 impl Processor {
     pub const fn new() -> Self {
-        Processor { inner: UnsafeCell::new(None) }
+        Processor {
+            inner: UnsafeCell::new(None),
+        }
     }
 
     pub unsafe fn init(&self, id: usize, context: Box<Context>, manager: Arc<ThreadPool>) {
@@ -38,7 +40,8 @@ impl Processor {
     }
 
     fn inner(&self) -> &mut ProcessorInner {
-        unsafe { &mut *self.inner.get() }.as_mut()
+        unsafe { &mut *self.inner.get() }
+            .as_mut()
             .expect("Processor is not initialized")
     }
 
@@ -51,22 +54,30 @@ impl Processor {
     ///   via switch back to the scheduler.
     pub fn run(&self) -> ! {
         let inner = self.inner();
-        unsafe { interrupt::disable_and_store(); }
+        unsafe {
+            interrupt::disable_and_store();
+        }
         loop {
             if let Some(proc) = inner.manager.run(inner.id) {
                 trace!("CPU{} begin running thread {}", inner.id, proc.0);
                 inner.proc = Some(proc);
                 unsafe {
-                    inner.loop_context.switch_to(&mut *inner.proc.as_mut().unwrap().1);
+                    inner
+                        .loop_context
+                        .switch_to(&mut *inner.proc.as_mut().unwrap().1);
                 }
                 let (tid, context) = inner.proc.take().unwrap();
                 trace!("CPU{} stop running thread {}", inner.id, tid);
                 inner.manager.stop(tid, context);
             } else {
                 trace!("CPU{} idle", inner.id);
-                unsafe { interrupt::enable_and_wfi(); }
+                unsafe {
+                    interrupt::enable_and_wfi();
+                }
                 // wait for a timer interrupt
-                unsafe { interrupt::disable_and_store(); }
+                unsafe {
+                    interrupt::disable_and_store();
+                }
             }
         }
     }
@@ -79,7 +90,12 @@ impl Processor {
         let inner = self.inner();
         unsafe {
             let flags = interrupt::disable_and_store();
-            inner.proc.as_mut().unwrap().1.switch_to(&mut *inner.loop_context);
+            inner
+                .proc
+                .as_mut()
+                .unwrap()
+                .1
+                .switch_to(&mut *inner.loop_context);
             interrupt::restore(flags);
         }
     }

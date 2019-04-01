@@ -57,16 +57,10 @@ impl ColorBuffer {
         unsafe {
             match color_depth {
                 ColorDepth16 => ColorBuffer {
-                    buf16: core::slice::from_raw_parts_mut(
-                        base_addr as *mut u16,
-                        size / 2,
-                    ),
+                    buf16: core::slice::from_raw_parts_mut(base_addr as *mut u16, size / 2),
                 },
                 ColorDepth32 => ColorBuffer {
-                    buf32: core::slice::from_raw_parts_mut(
-                        base_addr as *mut u32,
-                        size / 4,
-                    ),
+                    buf32: core::slice::from_raw_parts_mut(base_addr as *mut u32, size / 4),
                 },
             }
         }

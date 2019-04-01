@@ -45,7 +45,7 @@ impl<T: PartialEq> Timer<T> {
         let time = self.tick + time_after;
         let event = Event { time, data };
         let mut it = self.timers.iter();
-        let mut i : usize = 0;
+        let mut i: usize = 0;
         loop {
             match it.next() {
                 None => break,

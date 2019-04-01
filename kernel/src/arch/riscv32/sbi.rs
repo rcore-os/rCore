@@ -28,7 +28,12 @@ pub fn shutdown() -> ! {
 
 pub fn set_timer(stime_value: u64) {
     #[cfg(target_pointer_width = "32")]
-    sbi_call(SBI_SET_TIMER, stime_value as usize, (stime_value >> 32) as usize, 0);
+    sbi_call(
+        SBI_SET_TIMER,
+        stime_value as usize,
+        (stime_value >> 32) as usize,
+        0,
+    );
     #[cfg(target_pointer_width = "64")]
     sbi_call(SBI_SET_TIMER, stime_value as usize, 0, 0);
 }
@@ -50,7 +55,12 @@ pub fn remote_sfence_vma(hart_mask: usize, _start: usize, _size: usize) {
 }
 
 pub fn remote_sfence_vma_asid(hart_mask: usize, _start: usize, _size: usize, _asid: usize) {
-    sbi_call(SBI_REMOTE_SFENCE_VMA_ASID, &hart_mask as *const _ as usize, 0, 0);
+    sbi_call(
+        SBI_REMOTE_SFENCE_VMA_ASID,
+        &hart_mask as *const _ as usize,
+        0,
+        0,
+    );
 }
 
 const SBI_SET_TIMER: usize = 0;

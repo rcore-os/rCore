@@ -6,12 +6,12 @@
 //! - `processor`: Get a reference of the current `Processor`
 //! - `new_kernel_context`: Construct a `Context` of the new kernel thread
 
+use crate::processor::*;
+use crate::thread_pool::*;
 use alloc::boxed::Box;
 use core::marker::PhantomData;
 use core::time::Duration;
 use log::*;
-use crate::processor::*;
-use crate::thread_pool::*;
 
 #[linkage = "weak"]
 #[no_mangle]
@@ -23,14 +23,15 @@ fn processor() -> &'static Processor {
 #[linkage = "weak"]
 #[no_mangle]
 /// Construct a `Context` of the new kernel thread
-fn new_kernel_context(_entry: extern fn(usize) -> !, _arg: usize) -> Box<Context> {
+fn new_kernel_context(_entry: extern "C" fn(usize) -> !, _arg: usize) -> Box<Context> {
     unimplemented!("thread: Please implement and export `new_kernel_context`")
 }
 
-
 /// Gets a handle to the thread that invokes it.
 pub fn current() -> Thread {
-    Thread { tid: processor().tid() }
+    Thread {
+        tid: processor().tid(),
+    }
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
@@ -50,9 +51,9 @@ pub fn sleep(dur: Duration) {
 /// `F`: Type of the function `f`
 /// `T`: Type of the return value of `f`
 pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-    where
-        F: Send + 'static + FnOnce() -> T,
-        T: Send + 'static,
+where
+    F: Send + 'static + FnOnce() -> T,
+    T: Send + 'static,
 {
     trace!("spawn:");
 
@@ -69,10 +70,10 @@ pub fn spawn<F, T>(f: F) -> JoinHandle<T>
     //
     // 注意到它具有泛型参数，因此对每一次spawn调用，
     // 由于F类型是独特的，因此都会生成一个新的kernel_thread_entry
-    extern fn kernel_thread_entry<F, T>(f: usize) -> !
-        where
-            F: Send + 'static + FnOnce() -> T,
-            T: Send + 'static,
+    extern "C" fn kernel_thread_entry<F, T>(f: usize) -> !
+    where
+        F: Send + 'static + FnOnce() -> T,
+        T: Send + 'static,
     {
         // 在静态函数内部：
         // 根据传进来的指针，恢复f
