@@ -42,17 +42,11 @@ build_path := target/$(target)/$(mode)
 kernel := $(build_path)/rcore
 kernel_img := $(build_path)/kernel.img
 bootimage := $(build_path)/bootimage.bin
-dtb := src/arch/$(arch)/boot/dts/$(board).dtb
 bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 
-ifeq ($(arch), aarch64)
-board := raspi3
-
-ifeq ($(arch), mipsel)
-board := malta
 
 ### export environments ###
 export ARCH = $(arch)
@@ -60,8 +54,16 @@ export BOARD = $(board)
 export SMP = $(smp)
 export DTB = $(dtb)
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
+
+ifeq ($(arch), aarch64)
+board := raspi3
 export SFSIMG = $(user_dir)/build/$(arch).img
+else ifeq ($(arch), mipsel)
+board := malta
 endif
+
+dtb := src/arch/$(arch)/boot/dts/$(board).dtb
+
 
 ### qemu options ###
 qemu_opts := \
@@ -108,7 +110,6 @@ qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img)
-endif
 
 else ifeq ($(arch), mipsel)
 qemu_opts += \

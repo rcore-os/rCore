@@ -2,6 +2,7 @@ extern crate cc;
 
 use std::fs::File;
 use std::io::{Result, Write};
+use std::path::Path;
 
 fn main() {
 	println!("cargo:rerun-if-env-changed=LOG");
@@ -19,7 +20,7 @@ fn main() {
 		"riscv64" => {
 		}
 		"mipsel" => {
-			gen_dtb_asm().unwrap();
+			gen_dtb_asm(&arch, &board).unwrap();
 		}
 		"aarch64" => {
 		}
@@ -52,10 +53,8 @@ fn gen_vector_asm() -> Result<()> {
 }
 
 
-fn gen_dtb_asm() -> Result<()> {
-	let arch = std::env::var("ARCH").unwrap();
+fn gen_dtb_asm(arch: &String, board: &String) -> Result<()> {
     let dtb = std::env::var("DTB").unwrap();
-	let board = std::env::var("BOARD").unwrap();
 
     if !Path::new(&dtb).is_file() {
         panic!("DTB `{}` not found", dtb)
