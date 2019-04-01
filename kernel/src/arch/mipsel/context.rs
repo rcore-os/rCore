@@ -5,23 +5,48 @@ use mips::registers;
 #[repr(C)]
 pub struct TrapFrame {
     /// CP0 status register
-    pub status: usize;
+    pub status: u32,
     /// CP0 cause register
-    pub cause: usize;
+    pub cause: u32,
     /// CP0 EPC register
-    pub epc: usize;
+    pub epc: u32,
     /// CP0 vaddr register
-    pub vaddr: usize;
+    pub vaddr: u32,
     /// HI/LO registers
-    pub hi, lo: usize;
-    /// General registers 1-7
-    pub at, v0, v1, a0, a1, a2, a3: u32;
-    /// General registers 8-15
-    pub t0, t1, t2, t3, t4, t5, t6, t7: u32;  
-    /// General registers 16-23
-    pub s0, s1, s2, s3, s4, s5, s6, s7: u32;
-    /// General registers 24-31
-    pub t8, t9, k0, k1, gp, sp, fp, ra: u32;
+    pub hi: u32,
+    pub lo: u32,
+    /// General registers
+    pub at: u32,
+    pub v0: u32,
+    pub v1: u32,
+    pub a0: u32,
+    pub a1: u32,
+    pub a2: u32,
+    pub a3: u32,
+    pub t0: u32,
+    pub t1: u32,
+    pub t2: u32,
+    pub t3: u32,
+    pub t4: u32,
+    pub t5: u32,
+    pub t6: u32,
+    pub t7: u32,
+    pub s0: u32,
+    pub s1: u32,
+    pub s2: u32,
+    pub s3: u32,
+    pub s4: u32,
+    pub s5: u32,
+    pub s6: u32,
+    pub s7: u32,
+    pub t8: u32,
+    pub t9: u32,
+    pub k0: u32,
+    pub k1: u32,
+    pub gp: u32,
+    pub sp: u32,
+    pub fp: u32,
+    pub ra: u32,
     /// Reserve space for hartid
     pub _hartid: usize,
 }

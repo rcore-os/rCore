@@ -1,14 +1,13 @@
+#include "regdef.h"
+
+	.set noreorder
     .section .text.entry
     .globl _start
 _start:
-    add t0, a0, 1
-    slli t0, t0, 16
-    
-    lui sp, %hi(bootstack)
-    addi sp, sp, %lo(bootstack)
-    add sp, sp, t0
+	la sp, bootstacktop
 
-    call rust_main
+    b rust_main
+	nop
 
     .section .bss.stack
     .align 12  #PGSHIFT

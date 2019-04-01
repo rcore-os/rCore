@@ -83,5 +83,5 @@ global_asm!(r"
 ");
 
 
-global_asm!(include_str!("boot/entry.asm"));
-global_asm!(include_str!("boot/trap.asm"));
+global_asm!(include_str!("boot/entry.S"));
+global_asm!(include_str!("boot/trap.S"));
