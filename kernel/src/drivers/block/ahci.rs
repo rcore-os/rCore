@@ -7,18 +7,18 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::cmp::min;
 use core::mem::size_of;
 use core::slice;
+use core::sync::atomic::spin_loop_hint;
 
-use crate::sync::FlagsGuard;
+use bit_field::*;
 use bitflags::*;
 use log::*;
-use rcore_memory::paging::PageTable;
-use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
+use rcore_fs::dev::BlockDevice;
 use volatile::Volatile;
 
-use rcore_fs::dev::BlockDevice;
+use rcore_memory::paging::PageTable;
+use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
 
 use crate::drivers::BlockDriver;
 use crate::memory::active_table;
@@ -29,7 +29,7 @@ use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
 pub struct AHCI {
     header: usize,
     size: usize,
-    rfis: usize,
+    received_fis: &'static mut AHCIReceivedFIS,
     cmd_list: &'static mut [AHCICommandHeader],
     cmd_table: &'static mut AHCICommandTable,
     data: &'static mut [u8],
@@ -38,21 +38,31 @@ pub struct AHCI {
 
 pub struct AHCIDriver(Mutex<AHCI>);
 
-// AHCI
-// 3.1 Generic Host Control
+/// AHCI Generic Host Control (3.1)
 #[repr(C)]
 pub struct AHCIGHC {
-    cap: Volatile<AHCICap>,
-    ghc: Volatile<u32>,
-    is: Volatile<u32>,
-    pi: Volatile<u32>,
-    vs: Volatile<u32>,
-    ccc_ctl: Volatile<u32>,
+    /// Host capability
+    capability: Volatile<AHCICap>,
+    /// Global host control
+    global_host_control: Volatile<u32>,
+    /// Interrupt status
+    interrupt_status: Volatile<u32>,
+    /// Port implemented
+    port_implemented: Volatile<u32>,
+    /// Version
+    version: Volatile<u32>,
+    /// Command completion coalescing control
+    ccc_control: Volatile<u32>,
+    /// Command completion coalescing ports
     ccc_ports: Volatile<u32>,
-    em_loc: Volatile<u32>,
-    em_ctl: Volatile<u32>,
-    cap2: Volatile<u32>,
-    bohc: Volatile<u32>,
+    /// Enclosure management location
+    em_location: Volatile<u32>,
+    /// Enclosure management control
+    em_control: Volatile<u32>,
+    /// Host capabilities extended
+    capabilities2: Volatile<u32>,
+    /// BIOS/OS handoff control and status
+    bios_os_handoff_control: Volatile<u32>,
 }
 
 bitflags! {
@@ -78,42 +88,63 @@ bitflags! {
         const EMS = 1 << 6;
         const SXS = 1 << 5;
         // number of ports = 1
-        const NP_1 = 1 << 0;
-        const NP_2 = 1 << 1;
-        const NP_4 = 1 << 2;
-        const NP_8 = 1 << 3;
-        const NP_16 = 1 << 4;
+        const NUM_MASK = 0b11111;
     }
 }
 
-// AHCI
-// 3.3 Port Registers (one set per port)
-#[repr(C)]
-pub struct AHCIPort {
-    clb: Volatile<u32>,
-    clbu: Volatile<u32>,
-    fb: Volatile<u32>,
-    fbu: Volatile<u32>,
-    is: Volatile<u32>,
-    ie: Volatile<u32>,
-    cmd: Volatile<u32>,
-    reserved: Volatile<u32>,
-    tfd: Volatile<u32>,
-    sig: Volatile<u32>,
-    ssts: Volatile<u32>,
-    sctl: Volatile<u32>,
-    serr: Volatile<u32>,
-    sact: Volatile<u32>,
-    ci: Volatile<u32>,
-    sntf: Volatile<u32>,
-    fbs: Volatile<u32>,
-    devslp: Volatile<u32>,
+impl AHCIGHC {
+    fn enable(&mut self) {
+        self.global_host_control.update(|v| {
+            v.set_bit(13, true);
+        });
+    }
+    fn num_ports(&self) -> usize {
+        (self.capability.read() & AHCICap::NUM_MASK).bits() as usize + 1
+    }
+    fn has_port(&self, port_num: usize) -> bool {
+        self.port_implemented.read().get_bit(port_num)
+    }
 }
 
-// AHCi
-// 4.2.1 Received FIS Structure
+/// AHCI Port Registers (3.3) (one set per port)
 #[repr(C)]
-pub struct AHCIRFIS {
+pub struct AHCIPort {
+    command_list_base_address: Volatile<u64>,
+    fis_base_address: Volatile<u64>,
+    interrupt_status: Volatile<u32>,
+    interrupt_enable: Volatile<u32>,
+    command: Volatile<u32>,
+    reserved: Volatile<u32>,
+    task_file_data: Volatile<u32>,
+    signature: Volatile<u32>,
+    sata_status: Volatile<u32>,
+    sata_control: Volatile<u32>,
+    sata_error: Volatile<u32>,
+    sata_active: Volatile<u32>,
+    command_issue: Volatile<u32>,
+    sata_notification: Volatile<u32>,
+    fis_based_switch_control: Volatile<u32>,
+}
+
+impl AHCIPort {
+    fn spin_on_slot(&mut self, slot: usize) {
+        loop {
+            let ci = self.command_issue.read();
+            if !ci.get_bit(slot) {
+                break;
+            }
+            spin_loop_hint();
+        }
+    }
+    fn issue_command(&mut self, slot: usize) {
+        assert!(slot < 32);
+        self.command_issue.write(1 << (slot as u32));
+    }
+}
+
+/// AHCI Received FIS Structure (4.2.1)
+#[repr(C)]
+pub struct AHCIReceivedFIS {
     dma: [u8; 0x20],
     pio: [u8; 0x20],
     d2h: [u8; 0x18],
@@ -122,35 +153,74 @@ pub struct AHCIRFIS {
     reserved: [u8; 0x60],
 }
 
-// AHCI
-// 4.2.2 Command List Structure
+/// # AHCI Command List Structure (4.2.2)
+///
+/// Host sends commands to the device through Command List.
+///
+/// Command List consists of 1 to 32 command headers, each one is called a slot.
+///
+/// Each command header describes an ATA or ATAPI command, including a
+/// Command FIS, an ATAPI command buffer and a bunch of Physical Region
+/// Descriptor Tables specifying the data payload address and size.
+///
+/// https://wiki.osdev.org/images/e/e8/Command_list.jpg
 #[repr(C)]
 pub struct AHCICommandHeader {
-    pwa_cfl: u8,
-    pmp_cbr: u8,
-    prdtl: u16,
-    prdbc: u32,
-    ctba0: u32,
-    ctba_u0: u32,
-    reservec: [u32; 4],
+    ///
+    flags: CommandHeaderFlags,
+    /// Physical region descriptor table length in entries
+    prdt_length: u16,
+    /// Physical region descriptor byte count transferred
+    prd_byte_count: u32,
+    /// Command table descriptor base address
+    command_table_base_address: u64,
+    /// Reserved
+    reserved: [u32; 4],
 }
 
-// AHCI
-// 4.2.3 Command Table
+bitflags! {
+    pub struct CommandHeaderFlags: u16 {
+        /// Command FIS length in DWORDS, 2 ~ 16
+        const CFL_MASK = 0b11111;
+        /// ATAPI
+        const ATAPI = 1 << 5;
+        /// Write, 1: H2D, 0: D2H
+        const WRITE = 1 << 6;
+        /// Prefetchable
+        const PREFETCHABLE = 1 << 7;
+        /// Reset
+        const RESET = 1 << 8;
+        /// BIST
+        const BIST = 1 << 9;
+        /// Clear busy upon R_OK
+        const CLEAR = 1 << 10;
+        /// Port multiplier port
+        const PORT_MULTIPLIER_PORT_MASK = 0b1111 << 12;
+    }
+}
+
+/// AHCI Command Table (4.2.3)
 #[repr(C)]
 pub struct AHCICommandTable {
-    cfis: [u8; 64],
+    /// Command FIS
+    cfis: SATAFISRegH2D,
+    /// ATAPI command, 12 or 16 bytes
     acmd: [u8; 16],
+    /// Reserved
     reserved: [u8; 48],
-    prdt: [AHCIPRD; 1],
+    /// Physical region descriptor table entries, 0 ~ 65535
+    prdt: [AHCIPrdtEntry; 1],
 }
 
-// 4.2.3 Command Table
+/// Physical region descriptor table entry
 #[repr(C)]
-pub struct AHCIPRD {
-    dba: u32,
-    dbau: u32,
+pub struct AHCIPrdtEntry {
+    /// Data base address
+    data_base_address: u64,
+    /// Reserved
     reserved: u32,
+    /// Bit 21-0: Byte count, 4M max
+    /// Bit 31:   Interrupt on completion
     dbc_i: u32,
 }
 
@@ -160,32 +230,47 @@ const CMD_READ_DMA_EXT: u8 = 0x25;
 const CMD_WRITE_DMA_EXT: u8 = 0x35;
 const CMD_IDENTIFY_DEVICE: u8 = 0xec;
 
-// https://wiki.osdev.org/AHCI
-// SATA
-// Figure 5-2: Register FIS - Host to Device
+/// SATA Register FIS - Host to Device
+///
+/// https://wiki.osdev.org/AHCI Figure 5-2
 #[repr(C)]
-#[derive(Default)]
 pub struct SATAFISRegH2D {
     fis_type: u8,
     cflags: u8,
     command: u8,
     feature_lo: u8,
+
     lba_0: u8, // LBA 7:0
     lba_1: u8, // LBA 15:8
     lba_2: u8, // LBA 23:16
     dev_head: u8,
+
     lba_3: u8, // LBA 31:24
     lba_4: u8, // LBA 39:32
     lba_5: u8, // LBA 47:40
     feature_hi: u8,
-    sector_count_lo: u8,
-    sector_count_hi: u8,
+
+    sector_count: u16,
     reserved: u8,
     control: u8,
+
+    _padding: [u8; 48],
 }
 
-// ATA8-ACS
-// Table 29 IDENTIFY DEVICE data
+impl SATAFISRegH2D {
+    fn set_lba(&mut self, lba: u64) {
+        self.lba_0 = (lba >> 0) as u8;
+        self.lba_1 = (lba >> 8) as u8;
+        self.lba_2 = (lba >> 16) as u8;
+        self.lba_3 = (lba >> 24) as u8;
+        self.lba_4 = (lba >> 32) as u8;
+        self.lba_5 = (lba >> 40) as u8;
+    }
+}
+
+/// IDENTIFY DEVICE data
+///
+/// ATA8-ACS Table 29
 #[repr(C)]
 pub struct ATAIdentifyPacket {
     _1: [u16; 10],
@@ -197,6 +282,54 @@ pub struct ATAIdentifyPacket {
     lba_sectors: u32, // words 60-61
     _4: [u16; 38],
     lba48_sectors: u64, // words 100-103
+}
+
+impl AHCI {
+    fn read_block(&mut self, block_id: usize, buf: &mut [u8]) -> usize {
+        self.cmd_list[0].flags = CommandHeaderFlags::empty();
+
+        let fis = &mut self.cmd_table.cfis;
+        // Register FIS from HBA to device
+        fis.fis_type = FIS_REG_H2D;
+        fis.cflags = 1 << 7;
+        // 7.25 READ DMA EXT - 25h, DMA
+        fis.command = CMD_READ_DMA_EXT;
+        fis.sector_count = 1;
+        fis.dev_head = 0x40; // LBA
+        fis.control = 0x80; // LBA48
+        fis.set_lba(block_id as u64);
+
+        self.port.issue_command(0);
+        self.port.spin_on_slot(0);
+
+        let len = buf.len().min(BLOCK_SIZE);
+        buf[..len].clone_from_slice(&self.data[0..len]);
+        len
+    }
+
+    fn write_block(&mut self, block_id: usize, buf: &[u8]) -> usize {
+        self.cmd_list[0].flags = CommandHeaderFlags::WRITE; // device write
+
+        let len = buf.len().min(BLOCK_SIZE);
+        self.data[0..len].clone_from_slice(&buf[..len]);
+
+        let fis = &mut self.cmd_table.cfis;
+        // Register FIS from HBA to device
+        fis.fis_type = FIS_REG_H2D;
+        fis.cflags = 1 << 7;
+        // ATA8-ACS
+        // 7.63 WRITE DMA EXT - 35h, DMA
+        fis.command = CMD_WRITE_DMA_EXT;
+        fis.sector_count = 1;
+        fis.dev_head = 0x40; // LBA
+        fis.control = 0x80; // LBA48
+        fis.set_lba(block_id as u64);
+
+        self.port.issue_command(0);
+        self.port.spin_on_slot(0);
+
+        len
+    }
 }
 
 impl Driver for AHCIDriver {
@@ -214,43 +347,8 @@ impl Driver for AHCIDriver {
 
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
-
-        driver.cmd_list[0].prdbc = 0;
-        driver.cmd_list[0].pwa_cfl = 0;
-
-        let len = min(BLOCK_SIZE, buf.len());
-
-        let fis = unsafe { &mut *(driver.cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
-        // Register FIS from HBA to device
-        fis.fis_type = FIS_REG_H2D;
-        fis.cflags = 1 << 7;
-
-        // 7.25 READ DMA EXT - 25h, DMA
-        fis.command = CMD_READ_DMA_EXT;
-        fis.sector_count_lo = 1;
-        fis.sector_count_hi = 0;
-        fis.dev_head = 0x40; // LBA
-        fis.control = 0x80; // LBA48
-
-        let block_id = block_id as u64; // avoid problems on riscv32
-        fis.lba_0 = block_id as u8;
-        fis.lba_1 = (block_id >> 8) as u8;
-        fis.lba_2 = (block_id >> 16) as u8;
-        fis.lba_3 = (block_id >> 24) as u8;
-        fis.lba_4 = (block_id >> 32) as u8;
-        fis.lba_5 = (block_id >> 40) as u8;
-
-        driver.port.ci.write(1 << 0);
-
-        loop {
-            let ci = driver.port.ci.read();
-            if (ci & (1 << 0)) == 0 {
-                break;
-            }
-        }
-
-        buf[..len].clone_from_slice(&driver.data[0..len]);
-        return true;
+        driver.read_block(block_id, buf);
+        true
     }
 
     fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
@@ -258,42 +356,8 @@ impl Driver for AHCIDriver {
             return false;
         }
         let mut driver = self.0.lock();
-
-        driver.cmd_list[0].prdbc = 0;
-        driver.cmd_list[0].pwa_cfl = 1 << 6; // devic write
-
-        driver.data[0..BLOCK_SIZE].clone_from_slice(&buf[..BLOCK_SIZE]);
-
-        let fis = unsafe { &mut *(driver.cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
-        // Register FIS from HBA to device
-        fis.fis_type = FIS_REG_H2D;
-        fis.cflags = 1 << 7;
-
-        // ATA8-ACS
-        // 7.63 WRITE DMA EXT - 35h, DMA
-        fis.command = CMD_WRITE_DMA_EXT;
-        fis.sector_count_lo = 1;
-        fis.sector_count_hi = 0;
-        fis.dev_head = 0x40; // LBA
-        fis.control = 0x80; // LBA48
-
-        let block_id = block_id as u64; // avoid problems on riscv32
-        fis.lba_0 = block_id as u8;
-        fis.lba_1 = (block_id >> 8) as u8;
-        fis.lba_2 = (block_id >> 16) as u8;
-        fis.lba_3 = (block_id >> 24) as u8;
-        fis.lba_4 = (block_id >> 32) as u8;
-        fis.lba_5 = (block_id >> 40) as u8;
-
-        driver.port.ci.write(1 << 0);
-
-        loop {
-            let ci = driver.port.ci.read();
-            if (ci & (1 << 0)) == 0 {
-                break;
-            }
-        }
-        return true;
+        driver.write_block(block_id, buf);
+        true
     }
 }
 
@@ -320,93 +384,82 @@ fn alloc_dma(page_num: usize) -> (VirtAddr, PhysAddr) {
 pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver> {
     let ghc = unsafe { &mut *(header as *mut AHCIGHC) };
 
-    // AHCI Enable
-    ghc.ghc.write(ghc.ghc.read() | (1 << 13));
+    ghc.enable();
 
-    let num_ports = (ghc.cap.read().bits() & 0x1f) as usize + 1;
-
-    for port_num in 0..num_ports {
-        if (ghc.pi.read() | (1 << port_num)) != 0 {
+    for port_num in 0..ghc.num_ports() {
+        if ghc.has_port(port_num) {
             let addr = header + 0x100 + 0x80 * port_num;
             let port = unsafe { &mut *(addr as *mut AHCIPort) };
 
             // SSTS IPM Active
-            if (port.ssts.read() >> 8) & 0xF != 1 {
+            if port.sata_status.read().get_bits(8..12) != 1 {
                 continue;
             }
 
             // SSTS DET Present
-            if port.ssts.read() & 0xF != 3 {
+            if port.sata_status.read().get_bits(0..4) != 3 {
                 continue;
             }
 
             debug!("probing port {}", port_num);
             // Disable Port First
-            port.cmd.write(port.cmd.read() & !(1 << 4 | 1 << 0));
+            port.command.update(|c| {
+                c.set_bit(4, false);
+                c.set_bit(0, false);
+            });
 
             let (rfis_va, rfis_pa) = alloc_dma(1);
             let (cmd_list_va, cmd_list_pa) = alloc_dma(1);
             let (cmd_table_va, cmd_table_pa) = alloc_dma(1);
             let (data_va, data_pa) = alloc_dma(1);
 
+            let received_fis = unsafe { &mut *(rfis_va as *mut AHCIReceivedFIS) };
             let cmd_list = unsafe {
                 slice::from_raw_parts_mut(
                     cmd_list_va as *mut AHCICommandHeader,
                     PAGE_SIZE / size_of::<AHCICommandHeader>(),
                 )
             };
-
             let cmd_table = unsafe { &mut *(cmd_table_va as *mut AHCICommandTable) };
+            let identify_data = unsafe { &*(data_va as *mut ATAIdentifyPacket) };
 
-            cmd_table.prdt[0].dba = data_pa as u32;
-            cmd_table.prdt[0].dbau = (data_pa >> 32) as u32;
+            cmd_table.prdt[0].data_base_address = data_pa as u64;
             cmd_table.prdt[0].dbc_i = (BLOCK_SIZE - 1) as u32;
 
-            cmd_list[0].ctba0 = cmd_table_pa as u32;
-            cmd_list[0].ctba_u0 = (cmd_table_pa >> 32) as u32;
-            cmd_list[0].prdtl = 1;
-            cmd_list[0].prdbc = 0;
+            cmd_list[0].command_table_base_address = cmd_table_pa as u64;
+            cmd_list[0].prdt_length = 1;
+            cmd_list[0].prd_byte_count = 0;
 
-            port.clb.write(cmd_list_pa as u32);
-            port.clbu.write((cmd_list_pa >> 32) as u32);
-
-            port.fb.write(rfis_pa as u32);
-            port.fbu.write((rfis_pa >> 32) as u32);
+            port.command_list_base_address.write(cmd_list_pa as u64);
+            port.fis_base_address.write(rfis_pa as u64);
 
             // clear status and errors
-            port.ci.write(0);
-            port.sact.write(0);
-            port.serr.write(0);
+            port.command_issue.write(0);
+            port.sata_active.write(0);
+            port.sata_error.write(0);
 
             // enable port
-            port.cmd
-                .write(port.cmd.read() | 1 << 0 | 1 << 1 | 1 << 2 | 1 << 4 | 1 << 28);
+            port.command.update(|c| {
+                *c |= 1 << 0 | 1 << 1 | 1 << 2 | 1 << 4 | 1 << 28;
+            });
 
-            let stat = port.ssts.read();
+            let stat = port.sata_status.read();
             if stat == 0 {
                 warn!("port is not connected to external drive?");
             }
 
-            let fis = unsafe { &mut *(cmd_table.cfis.as_ptr() as *mut SATAFISRegH2D) };
+            let fis = &mut cmd_table.cfis;
             // Register FIS from HBA to device
             fis.fis_type = FIS_REG_H2D;
             fis.cflags = 1 << 7;
 
             // 7.15 IDENTIFY DEVICE - ECh, PIO Data-In
             fis.command = CMD_IDENTIFY_DEVICE;
-            fis.sector_count_lo = 1;
+            fis.sector_count = 1;
 
             debug!("issued identify command");
-            port.ci.write(1 << 0);
-
-            loop {
-                let ci = port.ci.read();
-                if (ci & (1 << 0)) == 0 {
-                    break;
-                }
-            }
-
-            let identify_data = unsafe { &*(data_va as *mut ATAIdentifyPacket) };
+            port.issue_command(0);
+            port.spin_on_slot(0);
 
             unsafe {
                 debug!(
@@ -424,7 +477,7 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
             let driver = AHCIDriver(Mutex::new(AHCI {
                 header,
                 size,
-                rfis: rfis_va,
+                received_fis,
                 cmd_list,
                 cmd_table,
                 data,
