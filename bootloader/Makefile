@@ -13,6 +13,8 @@ else ifeq ($(arch), riscv32)
 prefix := riscv64-unknown-elf-
 else ifeq ($(arch), riscv64)
 prefix := riscv64-unknown-elf-
+else ifeq ($(arch), mipsel)
+prefix := mipsel-linux-gnu-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 ifeq (,$(shell which $(prefix)ld))
@@ -30,6 +32,7 @@ strip := $(prefix)strip
 
 export CC = $(cc)
 export PAYLOAD = $(payload)
+export DTB = $(dtb)
 
 build_args := --target=targets/$(arch).json
 ifeq ($(mode), release)
