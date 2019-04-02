@@ -38,6 +38,8 @@ pub extern fn rust_main() -> ! {
 
     unsafe { memory::clear_bss(); }
 
+    crate::io::init();
+
     println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 
     crate::logging::init();
