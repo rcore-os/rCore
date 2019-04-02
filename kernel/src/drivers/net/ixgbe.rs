@@ -1,8 +1,9 @@
 //! Intel 10Gb Network Adapter 82599 i.e. ixgbe network driver
 //! Datasheet: https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 
-use alloc::prelude::*;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use alloc::collections::BTreeMap;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;

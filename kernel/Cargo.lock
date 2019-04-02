@@ -125,12 +125,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "deque"
 version = "0.3.2"
-source = "git+https://github.com/rcore-os/deque.git?branch=no_std#907d03935b9badde1902d9c84d138872f34c6763"
+source = "git+https://github.com/rcore-os/deque.git?branch=no_std#b13a836dd69ae82cc0b8d711c2990b9baf5170d1"
 
 [[package]]
 name = "device_tree"
 version = "1.0.3"
-source = "git+https://github.com/rcore-os/device_tree-rs#0e887395ab92e99f68117b17d85b0b417bfd1b45"
+source = "git+https://github.com/rcore-os/device_tree-rs#7945459093f49a39996291283b8894753c8a638d"
 
 [[package]]
 name = "fixedvec"

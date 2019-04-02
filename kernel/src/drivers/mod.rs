@@ -1,5 +1,6 @@
-use alloc::prelude::*;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use lazy_static::lazy_static;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
