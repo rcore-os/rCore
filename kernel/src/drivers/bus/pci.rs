@@ -101,6 +101,7 @@ unsafe fn enable(loc: Location) -> Option<u32> {
 }
 
 pub fn init_driver(dev: &PCIDevice) {
+    let name = format!("enp{}s{}f{}", dev.loc.bus, dev.loc.device, dev.loc.function);
     match (dev.id.vendor_id, dev.id.device_id) {
         (0x8086, 0x100e) | (0x8086, 0x100f) | (0x8086, 0x10d3) => {
             // 0x100e
@@ -110,14 +111,19 @@ pub fn init_driver(dev: &PCIDevice) {
             // 0x10d3
             // 82574L Gigabit Network Connection
             if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[0] {
-                let _ = unsafe { enable(dev.loc) };
-                e1000::e1000_init(addr as usize, len as usize);
+                let irq = unsafe { enable(dev.loc) };
+                let vaddr = KERNEL_OFFSET + addr as usize;
+                let mut current_addr = addr as usize;
+                while current_addr < addr as usize + len as usize {
+                    active_table().map_if_not_exists(KERNEL_OFFSET + current_addr, current_addr);
+                    current_addr = current_addr + PAGE_SIZE;
+                }
+                e1000::e1000_init(name, irq, vaddr, len as usize);
             }
         }
         (0x8086, 0x10fb) => {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[0] {
-                let name = format!("enp{}s{}f{}", dev.loc.bus, dev.loc.device, dev.loc.function);
                 let irq = unsafe { enable(dev.loc) };
                 PCI_DRIVERS.lock().insert(
                     dev.loc,

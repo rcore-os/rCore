@@ -457,7 +457,6 @@ pub fn ahci_init(irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver
             fis.command = CMD_IDENTIFY_DEVICE;
             fis.sector_count = 1;
 
-            debug!("issued identify command");
             port.issue_command(0);
             port.spin_on_slot(0);
 
