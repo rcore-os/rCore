@@ -125,10 +125,15 @@ pub fn init_driver(dev: &PCIDevice) {
             // 82599ES 10-Gigabit SFI/SFP+ Network Connection
             if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[0] {
                 let irq = unsafe { enable(dev.loc) };
-                PCI_DRIVERS.lock().insert(
-                    dev.loc,
-                    ixgbe::ixgbe_init(name, irq, addr as usize, len as usize),
-                );
+                let vaddr = KERNEL_OFFSET + addr as usize;
+                let mut current_addr = addr as usize;
+                while current_addr < addr as usize + len as usize {
+                    active_table().map_if_not_exists(KERNEL_OFFSET + current_addr, current_addr);
+                    current_addr = current_addr + PAGE_SIZE;
+                }
+                PCI_DRIVERS
+                    .lock()
+                    .insert(dev.loc, ixgbe::ixgbe_init(name, irq, vaddr, len as usize));
             }
         }
         (0x8086, 0x2922) => {
