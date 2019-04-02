@@ -87,7 +87,7 @@ bitflags! {
         const CCCS = 1 << 7;
         const EMS = 1 << 6;
         const SXS = 1 << 5;
-        // number of ports = 1
+        // number of ports - 1
         const NUM_MASK = 0b11111;
     }
 }
