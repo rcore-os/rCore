@@ -79,7 +79,7 @@ qemu_net_opts += \
 	-device e1000e,netdev=net0
 else
 qemu_opts += \
-	-machine ubuntu,accel=kvm
+	-machine accel=kvm
 qemu_net_opts += \
 	-device vfio-pci,host=$(pci_passthru)
 endif
