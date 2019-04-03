@@ -63,6 +63,10 @@ impl<F: Font> ConsoleBuffer<F> {
         let off_y = row * F::HEIGHT;
         if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
             let (mut foreground, mut background) = match fb.color_depth {
+                ColorDepth8 => (
+                    ch.attr.foreground.pack8() as u32,
+                    ch.attr.background.pack8() as u32,
+                ),
                 ColorDepth16 => (
                     ch.attr.foreground.pack16() as u32,
                     ch.attr.background.pack16() as u32,

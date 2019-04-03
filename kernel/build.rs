@@ -53,7 +53,7 @@ fn gen_vector_asm() -> Result<()> {
 }
 
 
-fn gen_dtb_asm(arch: &String, board: &String) -> Result<()> {
+fn gen_dtb_asm(arch: &String, _board: &String) -> Result<()> {
     let dtb = std::env::var("DTB").unwrap();
 
     if !Path::new(&dtb).is_file() {

@@ -1,6 +1,5 @@
 //! Framebuffer
 
-use super::mailbox;
 use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -40,6 +39,7 @@ pub struct FramebufferInfo {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 pub enum ColorDepth {
+    ColorDepth8 = 8,
     ColorDepth16 = 16,
     ColorDepth32 = 32,
 }
@@ -48,6 +48,7 @@ use self::ColorDepth::*;
 #[repr(C)]
 union ColorBuffer {
     base_addr: usize,
+    buf8: &'static mut [u8],
     buf16: &'static mut [u16],
     buf32: &'static mut [u32],
 }
@@ -56,6 +57,9 @@ impl ColorBuffer {
     fn new(color_depth: ColorDepth, base_addr: usize, size: usize) -> ColorBuffer {
         unsafe {
             match color_depth {
+                ColorDepth8 => ColorBuffer {
+                    buf8: core::slice::from_raw_parts_mut(base_addr as *mut u8, size),
+                },
                 ColorDepth16 => ColorBuffer {
                     buf16: core::slice::from_raw_parts_mut(base_addr as *mut u16, size / 2),
                 },
@@ -67,6 +71,11 @@ impl ColorBuffer {
     }
 
     #[inline]
+    fn read8(&self, index: u32) -> u8 {
+        unsafe { self.buf8[index as usize] }
+    }
+
+    #[inline]
     fn read16(&self, index: u32) -> u16 {
         unsafe { self.buf16[index as usize] }
     }
@@ -74,6 +83,11 @@ impl ColorBuffer {
     #[inline]
     fn read32(&self, index: u32) -> u32 {
         unsafe { self.buf32[index as usize] }
+    }
+
+    #[inline]
+    fn write8(&mut self, index: u32, pixel: u8) {
+        unsafe { self.buf8[index as usize] = pixel }
     }
 
     #[inline]
@@ -108,49 +122,27 @@ impl Framebuffer {
     fn new(width: u32, height: u32, depth: u32) -> Result<Framebuffer, String> {
         assert_has_not_been_called!("Framebuffer::new must be called only once");
 
-        let (width, height) = if width == 0 || height == 0 {
-            mailbox::framebuffer_get_physical_size()?
-        } else {
-            (width, height)
-        };
-        let depth = if depth == 0 {
-            mailbox::framebuffer_get_depth()?
-        } else {
-            depth
-        };
+        let probed_info = super::probe_fb_info(width, height, depth);
 
-        let info = mailbox::framebuffer_alloc(width, height, depth)?;
-        let color_depth = match info.depth {
-            16 => ColorDepth16,
-            32 => ColorDepth32,
-            _ => Err(format!("unsupported color depth {}", info.depth))?,
-        };
-
-        if info.bus_addr == 0 || info.screen_size == 0 {
-            Err(format!("mailbox call returned an invalid address/size"))?;
-        }
-        if info.pitch == 0 || info.pitch != info.xres * info.depth / 8 {
-            Err(format!(
-                "mailbox call returned an invalid pitch value {}",
-                info.pitch
-            ))?;
+        match probed_info {
+            Ok((info, addr)) => {
+                let color_depth = match info.depth {
+                    8 => ColorDepth8,
+                    16 => ColorDepth16,
+                    32 => ColorDepth32,
+                    _ => Err(format!("unsupported color depth {}", info.depth))?,
+                };
+                Ok(Framebuffer {
+                    buf: ColorBuffer::new(color_depth, addr, info.screen_size as usize),
+                    color_depth,
+                    fb_info: info,
+                })
+            },
+            Err(e) => {
+                Err(e)?
+            },
         }
 
-        use crate::arch::memory;
-        let paddr = info.bus_addr & !0xC0000000;
-        let vaddr = memory::ioremap(paddr as usize, info.screen_size as usize, "fb");
-        if vaddr == 0 {
-            Err(format!(
-                "cannot remap memory range [{:#x?}..{:#x?}]",
-                paddr,
-                paddr + info.screen_size
-            ))?;
-        }
-        Ok(Framebuffer {
-            buf: ColorBuffer::new(color_depth, vaddr, info.screen_size as usize),
-            color_depth,
-            fb_info: info,
-        })
     }
 
     #[inline]
@@ -162,6 +154,7 @@ impl Framebuffer {
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {
         match self.color_depth {
+            ColorDepth8 => self.buf.read8(y * self.fb_info.xres + x) as u32,
             ColorDepth16 => self.buf.read16(y * self.fb_info.xres + x) as u32,
             ColorDepth32 => self.buf.read32(y * self.fb_info.xres + x),
         }
@@ -171,6 +164,7 @@ impl Framebuffer {
     #[inline]
     pub fn write(&mut self, x: u32, y: u32, pixel: u32) {
         match self.color_depth {
+            ColorDepth8 => self.buf.write8(y * self.fb_info.xres + x, pixel as u8),
             ColorDepth16 => self.buf.write16(y * self.fb_info.xres + x, pixel as u16),
             ColorDepth32 => self.buf.write32(y * self.fb_info.xres + x, pixel),
         }
