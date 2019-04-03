@@ -9,7 +9,7 @@ pub fn getchar() -> char {
     SERIAL_PORT.lock().getchar()
 }
 
-pub fn getchar_option() -> Option<Char> {
+pub fn getchar_option() -> Option<char> {
     unsafe { SERIAL_PORT.force_unlock() }
     SERIAL_PORT.lock().getchar_option()
 }

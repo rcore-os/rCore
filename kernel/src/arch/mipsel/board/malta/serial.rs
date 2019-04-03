@@ -1,5 +1,8 @@
+//! 16550 serial adapter driver for malta board
+
 use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
+use spin::Mutex;
 
 struct SerialPort {
     base: usize
@@ -7,7 +10,9 @@ struct SerialPort {
 
 impl SerialPort {
     fn new() -> SerialPort {
-        SerialPort { }
+        SerialPort { 
+            base: 0
+        }
     }
 
     pub fn init(&mut self, base: usize) {

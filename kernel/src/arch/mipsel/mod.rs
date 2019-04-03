@@ -11,7 +11,7 @@ pub mod rand;
 pub mod driver;
 
 use log::*;
-use mips::registers;
+use mips::registers::cp0;
 use mips::instructions;
 
 #[cfg(feature = "board_malta")]

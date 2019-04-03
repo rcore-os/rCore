@@ -49,20 +49,22 @@ user_dir := ../user
 
 
 ### export environments ###
-export ARCH = $(arch)
-export BOARD = $(board)
-export SMP = $(smp)
-export DTB = $(dtb)
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
 
 ifeq ($(arch), aarch64)
 board := raspi3
 export SFSIMG = $(user_dir)/build/$(arch).img
-else ifeq ($(arch), mipsel)
-board := malta
 endif
 
-dtb := src/arch/$(arch)/boot/dts/$(board).dtb
+# currently only mipsel architecture needs DTB linked to the kernel
+ifeq ($(arch), mipsel)
+dtb := src/arch/$(arch)/board/$(board)/device.dtb
+endif
+
+export ARCH = $(arch)
+export BOARD = $(board)
+export SMP = $(smp)
+export DTB = $(dtb)
 
 
 ### qemu options ###
