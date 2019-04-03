@@ -8,7 +8,7 @@ pub mod console;
 /// Initialize serial port first
 pub fn init_serial_early() {
     assert_has_not_been_called!("board::init must be called only once");
-    serial::init();
+    serial::init(0xa3000000);
     println!("Hello ThinPad!");
 }
 
@@ -16,5 +16,4 @@ pub fn init_serial_early() {
 pub fn init_driver() {
     // TODO: add possibly more drivers
     // timer::init();
-    console::init();
 }
