@@ -1,12 +1,13 @@
-use alloc::prelude::*;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use lazy_static::lazy_static;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use spin::RwLock;
 
-use self::block::virtio_blk::VirtIOBlkDriver;
 use crate::sync::Condvar;
+use rcore_fs::dev::BlockDevice;
 
 #[allow(dead_code)]
 pub mod block;
@@ -64,13 +65,35 @@ pub trait Driver: Send + Sync {
     fn poll(&self) {
         unimplemented!("not a net driver")
     }
+
+    // block related drivers should implement these
+    fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
+        unimplemented!("not a block driver")
+    }
+
+    fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
+        unimplemented!("not a block driver")
+    }
 }
 
 lazy_static! {
     // NOTE: RwLock only write when initializing drivers
     pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
-    pub static ref BLK_DRIVERS: RwLock<Vec<Arc<VirtIOBlkDriver>>> = RwLock::new(Vec::new());
+    pub static ref BLK_DRIVERS: RwLock<Vec<Arc<BlockDriver>>> = RwLock::new(Vec::new());
+}
+
+pub struct BlockDriver(Arc<Driver>);
+
+impl BlockDevice for BlockDriver {
+    const BLOCK_SIZE_LOG2: u8 = 9; // 512
+    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> bool {
+        self.0.read_block(block_id, buf)
+    }
+
+    fn write_at(&self, block_id: usize, buf: &[u8]) -> bool {
+        self.0.write_block(block_id, buf)
+    }
 }
 
 lazy_static! {

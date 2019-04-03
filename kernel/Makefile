@@ -27,6 +27,7 @@
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1 Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls              Only available on riscv64, run specified program instead of user shell
+#   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
 
 arch ?= riscv64
 board ?= none
@@ -36,6 +37,7 @@ graphic ?= off
 smp  ?= 4
 pci_passthru ?=
 init ?=
+extra_nic ?= off
 
 target := $(arch)
 build_path := target/$(target)/$(mode)
@@ -76,7 +78,9 @@ qemu_net_opts := \
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback \
+	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
+	-device ahci,id=ahci0 \
+	-device ide-drive,drive=sfsimg,bus=ahci0.0 \
 	-serial mon:stdio \
 	-m 4G \
 	-device isa-debug-exit
@@ -85,9 +89,14 @@ qemu_net_opts += \
 	-device e1000e,netdev=net0
 else
 qemu_opts += \
-	-machine ubuntu,accel=kvm
+	-machine accel=kvm
 qemu_net_opts += \
 	-device vfio-pci,host=$(pci_passthru)
+endif
+ifeq ($(extra_nic), on)
+qemu_net_opts += \
+	-netdev type=tap,id=net1,script=no,downscript=no \
+	-device e1000e,netdev=net1
 endif
 
 else ifeq ($(arch), riscv32)

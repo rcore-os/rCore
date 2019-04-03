@@ -1,6 +1,8 @@
-use alloc::prelude::*;
+use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt;
 use core::mem::size_of;
 use core::mem::transmute_copy;
