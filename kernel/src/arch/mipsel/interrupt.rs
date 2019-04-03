@@ -74,9 +74,6 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 
 fn external() {
     // TODO
-    #[cfg(feature = "board_u540")]
-    unsafe { super::board::handle_external_interrupt(); }
-
     // true means handled, false otherwise
     let handlers = [try_process_serial, try_process_drivers];
     for handler in handlers.iter() {
@@ -87,7 +84,6 @@ fn external() {
 }
 
 fn try_process_serial() -> bool {
-    // TODO
     match super::io::getchar_option() {
         Some(ch) => {
             crate::trap::serial(ch);

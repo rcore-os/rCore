@@ -59,8 +59,7 @@ pub fn putfmt(fmt: Arguments) {
     SerialPort.write_fmt(fmt).unwrap();
 }
 
-pub fn init(serial_base_addr: usize) {
-    COM1 = serial_base_addr;
+pub fn init() {
     // Turn off the FIFO
     write(COM1 + COM_FCR, 0 as u8);
     // Set speed; requires DLAB latch
@@ -77,7 +76,8 @@ pub fn init(serial_base_addr: usize) {
     write(COM1 + COM_IER, COM_IER_RDI);
 }
 
-static mut COM1: usize = 0;
+#[cfg(feature = "board_malta")]
+const COM1          :usize = 0xbf000900; // 16550 Base Address
 
 const COM_RX        :usize = 0;   // In:  Receive buffer (DLAB=0)
 const COM_TX        :usize = 0;   // Out: Transmit buffer (DLAB=0)
