@@ -113,10 +113,12 @@ qemu_opts += \
 	-kernel $(kernel_img)
 
 else ifeq ($(arch), mipsel)
+ifeq ($(board), malta)
 qemu_opts += \
 	-machine $(board) \
-	-serial null -serial null -serial mon:stdio \
+	-serial none -serial none -serial mon:stdio \
 	-kernel $(kernel_img)
+endif
 endif
 
 ifdef d

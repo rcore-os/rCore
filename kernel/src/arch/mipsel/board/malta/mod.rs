@@ -8,7 +8,7 @@ pub mod console;
 /// Initialize serial port first
 pub fn init_serial_early() {
     assert_has_not_been_called!("board::init must be called only once");
-    serial::init();
+    serial::init(0xbf000900);
     println!("Hello QEMU Malta!");
 }
 

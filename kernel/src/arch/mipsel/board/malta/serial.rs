@@ -1,23 +1,75 @@
 use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
 
-struct SerialPort {};
+struct SerialPort {
+    base: usize
+}
 
 impl SerialPort {
     fn new() -> SerialPort {
         SerialPort { }
     }
+
+    pub fn init(&mut self, base: usize) {
+        self.base = base;
+        // Turn off the FIFO
+        write(self.base + COM_FCR, 0 as u8);
+        // Set speed; requires DLAB latch
+        write(self.base + COM_LCR, COM_LCR_DLAB);
+        write(self.base + COM_DLL, (115200 / 9600) as u8);
+        write(self.base + COM_DLM, 0 as u8);
+
+        // 8 data bits, 1 stop bit, parity off; turn off DLAB latch
+        write(self.base + COM_LCR, COM_LCR_WLEN8 & !COM_LCR_DLAB);
+
+        // No modem controls
+        write(self.base + COM_MCR, 0 as u8);
+        // Enable rcv interrupts
+        write(self.base + COM_IER, COM_IER_RDI);
+    }
+
+    /// non-blocking version of putchar()
+    fn putchar(&mut self, c: u8) {
+        write(self.base + COM_TX, c);
+    }
+
+    /// blocking version of getchar()
+    pub fn getchar(&mut self) -> char {
+        loop {
+            if (read::<u8>(self.base + COM_LSR) & COM_LSR_DATA) == 0 {
+                break;
+            }
+        }
+        let c = read::<u8>(self.base + COM_RX);
+        match c {
+            255 => '\0',   // null
+            c => c as char,
+        }
+    }
+
+    /// non-blocking version of getchar()
+    pub fn getchar_option(&mut self) -> Option<char> {
+        match read::<u8>(self.base + COM_LSR) & COM_LSR_DATA {
+            0 => None,
+            _ => Some(read::<u8>(self.base + COM_RX) as u8 as char),
+        }
+    }
+
+    pub fn putfmt(&mut self, fmt: Arguments) {
+        self.write_fmt(fmt).unwrap();
+    }
+
 }
 
 impl Write for SerialPort {
     fn write_str(&mut self, s: &str) -> Result {
         for c in s.bytes() {
             if c == 127 {
-                putchar(8);
-                putchar(b' ');
-                putchar(8);
+                self.putchar(8);
+                self.putchar(b' ');
+                self.putchar(8);
             } else {
-                putchar(c);
+                self.putchar(c);
             }
         }
         Ok(())
@@ -34,55 +86,6 @@ fn read<T>(addr: usize) -> T {
     read_volatile(cell);
 }
 
-/// non-blocking version of putchar()
-fn putchar(c: u8) {
-    write(COM1 + COM_TX, c);
-}
-
-/// blocking version of getchar()
-pub fn getchar() -> char {
-    loop {
-        if (read::<u8>(COM1 + COM_LSR) & COM_LSR_DATA) == 0 {
-            break;
-        }
-    }
-    let c = read::<u8>(COM1 + COM_RX);
-    match c {
-        255 => '\0',   // null
-        c => c as char,
-    }
-}
-
-/// non-blocking version of getchar()
-pub fn getchar_option() -> Option<char> {
-    match read::<u8>(COM1 + COM_LSR) & COM_LSR_DATA {
-        0 => None,
-        else => Some(read::<u8>(COM1 + COM_RX) as u8 as char),
-    }
-}
-
-pub fn putfmt(fmt: Arguments) {
-    SerialPort.write_fmt(fmt).unwrap();
-}
-
-pub fn init() {
-    // Turn off the FIFO
-    write(COM1 + COM_FCR, 0 as u8);
-    // Set speed; requires DLAB latch
-    write(COM1 + COM_LCR, COM_LCR_DLAB);
-    write(COM1 + COM_DLL, (115200 / 9600) as u8);
-    write(COM1 + COM_DLM, 0 as u8);
-
-    // 8 data bits, 1 stop bit, parity off; turn off DLAB latch
-    write(COM1 + COM_LCR, COM_LCR_WLEN8 & !COM_LCR_DLAB);
-
-    // No modem controls
-    write(COM1 + COM_MCR, 0 as u8);
-    // Enable rcv interrupts
-    write(COM1 + COM_IER, COM_IER_RDI);
-}
-
-const COM1          :usize = 0xbf000900; // 16550 Base Address
 
 const COM_RX        :usize = 0;   // In:  Receive buffer (DLAB=0)
 const COM_TX        :usize = 0;   // Out: Transmit buffer (DLAB=0)
@@ -109,6 +112,6 @@ lazy_static! {
     pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
 }
 
-pub fn init() {
-    SERIAL_PORT.lock().init();
+pub fn init(base: usize) {
+    SERIAL_PORT.lock().init(base);
 }
