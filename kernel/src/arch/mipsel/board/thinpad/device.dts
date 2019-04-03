@@ -1,0 +1,85 @@
+/dts-v1/;
+
+
+/ {
+	model = "thinpad trivialmips";
+	compatible = "tsinghua,thinpad";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+	chosen {
+		stdio = &uart;
+        bootargs = "";
+	};
+
+    aliases { };
+
+    cpu_intc: interrupt-controller {
+		compatible = "mti,cpu-interrupt-controller";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+	};
+
+    memory: memory@80000000 {
+        device_type = "memory";
+		reg = <0x80000000 0x00800000>;
+	};
+
+    bus: trivial_bus@a0000000 {
+        compatible = "thinpad,bus";
+        reg = <0xa0000000 0x800000>;
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        flash: flash@a1000000 {
+            compatible = "cfi-flash";
+            reg = <0xa1000000 0x00800000>;
+        };
+
+        framebuffer: framebuffer@a2000000 {
+            compatible = "thinpad,framebuffer";
+            reg = <0xa2000000 0x75300
+                   0xa2075300 0x4>;
+        };
+
+        uart: serial@a3000000 {
+            compatible = "thinpad,uart";
+            reg = <0xa3000000 0x1
+                   0xa3000004 0x1>;
+            clock-frequency = <115200>;
+            interrupt-parent = <&cpu_intc>;
+            interrupts = <1>;
+        };
+
+        timer: gpio@a4000000 {
+            compatible = "thinpad,timer";
+            reg = <0xa400000 0x8>;
+        };
+
+        eth: ethernet@a5000000 {
+            compatible = "davicom,dm9000";
+            reg = <0xa5000000 0x2
+                   0xa5000004 0x2>;
+            interrupt-parent = <&cpu_intc>;
+            interrupts = <2>;
+            davicom,no-eeprom;
+            mac-address = [00 0a 2d 98 01 29];
+        };
+
+        gpio: gpio@a6000000 {
+            compatible = "thinpad,gpio";
+            reg = <0xa6000000 0x2
+                   0xa6000004 0x2
+                   0xa6000008 0x2>;
+            reg-io-width = <2>;
+        };
+
+        usb: usb@a7000000 {
+            compatible = "cypress,sl811";
+            reg = <0xa7000000 0x1
+                   0xa7000004 0x1>;
+        };
+    };
+
+};
