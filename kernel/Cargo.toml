@@ -42,6 +42,7 @@ bitflags = "1.0"
 bit_field = "0.9"
 volatile = "0.2"
 heapless = "0.4"
+bitvec = { git = "https://github.com/myrrlyn/bitvec.git", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
 buddy_system_allocator = "0.1"
 pci = { git = "https://github.com/rcore-os/pci-rs" }

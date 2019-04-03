@@ -10,6 +10,8 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 
+use bitvec::{BitSlice, BitVec, LittleEndian};
+
 use super::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -160,30 +162,30 @@ pub fn sys_select(
     loop {
         let proc = process();
         let mut events = 0;
-        for (fd, file_like) in proc.files.iter() {
-            if *fd < nfds {
+        for (&fd, file_like) in proc.files.iter() {
+            if fd < nfds {
                 match file_like {
                     FileLike::File(_) => {
                         // FIXME: assume it is stdin for now
                         if STDIN.can_read() {
-                            if read_fds.is_set(*fd) {
-                                read_fds.set(*fd);
+                            if read_fds.contains(fd) {
+                                read_fds.set(fd);
                                 events = events + 1;
                             }
                         }
                     }
                     FileLike::Socket(socket) => {
                         let (input, output, err) = socket.poll();
-                        if err && err_fds.is_set(*fd) {
-                            err_fds.set(*fd);
+                        if err && err_fds.contains(fd) {
+                            err_fds.set(fd);
                             events = events + 1;
                         }
-                        if input && read_fds.is_set(*fd) {
-                            read_fds.set(*fd);
+                        if input && read_fds.contains(fd) {
+                            read_fds.set(fd);
                             events = events + 1;
                         }
-                        if output && write_fds.is_set(*fd) {
-                            write_fds.set(*fd);
+                        if output && write_fds.contains(fd) {
+                            write_fds.set(fd);
                             events = events + 1;
                         }
                     }
@@ -1172,54 +1174,51 @@ const FD_PER_ITEM: usize = 8 * size_of::<u32>();
 const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
 
 struct FdSet {
-    addr: *mut u32,
-    nfds: usize,
-    saved: [u32; MAX_FDSET_SIZE],
+    bitset: &'static mut BitSlice<LittleEndian, u32>,
+    origin: BitVec<LittleEndian, u32>,
 }
 
 impl FdSet {
     /// Initialize a `FdSet` from pointer and number of fds
     /// Check if the array is large enough
     fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
-        let mut saved = [0u32; MAX_FDSET_SIZE];
-        if addr as usize != 0 {
+        if addr.is_null() {
+            Ok(FdSet {
+                bitset: BitSlice::empty_mut(),
+                origin: BitVec::new(),
+            })
+        } else {
             let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
             vm.check_write_array(addr, len)?;
             if len > MAX_FDSET_SIZE {
                 return Err(SysError::EINVAL);
             }
             let slice = unsafe { slice::from_raw_parts_mut(addr, len) };
+            let bitset: &'static mut BitSlice<LittleEndian, u32> = slice.into();
 
             // save the fdset, and clear it
-            for i in 0..len {
-                saved[i] = slice[i];
-                slice[i] = 0;
-            }
+            use alloc::prelude::ToOwned;
+            let origin = bitset.to_owned();
+            bitset.set_all(false);
+            Ok(FdSet { bitset, origin })
         }
-
-        Ok(FdSet { addr, nfds, saved })
     }
 
     /// Try to set fd in `FdSet`
     /// Return true when `FdSet` is valid, and false when `FdSet` is bad (i.e. null pointer)
     /// Fd should be less than nfds
     fn set(&mut self, fd: usize) -> bool {
-        if self.addr as usize != 0 {
-            assert!(fd < self.nfds);
-            unsafe {
-                *self.addr.add(fd / 8 / size_of::<u32>()) |= 1 << (fd % (8 * size_of::<u32>()));
-            }
-            true
-        } else {
-            false
+        if self.bitset.is_empty() {
+            return false;
         }
+        self.bitset.set(fd, true);
+        true
     }
 
-    /// Check to see fd is see in original `FdSet`
+    /// Check to see whether `fd` is in original `FdSet`
     /// Fd should be less than nfds
-    fn is_set(&mut self, fd: usize) -> bool {
-        assert!(fd < self.nfds);
-        self.saved[fd / 8 / size_of::<u32>()] & (1 << (fd % (8 * size_of::<u32>()))) != 0
+    fn contains(&self, fd: usize) -> bool {
+        self.origin[fd]
     }
 }
 
