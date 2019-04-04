@@ -31,6 +31,10 @@ pub trait Socket: Send + Sync {
     fn remote_endpoint(&self) -> Option<IpEndpoint> {
         None
     }
+    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+        warn!("setsockopt is unimplemented");
+        Ok(0)
+    }
     fn box_clone(&self) -> Box<dyn Socket>;
 }
 
@@ -65,6 +69,7 @@ pub struct UdpSocketState {
 #[derive(Debug, Clone)]
 pub struct RawSocketState {
     handle: GlobalSocketHandle,
+    header_included: bool,
 }
 
 /// A wrapper for `SocketHandle`.
@@ -469,7 +474,10 @@ impl RawSocketState {
         );
         let handle = GlobalSocketHandle(SOCKETS.lock().add(socket));
 
-        RawSocketState { handle }
+        RawSocketState {
+            handle,
+            header_included: false,
+        }
     }
 }
 
@@ -499,41 +507,51 @@ impl Socket for RawSocketState {
     }
 
     fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
-        if let Some(endpoint) = sendto_endpoint {
-            // temporary solution
-            let iface = &*(NET_DRIVERS.read()[0]);
-            let v4_src = iface.ipv4_address().unwrap();
+        if self.header_included {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<RawSocket>(self.handle.0);
 
-            if let IpAddress::Ipv4(v4_dst) = endpoint.addr {
-                let len = data.len();
-                // using 20-byte IPv4 header
-                let mut buffer = vec![0u8; len + 20];
-                let mut packet = Ipv4Packet::new_unchecked(&mut buffer);
-                packet.set_version(4);
-                packet.set_header_len(20);
-                packet.set_total_len((20 + len) as u16);
-                packet.set_protocol(socket.ip_protocol().into());
-                packet.set_src_addr(v4_src);
-                packet.set_dst_addr(v4_dst);
-                let payload = packet.payload_mut();
-                payload.copy_from_slice(data);
-                packet.fill_checksum();
-
-                socket.send_slice(&buffer).unwrap();
-
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
-                iface.poll();
-
-                Ok(len)
-            } else {
-                unimplemented!("ip type")
+            match socket.send_slice(&data) {
+                Ok(()) => Ok(data.len()),
+                Err(_) => Err(SysError::ENOBUFS),
             }
         } else {
-            Err(SysError::ENOTCONN)
+            if let Some(endpoint) = sendto_endpoint {
+                // temporary solution
+                let iface = &*(NET_DRIVERS.read()[0]);
+                let v4_src = iface.ipv4_address().unwrap();
+                let mut sockets = SOCKETS.lock();
+                let mut socket = sockets.get::<RawSocket>(self.handle.0);
+
+                if let IpAddress::Ipv4(v4_dst) = endpoint.addr {
+                    let len = data.len();
+                    // using 20-byte IPv4 header
+                    let mut buffer = vec![0u8; len + 20];
+                    let mut packet = Ipv4Packet::new_unchecked(&mut buffer);
+                    packet.set_version(4);
+                    packet.set_header_len(20);
+                    packet.set_total_len((20 + len) as u16);
+                    packet.set_protocol(socket.ip_protocol().into());
+                    packet.set_src_addr(v4_src);
+                    packet.set_dst_addr(v4_dst);
+                    let payload = packet.payload_mut();
+                    payload.copy_from_slice(data);
+                    packet.fill_checksum();
+
+                    socket.send_slice(&buffer).unwrap();
+
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
+                    iface.poll();
+
+                    Ok(len)
+                } else {
+                    unimplemented!("ip type")
+                }
+            } else {
+                Err(SysError::ENOTCONN)
+            }
         }
     }
 
@@ -547,6 +565,19 @@ impl Socket for RawSocketState {
 
     fn box_clone(&self) -> Box<dyn Socket> {
         Box::new(self.clone())
+    }
+
+    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+        match (level, opt) {
+            (IPPROTO_IP, IP_HDRINCL) => {
+                if let Some(arg) = data.first() {
+                    self.header_included = *arg > 0;
+                    debug!("hdrincl set to {}", self.header_included);
+                }
+            }
+            _ => {}
+        }
+        Ok(0)
     }
 }
 

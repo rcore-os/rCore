@@ -34,15 +34,18 @@ pub fn sys_setsockopt(
     fd: usize,
     level: usize,
     optname: usize,
-    _optval: *const u8,
-    _optlen: usize,
+    optval: *const u8,
+    optlen: usize,
 ) -> SysResult {
     info!(
         "setsockopt: fd: {}, level: {}, optname: {}",
         fd, level, optname
     );
-    warn!("sys_setsockopt is unimplemented");
-    Ok(0)
+    let mut proc = process();
+    proc.vm.check_read_array(optval, optlen)?;
+    let data = unsafe { slice::from_raw_parts(optval, optlen) };
+    let socket = proc.get_socket(fd)?;
+    socket.setsockopt(level, optname, data)
 }
 
 pub fn sys_getsockopt(
@@ -387,3 +390,5 @@ const SO_RCVBUF: usize = 8;
 const SO_LINGER: usize = 13;
 
 const TCP_CONGESTION: usize = 13;
+
+const IP_HDRINCL: usize = 3;
