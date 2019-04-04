@@ -149,6 +149,23 @@ impl Driver for E1000Interface {
             }
         }
     }
+
+    // send an ethernet frame, only use it when necessary
+    fn send(&self, data: &[u8]) -> Option<usize> {
+        use smoltcp::phy::TxToken;
+        let token = E1000TxToken(self.driver.clone());
+        if token
+            .consume(Instant::from_millis(0), data.len(), |buffer| {
+                buffer.copy_from_slice(&data);
+                Ok(())
+            })
+            .is_ok()
+        {
+            Some(data.len())
+        } else {
+            None
+        }
+    }
 }
 
 #[repr(C)]

@@ -66,6 +66,11 @@ pub trait Driver: Send + Sync {
         unimplemented!("not a net driver")
     }
 
+    // send an ethernet frame, only use it when necessary
+    fn send(&self, data: &[u8]) -> Option<usize> {
+        unimplemented!("not a net driver")
+    }
+
     // block related drivers should implement these
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         unimplemented!("not a block driver")

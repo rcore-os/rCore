@@ -8,7 +8,17 @@ use smoltcp::socket::*;
 use smoltcp::wire::*;
 
 #[derive(Clone, Debug)]
-pub struct LinkLevelEndpoint {}
+pub struct LinkLevelEndpoint {
+    interface_index: usize,
+}
+
+impl LinkLevelEndpoint {
+    pub fn new(ifindex: usize) -> Self {
+        LinkLevelEndpoint {
+            interface_index: ifindex,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Endpoint {
@@ -633,8 +643,12 @@ impl Socket for PacketSocketState {
     }
 
     fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
-        if let Some(endpoint) = sendto_endpoint {
-            unimplemented!()
+        if let Some(Endpoint::LinkLevel(endpoint)) = sendto_endpoint {
+            let ifaces = NET_DRIVERS.read();
+            match ifaces[endpoint.interface_index].send(data) {
+                Some(len) => Ok(len),
+                None => Err(SysError::ENOBUFS),
+            }
         } else {
             Err(SysError::ENOTCONN)
         }

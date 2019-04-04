@@ -4,7 +4,8 @@ use super::*;
 use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::FileLike;
 use crate::net::{
-    Endpoint, PacketSocketState, RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
+    Endpoint, LinkLevelEndpoint, PacketSocketState, RawSocketState, Socket, TcpSocketState,
+    UdpSocketState, SOCKETS,
 };
 use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::boxed::Box;
@@ -288,14 +289,15 @@ pub struct SockAddrUn {
     sun_path: [u8; 108],
 }
 
-#[repr(C)]
+// beware of alignment issue
+#[repr(C, packed)]
 pub struct SockAddrLl {
     sll_protocol: u16,
     sll_ifindex: u32,
     sll_hatype: u16,
     sll_pkttype: u8,
     sll_halen: u8,
-    sll_addr: u8,
+    sll_addr: [u8; 8],
 }
 
 #[repr(C)]
@@ -361,7 +363,9 @@ fn sockaddr_to_endpoint(
                 if len < size_of::<u16>() + size_of::<SockAddrLl>() {
                     return Err(SysError::EINVAL);
                 }
-                unimplemented!()
+                Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
+                    (*addr).payload.addr_ll.sll_ifindex as usize,
+                )))
             }
             _ => Err(SysError::EINVAL),
         }
