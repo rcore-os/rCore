@@ -150,7 +150,6 @@ impl Driver for E1000Interface {
         }
     }
 
-    // send an ethernet frame, only use it when necessary
     fn send(&self, data: &[u8]) -> Option<usize> {
         use smoltcp::phy::TxToken;
         let token = E1000TxToken(self.driver.clone());
@@ -165,6 +164,12 @@ impl Driver for E1000Interface {
         } else {
             None
         }
+    }
+
+    fn get_arp(&self, ip: IpAddress) -> Option<EthernetAddress> {
+        let iface = self.iface.lock();
+        let cache = iface.neighbor_cache();
+        cache.lookup_pure(&ip, Instant::from_millis(0))
     }
 }
 
@@ -493,7 +498,7 @@ pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize, in
         .neighbor_cache(neighbor_cache)
         .finalize();
 
-    info!("e1000 interface {} has addr 10.0.{}.2/24", name, index);
+    info!("e1000 interface {} up with addr 10.0.{}.2/24", name, index);
     let e1000_iface = E1000Interface {
         iface: Mutex::new(iface),
         driver: net_driver.clone(),

@@ -132,9 +132,11 @@ pub fn init_driver(dev: &PCIDevice) {
                     active_table().map_if_not_exists(KERNEL_OFFSET + current_addr, current_addr);
                     current_addr = current_addr + PAGE_SIZE;
                 }
-                PCI_DRIVERS
-                    .lock()
-                    .insert(dev.loc, ixgbe::ixgbe_init(name, irq, vaddr, len as usize));
+                let index = NET_DRIVERS.read().len();
+                PCI_DRIVERS.lock().insert(
+                    dev.loc,
+                    ixgbe::ixgbe_init(name, irq, vaddr, len as usize, index),
+                );
             }
         }
         (0x8086, 0x2922) => {

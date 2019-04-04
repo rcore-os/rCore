@@ -100,6 +100,12 @@ impl Driver for IXGBEInterface {
             }
         }
     }
+
+    fn get_arp(&self, ip: IpAddress) -> Option<EthernetAddress> {
+        let iface = self.iface.lock();
+        let cache = iface.neighbor_cache();
+        cache.lookup_pure(&ip, Instant::from_millis(0))
+    }
 }
 pub struct IXGBERxToken(Vec<u8>);
 pub struct IXGBETxToken(IXGBEDriver);
@@ -171,6 +177,7 @@ pub fn ixgbe_init(
     irq: Option<u32>,
     header: usize,
     size: usize,
+    index: usize,
 ) -> Arc<IXGBEInterface> {
     let _ = FlagsGuard::no_irq_region();
     let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
@@ -185,12 +192,9 @@ pub fn ixgbe_init(
         mtu: 1500,
     };
 
-    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
+    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, index as u8, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let mut routes = Routes::new(BTreeMap::new());
-    routes
-        .add_default_ipv4_route(Ipv4Address::new(10, 0, 0, 1))
-        .unwrap();
+    let routes = Routes::new(BTreeMap::new());
     let mut iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
         .ip_addrs(ip_addrs)
@@ -198,7 +202,7 @@ pub fn ixgbe_init(
         .routes(routes)
         .finalize();
 
-    info!("ixgbe: interface {} up", &name);
+    info!("ixgbe interface {} up with addr 10.0.{}.2/24", name, index);
 
     let ixgbe_iface = IXGBEInterface {
         iface: Mutex::new(iface),

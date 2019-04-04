@@ -70,10 +70,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigprocmask is unimplemented");
             Ok(0)
         }
-        SYS_IOCTL => {
-            warn!("sys_ioctl is unimplemented");
-            Ok(0)
-        }
+        SYS_IOCTL => sys_ioctl(args[0], args[1], args[2], args[3], args[4]),
         SYS_PREAD64 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
         SYS_PWRITE64 => sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
         SYS_READV => sys_readv(args[0], args[1] as *const IoVec, args[2]),

@@ -474,7 +474,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 
 pub fn sys_ioctl(fd: usize, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
     info!(
-        "ioctl: fd:{}, request:{}, args: {} {} {}",
+        "ioctl: fd: {}, request: {}, args: {} {} {}",
         fd, request, arg1, arg2, arg3
     );
     let mut proc = process();

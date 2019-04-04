@@ -505,7 +505,7 @@ impl Socket for UdpSocketState {
             // SIOCGARP
             0x8954 => {
                 // FIXME: check addr
-                let req = unsafe { &mut *(request as *mut ArpReq) };
+                let req = unsafe { &mut *(arg1 as *mut ArpReq) };
                 if let AddressFamily::Internet = AddressFamily::from(req.arp_pa.family) {
                     let name = req.arp_dev.as_ptr();
                     let ifname = unsafe { util::from_cstr(name) };
@@ -518,6 +518,14 @@ impl Socket for UdpSocketState {
                     for iface in NET_DRIVERS.read().iter() {
                         if iface.get_ifname() == ifname {
                             debug!("get arp matched ifname {}", ifname);
+                            return match iface.get_arp(addr) {
+                                Some(mac) => {
+                                    // TODO: update flags
+                                    req.arp_ha.data[0..6].copy_from_slice(mac.as_bytes());
+                                    Ok(0)
+                                }
+                                None => Err(SysError::ENOENT),
+                            };
                         }
                     }
                     Err(SysError::ENOENT)

@@ -62,8 +62,7 @@ endif
 ### qemu options ###
 qemu_opts := \
 	-smp cores=$(smp)
-qemu_net_opts := \
-	-netdev type=tap,id=net0,script=no,downscript=no
+qemu_net_opts :=
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -76,6 +75,7 @@ qemu_opts += \
 	-device isa-debug-exit
 ifeq ($(pci_passthru), )
 qemu_net_opts += \
+	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device e1000e,netdev=net0
 else
 qemu_opts += \
@@ -96,6 +96,7 @@ qemu_opts += \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
+	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), riscv64)
@@ -105,6 +106,7 @@ qemu_opts += \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
+	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), aarch64)
