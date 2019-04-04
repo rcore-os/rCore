@@ -7,13 +7,22 @@ use alloc::boxed::Box;
 use smoltcp::socket::*;
 use smoltcp::wire::*;
 
-///
+#[derive(Clone, Debug)]
+pub struct LinkLevelEndpoint {}
+
+#[derive(Clone, Debug)]
+pub enum Endpoint {
+    Ip(IpEndpoint),
+    LinkLevel(LinkLevelEndpoint),
+}
+
+/// Common methods that a socket must have
 pub trait Socket: Send + Sync {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint);
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult;
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint);
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult;
-    fn bind(&mut self, endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult;
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
         Err(SysError::EINVAL)
     }
     fn listen(&mut self) -> SysResult {
@@ -22,13 +31,13 @@ pub trait Socket: Send + Sync {
     fn shutdown(&self) -> SysResult {
         Err(SysError::EINVAL)
     }
-    fn accept(&mut self) -> Result<(Box<dyn Socket>, IpEndpoint), SysError> {
+    fn accept(&mut self) -> Result<(Box<dyn Socket>, Endpoint), SysError> {
         Err(SysError::EINVAL)
     }
-    fn endpoint(&self) -> Option<IpEndpoint> {
+    fn endpoint(&self) -> Option<Endpoint> {
         None
     }
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
+    fn remote_endpoint(&self) -> Option<Endpoint> {
         None
     }
     fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
@@ -72,6 +81,12 @@ pub struct RawSocketState {
     header_included: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct PacketSocketState {
+    // no state
+// only ethernet egress
+}
+
 /// A wrapper for `SocketHandle`.
 /// Auto increase and decrease reference count on Clone and Drop.
 #[derive(Debug)]
@@ -112,7 +127,7 @@ impl TcpSocketState {
 }
 
 impl Socket for TcpSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         spin_and_wait(&[&SOCKET_ACTIVITY], move || {
             poll_ifaces();
             let mut sockets = SOCKETS.lock();
@@ -127,17 +142,20 @@ impl Socket for TcpSocketState {
                         drop(sockets);
 
                         poll_ifaces();
-                        return Some((Ok(size), endpoint));
+                        return Some((Ok(size), Endpoint::Ip(endpoint)));
                     }
                 }
             } else {
-                return Some((Err(SysError::ENOTCONN), IpEndpoint::UNSPECIFIED));
+                return Some((
+                    Err(SysError::ENOTCONN),
+                    Endpoint::Ip(IpEndpoint::UNSPECIFIED),
+                ));
             }
             None
         })
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
         let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
@@ -183,52 +201,60 @@ impl Socket for TcpSocketState {
         (input, output, err)
     }
 
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult {
         let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
-        let temp_port = get_ephemeral_port();
+        if let Endpoint::Ip(ip) = endpoint {
+            let temp_port = get_ephemeral_port();
 
-        match socket.connect(endpoint, temp_port) {
-            Ok(()) => {
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
+            match socket.connect(ip, temp_port) {
+                Ok(()) => {
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
 
-                // wait for connection result
-                loop {
-                    poll_ifaces();
+                    // wait for connection result
+                    loop {
+                        poll_ifaces();
 
-                    let mut sockets = SOCKETS.lock();
-                    let socket = sockets.get::<TcpSocket>(self.handle.0);
-                    match socket.state() {
-                        TcpState::SynSent => {
-                            // still connecting
-                            drop(socket);
-                            drop(sockets);
-                            debug!("poll for connection wait");
-                            SOCKET_ACTIVITY._wait();
-                        }
-                        TcpState::Established => {
-                            break Ok(0);
-                        }
-                        _ => {
-                            break Err(SysError::ECONNREFUSED);
+                        let mut sockets = SOCKETS.lock();
+                        let socket = sockets.get::<TcpSocket>(self.handle.0);
+                        match socket.state() {
+                            TcpState::SynSent => {
+                                // still connecting
+                                drop(socket);
+                                drop(sockets);
+                                debug!("poll for connection wait");
+                                SOCKET_ACTIVITY._wait();
+                            }
+                            TcpState::Established => {
+                                break Ok(0);
+                            }
+                            _ => {
+                                break Err(SysError::ECONNREFUSED);
+                            }
                         }
                     }
                 }
+                Err(_) => Err(SysError::ENOBUFS),
             }
-            Err(_) => Err(SysError::ENOBUFS),
+        } else {
+            Err(SysError::EINVAL)
         }
     }
 
-    fn bind(&mut self, mut endpoint: IpEndpoint) -> SysResult {
-        if endpoint.port == 0 {
-            endpoint.port = get_ephemeral_port();
+    fn bind(&mut self, mut endpoint: Endpoint) -> SysResult {
+        if let Endpoint::Ip(mut ip) = endpoint {
+            if ip.port == 0 {
+                ip.port = get_ephemeral_port();
+            }
+            self.local_endpoint = Some(ip);
+            self.is_listening = false;
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
         }
-        self.local_endpoint = Some(endpoint);
-        self.is_listening = false;
-        Ok(0)
     }
 
     fn listen(&mut self) -> SysResult {
@@ -260,7 +286,7 @@ impl Socket for TcpSocketState {
         Ok(0)
     }
 
-    fn accept(&mut self) -> Result<(Box<dyn Socket>, IpEndpoint), SysError> {
+    fn accept(&mut self) -> Result<(Box<dyn Socket>, Endpoint), SysError> {
         let endpoint = self.local_endpoint.ok_or(SysError::EINVAL)?;
         loop {
             let mut sockets = SOCKETS.lock();
@@ -287,7 +313,7 @@ impl Socket for TcpSocketState {
 
                 drop(sockets);
                 poll_ifaces();
-                return Ok((new_socket, remote_endpoint));
+                return Ok((new_socket, Endpoint::Ip(remote_endpoint)));
             }
 
             // avoid deadlock
@@ -297,24 +323,27 @@ impl Socket for TcpSocketState {
         }
     }
 
-    fn endpoint(&self) -> Option<IpEndpoint> {
-        self.local_endpoint.clone().or_else(|| {
-            let mut sockets = SOCKETS.lock();
-            let socket = sockets.get::<TcpSocket>(self.handle.0);
-            let endpoint = socket.local_endpoint();
-            if endpoint.port != 0 {
-                Some(endpoint)
-            } else {
-                None
-            }
-        })
+    fn endpoint(&self) -> Option<Endpoint> {
+        self.local_endpoint
+            .clone()
+            .map(|e| Endpoint::Ip(e))
+            .or_else(|| {
+                let mut sockets = SOCKETS.lock();
+                let socket = sockets.get::<TcpSocket>(self.handle.0);
+                let endpoint = socket.local_endpoint();
+                if endpoint.port != 0 {
+                    Some(Endpoint::Ip(endpoint))
+                } else {
+                    None
+                }
+            })
     }
 
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
+    fn remote_endpoint(&self) -> Option<Endpoint> {
         let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<TcpSocket>(self.handle.0);
         if socket.is_open() {
-            Some(socket.remote_endpoint())
+            Some(Endpoint::Ip(socket.remote_endpoint()))
         } else {
             None
         }
@@ -346,7 +375,7 @@ impl UdpSocketState {
 }
 
 impl Socket for UdpSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         loop {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<UdpSocket>(self.handle.0);
@@ -359,10 +388,13 @@ impl Socket for UdpSocketState {
                     drop(sockets);
 
                     poll_ifaces();
-                    return (Ok(size), endpoint);
+                    return (Ok(size), Endpoint::Ip(endpoint));
                 }
             } else {
-                return (Err(SysError::ENOTCONN), IpEndpoint::UNSPECIFIED);
+                return (
+                    Err(SysError::ENOTCONN),
+                    Endpoint::Ip(IpEndpoint::UNSPECIFIED),
+                );
             }
 
             // avoid deadlock
@@ -371,9 +403,9 @@ impl Socket for UdpSocketState {
         }
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
         let remote_endpoint = {
-            if let Some(ref endpoint) = sendto_endpoint {
+            if let Some(Endpoint::Ip(ref endpoint)) = sendto_endpoint {
                 endpoint
             } else if let Some(ref endpoint) = self.remote_endpoint {
                 endpoint
@@ -422,33 +454,41 @@ impl Socket for UdpSocketState {
         (input, output, err)
     }
 
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult {
-        self.remote_endpoint = Some(endpoint);
-        Ok(0)
-    }
-
-    fn bind(&mut self, endpoint: IpEndpoint) -> SysResult {
-        let mut sockets = SOCKETS.lock();
-        let mut socket = sockets.get::<UdpSocket>(self.handle.0);
-        match socket.bind(endpoint) {
-            Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EINVAL),
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult {
+        if let Endpoint::Ip(ip) = endpoint {
+            self.remote_endpoint = Some(ip);
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
         }
     }
 
-    fn endpoint(&self) -> Option<IpEndpoint> {
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
+        let mut sockets = SOCKETS.lock();
+        let mut socket = sockets.get::<UdpSocket>(self.handle.0);
+        if let Endpoint::Ip(ip) = endpoint {
+            match socket.bind(ip) {
+                Ok(()) => Ok(0),
+                Err(_) => Err(SysError::EINVAL),
+            }
+        } else {
+            Err(SysError::EINVAL)
+        }
+    }
+
+    fn endpoint(&self) -> Option<Endpoint> {
         let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<UdpSocket>(self.handle.0);
         let endpoint = socket.endpoint();
         if endpoint.port != 0 {
-            Some(endpoint)
+            Some(Endpoint::Ip(endpoint))
         } else {
             None
         }
     }
 
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
-        self.remote_endpoint.clone()
+    fn remote_endpoint(&self) -> Option<Endpoint> {
+        self.remote_endpoint.clone().map(|e| Endpoint::Ip(e))
     }
 
     fn box_clone(&self) -> Box<dyn Socket> {
@@ -482,7 +522,7 @@ impl RawSocketState {
 }
 
 impl Socket for RawSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         loop {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<RawSocket>(self.handle.0);
@@ -492,10 +532,10 @@ impl Socket for RawSocketState {
 
                 return (
                     Ok(size),
-                    IpEndpoint {
+                    Endpoint::Ip(IpEndpoint {
                         addr: IpAddress::Ipv4(packet.src_addr()),
                         port: 0,
-                    },
+                    }),
                 );
             }
 
@@ -506,7 +546,7 @@ impl Socket for RawSocketState {
         }
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
         if self.header_included {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<RawSocket>(self.handle.0);
@@ -516,7 +556,7 @@ impl Socket for RawSocketState {
                 Err(_) => Err(SysError::ENOBUFS),
             }
         } else {
-            if let Some(endpoint) = sendto_endpoint {
+            if let Some(Endpoint::Ip(endpoint)) = sendto_endpoint {
                 // temporary solution
                 let iface = &*(NET_DRIVERS.read()[0]);
                 let v4_src = iface.ipv4_address().unwrap();
@@ -559,7 +599,7 @@ impl Socket for RawSocketState {
         unimplemented!()
     }
 
-    fn connect(&mut self, _endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
         unimplemented!()
     }
 
@@ -578,6 +618,38 @@ impl Socket for RawSocketState {
             _ => {}
         }
         Ok(0)
+    }
+}
+
+impl PacketSocketState {
+    pub fn new() -> Self {
+        PacketSocketState {}
+    }
+}
+
+impl Socket for PacketSocketState {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
+        unimplemented!()
+    }
+
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
+        if let Some(endpoint) = sendto_endpoint {
+            unimplemented!()
+        } else {
+            Err(SysError::ENOTCONN)
+        }
+    }
+
+    fn poll(&self) -> (bool, bool, bool) {
+        unimplemented!()
+    }
+
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
+        unimplemented!()
+    }
+
+    fn box_clone(&self) -> Box<dyn Socket> {
+        Box::new(self.clone())
     }
 }
 
