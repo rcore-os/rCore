@@ -3,7 +3,7 @@ pub use crate::arch::paging::*;
 use crate::consts::MEMORY_OFFSET;
 use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
-use bit_allocator::BitAlloc;
+use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::LockedHeap;
 use lazy_static::*;
 use log::*;
@@ -14,15 +14,15 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 
 // x86_64 support up to 64G memory
 #[cfg(target_arch = "x86_64")]
-pub type FrameAlloc = bit_allocator::BitAlloc16M;
+pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
 
 // RISCV has 8M memory
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-pub type FrameAlloc = bit_allocator::BitAlloc4K;
+pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory
 #[cfg(target_arch = "aarch64")]
-pub type FrameAlloc = bit_allocator::BitAlloc1M;
+pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
