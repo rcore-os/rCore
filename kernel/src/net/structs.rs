@@ -2,6 +2,7 @@ use crate::arch::rand;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
+use crate::util;
 use alloc::boxed::Box;
 
 use smoltcp::socket::*;
@@ -52,6 +53,10 @@ pub trait Socket: Send + Sync {
     }
     fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
         warn!("setsockopt is unimplemented");
+        Ok(0)
+    }
+    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+        warn!("ioctl is unimplemented for this socket");
         Ok(0)
     }
     fn box_clone(&self) -> Box<dyn Socket>;
@@ -384,6 +389,15 @@ impl UdpSocketState {
     }
 }
 
+#[repr(C)]
+struct ArpReq {
+    arp_pa: SockAddrPlaceholder,
+    arp_ha: SockAddrPlaceholder,
+    arp_flags: u32,
+    arp_netmask: SockAddrPlaceholder,
+    arp_dev: [u8; 16],
+}
+
 impl Socket for UdpSocketState {
     fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         loop {
@@ -483,6 +497,35 @@ impl Socket for UdpSocketState {
             }
         } else {
             Err(SysError::EINVAL)
+        }
+    }
+
+    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+        match request {
+            // SIOCGARP
+            0x8954 => {
+                // FIXME: check addr
+                let req = unsafe { &mut *(request as *mut ArpReq) };
+                if let AddressFamily::Internet = AddressFamily::from(req.arp_pa.family) {
+                    let name = req.arp_dev.as_ptr();
+                    let ifname = unsafe { util::from_cstr(name) };
+                    let addr = &req.arp_pa as *const SockAddrPlaceholder as *const SockAddr;
+                    let addr = unsafe {
+                        IpAddress::from(Ipv4Address::from_bytes(
+                            &u32::from_be((*addr).payload.addr_in.sin_addr).to_be_bytes()[..],
+                        ))
+                    };
+                    for iface in NET_DRIVERS.read().iter() {
+                        if iface.get_ifname() == ifname {
+                            debug!("get arp matched ifname {}", ifname);
+                        }
+                    }
+                    Err(SysError::ENOENT)
+                } else {
+                    Err(SysError::EINVAL)
+                }
+            }
+            _ => Ok(0),
         }
     }
 

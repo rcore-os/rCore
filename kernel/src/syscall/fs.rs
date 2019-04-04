@@ -472,6 +472,16 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     Ok(fd2)
 }
 
+pub fn sys_ioctl(fd: usize, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+    info!(
+        "ioctl: fd:{}, request:{}, args: {} {} {}",
+        fd, request, arg1, arg2, arg3
+    );
+    let mut proc = process();
+    let file_like = proc.get_file_like(fd)?;
+    file_like.ioctl(request, arg1, arg2, arg3)
+}
+
 pub fn sys_chdir(path: *const u8) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };

@@ -28,6 +28,15 @@ impl FileLike {
         };
         Ok(len)
     }
+    pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+        match self {
+            FileLike::File(file) => {
+                warn!("ioctl not implemented for file");
+                Ok(0)
+            }
+            FileLike::Socket(socket) => socket.ioctl(request, arg1, arg2, arg3),
+        }
+    }
 }
 
 impl fmt::Debug for FileLike {

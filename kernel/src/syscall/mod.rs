@@ -19,7 +19,7 @@ use self::custom::*;
 use self::fs::*;
 use self::mem::*;
 use self::misc::*;
-use self::net::*;
+pub use self::net::*;
 use self::proc::*;
 use self::time::*;
 

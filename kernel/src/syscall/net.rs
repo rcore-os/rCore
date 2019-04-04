@@ -279,38 +279,44 @@ impl Process {
 // cancel alignment
 #[repr(packed)]
 pub struct SockAddrIn {
-    sin_port: u16,
-    sin_addr: u32,
-    sin_zero: [u8; 8],
+    pub sin_port: u16,
+    pub sin_addr: u32,
+    pub sin_zero: [u8; 8],
 }
 
 #[repr(C)]
 pub struct SockAddrUn {
-    sun_path: [u8; 108],
+    pub sun_path: [u8; 108],
 }
 
 // beware of alignment issue
 #[repr(C, packed)]
 pub struct SockAddrLl {
-    sll_protocol: u16,
-    sll_ifindex: u32,
-    sll_hatype: u16,
-    sll_pkttype: u8,
-    sll_halen: u8,
-    sll_addr: [u8; 8],
+    pub sll_protocol: u16,
+    pub sll_ifindex: u32,
+    pub sll_hatype: u16,
+    pub sll_pkttype: u8,
+    pub sll_halen: u8,
+    pub sll_addr: [u8; 8],
 }
 
 #[repr(C)]
 pub union SockAddrPayload {
-    addr_in: SockAddrIn,
-    addr_un: SockAddrUn,
-    addr_ll: SockAddrLl,
+    pub addr_in: SockAddrIn,
+    pub addr_un: SockAddrUn,
+    pub addr_ll: SockAddrLl,
 }
 
 #[repr(C)]
 pub struct SockAddr {
-    family: u16,
-    payload: SockAddrPayload,
+    pub family: u16,
+    pub payload: SockAddrPayload,
+}
+
+#[repr(C)]
+pub struct SockAddrPlaceholder {
+    pub family: u16,
+    pub data: [u8; 14],
 }
 
 impl From<Endpoint> for SockAddr {
