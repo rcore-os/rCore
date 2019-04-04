@@ -337,7 +337,7 @@ bitflags! {
 }
 
 // JudgeDuck-OS/kern/e1000.c
-pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
+pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize, index: usize) {
     info!("Probing e1000 {}", name);
     assert_eq!(size_of::<E1000SendDesc>(), 16);
     assert_eq!(size_of::<E1000RecvDesc>(), 16);
@@ -357,7 +357,7 @@ pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     let mut recv_queue =
         unsafe { slice::from_raw_parts_mut(recv_page as *mut E1000RecvDesc, recv_queue_size) };
     // randomly generated
-    let mac: [u8; 6] = [0x54, 0x51, 0x9F, 0x71, 0xC0, 0x3C];
+    let mac: [u8; 6] = [0x54, 0x51, 0x9F, 0x71, 0xC0, index as u8];
 
     let mut driver = E1000 {
         header,
@@ -468,7 +468,7 @@ pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     let net_driver = E1000Driver(Arc::new(Mutex::new(driver)));
 
     let ethernet_addr = EthernetAddress::from_bytes(&mac);
-    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
+    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, index as u8, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     let iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
@@ -476,6 +476,7 @@ pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
         .neighbor_cache(neighbor_cache)
         .finalize();
 
+    info!("e1000 interface {} has addr 10.0.{}.2/24", name, index);
     let e1000_iface = E1000Interface {
         iface: Mutex::new(iface),
         driver: net_driver.clone(),

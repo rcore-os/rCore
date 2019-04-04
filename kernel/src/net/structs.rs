@@ -611,6 +611,6 @@ const UDP_METADATA_BUF: usize = 1024;
 const UDP_SENDBUF: usize = 64 * 1024; // 64K
 const UDP_RECVBUF: usize = 64 * 1024; // 64K
 
-const RAW_METADATA_BUF: usize = 2;
-const RAW_SENDBUF: usize = 2 * 1024; // 2K
-const RAW_RECVBUF: usize = 2 * 1024; // 2K
+const RAW_METADATA_BUF: usize = 1024;
+const RAW_SENDBUF: usize = 64 * 1024; // 64K
+const RAW_RECVBUF: usize = 64 * 1024; // 64K
