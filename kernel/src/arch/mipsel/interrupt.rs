@@ -115,10 +115,9 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    // TODO
     tf.sepc += 4;   // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(tf.x[17], [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]], tf);
-    tf.x[10] = ret as usize;
+    let ret = crate::syscall::syscall(tf.t0, [tf.x0, tf.x1, tf.x2, tf.x3, tf.s0, tf.s1], tf);
+    tf.v0 = ret as usize;
 }
 
 fn page_fault(tf: &mut TrapFrame) {
