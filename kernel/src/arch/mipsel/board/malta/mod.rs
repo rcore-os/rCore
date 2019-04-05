@@ -1,6 +1,8 @@
 use once::*;
+use alloc::string::String;
 
 pub mod serial;
+#[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
@@ -16,4 +18,8 @@ pub fn init_serial_early() {
 pub fn init_driver() {
     // TODO: add possibly more drivers
     // timer::init();
+}
+
+pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(fb::FramebufferInfo, usize), String> {
+    Err(String::from("Framebuffer not usable on malta board"))
 }

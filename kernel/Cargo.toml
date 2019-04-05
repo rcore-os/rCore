@@ -27,9 +27,9 @@ nographic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 # for mipsel qemu malta machine
-board_malta = []
+board_malta = ["link_user"]
 # for thinpad
-board_thinpad = []
+board_thinpad = ["link_user"]
 # Hard link user program
 link_user = []
 # Run cmdline instead of user shell, useful for automatic testing
@@ -77,7 +77,7 @@ aarch64 = { git = "https://github.com/rcore-os/aarch64" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
-mips = "^0.1.0"
+mips =  { git = "https://github.com/Harry-Chen/rust-mips" }
 
 [package.metadata.bootimage]
 default-target = "targets/x86_64.json"

@@ -72,7 +72,7 @@ fn others_main() -> ! {
     crate::kmain();
 }
 
-const BOOT_CPU_ID: usize = 0;
+const BOOT_CPU_ID: u32 = 0;
 
 global_asm!(include_str!("boot/entry.S"));
 global_asm!(include_str!("boot/trap.S"));

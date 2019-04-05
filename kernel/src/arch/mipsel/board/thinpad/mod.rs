@@ -19,7 +19,7 @@ pub fn init_driver() {
     // timer::init();
 }
 
-pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(FramebufferInfo, u32), String> {
+pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(FramebufferInfo, usize), String> {
     let fb_info = FramebufferInfo {
         xres: 800,
         yres: 600,

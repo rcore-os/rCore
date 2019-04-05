@@ -34,7 +34,7 @@ impl SerialPort {
     }
 
     /// non-blocking version of putchar()
-    fn putchar(&mut self, c: u8) {
+    pub fn putchar(&mut self, c: u8) {
         write(self.base + COM_TX, c);
     }
 
@@ -88,7 +88,7 @@ fn write<T>(addr: usize, content: T) {
 
 fn read<T>(addr: usize) -> T {
     let cell = (addr) as *const T;
-    read_volatile(cell);
+    read_volatile(cell)
 }
 
 
