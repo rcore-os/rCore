@@ -101,6 +101,11 @@ impl Driver for IXGBEInterface {
         }
     }
 
+    fn send(&self, data: &[u8]) -> Option<usize> {
+        self.driver.inner.send(&data);
+        Some(data.len())
+    }
+
     fn get_arp(&self, ip: IpAddress) -> Option<EthernetAddress> {
         let iface = self.iface.lock();
         let cache = iface.neighbor_cache();

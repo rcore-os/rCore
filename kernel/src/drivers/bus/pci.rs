@@ -80,8 +80,9 @@ unsafe fn enable(loc: Location) -> Option<u32> {
             let orig_ctrl = am.read32(ops, loc, cap_ptr + PCI_MSI_CTRL_CAP);
             am.write32(ops, loc, cap_ptr + PCI_MSI_CTRL_CAP, orig_ctrl | 0x10000);
             debug!(
-                "MSI control {:#b}, enabling MSI interrupts",
-                orig_ctrl >> 16
+                "MSI control {:#b}, enabling MSI interrupt {}",
+                orig_ctrl >> 16,
+                irq
             );
             msi_found = true;
             break;
