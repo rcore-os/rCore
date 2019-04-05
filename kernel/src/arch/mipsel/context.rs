@@ -159,57 +159,7 @@ impl Context {
     #[naked]
     #[inline(never)]
     pub unsafe extern fn switch(&mut self, _target: &mut Self) {
-        asm!(r"
-        .equ XLENB, 4
-        .macro Load reg, mem
-            lw \reg, \mem
-        .endm
-        .macro Store reg, mem
-            sw \reg, \mem
-        .endm");
-        asm!("
-        // save from's registers
-        addi  sp, sp, (-XLENB*14)
-        Store sp, 0(a0)
-        Store ra, 0*XLENB(sp)
-        Store s0, 2*XLENB(sp)
-        Store s1, 3*XLENB(sp)
-        Store s2, 4*XLENB(sp)
-        Store s3, 5*XLENB(sp)
-        Store s4, 6*XLENB(sp)
-        Store s5, 7*XLENB(sp)
-        Store s6, 8*XLENB(sp)
-        Store s7, 9*XLENB(sp)
-        Store s8, 10*XLENB(sp)
-        Store gp, 11*XLENB(sp)
-        Store ra, 12*XLENB(sp)
-        Store sp, 13*XLENB(sp)
-
-        Store $1, 1*XLENB(sp)
-
-        // restore to's registers
-        Load sp, 0(a1)
-        Load $0, 1*XLENB(sp)
-
-        Load ra, 0*XLENB(sp)
-        Load s0, 2*XLENB(sp)
-        Load s1, 3*XLENB(sp)
-        Load s2, 4*XLENB(sp)
-        Load s3, 5*XLENB(sp)
-        Load s4, 6*XLENB(sp)
-        Load s5, 7*XLENB(sp)
-        Load s6, 8*XLENB(sp)
-        Load s7, 9*XLENB(sp)
-        Load s8, 10*XLENB(sp)
-        Load gp, 11*XLENB(sp)
-        Load ra, 12*XLENB(sp)
-        Load sp, 13*XLENB(sp)
-        addi sp, sp, (XLENB*14)
-
-        Store zero, 0(a1)
-        jr ra
-        nop"
-        :"=r"(*root_page_table_ptr) :"r"(*root_page_table_ptr) : : "volatile" )
+        asm!(include_str!("boot/context.S"));
     }
 
     /// Constructs a null Context for the current running thread.
