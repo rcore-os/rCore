@@ -54,9 +54,9 @@ lazy_static! {
                 fn _user_img_start();
                 fn _user_img_end();
             }
+            println!("Sfs start {:x}, end {:x}", _user_img_start as usize, _user_img_end as usize);
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
-
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()
     };
