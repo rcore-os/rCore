@@ -74,6 +74,6 @@ fn others_main() -> ! {
 
 const BOOT_CPU_ID: u32 = 0;
 
-global_asm!(include_str!("boot/entry.S"));
-global_asm!(include_str!("boot/trap.S"));
-global_asm!(include_str!("boot/dtb.S"));
+global_asm!(include_str!("boot/entry.gen.s"));
+global_asm!(include_str!("boot/trap.gen.s"));
+global_asm!(include_str!("boot/dtb.gen.s"));
