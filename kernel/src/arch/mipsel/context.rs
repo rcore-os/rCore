@@ -159,7 +159,11 @@ impl Context {
     #[naked]
     #[inline(never)]
     pub unsafe extern fn switch(&mut self, _target: &mut Self) {
-        asm!(include_str!("boot/context.gen.s"));
+        extern {
+            fn switch_context(src : &mut Context, dst : &mut Context);
+        }
+
+        switch_context(self, _target);
     }
 
     /// Constructs a null Context for the current running thread.

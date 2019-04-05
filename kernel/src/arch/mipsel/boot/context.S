@@ -3,7 +3,7 @@
 .set noat
 .set noreorder
 
-// .section .text.context
+.section .text.context
 .globl switch_context
 .extern root_page_table_ptr
 

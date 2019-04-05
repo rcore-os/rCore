@@ -24,7 +24,8 @@ pub fn fp() -> usize {
     }
     #[cfg(any(target_arch = "mips"))]
     unsafe {
-        asm!("mov $0, fp" : "=r"(ptr));
+        // fp = $30
+        asm!("ori $0, $$$30, 0" : "=r"(ptr));
     }
 
     ptr
@@ -39,14 +40,18 @@ pub fn lr() -> usize {
         asm!("mov $0, x30" : "=r"(ptr));
     }
     #[cfg(any(target_arch = "riscv32",
-              target_arch = "riscv64",
-              target_arch = "mips"))]
+              target_arch = "riscv64"))]
     unsafe {
         asm!("mv $0, ra" : "=r"(ptr));
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
         asm!("movq 8(%rbp), $0" : "=r"(ptr));
+    }
+
+    #[cfg(target_arch = "mips")]
+    unsafe {
+        asm!("ori $0, $$$31, 0" : "=r"(ptr));
     }
 
     ptr
