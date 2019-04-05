@@ -58,7 +58,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
     use cp0::cause::{Exception as E};
     trace!("Interrupt @ CPU{}: {:?} ", 0, tf.cause.cause());
     match tf.cause.cause() {
-        E::Interrupt => interrupt_dispatcher(),
+        E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),
         E::TLBModification => page_fault(tf),
         E::TLBLoadMiss => page_fault(tf),
