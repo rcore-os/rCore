@@ -26,13 +26,13 @@ switch_context:
 	sw sp, 13*4(sp)
 
 	la s0, root_page_table_ptr
-	lw at, 0(s0)
-	sw at, 4(sp)
+	lw AT, 0(s0)
+	sw AT, 4(sp)
 
 	// restore to's registers
 	lw sp, 0(a1)
-	lw at, 4(sp)
-	sw at, 0(s0)
+	lw AT, 4(sp)
+	sw AT, 0(s0)
 
 	lw ra, 0(sp)
 	lw s0, 2*4(sp)
