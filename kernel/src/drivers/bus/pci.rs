@@ -120,7 +120,7 @@ pub fn init_driver(dev: &PCIDevice) {
                     current_addr = current_addr + PAGE_SIZE;
                 }
                 let index = NET_DRIVERS.read().len();
-                e1000::e1000_init(name, irq, vaddr, len as usize, index);
+                e1000::init(name, irq, vaddr, len as usize, index);
             }
         }
         (0x8086, 0x10fb) => {

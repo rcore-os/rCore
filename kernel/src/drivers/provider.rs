@@ -9,6 +9,8 @@ use crate::memory::active_table;
 pub struct Provider;
 
 impl provider::Provider for Provider {
+    const PAGE_SIZE: usize = PAGE_SIZE;
+
     fn alloc_dma(size: usize) -> (usize, usize) {
         let layout = Layout::from_size_align(size, PAGE_SIZE).unwrap();
         let vaddr = unsafe { alloc_zeroed(layout) } as usize;
