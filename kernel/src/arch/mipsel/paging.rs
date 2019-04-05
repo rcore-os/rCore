@@ -50,7 +50,7 @@ impl PageTableExt for ActivePageTable {}
 
 /// The virtual address of root page table
 static ROOT_PAGE_TABLE_BUFFER: MIPSPageTable = ::core::mem::uninitialized();
-static mut root_page_table_ptr: usize =
+pub static mut root_page_table_ptr: usize =
     &ROOT_PAGE_TABLE_BUFFER as *const MIPSPageTable as usize;
 
 impl ActivePageTable {

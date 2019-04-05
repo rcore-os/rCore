@@ -40,7 +40,7 @@ pub unsafe fn enable() {
 pub unsafe fn disable_and_store() -> usize {
     let e = cp0::status::read_u32() & 1;
     interrupts::disable();
-    e
+    e as usize
 }
 
 /// Enable interrupt if `flags` != 0
@@ -116,7 +116,7 @@ fn timer() {
 
 fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4;   // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(tf.t0, [tf.x0, tf.x1, tf.x2, tf.x3, tf.s0, tf.s1], tf);
+    let ret = crate::syscall::syscall(tf.t0, [tf.t0, tf.t1, tf.t2, tf.t3, tf.s0, tf.s1], tf);
     tf.v0 = ret as usize;
 }
 

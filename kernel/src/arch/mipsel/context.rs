@@ -1,52 +1,53 @@
-use mips::registers;
+use mips::registers::cp0;
+use crate::arch::paging::root_page_table_ptr;
 
 /// Saved registers on a trap.
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
     /// CP0 status register
-    pub status: u32,
+    pub status: cp0::status::Status,
     /// CP0 cause register
-    pub cause: u32,
+    pub cause: cp0::cause::Cause,
     /// CP0 EPC register
-    pub epc: u32,
+    pub epc: usize,
     /// CP0 vaddr register
-    pub vaddr: u32,
+    pub vaddr: usize,
     /// HI/LO registers
-    pub hi: u32,
-    pub lo: u32,
+    pub hi: usize,
+    pub lo: usize,
     /// General registers
-    pub at: u32,
-    pub v0: u32,
-    pub v1: u32,
-    pub a0: u32,
-    pub a1: u32,
-    pub a2: u32,
-    pub a3: u32,
-    pub t0: u32,
-    pub t1: u32,
-    pub t2: u32,
-    pub t3: u32,
-    pub t4: u32,
-    pub t5: u32,
-    pub t6: u32,
-    pub t7: u32,
-    pub s0: u32,
-    pub s1: u32,
-    pub s2: u32,
-    pub s3: u32,
-    pub s4: u32,
-    pub s5: u32,
-    pub s6: u32,
-    pub s7: u32,
-    pub t8: u32,
-    pub t9: u32,
-    pub k0: u32,
-    pub k1: u32,
-    pub gp: u32,
-    pub sp: u32,
-    pub fp: u32,
-    pub ra: u32,
+    pub at: usize,
+    pub v0: usize,
+    pub v1: usize,
+    pub a0: usize,
+    pub a1: usize,
+    pub a2: usize,
+    pub a3: usize,
+    pub t0: usize,
+    pub t1: usize,
+    pub t2: usize,
+    pub t3: usize,
+    pub t4: usize,
+    pub t5: usize,
+    pub t6: usize,
+    pub t7: usize,
+    pub s0: usize,
+    pub s1: usize,
+    pub s2: usize,
+    pub s3: usize,
+    pub s4: usize,
+    pub s5: usize,
+    pub s6: usize,
+    pub s7: usize,
+    pub t8: usize,
+    pub t9: usize,
+    pub k0: usize,
+    pub k1: usize,
+    pub gp: usize,
+    pub sp: usize,
+    pub fp: usize,
+    pub ra: usize,
     /// Reserve space for hartid
     pub _hartid: usize,
 }
@@ -59,13 +60,13 @@ impl TrapFrame {
     fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
-        tf.x[10] = arg; // a0
-        tf.x[2] = sp;
-        tf.sepc = entry as usize;
-        tf.sstatus = sstatus::read();
-        tf.sstatus.set_spie(true);
-        tf.sstatus.set_sie(false);
-        tf.sstatus.set_spp(sstatus::SPP::Supervisor);
+        tf.a0 = arg;
+        tf.sp = sp;
+        tf.epc = entry as usize;
+        tf.status = cp0::status::read();
+        tf.status.set_kernel_mode();
+        tf.status.set_ie();
+        tf.status.set_exl();
         tf
     }
 
@@ -76,12 +77,12 @@ impl TrapFrame {
     fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
-        tf.x[2] = sp;
-        tf.sepc = entry_addr;
-        tf.sstatus = sstatus::read();
-        tf.sstatus.set_spie(true);
-        tf.sstatus.set_sie(false);
-        tf.sstatus.set_spp(sstatus::SPP::User);
+        tf.sp = sp;
+        tf.epc = entry_addr;
+        tf.status = cp0::status::read();
+        tf.status.set_user_mode();
+        tf.status.set_ie();
+        tf.status.set_exl();
         tf
     }
 }
@@ -89,23 +90,11 @@ impl TrapFrame {
 use core::fmt::{Debug, Formatter, Error};
 impl Debug for TrapFrame {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        struct Regs<'a>(&'a [usize; 32]);
-        impl<'a> Debug for Regs<'a> {
-            fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-                const REG_NAME: [&str; 32] = [
-                    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
-                    "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
-                    "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
-                    "t3", "t4", "t5", "t6"];
-                f.debug_map().entries(REG_NAME.iter().zip(self.0)).finish()
-            }
-        }
         f.debug_struct("TrapFrame")
-            .field("regs", &Regs(&self.x))
-            .field("sstatus", &self.sstatus)
-            .field("sepc", &self.sepc)
-            .field("stval", &self.stval)
-            .field("scause", &self.scause.cause())
+            .field("status", &self.status.bits)
+            .field("epc", &self.epc.bits)
+            .field("cause", &self.cause.bits)
+            .field("vaddr", &self.vaddr.bits)
             .finish()
     }
 }
@@ -167,7 +156,6 @@ impl Context {
     #[naked]
     #[inline(never)]
     pub unsafe extern fn switch(&mut self, _target: &mut Self) {
-        #[cfg(target_arch = "riscv32")]
         asm!(r"
         .equ XLENB, 4
         .macro Load reg, mem
@@ -175,15 +163,6 @@ impl Context {
         .endm
         .macro Store reg, mem
             sw \reg, \mem
-        .endm");
-        #[cfg(target_arch = "riscv64")]
-        asm!(r"
-        .equ XLENB, 8
-        .macro Load reg, mem
-            ld \reg, \mem
-        .endm
-        .macro Store reg, mem
-            sd \reg, \mem
         .endm");
         asm!("
         // save from's registers
@@ -199,16 +178,16 @@ impl Context {
         Store s6, 8*XLENB(sp)
         Store s7, 9*XLENB(sp)
         Store s8, 10*XLENB(sp)
-        Store s9, 11*XLENB(sp)
-        Store s10, 12*XLENB(sp)
-        Store s11, 13*XLENB(sp)
-        csrr  s11, satp
-        Store s11, 1*XLENB(sp)
+        Store gp, 11*XLENB(sp)
+        Store ra, 12*XLENB(sp)
+        Store sp, 13*XLENB(sp)
+
+        Store $1, 1*XLENB(sp)
 
         // restore to's registers
         Load sp, 0(a1)
-        Load s11, 1*XLENB(sp)
-        csrw satp, s11
+        Load $0, 1*XLENB(sp)
+
         Load ra, 0*XLENB(sp)
         Load s0, 2*XLENB(sp)
         Load s1, 3*XLENB(sp)
@@ -219,14 +198,15 @@ impl Context {
         Load s6, 8*XLENB(sp)
         Load s7, 9*XLENB(sp)
         Load s8, 10*XLENB(sp)
-        Load s9, 11*XLENB(sp)
-        Load s10, 12*XLENB(sp)
-        Load s11, 13*XLENB(sp)
+        Load gp, 11*XLENB(sp)
+        Load ra, 12*XLENB(sp)
+        Load sp, 13*XLENB(sp)
         addi sp, sp, (XLENB*14)
 
         Store zero, 0(a1)
-        ret"
-        : : : : "volatile" )
+        jr ra
+        nop"
+        :"=r"(root_page_table_ptr) :"r"(root_page_table_ptr) : : "volatile" )
     }
 
     /// Constructs a null Context for the current running thread.
@@ -269,7 +249,7 @@ impl Context {
             tf: {
                 let mut tf = tf.clone();
                 // fork function's ret value, the new process is 0
-                tf.x[10] = 0; // a0
+                tf.a0 = 0;
                 tf
             },
         }.push_at(kstack_top)
@@ -287,9 +267,9 @@ impl Context {
             context: ContextData::new(satp),
             tf: {
                 let mut tf = tf.clone();
-                tf.x[2] = ustack_top;   // sp
-                tf.x[4] = tls; // tp
-                tf.x[10] = 0;  // a0
+                tf.sp = ustack_top;   // sp
+                tf.v1 = tls; // tp
+                tf.a0 = 0;  // a0
                 tf
             },
         }.push_at(kstack_top)
