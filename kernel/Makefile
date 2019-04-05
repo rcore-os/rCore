@@ -295,7 +295,7 @@ else ifeq ($(arch), aarch64)
 else ifeq ($(arch), mipsel)
 	# qemu-system-mipsel accepts ELF file only, so don't use objcopy
 	@cp $(kernel) $(kernel)_orig
-	@$(strip) $(kernel) -o $(kernel)
+	@$(strip) $(kernel) -o $@
 endif
 
 kernel: $(dtb)
