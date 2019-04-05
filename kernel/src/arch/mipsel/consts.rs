@@ -5,7 +5,7 @@ pub const KERNEL_OFFSET: usize = 0x80100000;
 pub const KERNEL_HEAP_SIZE: usize = 0x00a0_0000;
 
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
-pub const MEMORY_END: usize = 0x8100_0000;
+pub const MEMORY_END: usize = 0x8800_0000;
 
 pub const USER_STACK_OFFSET: usize = 0x80000000 - USER_STACK_SIZE;
 pub const USER_STACK_SIZE: usize = 0x10000;
