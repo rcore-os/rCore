@@ -10,7 +10,7 @@ pub mod syscall;
 pub mod rand;
 
 use log::*;
-use mips::registers;
+use mips::registers::cp0;
 use mips::instructions;
 
 extern "C" {

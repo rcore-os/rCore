@@ -1,5 +1,5 @@
-use mips::interrupts::*;
-use mips::registers::*;
+use mips::interrupts;
+use mips::registers::cp0;
 use crate::drivers::DRIVERS;
 pub use self::context::*;
 use log::*;
