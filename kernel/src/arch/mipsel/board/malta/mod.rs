@@ -6,6 +6,7 @@ pub mod serial;
 pub mod fb;
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
+pub mod consts;
 
 /// Initialize serial port first
 pub fn init_serial_early() {

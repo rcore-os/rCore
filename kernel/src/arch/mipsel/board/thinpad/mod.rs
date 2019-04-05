@@ -1,10 +1,14 @@
 use once::*;
+use alloc::string::String;
 
 pub mod serial;
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
+pub mod consts;
+
+use fb::FramebufferInfo;
 
 /// Initialize serial port first
 pub fn init_serial_early() {
@@ -31,6 +35,6 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(Framebuffer
         pitch: 800,
         bus_addr: 0xa2000000,
         screen_size: 800 * 600,
-    }
+    };
     Ok((fb_info, 0xa2000000))
 }

@@ -4,7 +4,7 @@ use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
 use spin::Mutex;
 
-struct SerialPort {
+pub struct SerialPort {
     base: usize
 }
 
@@ -27,7 +27,7 @@ impl SerialPort {
     }
 
     /// non-blocking version of putchar()
-    fn putchar(&mut self, c: u8) {
+    pub fn putchar(&mut self, c: u8) {
         write(self.base + UART_DATA, c);
     }
 
@@ -76,12 +76,12 @@ impl Write for SerialPort {
 
 fn write<T>(addr: usize, content: T) {
     let cell = (addr) as *mut T;
-    write_volatile(cell, content);
+    unsafe { write_volatile(cell, content); }
 }
 
 fn read<T>(addr: usize) -> T {
     let cell = (addr) as *const T;
-    read_volatile(cell);
+    unsafe { read_volatile(cell) }
 }
 
 

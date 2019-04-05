@@ -83,7 +83,7 @@ impl Write for SerialPort {
 
 fn write<T>(addr: usize, content: T) {
     let cell = (addr) as *mut T;
-    unsafe { write_volatile(cell, content) }
+    unsafe { write_volatile(cell, content); }
 }
 
 fn read<T>(addr: usize) -> T {
