@@ -1,5 +1,8 @@
 use mips::registers::cp0;
-use crate::arch::paging::root_page_table_ptr;
+
+extern {
+    static root_page_table_ptr : *mut usize;
+}
 
 /// Saved registers on a trap.
 #[derive(Clone)]
@@ -206,7 +209,7 @@ impl Context {
         Store zero, 0(a1)
         jr ra
         nop"
-        :"=r"(root_page_table_ptr) :"r"(root_page_table_ptr) : : "volatile" )
+        :"=r"(*root_page_table_ptr) :"r"(*root_page_table_ptr) : : "volatile" )
     }
 
     /// Constructs a null Context for the current running thread.

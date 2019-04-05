@@ -156,3 +156,11 @@ kernel_stack:
     .space 1024 * 16 # 16KB for kernel stack
     .global kernel_stack_top
 kernel_stack_top:
+
+    .align 12  #PGSHIFT
+    .global root_page_table_buffer
+root_page_table_buffer:
+    .space 1024 * 4 # 4KB
+    .global root_page_table_ptr
+root_page_table_ptr:
+    .space 4 # 4bytes

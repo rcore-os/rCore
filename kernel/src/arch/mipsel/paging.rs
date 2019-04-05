@@ -49,14 +49,15 @@ impl PageTable for ActivePageTable {
 impl PageTableExt for ActivePageTable {}
 
 /// The virtual address of root page table
-static ROOT_PAGE_TABLE_BUFFER: MIPSPageTable = ::core::mem::uninitialized();
-pub static mut root_page_table_ptr: usize =
-    &ROOT_PAGE_TABLE_BUFFER as *const MIPSPageTable as usize;
+extern {
+    static root_page_table_buffer : *mut MIPSPageTable;
+    static root_page_table_ptr : *mut usize;
+}
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(
-            TwoLevelPageTable::new(&mut ROOT_PAGE_TABLE_BUFFER),
+            TwoLevelPageTable::new(&mut *(root_page_table_buffer as *mut MIPSPageTable)),
             ::core::mem::uninitialized()
         )
     }
@@ -119,11 +120,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn set_token(token: usize) {
-        root_page_table_ptr = token;
+        *root_page_table_ptr = token;
     }
 
     fn active_token() -> usize {
-        root_page_table_ptr
+        unsafe { *root_page_table_ptr }
     }
 
     fn flush_tlb() {
@@ -131,11 +132,16 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let pt: *mut MIPSPageTable = self.token() as *mut MIPSPageTable;
-        let active = ActivePageTable(
+        let pt: *mut MIPSPageTable = unsafe {
+            self.token() as *mut MIPSPageTable
+        };
+
+        let mut active = unsafe {
+            ActivePageTable(
                 TwoLevelPageTable::new(&mut *pt),
                 ::core::mem::uninitialized()
-            );
+            )
+        };
         f(&mut active)
     }
 }
