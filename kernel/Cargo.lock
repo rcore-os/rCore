@@ -125,12 +125,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "deque"
 version = "0.3.2"
-source = "git+https://github.com/rcore-os/deque.git?branch=no_std#907d03935b9badde1902d9c84d138872f34c6763"
+source = "git+https://github.com/rcore-os/deque.git?branch=no_std#b13a836dd69ae82cc0b8d711c2990b9baf5170d1"
 
 [[package]]
 name = "device_tree"
 version = "1.0.3"
-source = "git+https://github.com/rcore-os/device_tree-rs#0e887395ab92e99f68117b17d85b0b417bfd1b45"
+source = "git+https://github.com/rcore-os/device_tree-rs#7945459093f49a39996291283b8894753c8a638d"
 
 [[package]]
 name = "fixedvec"
@@ -253,6 +253,14 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "pci"
+version = "0.0.1"
+source = "git+https://github.com/rcore-os/pci-rs#30f2e83aa51dd313957f3fd6c3b233d3c905a4d0"
+dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -317,6 +325,7 @@ dependencies = [
  "mips 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs)",
  "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs)",
@@ -618,6 +627,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum once 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "931fb7a4cf34610cf6cbe58d52a8ca5ef4c726d4e2e178abd0dc13a6551c6d73"
 "checksum os_bootinfo 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "66481dbeb5e773e7bd85b63cd6042c30786f834338288c5ec4f3742673db360a"
 "checksum pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c48392db76c4e9a69e0b3be356c5f97ebb7b14413c5e4fd0af4755dbf86e2fce"
+"checksum pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)" = "<none>"
 "checksum pulldown-cmark 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8361e81576d2e02643b04950e487ec172b687180da65c731c03cf336784e6c07"
 "checksum rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"

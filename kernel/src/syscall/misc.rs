@@ -1,8 +1,8 @@
 use super::*;
 use crate::arch::cpu;
+use crate::consts::USER_STACK_SIZE;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
-use crate::consts::USER_STACK_SIZE;
 
 pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
     const ARCH_SET_FS: i32 = 0x1002;
@@ -177,7 +177,7 @@ pub fn sys_prlimit64(
                 }
             }
             Ok(0)
-        },
+        }
         RLIMIT_RSS | RLIMIT_AS => {
             if !old_limit.is_null() {
                 proc.vm.check_write_ptr(old_limit)?;

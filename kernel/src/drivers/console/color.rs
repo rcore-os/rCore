@@ -3,6 +3,9 @@
 use crate::util::color::ConsoleColor;
 
 pub trait FramebufferColor {
+    /// pack as 8-bit integer
+    fn pack8(&self) -> u8;
+
     /// pack as 16-bit integer
     fn pack16(&self) -> u16;
 
@@ -43,6 +46,12 @@ impl From<ConsoleColor> for RgbColor {
 
 impl FramebufferColor for RgbColor {
     #[inline]
+    fn pack8(&self) -> u8 {
+        // RGB332
+        ((self.0 >> 5) << 5) | ((self.1 >> 5) << 2) | (self.2 >> 6)
+    }
+
+    #[inline]
     fn pack16(&self) -> u16 {
         // BGR565
         ((self.0 as u16 & 0xF8) << 8) | ((self.1 as u16 & 0xFC) << 3) | (self.2 as u16 >> 3)
@@ -58,6 +67,11 @@ impl FramebufferColor for RgbColor {
 }
 
 impl FramebufferColor for ConsoleColor {
+    #[inline]
+    fn pack8(&self) -> u8 {
+        RgbColor::from(*self).pack8()
+    }
+    
     #[inline]
     fn pack16(&self) -> u16 {
         RgbColor::from(*self).pack16()

@@ -2,13 +2,13 @@ use crate::consts::KERNEL_OFFSET;
 use bit_allocator::BitAlloc;
 // Depends on kernel
 use super::{BootInfo, MemoryRegionType};
-use crate::memory::{active_table, init_heap, FRAME_ALLOCATOR, alloc_frame};
+use crate::memory::{active_table, alloc_frame, init_heap, FRAME_ALLOCATOR};
 use crate::HEAP_ALLOCATOR;
-use rcore_memory::PAGE_SIZE;
 use alloc::vec::Vec;
 use log::*;
 use once::*;
 use rcore_memory::paging::*;
+use rcore_memory::PAGE_SIZE;
 
 pub fn init(boot_info: &BootInfo) {
     assert_has_not_been_called!("memory::init must be called only once");
@@ -60,14 +60,12 @@ fn enlarge_heap() {
         addrs.push((va, PAGE_SIZE));
     }
     for (addr, len) in addrs.into_iter() {
-        for va in (addr..(addr+len)).step_by(PAGE_SIZE) {
+        for va in (addr..(addr + len)).step_by(PAGE_SIZE) {
             page_table.map(va, va - va_offset).update();
         }
         info!("Adding {:#X} {:#X} to heap", addr, len);
         unsafe {
-            HEAP_ALLOCATOR
-                .lock()
-                .init(addr, len);
+            HEAP_ALLOCATOR.lock().init(addr, len);
         }
     }
 }

@@ -1,8 +1,9 @@
 //! Intel 10Gb Network Adapter 82599 i.e. ixgbe network driver
 //! Datasheet: https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 
-use alloc::prelude::*;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use alloc::collections::BTreeMap;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;
@@ -20,7 +21,6 @@ use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::sync::{MutexGuard, SpinNoIrq};
 
 use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 
@@ -30,21 +30,6 @@ struct IXGBEDriver {
     header: usize,
     size: usize,
     mtu: usize,
-}
-
-impl Drop for IXGBEDriver {
-    fn drop(&mut self) {
-        let _ = FlagsGuard::no_irq_region();
-        let header = self.header;
-        let size = self.size;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-    }
 }
 
 pub struct IXGBEInterface {
@@ -64,16 +49,6 @@ impl Driver for IXGBEInterface {
 
         let handled = {
             let _ = FlagsGuard::no_irq_region();
-            let header = self.driver.header;
-            let size = self.driver.size;
-            if let None = active_table().get_entry(header) {
-                let mut current_addr = header;
-                while current_addr < header + size {
-                    active_table().map_if_not_exists(current_addr, current_addr);
-                    current_addr = current_addr + PAGE_SIZE;
-                }
-            }
-
             self.driver.inner.try_handle_interrupt()
         };
 
@@ -135,15 +110,6 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let _ = FlagsGuard::no_irq_region();
-        let header = self.header;
-        let size = self.size;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
         if self.inner.can_send() {
             if let Some(data) = self.inner.recv() {
                 Some((IXGBERxToken(data), IXGBETxToken(self.clone())))
@@ -157,15 +123,6 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
         let _ = FlagsGuard::no_irq_region();
-        let header = self.header;
-        let size = self.size;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
         if self.inner.can_send() {
             Some(IXGBETxToken(self.clone()))
         } else {
@@ -200,15 +157,6 @@ impl phy::TxToken for IXGBETxToken {
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
         let _ = FlagsGuard::no_irq_region();
-        let header = self.0.header;
-        let size = self.0.size;
-        if let None = active_table().get_entry(header) {
-            let mut current_addr = header;
-            while current_addr < header + size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
         let mut buffer = [0u8; ixgbe::IXGBEDriver::get_mtu()];
         let result = f(&mut buffer[..len]);
         if result.is_ok() {
@@ -225,13 +173,6 @@ pub fn ixgbe_init(
     size: usize,
 ) -> Arc<IXGBEInterface> {
     let _ = FlagsGuard::no_irq_region();
-    if let None = active_table().get_entry(header) {
-        let mut current_addr = header;
-        while current_addr < header + size {
-            active_table().map_if_not_exists(current_addr, current_addr);
-            current_addr = current_addr + PAGE_SIZE;
-        }
-    }
     let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
     ixgbe.enable_irq();
 

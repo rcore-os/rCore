@@ -8,10 +8,19 @@ pub mod consts;
 pub mod cpu;
 pub mod syscall;
 pub mod rand;
+pub mod driver;
 
 use log::*;
 use mips::registers::cp0;
 use mips::instructions;
+
+#[cfg(feature = "board_malta")]
+#[path = "board/malta/mod.rs"]
+pub mod board;
+
+#[cfg(feature = "board_thinpad")]
+#[path = "board/thinpad/mod.rs"]
+pub mod board;
 
 extern "C" {
     fn _dtb_start();
@@ -38,12 +47,16 @@ pub extern fn rust_main() -> ! {
 
     unsafe { memory::clear_bss(); }
 
+    board::init_serial_early();
+    driver::init();
+
     println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 
-    crate::logging::init();
     interrupt::init();
     memory::init();
     timer::init();
+
+    crate::logging::init();
     crate::drivers::init(dtb_start);
     crate::process::init();
 

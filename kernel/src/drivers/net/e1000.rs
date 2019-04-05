@@ -3,8 +3,9 @@
 
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::format;
-use alloc::prelude::*;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::mem::size_of;
 use core::slice;
 use core::sync::atomic::{fence, Ordering};
@@ -72,20 +73,19 @@ const E1000_RAH: usize = 0x5404 / 4;
 pub struct E1000Interface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>,
     driver: E1000Driver,
+    name: String,
+    irq: Option<u32>,
 }
 
 impl Driver for E1000Interface {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
-        let irq = {
-            let driver = self.driver.0.lock();
+    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+        if irq.is_some() && self.irq.is_some() && irq != self.irq {
+            // not ours, skip it
+            return false;
+        }
 
-            if let None = active_table().get_entry(driver.header) {
-                let mut current_addr = driver.header;
-                while current_addr < driver.header + driver.size {
-                    active_table().map_if_not_exists(current_addr, current_addr);
-                    current_addr = current_addr + PAGE_SIZE;
-                }
-            }
+        let data = {
+            let driver = self.driver.0.lock();
 
             let e1000 = unsafe {
                 slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
@@ -101,7 +101,7 @@ impl Driver for E1000Interface {
             }
         };
 
-        if irq {
+        if data {
             let timestamp = Instant::from_millis(crate::trap::uptime_msec() as i64);
             let mut sockets = SOCKETS.lock();
             match self.iface.lock().poll(&mut sockets, timestamp) {
@@ -114,7 +114,7 @@ impl Driver for E1000Interface {
             }
         }
 
-        return irq;
+        return data;
     }
 
     fn device_type(&self) -> DeviceType {
@@ -130,7 +130,7 @@ impl Driver for E1000Interface {
     }
 
     fn get_ifname(&self) -> String {
-        format!("e1000")
+        self.name.clone()
     }
 
     fn ipv4_address(&self) -> Option<Ipv4Address> {
@@ -184,14 +184,6 @@ impl<'a> phy::Device<'a> for E1000Driver {
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let driver = self.0.lock();
 
-        if let None = active_table().get_entry(driver.header) {
-            let mut current_addr = driver.header;
-            while current_addr < driver.header + driver.size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
-
         let e1000 = unsafe {
             slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
         };
@@ -236,14 +228,6 @@ impl<'a> phy::Device<'a> for E1000Driver {
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
         let driver = self.0.lock();
-
-        if let None = active_table().get_entry(driver.header) {
-            let mut current_addr = driver.header;
-            while current_addr < driver.header + driver.size {
-                active_table().map_if_not_exists(current_addr, current_addr);
-                current_addr = current_addr + PAGE_SIZE;
-            }
-        }
 
         let e1000 = unsafe {
             slice::from_raw_parts_mut(driver.header as *mut Volatile<u32>, driver.size / 4)
@@ -353,8 +337,8 @@ bitflags! {
 }
 
 // JudgeDuck-OS/kern/e1000.c
-pub fn e1000_init(header: usize, size: usize) {
-    info!("Probing e1000");
+pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
+    info!("Probing e1000 {}", name);
     assert_eq!(size_of::<E1000SendDesc>(), 16);
     assert_eq!(size_of::<E1000RecvDesc>(), 16);
 
@@ -385,12 +369,6 @@ pub fn e1000_init(header: usize, size: usize) {
         recv_buffers: Vec::with_capacity(recv_queue_size),
         first_trans: true,
     };
-
-    let mut current_addr = header;
-    while current_addr < header + size {
-        active_table().map_if_not_exists(current_addr, current_addr);
-        current_addr = current_addr + PAGE_SIZE;
-    }
 
     let e1000 = unsafe { slice::from_raw_parts_mut(header as *mut Volatile<u32>, size / 4) };
     debug!(
@@ -501,6 +479,8 @@ pub fn e1000_init(header: usize, size: usize) {
     let e1000_iface = E1000Interface {
         iface: Mutex::new(iface),
         driver: net_driver.clone(),
+        name,
+        irq,
     };
 
     let driver = Arc::new(e1000_iface);
