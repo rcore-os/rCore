@@ -157,12 +157,12 @@ impl Context {
     /// Store current sp, switch to target.
     /// Pop all callee-saved registers, then return to the target.
     #[inline(always)]
-    pub unsafe extern fn switch(&mut self, _target: &mut Self) {
-        extern {
-            fn switch_context(src : &mut Context, dst : &mut Context);
+    pub unsafe fn switch(&mut self, target: &mut Self) {
+        extern "C" {
+            fn switch_context(src: *mut Context, dst: *mut Context);
         }
 
-        switch_context(self, _target);
+        switch_context(self as *mut Context, target as *mut Context);
     }
 
     /// Constructs a null Context for the current running thread.
