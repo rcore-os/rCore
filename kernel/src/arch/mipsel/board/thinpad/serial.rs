@@ -8,8 +8,8 @@ pub struct SerialPort {
     base: usize
 }
 
-const UART_STATUS: usize = 0;
-const UART_DATA: usize = 0;
+const UART_STATUS: usize = 0x0;
+const UART_DATA: usize = 0x4;
 
 const UART_STATUS_CTS: u8 = 0x1; // clear to send signal
 const UART_STATUS_DR: u8 = 0x2; // data ready signal
