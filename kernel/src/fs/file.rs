@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc};
 
-use rcore_fs::vfs::{FsError, INode, Metadata, Result};
+use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 
 #[derive(Clone)]
 pub struct FileHandle {
@@ -107,5 +107,13 @@ impl FileHandle {
         let name = self.inode.get_entry(self.offset as usize)?;
         self.offset += 1;
         Ok(name)
+    }
+
+    pub fn poll(&self) -> Result<PollStatus> {
+        self.inode.poll()
+    }
+
+    pub fn io_control(&self, cmd: u32, arg: u32) -> Result<()> {
+        self.inode.io_control(cmd, arg)
     }
 }

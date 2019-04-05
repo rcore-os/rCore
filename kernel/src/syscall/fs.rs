@@ -88,34 +88,24 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
         let proc = process();
         let mut events = 0;
         for poll in polls.iter_mut() {
-            poll.revents = PE::NONE;
-            match proc.files.get(&(poll.fd as usize)) {
-                Some(FileLike::File(_)) => {
-                    // FIXME: assume it is stdin for now
-                    if poll.events.contains(PE::IN) && STDIN.can_read() {
-                        poll.revents = poll.revents | PE::IN;
-                        events = events + 1;
-                    }
+            poll.revents = PE::empty();
+            if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
+                let status = file_like.poll()?;
+                if status.error {
+                    poll.revents |= PE::HUP;
+                    events += 1;
                 }
-                Some(FileLike::Socket(socket)) => {
-                    let (input, output, err) = socket.poll();
-                    if err {
-                        poll.revents = poll.revents | PE::HUP;
-                        events = events + 1;
-                    }
-                    if input && poll.events.contains(PE::IN) {
-                        poll.revents = poll.revents | PE::IN;
-                        events = events + 1;
-                    }
-                    if output && poll.events.contains(PE::OUT) {
-                        poll.revents = poll.revents | PE::OUT;
-                        events = events + 1;
-                    }
+                if status.read && poll.events.contains(PE::IN) {
+                    poll.revents |= PE::IN;
+                    events += 1;
                 }
-                None => {
-                    poll.revents = poll.revents | PE::ERR;
-                    events = events + 1;
+                if status.write && poll.events.contains(PE::OUT) {
+                    poll.revents |= PE::OUT;
+                    events += 1;
                 }
+            } else {
+                poll.revents |= PE::ERR;
+                events += 1;
             }
         }
         drop(proc);
@@ -163,33 +153,21 @@ pub fn sys_select(
         let proc = process();
         let mut events = 0;
         for (&fd, file_like) in proc.files.iter() {
-            if fd < nfds {
-                match file_like {
-                    FileLike::File(_) => {
-                        // FIXME: assume it is stdin for now
-                        if STDIN.can_read() {
-                            if read_fds.contains(fd) {
-                                read_fds.set(fd);
-                                events = events + 1;
-                            }
-                        }
-                    }
-                    FileLike::Socket(socket) => {
-                        let (input, output, err) = socket.poll();
-                        if err && err_fds.contains(fd) {
-                            err_fds.set(fd);
-                            events = events + 1;
-                        }
-                        if input && read_fds.contains(fd) {
-                            read_fds.set(fd);
-                            events = events + 1;
-                        }
-                        if output && write_fds.contains(fd) {
-                            write_fds.set(fd);
-                            events = events + 1;
-                        }
-                    }
-                }
+            if fd >= nfds {
+                continue;
+            }
+            let status = file_like.poll()?;
+            if status.error && err_fds.contains(fd) {
+                err_fds.set(fd);
+                events += 1;
+            }
+            if status.read && read_fds.contains(fd) {
+                read_fds.set(fd);
+                events += 1;
+            }
+            if status.write && write_fds.contains(fd) {
+                write_fds.set(fd);
+                events += 1;
             }
         }
         drop(proc);
@@ -1165,8 +1143,6 @@ pub struct PollFd {
 
 bitflags! {
     pub struct PollEvents: u16 {
-        /// Nothing Happens
-        const NONE = 0x0000;
         /// There is data to read.
         const IN = 0x0001;
         /// Writing is now possible.

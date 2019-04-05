@@ -2,8 +2,9 @@ use core::fmt;
 
 use super::FileHandle;
 use crate::net::Socket;
-use crate::syscall::SysResult;
+use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
+use rcore_fs::vfs::PollStatus;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -30,12 +31,22 @@ impl FileLike {
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
         match self {
-            FileLike::File(file) => {
-                warn!("ioctl not implemented for file");
-                Ok(0)
+            FileLike::File(file) => file.io_control(request as u32, arg1 as u32)?,
+            FileLike::Socket(socket) => {
+                socket.ioctl(request, arg1, arg2, arg3)?;
             }
-            FileLike::Socket(socket) => socket.ioctl(request, arg1, arg2, arg3),
         }
+        Ok(0)
+    }
+    pub fn poll(&self) -> Result<PollStatus, SysError> {
+        let status = match self {
+            FileLike::File(file) => file.poll()?,
+            FileLike::Socket(socket) => {
+                let (read, write, error) = socket.poll();
+                PollStatus { read, write, error }
+            }
+        };
+        Ok(status)
     }
 }
 
