@@ -15,6 +15,7 @@ pub fn init() {
     unsafe {
         // Set the exception vector address
         cp0::ebase::write_u32(trap_entry as u32);
+        println!("Set ebase = {:x}", trap_entry as u32);
 
         let mut status = cp0::status::read();
         // Enable IPI
@@ -127,6 +128,10 @@ fn syscall(tf: &mut TrapFrame) {
     tf.v0 = ret as usize;
 }
 
+extern {
+    static root_page_table_ptr : *mut usize;
+}
+
 fn page_fault(tf: &mut TrapFrame) {
     // TODO: set access/dirty bit
     let addr = tf.vaddr;
@@ -135,4 +140,6 @@ fn page_fault(tf: &mut TrapFrame) {
     if !crate::memory::handle_page_fault(addr) {
         crate::trap::error(tf);
     }
+
+
 }

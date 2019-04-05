@@ -107,9 +107,12 @@ impl InactivePageTable for InactivePageTable0 {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(PhysAddr::new(target));
-        active_table().with_temporary_map(target, |_, table: &mut MIPSPageTable| {
-            table.zero();
-        });
+
+        let table = unsafe {
+            &mut *(target as *mut MIPSPageTable)
+        };
+
+        table.zero();
         InactivePageTable0 { root_frame: frame }
     }
 

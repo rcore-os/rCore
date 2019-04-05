@@ -15,9 +15,9 @@ SECTIONS
     .text : {
         stext = .;
         *(.text.entry)
-        *(.text .text.*)
         . = ALIGN(4K);
         *(.text.ebase)
+        *(.text .text.*)
         . = ALIGN(4K);
         etext = .;
     }
