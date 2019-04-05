@@ -127,7 +127,7 @@ else ifeq ($(arch), mipsel)
 ifeq ($(board), malta)
 qemu_opts += \
 	-machine $(board) \
-	-serial none -serial none -serial mon:stdio \
+	-serial mon:stdio \
 	-kernel $(kernel_img)
 endif
 endif
