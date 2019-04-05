@@ -9,24 +9,23 @@ mod context;
 
 /// Initialize interrupt
 pub fn init() {
-    // TODO
- //   extern {
- //       fn trap_entry();
- //   }
- //   unsafe {
- //       // Set sscratch register to 0, indicating to exception vector that we are
- //       // presently executing in the kernel
- //       sscratch::write(0);
- //       // Set the exception vector address
- //       stvec::write(trap_entry as usize, stvec::TrapMode::Direct);
- //       // Enable IPI
- //       sie::set_ssoft();
- //       // Enable external interrupt
- //       if super::cpu::id() == super::BOOT_HART_ID {
- //           sie::set_sext();
- //       }
- //   }
- //   info!("interrupt: init end");
+    extern {
+        fn trap_entry();
+    }
+    unsafe {
+        // Set the exception vector address
+        cp0::ebase::write_u32(trap_entry as u32);
+
+        let mut status = cp0::status::read();
+        // Enable IPI
+        status.enable_soft_int0();
+        status.enable_soft_int1();
+        // Enable clock interrupt
+        status.enable_hard_int5();
+
+        cp0::status::write(status);
+    }
+    info!("interrupt: init end");
 }
 
 /// Enable interrupt
@@ -56,20 +55,28 @@ pub unsafe fn restore(flags: usize) {
 /// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
-    // TODO
-    use self::scause::{Trap, Interrupt as I, Exception as E};
-    // trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), tf.scause.cause());
-    match tf.scause.cause() {
-        Trap::Interrupt(I::SupervisorExternal) => external(),
-        Trap::Interrupt(I::SupervisorSoft) => ipi(),
-        Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::UserEnvCall) => syscall(tf),
-        Trap::Exception(E::LoadPageFault) => page_fault(tf),
-        Trap::Exception(E::StorePageFault) => page_fault(tf),
-        Trap::Exception(E::InstructionPageFault) => page_fault(tf),
+    use cp0::cause::{Exception as E};
+    trace!("Interrupt @ CPU{}: {:?} ", 0, tf.cause.cause());
+    match tf.cause.cause() {
+        E::Interrupt => interrupt_dispatcher(),
+        E::Syscall => syscall(tf),
+        E::TLBModification => page_fault(tf),
+        E::TLBLoadMiss => page_fault(tf),
+        E::TLBStoreMiss => page_fault(tf),
         _ => crate::trap::error(tf),
     }
     trace!("Interrupt end");
+}
+
+fn interrupt_dispatcher(tf: &mut TrapFrame) {
+    let pint = tf.cause.pending_interrupt();
+    if (pint & 0b10000_00) != 0 {
+        timer();
+    } else if (pint & 0xb01111_00) != 0 {
+        external();
+    } else {
+        ipi();
+    }
 }
 
 fn external() {
@@ -104,7 +111,7 @@ fn try_process_drivers() -> bool {
 }
 
 fn ipi() {
-    // TODO
+    /* do nothing */
     debug!("IPI");
 //    super::sbi::clear_ipi();
 }
@@ -115,14 +122,14 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    tf.sepc += 4;   // Must before syscall, because of fork.
+    tf.epc += 4;   // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(tf.t0, [tf.t0, tf.t1, tf.t2, tf.t3, tf.s0, tf.s1], tf);
     tf.v0 = ret as usize;
 }
 
 fn page_fault(tf: &mut TrapFrame) {
-    // TODO
-    let addr = tf.stval;
+    // TODO: set access/dirty bit
+    let addr = tf.vaddr;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     if !crate::memory::handle_page_fault(addr) {

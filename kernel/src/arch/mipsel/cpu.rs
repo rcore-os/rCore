@@ -1,20 +1,11 @@
+use mips::registers::cp0;
 use crate::consts::MAX_CPU_NUM;
 use core::ptr::{read_volatile, write_volatile};
 
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 
-pub unsafe fn set_cpu_id(cpu_id: usize) {
-    asm!("mv gp, $0" : : "r"(cpu_id));
-}
-
 pub fn id() -> usize {
-    let cpu_id;
-    unsafe { asm!("mv $0, gp" : "=r"(cpu_id)); }
-    cpu_id
-}
-
-pub fn send_ipi(cpu_id: usize) {
-    super::sbi::send_ipi(1 << cpu_id);
+    (cp0::ebase::read_u32() as usize) & 0x3ff
 }
 
 pub unsafe fn has_started(cpu_id: usize) -> bool {
@@ -30,9 +21,10 @@ pub unsafe fn start_others(hart_mask: usize) {
 }
 
 pub fn halt() {
-    unsafe { riscv::asm::wfi() }
+    /* nothing to do */
 }
 
 pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
-    super::sbi::shutdown()
+    /* nothing to do */
+    loop {}
 }

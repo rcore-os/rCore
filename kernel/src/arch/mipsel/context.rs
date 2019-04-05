@@ -92,9 +92,9 @@ impl Debug for TrapFrame {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         f.debug_struct("TrapFrame")
             .field("status", &self.status.bits)
-            .field("epc", &self.epc.bits)
+            .field("epc", &self.epc)
             .field("cause", &self.cause.bits)
-            .field("vaddr", &self.vaddr.bits)
+            .field("vaddr", &self.vaddr)
             .finish()
     }
 }
