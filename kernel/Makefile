@@ -16,18 +16,19 @@
 #
 # Options:
 #   arch    = x86_64 | riscv32 | riscv64 | aarch64
-#   d    = int | in_asm | ...   QEMU debug info
+#   d    = int | in_asm | ...    QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
-#   SFSIMG = <sfsimg>              SFS image path of user programs
-#   smp     = 1 | 2 | ...           SMP core number
-#   graphic = on | off              enable/disable qemu graphical output
-#   board   = none                Running on QEMU
-#         | u540                Only available on riscv64, run on HiFive U540, use Sv39
-#         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
-#   pci_passthru = 0000:00:00.1 Only available on x86_64, passthrough the specified PCI device
-#   init = /bin/ls              Only available on riscv64, run specified program instead of user shell
+#   SFSIMG = <sfsimg>            SFS image path of user programs
+#   smp     = 1 | 2 | ...        SMP core number
+#   graphic = on | off           Enable/disable qemu graphical output
+#   board   = none               Running on QEMU
+#         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
+#         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
+#   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
+#   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
 #   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
+#   u_boot = /path/to/u-boot.bin Only available on aarch64, use u-boot to boot rcore
 
 arch ?= riscv64
 board ?= none
@@ -114,6 +115,10 @@ qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img)
+ifneq ($(u_boot), )
+qemu_opts += \
+	-sd $(bootloader)
+endif
 endif
 
 ifdef d
@@ -262,7 +267,11 @@ else ifeq ($(arch), riscv64)
 	make -j && \
 	cp bbl $(abspath $@)
 else ifeq ($(arch), aarch64)
+ifneq ($(u_boot), )
+	@cp $(u_boot) $@
+else
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
+endif
 endif
 
 kernel:
