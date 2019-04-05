@@ -131,7 +131,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let pt: *MIPSPageTable = self.token() as *MIPSPageTable;
+        let pt: *mut MIPSPageTable = self.token() as *mut MIPSPageTable;
         let active = ActivePageTable(
                 TwoLevelPageTable::new(&mut *pt),
                 ::core::mem::uninitialized()
