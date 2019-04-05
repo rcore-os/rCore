@@ -24,8 +24,8 @@ pub fn fp() -> usize {
     }
     #[cfg(any(target_arch = "mips"))]
     unsafe {
-        // fp = $30
-        asm!("ori $0, $$$30, 0" : "=r"(ptr));
+        // fp = s8 = $30
+        asm!("ori $0, $$$1, 0" : "=r"(ptr): "i"(30));
     }
 
     ptr
@@ -51,7 +51,7 @@ pub fn lr() -> usize {
 
     #[cfg(target_arch = "mips")]
     unsafe {
-        asm!("ori $0, $$$31, 0" : "=r"(ptr));
+        asm!("ori $0, $$$1, 0" : "=r"(ptr) : "i"(31));
     }
 
     ptr
