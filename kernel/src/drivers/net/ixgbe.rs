@@ -26,7 +26,7 @@ use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS,
 
 #[derive(Clone)]
 struct IXGBEDriver {
-    inner: ixgbe::IXGBEDriver,
+    inner: Arc<Mutex<ixgbe::IXGBE<Provider>>>,
     header: usize,
     size: usize,
     mtu: usize,
@@ -49,7 +49,7 @@ impl Driver for IXGBEInterface {
 
         let handled = {
             let _ = FlagsGuard::no_irq_region();
-            self.driver.inner.try_handle_interrupt()
+            self.driver.inner.lock().try_handle_interrupt()
         };
 
         if handled {
@@ -102,7 +102,7 @@ impl Driver for IXGBEInterface {
     }
 
     fn send(&self, data: &[u8]) -> Option<usize> {
-        self.driver.inner.send(&data);
+        self.driver.inner.lock().send(&data);
         Some(data.len())
     }
 
@@ -121,8 +121,8 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let _ = FlagsGuard::no_irq_region();
-        if self.inner.can_send() {
-            if let Some(data) = self.inner.recv() {
+        if self.inner.lock().can_send() {
+            if let Some(data) = self.inner.lock().recv() {
                 Some((IXGBERxToken(data), IXGBETxToken(self.clone())))
             } else {
                 None
@@ -134,7 +134,7 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
         let _ = FlagsGuard::no_irq_region();
-        if self.inner.can_send() {
+        if self.inner.lock().can_send() {
             Some(IXGBETxToken(self.clone()))
         } else {
             None
@@ -168,10 +168,10 @@ impl phy::TxToken for IXGBETxToken {
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
         let _ = FlagsGuard::no_irq_region();
-        let mut buffer = [0u8; ixgbe::IXGBEDriver::get_mtu()];
+        let mut buffer = [0u8; ixgbe::IXGBE::<Provider>::get_mtu()];
         let result = f(&mut buffer[..len]);
         if result.is_ok() {
-            (self.0).inner.send(&buffer[..len]);
+            self.0.inner.lock().send(&buffer[..len]);
         }
         result
     }
@@ -185,13 +185,13 @@ pub fn ixgbe_init(
     index: usize,
 ) -> Arc<IXGBEInterface> {
     let _ = FlagsGuard::no_irq_region();
-    let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
+    let mut ixgbe = ixgbe::IXGBE::new(header, size);
     ixgbe.enable_irq();
 
     let ethernet_addr = EthernetAddress::from_bytes(&ixgbe.get_mac().as_bytes());
 
     let net_driver = IXGBEDriver {
-        inner: ixgbe,
+        inner: Arc::new(Mutex::new(ixgbe)),
         header,
         size,
         mtu: 1500,

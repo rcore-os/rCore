@@ -149,7 +149,7 @@ pub fn init_driver(dev: &PCIDevice) {
                 active_table().map(vaddr, addr as usize);
                 PCI_DRIVERS
                     .lock()
-                    .insert(dev.loc, ahci::ahci_init(irq, vaddr, len as usize));
+                    .insert(dev.loc, ahci::init(irq, vaddr, len as usize));
             }
         }
         _ => {}
