@@ -51,11 +51,16 @@ user_dir := ../user
 
 
 ### export environments ###
+
+ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
+#link user img, so use original image
+export SFSIMG = $(user_dir)/build/$(arch).img
+else
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
+endif
 
 ifeq ($(arch), aarch64)
 board := raspi3
-export SFSIMG = $(user_dir)/build/$(arch).img
 endif
 
 # currently only mipsel architecture needs DTB linked to the kernel
@@ -294,7 +299,6 @@ else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
 else ifeq ($(arch), mipsel)
 	# qemu-system-mipsel accepts ELF file only, so don't use objcopy
-	@cp $(kernel) $(kernel)_orig
 	@$(strip) $(kernel) -o $@
 endif
 
