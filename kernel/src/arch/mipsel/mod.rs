@@ -12,7 +12,6 @@ pub mod driver;
 
 use log::*;
 use mips::registers::cp0;
-use mips::instructions;
 
 #[cfg(feature = "board_malta")]
 #[path = "board/malta/mod.rs"]
@@ -40,7 +39,6 @@ pub extern fn rust_main() -> ! {
     let ebase = cp0::ebase::read_u32();
     let cpu_id = ebase & 0x3ff;
     let dtb_start = _dtb_start as usize;
-    let dtb_end = _dtb_end as usize;
 
     if cpu_id != BOOT_CPU_ID {
         // TODO: run others_main on other CPU

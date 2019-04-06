@@ -1,5 +1,7 @@
 //! 16550 serial adapter driver for malta board
 
+#![allow(dead_code)]
+
 use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
 use spin::Mutex;
