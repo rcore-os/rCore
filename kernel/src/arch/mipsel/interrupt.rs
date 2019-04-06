@@ -1,6 +1,9 @@
 use mips::interrupts;
+use mips::tlb;
 use mips::registers::cp0;
 use crate::drivers::DRIVERS;
+use mips::paging::{PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable};
+use mips::addr::*;
 pub use self::context::*;
 use log::*;
 
@@ -141,5 +144,10 @@ fn page_fault(tf: &mut TrapFrame) {
         crate::trap::error(tf);
     }
 
-
+    let virt_addr = VirtAddr::new(addr);
+    let root_table = unsafe {
+        &mut *(root_page_table_ptr as *mut MIPSPageTable)
+    };
+    let tlb_entry = root_table.lookup(addr);
+    tlb::write_tlb_random(tlb_entry);
 }
