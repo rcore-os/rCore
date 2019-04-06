@@ -174,6 +174,8 @@ impl Context {
     /// The stack pointer will be set to `kstack_top`.
     /// The SATP register will be set to `satp`.
     pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, satp: usize) -> Self {
+        trace!("New kernel thread @ {:x}, stack = {:x}", entry as usize, kstack_top);
+
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
@@ -186,6 +188,8 @@ impl Context {
     /// The stack pointer of user and kernel mode will be set to `ustack_top`, `kstack_top`.
     /// The SATP register will be set to `satp`.
     pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, satp: usize) -> Self {
+        trace!("New user thread @ {:x}, stack = {:x}", entry_addr, kstack_top);
+
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),

@@ -61,7 +61,7 @@ pub unsafe fn restore(flags: usize) {
 #[no_mangle]
 pub extern fn rust_trap(tf: &mut TrapFrame) {
     use cp0::cause::{Exception as E};
-    trace!("Interrupt @ CPU{}: {:?} ", 0, tf.cause.cause());
+    trace!("Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
     match tf.cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),
@@ -75,6 +75,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
     let pint = tf.cause.pending_interrupt();
+    trace!("  Interrupt {:?} ", tf.cause.pending_interrupt());
     if (pint & 0b10000_00) != 0 {
         timer();
     } else if (pint & 0xb01111_00) != 0 {
@@ -116,9 +117,9 @@ fn try_process_drivers() -> bool {
 }
 
 fn ipi() {
-    /* do nothing */
     debug!("IPI");
-//    super::sbi::clear_ipi();
+    cp0::cause::reset_soft_int0();
+    cp0::cause::reset_soft_int1();
 }
 
 fn timer() {

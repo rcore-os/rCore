@@ -58,14 +58,6 @@ lazy_static! {
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 
-        let device2 = {
-            extern {
-                fn _user_img_start();
-                fn _user_img_end();
-            }
-            Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
-        };
-
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
         sfs.root_inode()
     };

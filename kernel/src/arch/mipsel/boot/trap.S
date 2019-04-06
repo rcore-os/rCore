@@ -92,8 +92,9 @@ trap_from_kernel:
 	mtc0 t1, $12     # cp0.status
 
 	# prepare to call rust_trap
+	ori a0, sp, 0             /* set argument (trapframe) */
 	jal rust_trap
-	addiu a0, sp, 16             /* set argument (trapframe) */
+	nop
 
 	.globl trap_return
 trap_return:
