@@ -22,7 +22,7 @@ _start:
     mtc0  t0, $12
 
     # directly jump to main function
-    j rust_main
+    jal   rust_main
 	nop
 
     .section .bss.stack
