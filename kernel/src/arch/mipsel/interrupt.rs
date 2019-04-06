@@ -76,9 +76,9 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
     let pint = tf.cause.pending_interrupt();
     trace!("  Interrupt {:?} ", tf.cause.pending_interrupt());
-    if (pint & 0b10000_00) != 0 {
+    if (pint & 0b100_000_00) != 0 {
         timer();
-    } else if (pint & 0xb01111_00) != 0 {
+    } else if (pint & 0b011_111_00) != 0 {
         external();
     } else {
         ipi();
@@ -129,7 +129,7 @@ fn timer() {
 
 fn syscall(tf: &mut TrapFrame) {
     tf.epc += 4;   // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(tf.t0, [tf.t0, tf.t1, tf.t2, tf.t3, tf.s0, tf.s1], tf);
+    let ret = crate::syscall::syscall(tf.t0, [tf.a0, tf.a1, tf.a2, tf.a3, tf.s0, tf.s1], tf);
     tf.v0 = ret as usize;
 }
 
