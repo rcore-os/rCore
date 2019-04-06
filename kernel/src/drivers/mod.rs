@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use lazy_static::lazy_static;
-use smoltcp::wire::{EthernetAddress, IpAddress, Ipv4Address};
+use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address};
 use spin::RwLock;
 
 use crate::sync::Condvar;
@@ -53,6 +53,11 @@ pub trait Driver: Send + Sync {
 
     // get interface name for this device
     fn get_ifname(&self) -> String {
+        unimplemented!("not a net driver")
+    }
+
+    // get ip addresses
+    fn get_ip_addresses(&self) -> Vec<IpCidr> {
         unimplemented!("not a net driver")
     }
 

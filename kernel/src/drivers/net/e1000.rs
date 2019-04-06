@@ -73,6 +73,11 @@ impl Driver for E1000Interface {
         self.name.clone()
     }
 
+    // get ip addresses
+    fn get_ip_addresses(&self) -> Vec<IpCidr> {
+        Vec::from(self.iface.lock().ip_addrs())
+    }
+
     fn ipv4_address(&self) -> Option<Ipv4Address> {
         self.iface.lock().ipv4_address()
     }

@@ -745,7 +745,7 @@ impl Socket for PacketSocketState {
 }
 
 /// Common structure:
-/// | nlmsghdr | ifinfomsg | rtattr | rtattr | rtattr | ... | rtattr
+/// | nlmsghdr | ifinfomsg/ifaddrmsg | rtattr | rtattr | rtattr | ... | rtattr
 /// All aligned to 4 bytes boundary
 
 #[repr(C)]
@@ -766,6 +766,16 @@ struct IfaceInfoMsg {
     ifi_index: u32,
     ifi_flags: u32,
     ifi_change: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct IfaceAddrMsg {
+    ifa_family: u8,
+    ifa_prefixlen: u8,
+    ifa_flags: u8,
+    ifa_scope: u8,
+    ifa_index: u32,
 }
 
 #[repr(C)]
@@ -982,22 +992,70 @@ impl Socket for NetlinkSocketState {
 
                     buffer.push(msg);
                 }
+            }
+            NetlinkMessageType::GetAddr => {
+                let ifaces = NET_DRIVERS.read();
+                for i in 0..ifaces.len() {
+                    let ip_addrs = ifaces[i].get_ip_addresses();
+                    for j in 0..ip_addrs.len() {
+                        let mut msg = Vec::new();
+                        let mut new_header = NetlinkMessageHeader {
+                            nlmsg_len: 0, // to be determined later
+                            nlmsg_type: NetlinkMessageType::NewAddr.into(),
+                            nlmsg_flags: NetlinkMessageFlags::MULTI,
+                            nlmsg_seq: header.nlmsg_seq,
+                            nlmsg_pid: header.nlmsg_pid,
+                        };
+                        msg.push_ext(new_header);
 
-                let mut msg = Vec::new();
-                let mut new_header = NetlinkMessageHeader {
-                    nlmsg_len: 0, // to be determined later
-                    nlmsg_type: NetlinkMessageType::Done.into(),
-                    nlmsg_flags: NetlinkMessageFlags::MULTI,
-                    nlmsg_seq: header.nlmsg_seq,
-                    nlmsg_pid: header.nlmsg_pid,
-                };
-                msg.push_ext(new_header);
-                msg.align4();
-                msg.set_ext(0, msg.len() as u32);
-                buffer.push(msg);
+                        let family: u16 = AddressFamily::Internet.into();
+                        let if_addr = IfaceAddrMsg {
+                            ifa_family: family as u8,
+                            ifa_prefixlen: ip_addrs[j].prefix_len(),
+                            ifa_flags: 0,
+                            ifa_scope: 0,
+                            ifa_index: i as u32,
+                        };
+                        msg.align4();
+                        msg.push_ext(if_addr);
+
+                        let mut attrs = Vec::new();
+
+                        let ip_addr = ip_addrs[j].address();
+                        let attr = RouteAttr {
+                            rta_len: (ip_addr.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                            rta_type: RouteAttrTypes::Address.into(),
+                        };
+                        attrs.align4();
+                        attrs.push_ext(attr);
+                        for byte in ip_addr.as_bytes() {
+                            attrs.push(*byte);
+                        }
+
+                        msg.align4();
+                        msg.append(&mut attrs);
+
+                        msg.align4();
+                        msg.set_ext(0, msg.len() as u32);
+
+                        buffer.push(msg);
+                    }
+                }
             }
             _ => {}
         }
+        let mut msg = Vec::new();
+        let mut new_header = NetlinkMessageHeader {
+            nlmsg_len: 0, // to be determined later
+            nlmsg_type: NetlinkMessageType::Done.into(),
+            nlmsg_flags: NetlinkMessageFlags::MULTI,
+            nlmsg_seq: header.nlmsg_seq,
+            nlmsg_pid: header.nlmsg_pid,
+        };
+        msg.push_ext(new_header);
+        msg.align4();
+        msg.set_ext(0, msg.len() as u32);
+        buffer.push(msg);
         Ok(data.len())
     }
 

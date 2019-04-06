@@ -193,7 +193,7 @@ pub fn sys_recvmsg(fd: usize, msg: *mut MsgHdr, flags: usize) -> SysResult {
             sockaddr_in.write_to(&mut proc, hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
         }
     }
-    unimplemented!()
+    result
 }
 
 pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
@@ -302,9 +302,9 @@ impl Process {
     }
 }
 
-// cancel alignment
-#[repr(packed)]
+#[repr(C)]
 pub struct SockAddrIn {
+    pub sin_family: u16,
     pub sin_port: u16,
     pub sin_addr: u32,
     pub sin_zero: [u8; 8],
@@ -312,12 +312,13 @@ pub struct SockAddrIn {
 
 #[repr(C)]
 pub struct SockAddrUn {
+    pub sun_family: u16,
     pub sun_path: [u8; 108],
 }
 
-// beware of alignment issue
-#[repr(C, packed)]
+#[repr(C)]
 pub struct SockAddrLl {
+    pub sll_family: u16,
     pub sll_protocol: u16,
     pub sll_ifindex: u32,
     pub sll_hatype: u16,
@@ -326,26 +327,22 @@ pub struct SockAddrLl {
     pub sll_addr: [u8; 8],
 }
 
-// cancel alignment
-#[repr(packed)]
+#[repr(C)]
 pub struct SockAddrNl {
+    nl_family: u16,
     nl_pad: u16,
     nl_pid: u32,
     nl_groups: u32,
 }
 
 #[repr(C)]
-pub union SockAddrPayload {
+pub union SockAddr {
+    pub family: u16,
     pub addr_in: SockAddrIn,
     pub addr_un: SockAddrUn,
     pub addr_ll: SockAddrLl,
     pub addr_nl: SockAddrNl,
-}
-
-#[repr(C)]
-pub struct SockAddr {
-    pub family: u16,
-    pub payload: SockAddrPayload,
+    pub addr_ph: SockAddrPlaceholder,
 }
 
 #[repr(C)]
@@ -359,16 +356,41 @@ impl From<Endpoint> for SockAddr {
         if let Endpoint::Ip(ip) = endpoint {
             match ip.addr {
                 IpAddress::Ipv4(ipv4) => SockAddr {
-                    family: AddressFamily::Internet.into(),
-                    payload: SockAddrPayload {
-                        addr_in: SockAddrIn {
-                            sin_port: u16::to_be(ip.port),
-                            sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
-                            sin_zero: [0; 8],
-                        },
+                    addr_in: SockAddrIn {
+                        sin_family: AddressFamily::Internet.into(),
+                        sin_port: u16::to_be(ip.port),
+                        sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
+                        sin_zero: [0; 8],
+                    },
+                },
+                IpAddress::Unspecified => SockAddr {
+                    addr_ph: SockAddrPlaceholder {
+                        family: AddressFamily::Unspecified.into(),
+                        data: [0; 14],
                     },
                 },
                 _ => unimplemented!("only ipv4"),
+            }
+        } else if let Endpoint::LinkLevel(link_level) = endpoint {
+            SockAddr {
+                addr_ll: SockAddrLl {
+                    sll_family: AddressFamily::Packet.into(),
+                    sll_protocol: 0,
+                    sll_ifindex: link_level.interface_index as u32,
+                    sll_hatype: 0,
+                    sll_pkttype: 0,
+                    sll_halen: 0,
+                    sll_addr: [0; 8],
+                },
+            }
+        } else if let Endpoint::Netlink(netlink) = endpoint {
+            SockAddr {
+                addr_nl: SockAddrNl {
+                    nl_family: AddressFamily::Netlink.into(),
+                    nl_pad: 0,
+                    nl_pid: netlink.port_id,
+                    nl_groups: netlink.multicast_groups_mask,
+                },
             }
         } else {
             unimplemented!("only ip");
@@ -390,31 +412,31 @@ fn sockaddr_to_endpoint(
     unsafe {
         match AddressFamily::from((*addr).family) {
             AddressFamily::Internet => {
-                if len < size_of::<u16>() + size_of::<SockAddrIn>() {
+                if len < size_of::<SockAddrIn>() {
                     return Err(SysError::EINVAL);
                 }
-                let port = u16::from_be((*addr).payload.addr_in.sin_port);
+                let port = u16::from_be((*addr).addr_in.sin_port);
                 let addr = IpAddress::from(Ipv4Address::from_bytes(
-                    &u32::from_be((*addr).payload.addr_in.sin_addr).to_be_bytes()[..],
+                    &u32::from_be((*addr).addr_in.sin_addr).to_be_bytes()[..],
                 ));
                 Ok(Endpoint::Ip((addr, port).into()))
             }
             AddressFamily::Unix => Err(SysError::EINVAL),
             AddressFamily::Packet => {
-                if len < size_of::<u16>() + size_of::<SockAddrLl>() {
+                if len < size_of::<SockAddrLl>() {
                     return Err(SysError::EINVAL);
                 }
                 Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
-                    (*addr).payload.addr_ll.sll_ifindex as usize,
+                    (*addr).addr_ll.sll_ifindex as usize,
                 )))
             }
             AddressFamily::Netlink => {
-                if len < size_of::<u16>() + size_of::<SockAddrNl>() {
+                if len < size_of::<SockAddrNl>() {
                     return Err(SysError::EINVAL);
                 }
                 Ok(Endpoint::Netlink(NetlinkEndpoint::new(
-                    (*addr).payload.addr_nl.nl_pid,
-                    (*addr).payload.addr_nl.nl_groups,
+                    (*addr).addr_nl.nl_pid,
+                    (*addr).addr_nl.nl_groups,
                 )))
             }
             _ => Err(SysError::EINVAL),
@@ -439,7 +461,9 @@ impl SockAddr {
         proc.vm.check_write_ptr(addr_len)?;
         let max_addr_len = *addr_len as usize;
         let full_len = match AddressFamily::from(self.family) {
-            AddressFamily::Internet => size_of::<u16>() + size_of::<SockAddrIn>(),
+            AddressFamily::Internet => size_of::<SockAddrIn>(),
+            AddressFamily::Packet => size_of::<SockAddrLl>(),
+            AddressFamily::Netlink => size_of::<SockAddrNl>(),
             AddressFamily::Unix => return Err(SysError::EINVAL),
             _ => return Err(SysError::EINVAL),
         };
