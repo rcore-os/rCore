@@ -4,6 +4,8 @@ use mips::registers::cp0;
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
+    /// unused 16 bytes
+    pub unused: [usize; 4],
     /// CP0 status register
     pub status: cp0::status::Status,
     /// CP0 cause register

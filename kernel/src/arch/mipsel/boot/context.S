@@ -22,8 +22,8 @@ switch_context:
 	sw s7, 9*4(sp)
 	sw s8, 10*4(sp)
 	sw gp, 11*4(sp)
-	sw ra, 12*4(sp)
-	sw sp, 13*4(sp)
+	// sw ra, 12*4(sp)
+	// sw sp, 13*4(sp)
 
 	la s0, _root_page_table_ptr
 	lw AT, 0(s0)
@@ -45,8 +45,6 @@ switch_context:
 	lw s7, 9*4(sp)
 	lw s8, 10*4(sp)
 	lw gp, 11*4(sp)
-	lw ra, 12*4(sp)
-	lw sp, 13*4(sp)
 	addi sp, sp, (4*14)
 
 	sw zero, 0(a1)
