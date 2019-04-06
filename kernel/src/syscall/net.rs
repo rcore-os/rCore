@@ -1,5 +1,6 @@
 //! Syscalls for networking
 
+use super::fs::IoVecs;
 use super::*;
 use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::FileLike;
@@ -171,6 +172,28 @@ pub fn sys_recvfrom(
     }
 
     result
+}
+
+pub fn sys_recvmsg(fd: usize, msg: *mut MsgHdr, flags: usize) -> SysResult {
+    info!("recvmsg: fd: {}, msg: {:?}, flags: {}", fd, msg, flags);
+    let mut proc = process();
+    proc.vm.check_read_ptr(msg)?;
+    let hdr = unsafe { &mut *msg };
+    let mut iovs = IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &proc.vm, true)?;
+
+    let mut buf = iovs.new_buf(true);
+    let socket = proc.get_socket(fd)?;
+    let (result, endpoint) = socket.read(&mut buf);
+
+    if let Ok(len) = result {
+        // copy data to user
+        iovs.write_all_from_slice(&buf[..len]);
+        let sockaddr_in = SockAddr::from(endpoint);
+        unsafe {
+            sockaddr_in.write_to(&mut proc, hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
+        }
+    }
+    unimplemented!()
 }
 
 pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
@@ -431,6 +454,18 @@ impl SockAddr {
         addr_len.write(full_len as u32);
         return Ok(0);
     }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct MsgHdr {
+    msg_name: *mut SockAddr,
+    msg_namelen: u32,
+    msg_iov: *mut IoVec,
+    msg_iovlen: usize,
+    msg_control: usize,
+    msg_controllen: usize,
+    msg_flags: usize,
 }
 
 enum_with_unknown! {

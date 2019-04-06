@@ -1069,10 +1069,10 @@ pub struct IoVec {
 
 /// A valid IoVecs request from user
 #[derive(Debug)]
-struct IoVecs(Vec<&'static mut [u8]>);
+pub struct IoVecs(Vec<&'static mut [u8]>);
 
 impl IoVecs {
-    fn check_and_new(
+    pub fn check_and_new(
         iov_ptr: *const IoVec,
         iov_count: usize,
         vm: &MemorySet,
@@ -1098,7 +1098,7 @@ impl IoVecs {
         Ok(IoVecs(slices))
     }
 
-    fn read_all_to_vec(&self) -> Vec<u8> {
+    pub fn read_all_to_vec(&self) -> Vec<u8> {
         let mut buf = self.new_buf(false);
         for slice in self.0.iter() {
             buf.extend(slice.iter());
@@ -1106,7 +1106,7 @@ impl IoVecs {
         buf
     }
 
-    fn write_all_from_slice(&mut self, buf: &[u8]) {
+    pub fn write_all_from_slice(&mut self, buf: &[u8]) {
         let mut copied_len = 0;
         for slice in self.0.iter_mut() {
             let copy_len = min(slice.len(), buf.len() - copied_len);
@@ -1122,7 +1122,7 @@ impl IoVecs {
     /// Create a new Vec buffer from IoVecs
     /// For readv:  `set_len` is true,  Vec.len = total_len.
     /// For writev: `set_len` is false, Vec.cap = total_len.
-    fn new_buf(&self, set_len: bool) -> Vec<u8> {
+    pub fn new_buf(&self, set_len: bool) -> Vec<u8> {
         let total_len = self.0.iter().map(|slice| slice.len()).sum::<usize>();
         let mut buf = Vec::with_capacity(total_len);
         if set_len {

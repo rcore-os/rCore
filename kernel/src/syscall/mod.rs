@@ -109,7 +109,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             args[5] as *mut u32,
         ),
         //        SYS_SENDMSG => sys_sendmsg(),
-        //        SYS_RECVMSG => sys_recvmsg(),
+        SYS_RECVMSG => sys_recvmsg(args[0], args[1] as *mut MsgHdr, args[2]),
         SYS_SHUTDOWN => sys_shutdown(args[0], args[1]),
         SYS_BIND => sys_bind(args[0], args[1] as *const SockAddr, args[2]),
         // 50

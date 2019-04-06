@@ -4,6 +4,8 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 use crate::util;
 use alloc::boxed::Box;
+use bitflags::*;
+use core::mem::size_of;
 
 use smoltcp::socket::*;
 use smoltcp::wire::*;
@@ -738,6 +740,62 @@ impl Socket for PacketSocketState {
     }
 }
 
+#[repr(C)]
+#[derive(Debug)]
+struct NetlinkMessageHeader {
+    nlmsg_len: u32,                   // length of message including header
+    nlmsg_type: u16,                  // message content
+    nlmsg_flags: NetlinkMessageFlags, // additional flags
+    nlmsg_seq: u32,                   // sequence number
+    nlmsg_pid: u32,                   // sending process port id
+}
+
+bitflags! {
+    struct NetlinkMessageFlags : u16 {
+        const REQUEST = 0x01;
+        const MULTI = 0x02;
+        const ACK = 0x04;
+        const ECHO = 0x08;
+        const DUMP_INTR = 0x10;
+        const DUMP_FILTERED = 0x20;
+        // GET request
+        const ROOT = 0x100;
+        const MATCH = 0x200;
+        const ATOMIC = 0x400;
+        const DUMP = 0x100 | 0x200;
+        // NEW request
+        const REPLACE = 0x100;
+        const EXCL = 0x200;
+        const CREATE = 0x400;
+        const APPEND = 0x800;
+        // DELETE request
+        const NONREC = 0x100;
+        // ACK message
+        const CAPPED = 0x100;
+        const ACK_TLVS = 0x200;
+    }
+}
+
+enum_with_unknown! {
+    /// Netlink message types
+    pub doc enum NetlinkMessageType(u16) {
+        /// New link
+        NewLink = 16,
+        /// Delete link
+        DelLink = 17,
+        /// Get link
+        GetLink = 18,
+        /// Set link
+        SetLink = 19,
+        /// New addr
+        NewAddr = 20,
+        /// Delete addr
+        DelAddr = 21,
+        /// Get addr
+        GetAddr = 22,
+    }
+}
+
 impl NetlinkSocketState {
     pub fn new() -> Self {
         NetlinkSocketState {}
@@ -751,7 +809,17 @@ impl Socket for NetlinkSocketState {
 
     fn write(&self, data: &[u8], _sendto_endpoint: Option<Endpoint>) -> SysResult {
         debug!("data: {:x?}", &data);
-        unimplemented!()
+        if data.len() < size_of::<NetlinkMessageHeader>() {
+            return Err(SysError::EINVAL);
+        }
+        let header = unsafe { &*(data.as_ptr() as *const NetlinkMessageHeader) };
+        if header.nlmsg_len as usize > data.len() {
+            return Err(SysError::EINVAL);
+        }
+        let message_type = NetlinkMessageType::from(header.nlmsg_type);
+        debug!("header: {:?}", header);
+        debug!("type: {:?}", message_type);
+        Ok(data.len())
     }
 
     fn poll(&self) -> (bool, bool, bool) {

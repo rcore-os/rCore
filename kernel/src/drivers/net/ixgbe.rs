@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;
 use log::*;
-use rcore_memory::paging::PageTable;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, Checksum, DeviceCapabilities};
 use smoltcp::time::Instant;
