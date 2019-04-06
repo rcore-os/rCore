@@ -5,6 +5,7 @@ use crate::drivers::DRIVERS;
 use mips::paging::{PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable};
 use mips::addr::*;
 pub use self::context::*;
+use crate::arch::paging::get_root_page_table_ptr;
 use log::*;
 
 #[path = "context.rs"]
@@ -131,10 +132,6 @@ fn syscall(tf: &mut TrapFrame) {
     tf.v0 = ret as usize;
 }
 
-extern {
-    static root_page_table_ptr : *mut usize;
-}
-
 fn page_fault(tf: &mut TrapFrame) {
     // TODO: set access/dirty bit
     let addr = tf.vaddr;
@@ -146,7 +143,7 @@ fn page_fault(tf: &mut TrapFrame) {
 
     let virt_addr = VirtAddr::new(addr);
     let root_table = unsafe {
-        &mut *(root_page_table_ptr as *mut MIPSPageTable)
+        &mut *(get_root_page_table_ptr() as *mut MIPSPageTable)
     };
     let tlb_entry = root_table.lookup(addr);
     tlb::write_tlb_random(tlb_entry);

@@ -158,9 +158,9 @@ kernel_stack:
 kernel_stack_top:
 
     .align 12  #PGSHIFT
-    .global root_page_table_buffer
-root_page_table_buffer:
+    .global _root_page_table_buffer
+_root_page_table_buffer:
     .space 1024 * 4 # 4KB
-    .global root_page_table_ptr
-root_page_table_ptr:
+    .global _root_page_table_ptr
+_root_page_table_ptr:
     .space 4 # 4bytes

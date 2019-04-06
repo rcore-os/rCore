@@ -6,8 +6,6 @@ use mips::paging::{Mapper, PageTable as MIPSPageTable, PageTableEntry, PageTable
 use mips::paging::{FrameAllocator, FrameDeallocator};
 use rcore_memory::paging::*;
 use log::*;
-#[cfg(target_arch = "riscv32")]
-use crate::consts::KERNEL_P2_INDEX;
 
 pub struct ActivePageTable(TwoLevelPageTable<'static>, PageEntry);
 
@@ -46,18 +44,38 @@ impl PageTable for ActivePageTable {
     }
 }
 
+extern "C" {
+    fn _root_page_table_buffer();
+    fn _root_page_table_ptr();
+}
+
+pub fn set_root_page_table_ptr(ptr : usize) {
+    unsafe {
+        *(_root_page_table_ptr as *mut usize) = ptr;
+    }
+}
+
+pub fn get_root_page_table_ptr() -> usize {
+    unsafe {
+        *(_root_page_table_ptr as *mut usize)
+    }
+}
+
+pub fn root_page_table_buffer() -> &'static mut MIPSPageTable {
+    unsafe {
+        &mut *(_root_page_table_ptr as *mut MIPSPageTable)
+    }
+}
+
+
 impl PageTableExt for ActivePageTable {}
 
 /// The virtual address of root page table
-extern {
-    static root_page_table_buffer : *mut MIPSPageTable;
-    static root_page_table_ptr : *mut usize;
-}
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(
-            TwoLevelPageTable::new(&mut *(root_page_table_buffer as *mut MIPSPageTable)),
+            TwoLevelPageTable::new(root_page_table_buffer()),
             ::core::mem::uninitialized()
         )
     }
@@ -123,11 +141,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     unsafe fn set_token(token: usize) {
-        *root_page_table_ptr = token;
+        set_root_page_table_ptr(token);
     }
 
     fn active_token() -> usize {
-        unsafe { *root_page_table_ptr }
+        get_root_page_table_ptr()
     }
 
     fn flush_tlb() {

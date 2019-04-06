@@ -3,12 +3,21 @@ use rcore_memory::PAGE_SIZE;
 use log::*;
 use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
 use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
+use crate::arch::paging::*;
 
 /// Initialize the memory management module
 pub fn init() {
     // initialize heap and Frame allocator
     init_frame_allocator();
     init_heap();
+
+    set_root_page_table_ptr(0xFFFF_FFFF);
+    extern "C" {
+        fn _root_page_table_buffer();
+        fn _root_page_table_ptr();
+    }
+
+    println!("_root_page_table_ptr {:x}", _root_page_table_ptr as usize);
 }
 
 pub fn init_other() {

@@ -1,9 +1,5 @@
 use mips::registers::cp0;
 
-extern {
-    static root_page_table_ptr : *mut usize;
-}
-
 /// Saved registers on a trap.
 #[derive(Clone)]
 #[repr(C)]

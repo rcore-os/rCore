@@ -5,7 +5,7 @@
 
 .section .text.context
 .globl switch_context
-.extern root_page_table_ptr
+.extern _root_page_table_ptr
 
 switch_context:
 	// save from's registers
@@ -25,7 +25,7 @@ switch_context:
 	sw ra, 12*4(sp)
 	sw sp, 13*4(sp)
 
-	la s0, root_page_table_ptr
+	la s0, _root_page_table_ptr
 	lw AT, 0(s0)
 	sw AT, 4(sp)
 
