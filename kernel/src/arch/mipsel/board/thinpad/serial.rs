@@ -2,8 +2,8 @@
 
 use core::fmt::{Write, Result, Arguments};
 use core::ptr::{read_volatile, write_volatile};
-use spin::Mutex;
 
+#[derive(Debug, Clone, Copy)]
 pub struct SerialPort {
     base: usize
 }
@@ -14,13 +14,7 @@ const UART_DATA: usize = 0x4;
 const UART_STATUS_CTS: u8 = 0x1; // clear to send signal
 const UART_STATUS_DR: u8 = 0x2; // data ready signal
 
-
 impl SerialPort {
-    fn new() -> SerialPort {
-        SerialPort { 
-            base: 0
-        }
-    }
 
     pub fn init(&mut self, base: usize) {
         self.base = base;
@@ -57,6 +51,11 @@ impl SerialPort {
         self.write_fmt(fmt).unwrap();
     }
 
+    pub fn lock(&self) -> SerialPort {
+        self.clone()
+    }
+
+    pub fn force_unlock(&self) {}
 }
 
 impl Write for SerialPort {
@@ -84,10 +83,9 @@ fn read<T>(addr: usize) -> T {
     unsafe { read_volatile(cell) }
 }
 
-
-lazy_static! {
-    pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
-}
+pub static SERIAL_PORT: SerialPort = SerialPort { 
+    base: 0
+};
 
 pub fn init(base: usize) {
     SERIAL_PORT.lock().init(base);

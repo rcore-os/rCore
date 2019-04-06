@@ -42,7 +42,7 @@ pub extern fn rust_main() -> ! {
         // while unsafe { !cpu::has_started(hartid) }  { }
         // println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
         // others_main();
-        loop {}
+        // loop {}
     }
 
     unsafe { memory::clear_bss(); }
