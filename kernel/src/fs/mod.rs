@@ -54,7 +54,7 @@ lazy_static! {
                 fn _user_img_start();
                 fn _user_img_end();
             }
-            println!("Sfs start {:x}, end {:x}", _user_img_start as usize, _user_img_end as usize);
+            info!("SFS linked to kernel, from {:08x} to {:08x}", _user_img_start as usize, _user_img_end as usize);
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 
@@ -66,13 +66,7 @@ lazy_static! {
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 
-        let super_block = SimpleFileSystem::read(device2);
-	println!("Superblock: magic = {:x}, freemap_blocks = {:x}", super_block.magic, super_block.freemap_blocks);
-	println!("blocks = {:}", super_block.blocks);
-	println!("unused_blocks = {:}", super_block.unused_blocks);
-
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
-        // println!("{:}", sfs.free_map.read());
         sfs.root_inode()
     };
 }

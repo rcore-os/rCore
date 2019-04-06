@@ -298,7 +298,7 @@ else ifeq ($(arch), riscv64)
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
 else ifeq ($(arch), mipsel)
-	# qemu-system-mipsel accepts ELF file only, so don't use objcopy
+# qemu-system-mipsel accepts ELF file only, so objcopy is not needed
 	@$(strip) $(kernel) -o $@
 endif
 

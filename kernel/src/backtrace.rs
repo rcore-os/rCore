@@ -73,6 +73,8 @@ pub fn backtrace() {
             current_fp = ((current_fp as isize) - sp_offset) as usize;
         }
 
+        println!("=== BEGIN rCore stack trace ===");
+
         while current_pc >= stext as usize
             && current_pc <= etext as usize
             && current_fp as usize != 0
@@ -81,7 +83,7 @@ pub fn backtrace() {
             match size_of::<usize>() {
                 4 => {
                     println!(
-                        "Stack #{:02} PC: {:#010X} FP: {:#010X}",
+                        "#{:02} PC: {:#010X} FP: {:#010X}",
                         stack_num,
                         current_pc - size_of::<usize>(),
                         current_fp
@@ -89,7 +91,7 @@ pub fn backtrace() {
                 },
                 _ => {
                     println!(
-                        "Stack #{:02} PC: {:#018X} FP: {:#018X}",
+                        "#{:02} PC: {:#018X} FP: {:#018X}",
                         stack_num,
                         current_pc - size_of::<usize>(),
                         current_fp
@@ -143,6 +145,7 @@ pub fn backtrace() {
                     trace!("New PC {:08X} FP {:08X}", current_pc, current_fp);
                     continue;
                 } else {
+                    trace!("No sw ra found, probably due to optimizations.");
                     break;
                 }
             }
@@ -159,5 +162,6 @@ pub fn backtrace() {
                 current_pc = *(current_fp as *const usize).offset(1);
             }
         }
+        println!("=== END rCore stack trace ===");
     }
 }
