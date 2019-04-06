@@ -9,7 +9,6 @@ use alloc::collections::BTreeMap;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;
 use log::*;
 use rcore_memory::paging::PageTable;
-use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, Checksum, DeviceCapabilities};
 use smoltcp::time::Instant;

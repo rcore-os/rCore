@@ -4,8 +4,8 @@ use super::*;
 use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::FileLike;
 use crate::net::{
-    Endpoint, LinkLevelEndpoint, PacketSocketState, RawSocketState, Socket, TcpSocketState,
-    UdpSocketState, SOCKETS,
+    Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
+    RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
 };
 use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::boxed::Box;
@@ -15,22 +15,25 @@ use smoltcp::wire::*;
 
 pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResult {
     let domain = AddressFamily::from(domain as u16);
+    let socket_type = SocketType::from(socket_type as u8 & SOCK_TYPE_MASK);
     info!(
-        "socket: domain: {:?}, socket_type: {}, protocol: {}",
+        "socket: domain: {:?}, socket_type: {:?}, protocol: {}",
         domain, socket_type, protocol
     );
     let mut proc = process();
     let socket: Box<dyn Socket> = match domain {
-        AddressFamily::Internet | AddressFamily::Unix => {
-            match SocketType::from(socket_type as u8 & SOCK_TYPE_MASK) {
-                SocketType::Stream => Box::new(TcpSocketState::new()),
-                SocketType::Datagram => Box::new(UdpSocketState::new()),
-                SocketType::Raw => Box::new(RawSocketState::new(protocol as u8)),
-                _ => return Err(SysError::EINVAL),
-            }
-        }
-        AddressFamily::Packet => match SocketType::from(socket_type as u8 & SOCK_TYPE_MASK) {
+        AddressFamily::Internet | AddressFamily::Unix => match socket_type {
+            SocketType::Stream => Box::new(TcpSocketState::new()),
+            SocketType::Datagram => Box::new(UdpSocketState::new()),
+            SocketType::Raw => Box::new(RawSocketState::new(protocol as u8)),
+            _ => return Err(SysError::EINVAL),
+        },
+        AddressFamily::Packet => match socket_type {
             SocketType::Raw => Box::new(PacketSocketState::new()),
+            _ => return Err(SysError::EINVAL),
+        },
+        AddressFamily::Netlink => match socket_type {
+            SocketType::Raw => Box::new(NetlinkSocketState::new()),
             _ => return Err(SysError::EINVAL),
         },
         _ => return Err(SysError::EAFNOSUPPORT),
@@ -300,11 +303,20 @@ pub struct SockAddrLl {
     pub sll_addr: [u8; 8],
 }
 
+// cancel alignment
+#[repr(packed)]
+pub struct SockAddrNl {
+    nl_pad: u16,
+    nl_pid: u32,
+    nl_groups: u32,
+}
+
 #[repr(C)]
 pub union SockAddrPayload {
     pub addr_in: SockAddrIn,
     pub addr_un: SockAddrUn,
     pub addr_ll: SockAddrLl,
+    pub addr_nl: SockAddrNl,
 }
 
 #[repr(C)]
@@ -373,6 +385,15 @@ fn sockaddr_to_endpoint(
                     (*addr).payload.addr_ll.sll_ifindex as usize,
                 )))
             }
+            AddressFamily::Netlink => {
+                if len < size_of::<u16>() + size_of::<SockAddrNl>() {
+                    return Err(SysError::EINVAL);
+                }
+                Ok(Endpoint::Netlink(NetlinkEndpoint::new(
+                    (*addr).payload.addr_nl.nl_pid,
+                    (*addr).payload.addr_nl.nl_groups,
+                )))
+            }
             _ => Err(SysError::EINVAL),
         }
     }
@@ -421,6 +442,8 @@ enum_with_unknown! {
         Unix = 1,
         /// Internet IP Protocol
         Internet = 2,
+        /// Netlink
+        Netlink = 16,
         /// Packet family
         Packet = 17,
     }

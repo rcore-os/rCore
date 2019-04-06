@@ -22,9 +22,25 @@ impl LinkLevelEndpoint {
 }
 
 #[derive(Clone, Debug)]
+pub struct NetlinkEndpoint {
+    port_id: u32,
+    multicast_groups_mask: u32,
+}
+
+impl NetlinkEndpoint {
+    pub fn new(port_id: u32, multicast_groups_mask: u32) -> Self {
+        NetlinkEndpoint {
+            port_id,
+            multicast_groups_mask,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Endpoint {
     Ip(IpEndpoint),
     LinkLevel(LinkLevelEndpoint),
+    Netlink(NetlinkEndpoint),
 }
 
 /// Common methods that a socket must have
@@ -98,8 +114,12 @@ pub struct RawSocketState {
 
 #[derive(Debug, Clone)]
 pub struct PacketSocketState {
+    // no state, only ethernet egress
+}
+
+#[derive(Debug, Clone)]
+pub struct NetlinkSocketState {
     // no state
-// only ethernet egress
 }
 
 /// A wrapper for `SocketHandle`.
@@ -711,6 +731,39 @@ impl Socket for PacketSocketState {
 
     fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
         unimplemented!()
+    }
+
+    fn box_clone(&self) -> Box<dyn Socket> {
+        Box::new(self.clone())
+    }
+}
+
+impl NetlinkSocketState {
+    pub fn new() -> Self {
+        NetlinkSocketState {}
+    }
+}
+
+impl Socket for NetlinkSocketState {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
+        unimplemented!()
+    }
+
+    fn write(&self, data: &[u8], _sendto_endpoint: Option<Endpoint>) -> SysResult {
+        debug!("data: {:x?}", &data);
+        unimplemented!()
+    }
+
+    fn poll(&self) -> (bool, bool, bool) {
+        unimplemented!()
+    }
+
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
+        unimplemented!()
+    }
+
+    fn bind(&mut self, _endpoint: Endpoint) -> SysResult {
+        Ok(0)
     }
 
     fn box_clone(&self) -> Box<dyn Socket> {
