@@ -4,15 +4,19 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 use crate::util;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use bitflags::*;
+use core::cmp::min;
 use core::mem::size_of;
+use core::slice;
 
 use smoltcp::socket::*;
 use smoltcp::wire::*;
 
 #[derive(Clone, Debug)]
 pub struct LinkLevelEndpoint {
-    interface_index: usize,
+    pub interface_index: usize,
 }
 
 impl LinkLevelEndpoint {
@@ -25,8 +29,8 @@ impl LinkLevelEndpoint {
 
 #[derive(Clone, Debug)]
 pub struct NetlinkEndpoint {
-    port_id: u32,
-    multicast_groups_mask: u32,
+    pub port_id: u32,
+    pub multicast_groups_mask: u32,
 }
 
 impl NetlinkEndpoint {
@@ -121,7 +125,7 @@ pub struct PacketSocketState {
 
 #[derive(Debug, Clone)]
 pub struct NetlinkSocketState {
-    // no state
+    data: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 /// A wrapper for `SocketHandle`.
@@ -534,7 +538,7 @@ impl Socket for UdpSocketState {
                     let addr = &req.arp_pa as *const SockAddrPlaceholder as *const SockAddr;
                     let addr = unsafe {
                         IpAddress::from(Ipv4Address::from_bytes(
-                            &u32::from_be((*addr).payload.addr_in.sin_addr).to_be_bytes()[..],
+                            &u32::from_be((*addr).addr_in.sin_addr).to_be_bytes()[..],
                         ))
                     };
                     for iface in NET_DRIVERS.read().iter() {
@@ -740,14 +744,35 @@ impl Socket for PacketSocketState {
     }
 }
 
+/// Common structure:
+/// | nlmsghdr | ifinfomsg | rtattr | rtattr | rtattr | ... | rtattr
+/// All aligned to 4 bytes boundary
+
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct NetlinkMessageHeader {
     nlmsg_len: u32,                   // length of message including header
     nlmsg_type: u16,                  // message content
     nlmsg_flags: NetlinkMessageFlags, // additional flags
     nlmsg_seq: u32,                   // sequence number
     nlmsg_pid: u32,                   // sending process port id
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct IfaceInfoMsg {
+    ifi_family: u16,
+    ifi_type: u16,
+    ifi_index: u32,
+    ifi_flags: u32,
+    ifi_change: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct RouteAttr {
+    rta_len: u16,
+    rta_type: u16,
 }
 
 bitflags! {
@@ -779,6 +804,14 @@ bitflags! {
 enum_with_unknown! {
     /// Netlink message types
     pub doc enum NetlinkMessageType(u16) {
+        /// Nothing
+        Noop = 1,
+        /// Error
+        Error = 2,
+        /// End of a dump
+        Done = 3,
+        /// Data lost
+        Overrun = 4,
         /// New link
         NewLink = 16,
         /// Delete link
@@ -796,19 +829,92 @@ enum_with_unknown! {
     }
 }
 
+enum_with_unknown! {
+    /// Route Attr Types
+    pub doc enum RouteAttrTypes(u16) {
+        /// Unspecified
+        Unspecified = 0,
+        /// MAC Address
+        Address = 1,
+        /// Broadcast
+        Broadcast = 2,
+        /// Interface name
+        Ifname = 3,
+        /// MTU
+        MTU = 4,
+        /// Link
+        Link = 5,
+    }
+}
+
 impl NetlinkSocketState {
     pub fn new() -> Self {
-        NetlinkSocketState {}
+        NetlinkSocketState {
+            data: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+}
+
+trait VecExt {
+    fn align4(&mut self);
+    fn push_ext<T: Sized>(&mut self, data: T);
+    fn set_ext<T: Sized>(&mut self, offset: usize, data: T);
+}
+
+impl VecExt for Vec<u8> {
+    fn align4(&mut self) {
+        let len = (self.len() + 3) & !3;
+        if len > self.len() {
+            self.resize(len, 0);
+        }
+    }
+
+    fn push_ext<T: Sized>(&mut self, data: T) {
+        let bytes =
+            unsafe { slice::from_raw_parts(&data as *const T as *const u8, size_of::<T>()) };
+        for byte in bytes {
+            self.push(*byte);
+        }
+    }
+
+    fn set_ext<T: Sized>(&mut self, offset: usize, data: T) {
+        if self.len() < offset + size_of::<T>() {
+            self.resize(offset + size_of::<T>(), 0);
+        }
+        let bytes =
+            unsafe { slice::from_raw_parts(&data as *const T as *const u8, size_of::<T>()) };
+        for i in 0..bytes.len() {
+            self[offset + i] = bytes[i];
+        }
     }
 }
 
 impl Socket for NetlinkSocketState {
     fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
-        unimplemented!()
+        let mut buffer = self.data.lock();
+        if buffer.len() > 0 {
+            let msg = buffer.remove(0);
+            let len = min(msg.len(), data.len());
+            data[..len].copy_from_slice(&msg[..len]);
+            (
+                Ok(len),
+                Endpoint::Netlink(NetlinkEndpoint {
+                    port_id: 0,
+                    multicast_groups_mask: 0,
+                }),
+            )
+        } else {
+            (
+                Ok(0),
+                Endpoint::Netlink(NetlinkEndpoint {
+                    port_id: 0,
+                    multicast_groups_mask: 0,
+                }),
+            )
+        }
     }
 
     fn write(&self, data: &[u8], _sendto_endpoint: Option<Endpoint>) -> SysResult {
-        debug!("data: {:x?}", &data);
         if data.len() < size_of::<NetlinkMessageHeader>() {
             return Err(SysError::EINVAL);
         }
@@ -817,8 +923,81 @@ impl Socket for NetlinkSocketState {
             return Err(SysError::EINVAL);
         }
         let message_type = NetlinkMessageType::from(header.nlmsg_type);
-        debug!("header: {:?}", header);
         debug!("type: {:?}", message_type);
+        let mut buffer = self.data.lock();
+        buffer.clear();
+        match message_type {
+            NetlinkMessageType::GetLink => {
+                let ifaces = NET_DRIVERS.read();
+                for i in 0..ifaces.len() {
+                    let mut msg = Vec::new();
+                    let mut new_header = NetlinkMessageHeader {
+                        nlmsg_len: 0, // to be determined later
+                        nlmsg_type: NetlinkMessageType::NewLink.into(),
+                        nlmsg_flags: NetlinkMessageFlags::MULTI,
+                        nlmsg_seq: header.nlmsg_seq,
+                        nlmsg_pid: header.nlmsg_pid,
+                    };
+                    msg.push_ext(new_header);
+
+                    let if_info = IfaceInfoMsg {
+                        ifi_family: AddressFamily::Unspecified.into(),
+                        ifi_type: 0,
+                        ifi_index: i as u32,
+                        ifi_flags: 0,
+                        ifi_change: 0,
+                    };
+                    msg.align4();
+                    msg.push_ext(if_info);
+
+                    let mut attrs = Vec::new();
+
+                    let mac_addr = ifaces[i].get_mac();
+                    let attr = RouteAttr {
+                        rta_len: (mac_addr.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                        rta_type: RouteAttrTypes::Address.into(),
+                    };
+                    attrs.align4();
+                    attrs.push_ext(attr);
+                    for byte in mac_addr.as_bytes() {
+                        attrs.push(*byte);
+                    }
+
+                    let ifname = ifaces[i].get_ifname();
+                    let attr = RouteAttr {
+                        rta_len: (ifname.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                        rta_type: RouteAttrTypes::Ifname.into(),
+                    };
+                    attrs.align4();
+                    attrs.push_ext(attr);
+                    for byte in ifname.as_bytes() {
+                        attrs.push(*byte);
+                    }
+
+                    msg.align4();
+                    msg.append(&mut attrs);
+
+                    msg.align4();
+                    msg.set_ext(0, msg.len() as u32);
+
+                    buffer.push(msg);
+                }
+
+                let mut msg = Vec::new();
+                let mut new_header = NetlinkMessageHeader {
+                    nlmsg_len: 0, // to be determined later
+                    nlmsg_type: NetlinkMessageType::Done.into(),
+                    nlmsg_flags: NetlinkMessageFlags::MULTI,
+                    nlmsg_seq: header.nlmsg_seq,
+                    nlmsg_pid: header.nlmsg_pid,
+                };
+                msg.push_ext(new_header);
+                msg.align4();
+                msg.set_ext(0, msg.len() as u32);
+                buffer.push(msg);
+            }
+            _ => {}
+        }
         Ok(data.len())
     }
 
