@@ -137,14 +137,15 @@ fn page_fault(tf: &mut TrapFrame) {
     let addr = tf.vaddr;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    if !crate::memory::handle_page_fault(addr) {
-        crate::trap::error(tf);
-    }
-
     let virt_addr = VirtAddr::new(addr);
     let root_table = unsafe {
         &mut *(get_root_page_table_ptr() as *mut MIPSPageTable)
     };
-    let tlb_entry = root_table.lookup(addr);
-    tlb::write_tlb_random(tlb_entry);
+    let tlb_result = root_table.lookup(addr);
+    match tlb_result {
+        Ok(tlb_entry) => tlb::write_tlb_random(tlb_entry),
+        Err(()) => if !crate::memory::handle_page_fault(addr) {
+            crate::trap::error(tf);
+        }
+    }
 }
