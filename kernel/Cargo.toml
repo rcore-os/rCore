@@ -26,8 +26,9 @@ board_u540 = ["sv39", "link_user"]
 nographic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
-# for mipsel qemu malta machine
+# for qemu machine
 board_malta = ["link_user"]
+board_mipssim = ["link_user"]
 # for thinpad
 board_thinpad = ["link_user"]
 # Hard link user program

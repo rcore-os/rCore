@@ -1,6 +1,7 @@
 use once::*;
 use alloc::string::String;
 
+#[path = "../../../../drivers/serial/simple_uart.rs"]
 pub mod serial;
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;

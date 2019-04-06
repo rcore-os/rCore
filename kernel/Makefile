@@ -68,6 +68,11 @@ ifeq ($(arch), mipsel)
 dtb := src/arch/$(arch)/board/$(board)/device.dtb
 endif
 
+# mipssim does not support SMP
+ifeq ($(board), mipssim)
+smp := 1
+endif
+
 export ARCH = $(arch)
 export BOARD = $(board)
 export SMP = $(smp)
@@ -129,7 +134,7 @@ qemu_opts += \
 	-kernel $(kernel_img)
 
 else ifeq ($(arch), mipsel)
-ifeq ($(board), malta)
+ifeq ($(board), $(filter $(board), malta mipssim))
 qemu_opts += \
 	-machine $(board) \
 	-serial mon:stdio \

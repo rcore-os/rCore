@@ -1,0 +1,36 @@
+/dts-v1/;
+
+
+/ {
+	model = "qemu mipssim";
+	compatible = "qemu,mipssim";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+	chosen {
+		stdio = &uart0;
+	};
+
+    aliases { };
+
+    cpu_intc: interrupt-controller {
+		compatible = "mti,cpu-interrupt-controller";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+	};
+
+	main_memory: memory@0 {
+        device_type = "memory";
+		reg = <0x00000000 0x10000000>;
+	};
+
+	uart0: serial@bfd003f8 {
+		compatible = "ns16550a";
+		reg = <0xbfd003f8 0x8>;
+		clock-frequency = <1843200>;
+		/* attached to the MIPS CPU INT2 pin, ie interrupt 4 */
+        interrupt-parent = <&cpu_intc>;
+        interrupts = <4>;
+	};
+
+};

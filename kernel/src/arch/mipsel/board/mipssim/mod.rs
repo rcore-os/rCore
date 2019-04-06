@@ -12,8 +12,8 @@ pub mod consts;
 /// Initialize serial port first
 pub fn init_serial_early() {
     assert_has_not_been_called!("board::init must be called only once");
-    serial::init(0xb80003f8);
-    println!("Hello QEMU Malta!");
+    serial::init(0xbfd003f8);
+    println!("Hello QEMU MIPSSIM!");
 }
 
 /// Initialize other board drivers
@@ -23,5 +23,5 @@ pub fn init_driver() {
 }
 
 pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> Result<(fb::FramebufferInfo, usize), String> {
-    Err(String::from("Framebuffer not usable on malta board"))
+    Err(String::from("Framebuffer not usable on mipssim board"))
 }

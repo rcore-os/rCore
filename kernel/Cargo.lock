@@ -230,7 +230,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "mips"
 version = "0.1.0"
-source = "git+https://github.com/Harry-Chen/rust-mips#e2cea12fc88f1f5a788a155972cd4047e7ad2b4f"
+source = "git+https://github.com/Harry-Chen/rust-mips#bee9865920bceef12dbb527c1c237de905129c0b"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -22,6 +22,11 @@ pub mod board;
 #[path = "board/thinpad/mod.rs"]
 pub mod board;
 
+#[cfg(feature = "board_mipssim")]
+#[path = "board/mipssim/mod.rs"]
+pub mod board;
+
+
 extern "C" {
     fn _dtb_start();
     fn _dtb_end();
