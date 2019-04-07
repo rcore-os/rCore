@@ -10,7 +10,7 @@ use spin::Mutex;
 
 use crate::util::escape_parser::{CharacterAttribute, EscapeParser};
 
-use super::fb::{ColorDepth::*, FramebufferInfo, FRAME_BUFFER};
+use super::fb::{ColorDepth::*, ColorConfig, FramebufferInfo, FRAME_BUFFER};
 
 use self::color::FramebufferColor;
 use self::fonts::{Font, Font8x16};
@@ -62,17 +62,10 @@ impl<F: Font> ConsoleBuffer<F> {
         let off_x = col * F::WIDTH;
         let off_y = row * F::HEIGHT;
         if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
-            let (mut foreground, mut background) = match fb.color_depth {
-                ColorDepth8 => (
-                    ch.attr.foreground.pack8() as u32,
-                    ch.attr.background.pack8() as u32,
-                ),
-                ColorDepth16 => (
-                    ch.attr.foreground.pack16() as u32,
-                    ch.attr.background.pack16() as u32,
-                ),
-                ColorDepth32 => (ch.attr.foreground.pack32(), ch.attr.background.pack32()),
-            };
+            let (mut foreground, mut background) = (
+                ch.attr.foreground.pack32(fb.color_config),
+                ch.attr.background.pack32(fb.color_config)
+            );
             if ch.attr.reverse {
                 core::mem::swap(&mut foreground, &mut background);
             }

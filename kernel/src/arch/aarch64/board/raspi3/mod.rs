@@ -12,7 +12,7 @@ pub mod mailbox;
 pub mod serial;
 pub mod timer;
 
-use fb::FramebufferInfo;
+use fb::{ColorConfig, FramebufferInfo, FramebufferResult};
 
 pub const IO_REMAP_BASE: usize = bcm2837::consts::IO_BASE;
 pub const IO_REMAP_END: usize = bcm2837::consts::KERNEL_OFFSET + 0x4000_1000;
@@ -47,7 +47,7 @@ pub fn probe_memory() -> Option<(usize, usize)> {
     None
 }
 
-pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(FramebufferInfo, usize), String> {
+pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
     
     let (width, height) = if width == 0 || height == 0 {
         mailbox::framebuffer_get_physical_size()?
@@ -84,5 +84,5 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> Result<(Framebuffer
         ))?;
     }
 
-    Ok((info, vaddr))
+    Ok((info, fb::ColorConfig::BGRA8888, vaddr))
 }

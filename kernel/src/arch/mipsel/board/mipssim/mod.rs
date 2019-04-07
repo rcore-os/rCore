@@ -22,6 +22,6 @@ pub fn init_driver() {
     // timer::init();
 }
 
-pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> Result<(fb::FramebufferInfo, usize), String> {
+pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
     Err(String::from("Framebuffer not usable on mipssim board"))
 }

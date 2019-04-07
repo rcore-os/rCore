@@ -45,6 +45,18 @@ pub enum ColorDepth {
 }
 use self::ColorDepth::*;
 
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+pub enum ColorConfig {
+    RGB332,
+    RGB565,
+    BGRA8888,
+    VgaPalette,
+}
+use self::ColorConfig::*;
+
+pub type FramebufferResult = Result<(FramebufferInfo, ColorConfig, usize), String>;
+
 #[repr(C)]
 union ColorBuffer {
     base_addr: usize,
@@ -105,6 +117,7 @@ impl ColorBuffer {
 pub struct Framebuffer {
     pub fb_info: FramebufferInfo,
     pub color_depth: ColorDepth,
+    pub color_config: ColorConfig,
     buf: ColorBuffer,
 }
 
@@ -113,6 +126,7 @@ impl fmt::Debug for Framebuffer {
         let mut f = f.debug_struct("Framebuffer");
         f.field("fb_info", &self.fb_info);
         f.field("color_depth", &self.color_depth);
+        f.field("color_config", &self.color_config);
         f.field("base_addr", unsafe { &self.buf.base_addr });
         f.finish()
     }
@@ -125,7 +139,7 @@ impl Framebuffer {
         let probed_info = super::probe_fb_info(width, height, depth);
 
         match probed_info {
-            Ok((info, addr)) => {
+            Ok((info, config, addr)) => {
                 let color_depth = match info.depth {
                     8 => ColorDepth8,
                     16 => ColorDepth16,
@@ -134,6 +148,7 @@ impl Framebuffer {
                 };
                 Ok(Framebuffer {
                     buf: ColorBuffer::new(color_depth, addr, info.screen_size as usize),
+                    color_config: config,
                     color_depth,
                     fb_info: info,
                 })
