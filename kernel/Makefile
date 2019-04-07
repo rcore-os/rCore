@@ -200,7 +200,7 @@ prefix := riscv64-unknown-elf-
 else ifeq ($(arch), riscv64)
 prefix := riscv64-unknown-elf-
 else ifeq ($(arch), mipsel)
-prefix ?= mipsel-linux-gnu-
+prefix ?= mipsel-linux-musln32-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 ifeq (,$(shell which $(prefix)ld))

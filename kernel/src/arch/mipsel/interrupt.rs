@@ -156,8 +156,10 @@ fn page_fault(tf: &mut TrapFrame) {
     let tlb_result = root_table.lookup(addr);
     match tlb_result {
         Ok(tlb_entry) => tlb::write_tlb_random(tlb_entry),
-        Err(()) => if !crate::memory::handle_page_fault(addr) {
-            crate::trap::error(tf);
+        Err(()) => {
+            if !crate::memory::handle_page_fault(addr) {
+                crate::trap::error(tf);
+            }
         }
     }
 }
