@@ -79,6 +79,7 @@ bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
 mips =  { git = "https://github.com/Harry-Chen/rust-mips" }
+paste = "0.1"
 
 [package.metadata.bootimage]
 default-target = "targets/x86_64.json"
