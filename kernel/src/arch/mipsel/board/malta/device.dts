@@ -9,6 +9,7 @@
 
 	chosen {
 		stdio = &uart2;
+		bootargs = "rust/sh";
 	};
 
     aliases { };

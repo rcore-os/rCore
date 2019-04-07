@@ -262,7 +262,9 @@ sym:
 ### device tree process ###
 
 %.dtb: %.dts
-	$(dtc) -I dts -O dtb -o $@ $<
+	@echo Generating device tree file $@
+	@$(dtc) -I dts -O dtb -o $@ $<
+	@rm -rf src/arch/${arch}/boot/dtb.gen.s
 
 ### bootloader and kernel image ###
 
