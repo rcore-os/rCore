@@ -1,4 +1,5 @@
 use mips::registers::cp0;
+use mips::tlb;
 
 /// Saved registers on a trap.
 #[derive(Clone)]
@@ -226,8 +227,8 @@ impl Context {
             tf: {
                 let mut tf = tf.clone();
                 tf.sp = ustack_top;   // sp
-                tf.v1 = tls; // tp
-                tf.v0 = 0;  // a0
+                tf.v1 = tls;
+                tf.a0 = 0;  // return value
                 tf
             },
         }.push_at(kstack_top)
