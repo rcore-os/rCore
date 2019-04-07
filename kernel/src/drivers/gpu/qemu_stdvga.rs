@@ -15,30 +15,24 @@ const VGA_AR_PAS: u8 =  0x20;
 const VBE_DISPI_ENABLED: u16 = 0x01;
 
 const PCIR_COMMAND: u8 = 0x04;
-const PCIM_CMD_PORTEN: u16 = 0x0001;
-const PCIM_CMD_MEMEN: u16 = 0x0002;
+const PCIM_CMD_PORTEN: u32 = 0x0001;
+const PCIM_CMD_MEMEN: u32 = 0x0002;
 
 
-fn pci_read_config(pci_base: usize, bus: u8, slot: u8, func: u8, offset: u8) -> u16 {
-    // enable access mechanism
-    let data = 0xF0 | (func << 1);
-    write(pci_base + 0xcf8, data);
-    write(pci_base + 0xcfa, bus);
-    // calculate port address
-    let addr: u16 = (0xC000 | ((slot as u16) << 8) | (offset as u16)) & 0xFFFC;
+fn pci_read_config(pci_base: usize, bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
+    // write config address
+    let address = (1 << 31) | ((bus as u32) << 16) | ((slot as u32) << 11) | ((func as u32) << 8) | (offset as u32);
+    write(pci_base + 0xcf8, address);
     // do the actual work
-    read(pci_base + addr as usize)
+    read(pci_base + 0xcfc)
 }
 
-fn pci_write_config(pci_base: usize, bus: u8, slot: u8, func: u8, offset: u8, value: u16) {
-    // enable access mechanism
-    let data = 0xF0 | (func << 1);
-    write(pci_base + 0xcf8, data);
-    write(pci_base + 0xcfa, bus);
-    // calculate port address
-    let addr: u16 = (0xC000 | ((slot as u16) << 8) | (offset as u16)) & 0xFFFC;
+fn pci_write_config(pci_base: usize, bus: u8, slot: u8, func: u8, offset: u8, value: u32) {
+    // write config address
+    let address = (1 << 31) | ((bus as u32) << 16) | ((slot as u32) << 11) | ((func as u32) << 8) | (offset as u32);
+    write(pci_base + 0xcf8, address);
     // do the actual work
-    write(pci_base + addr as usize, value);
+    write(pci_base + 0xcfc, value)
 }
 
 pub fn init(pci_base: usize, vga_base: usize, x_res: u16, y_res: u16) {
