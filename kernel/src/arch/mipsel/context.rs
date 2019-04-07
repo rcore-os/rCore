@@ -174,7 +174,7 @@ impl Context {
     /// The stack pointer will be set to `kstack_top`.
     /// The SATP register will be set to `satp`.
     pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, satp: usize) -> Self {
-        trace!("New kernel thread @ {:x}, stack = {:x}", entry as usize, kstack_top);
+        info!("New kernel thread @ {:x}, stack = {:x}", entry as usize, kstack_top);
 
         InitStack {
             context: ContextData::new(satp),
@@ -188,7 +188,7 @@ impl Context {
     /// The stack pointer of user and kernel mode will be set to `ustack_top`, `kstack_top`.
     /// The SATP register will be set to `satp`.
     pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, satp: usize) -> Self {
-        trace!("New user thread @ {:x}, stack = {:x}", entry_addr, kstack_top);
+        info!("New user thread @ {:x}, stack = {:x}", entry_addr, kstack_top);
 
         InitStack {
             context: ContextData::new(satp),
@@ -207,7 +207,7 @@ impl Context {
             tf: {
                 let mut tf = tf.clone();
                 // fork function's ret value, the new process is 0
-                tf.a0 = 0;
+                tf.v0 = 0;
                 tf
             },
         }.push_at(kstack_top)
@@ -227,7 +227,7 @@ impl Context {
                 let mut tf = tf.clone();
                 tf.sp = ustack_top;   // sp
                 tf.v1 = tls; // tp
-                tf.a0 = 0;  // a0
+                tf.v0 = 0;  // a0
                 tf
             },
         }.push_at(kstack_top)
