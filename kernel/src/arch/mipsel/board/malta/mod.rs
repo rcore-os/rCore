@@ -31,7 +31,7 @@ pub fn init_serial_early() {
 /// Initialize other board drivers
 pub fn init_driver() {
     // TODO: add possibly more drivers
-    vga::init(0x92050000, 800, 600);
+    vga::init(0xb8000000, 0x92050000, 800, 600);
 }
 
 pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
