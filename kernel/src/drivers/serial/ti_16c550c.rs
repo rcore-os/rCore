@@ -3,8 +3,8 @@
 #![allow(dead_code)]
 
 use core::fmt::{Write, Result, Arguments};
-use core::ptr::{read_volatile, write_volatile};
 use spin::Mutex;
+use crate::util::{read, write};
 
 pub struct SerialPort {
     base: usize
@@ -82,17 +82,6 @@ impl Write for SerialPort {
         Ok(())
     }
 }
-
-fn write<T>(addr: usize, content: T) {
-    let cell = (addr) as *mut T;
-    unsafe { write_volatile(cell, content); }
-}
-
-fn read<T>(addr: usize) -> T {
-    let cell = (addr) as *const T;
-    unsafe { read_volatile(cell) }
-}
-
 
 const COM_RX     :usize = 0x00;   // In:  Receive buffer (DLAB=0)
 const COM_TX     :usize = 0x00;   // Out: Transmit buffer (DLAB=0)

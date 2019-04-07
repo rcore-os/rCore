@@ -1,7 +1,7 @@
 //! naive serial adapter driver for thinpad
 
 use core::fmt::{Write, Result, Arguments};
-use core::ptr::{read_volatile, write_volatile};
+use crate::util::{read, write};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SerialPort {
@@ -71,16 +71,6 @@ impl Write for SerialPort {
         }
         Ok(())
     }
-}
-
-fn write<T>(addr: usize, content: T) {
-    let cell = (addr) as *mut T;
-    unsafe { write_volatile(cell, content); }
-}
-
-fn read<T>(addr: usize) -> T {
-    let cell = (addr) as *const T;
-    unsafe { read_volatile(cell) }
 }
 
 pub static SERIAL_PORT: SerialPort = SerialPort { 
