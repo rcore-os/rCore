@@ -2,7 +2,7 @@ use once::*;
 use alloc::string::String;
 use mips::registers::cp0;
 
-#[path = "../../../../drivers/serial/16550_reg.rs"]
+#[path = "../../../../drivers/serial/ti_16c550c.rs"]
 pub mod serial;
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;

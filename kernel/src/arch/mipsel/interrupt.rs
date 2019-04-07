@@ -132,13 +132,15 @@ fn syscall(tf: &mut TrapFrame) {
     let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
     trace!("MIPS syscall {} invoked with {:?}", tf.v0, arguments);
 
-    let ret = crate::syscall::syscall(tf.v0, arguments, tf);
-    let ret = tf.v0 as isize;
+    let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
     // comply with mips n32 abi, always return a positive value
     // https://git.musl-libc.org/cgit/musl/tree/arch/mipsn32/syscall_arch.h
     if (ret < 0) {
         tf.v0 = (-ret) as usize;
         tf.a3 = 1;
+    } else {
+        tf.v0 = ret as usize;
+        tf.a3 = 0;
     }
 }
 
