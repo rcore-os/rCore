@@ -1,5 +1,6 @@
 use once::*;
 use alloc::string::String;
+use mips::registers::cp0;
 
 #[path = "../../../../drivers/serial/16550_reg.rs"]
 pub mod serial;
@@ -12,7 +13,14 @@ pub mod consts;
 /// Initialize serial port first
 pub fn init_serial_early() {
     assert_has_not_been_called!("board::init must be called only once");
-    serial::init(0xb80003f8);
+    // initialize serial driver
+    serial::init(0xbf000900);
+    // Enable serial interrupt
+    unsafe {
+        let mut status = cp0::status::read();
+        status.enable_hard_int2();
+        cp0::status::write(status);
+    }
     println!("Hello QEMU Malta!");
 }
 

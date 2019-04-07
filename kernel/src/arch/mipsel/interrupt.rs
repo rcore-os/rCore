@@ -75,7 +75,7 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
 
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
     let pint = tf.cause.pending_interrupt();
-    trace!("  Interrupt {:?} ", tf.cause.pending_interrupt());
+    trace!("  Interrupt {:08b} ", pint);
     if (pint & 0b100_000_00) != 0 {
         timer();
     } else if (pint & 0b011_111_00) != 0 {
@@ -86,7 +86,6 @@ fn interrupt_dispatcher(tf: &mut TrapFrame) {
 }
 
 fn external() {
-    // TODO
     // true means handled, false otherwise
     let handlers = [try_process_serial, try_process_drivers];
     for handler in handlers.iter() {
@@ -99,6 +98,7 @@ fn external() {
 fn try_process_serial() -> bool {
     match super::io::getchar_option() {
         Some(ch) => {
+            trace!("Get char {} from serial", ch);
             crate::trap::serial(ch);
             true
         }

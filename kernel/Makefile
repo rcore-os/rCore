@@ -134,7 +134,13 @@ qemu_opts += \
 	-kernel $(kernel_img)
 
 else ifeq ($(arch), mipsel)
-ifeq ($(board), $(filter $(board), malta mipssim))
+ifeq ($(board), malta)
+qemu_opts += \
+	-machine $(board) \
+	-serial null -serial null -serial mon:stdio \
+	-kernel $(kernel_img)
+endif
+ifeq ($(board), mipssim)
 qemu_opts += \
 	-machine $(board) \
 	-serial mon:stdio \
