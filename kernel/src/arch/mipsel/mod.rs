@@ -51,15 +51,15 @@ pub extern fn rust_main() -> ! {
     unsafe { memory::clear_bss(); }
 
     board::init_serial_early();
-    driver::init();
-
-    println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
+    crate::logging::init();
 
     interrupt::init();
     memory::init();
     timer::init();
+    driver::init();
 
-    crate::logging::init();
+    println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
+
     crate::drivers::init(dtb_start);
     crate::process::init();
 

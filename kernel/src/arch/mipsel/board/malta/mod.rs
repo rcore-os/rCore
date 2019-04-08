@@ -1,6 +1,7 @@
 use once::*;
 use alloc::string::String;
 use mips::registers::cp0;
+use crate::drivers::bus::pci;
 
 #[path = "../../../../drivers/serial/ti_16c550c.rs"]
 pub mod serial;
@@ -31,7 +32,9 @@ pub fn init_serial_early() {
 /// Initialize other board drivers
 pub fn init_driver() {
     // TODO: add possibly more drivers
-    vga::init(0xb8000000, 0xb2050000, 800, 600);
+    vga::init(0xbbe00000, 0xb2050000, 800, 600);
+    // pci::init();
+    fb::init();
 }
 
 pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
