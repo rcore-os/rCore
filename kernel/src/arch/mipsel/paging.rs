@@ -51,6 +51,7 @@ extern "C" {
 
 pub fn set_root_page_table_ptr(ptr : usize) {
     unsafe {
+        clear_all_tlb();
         *(_root_page_table_ptr as *mut usize) = ptr;
     }
 }
@@ -157,13 +158,19 @@ impl InactivePageTable for InactivePageTable0 {
             self.token() as *mut MIPSPageTable
         };
 
+        unsafe { clear_all_tlb(); } 
+
         let mut active = unsafe {
             ActivePageTable(
                 TwoLevelPageTable::new(&mut *pt),
                 ::core::mem::uninitialized()
             )
         };
-        f(&mut active)
+
+        let ret = f(&mut active);
+
+        unsafe { clear_all_tlb(); }
+        ret
     }
 }
 

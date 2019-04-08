@@ -19,7 +19,6 @@ pub fn init() {
 pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;
-    cp0::compare::write_u32(
-        cp0::count::read_u32() + timebase
-    );
+    cp0::count::write_u32(0);
+    cp0::compare::write_u32(timebase);
 }

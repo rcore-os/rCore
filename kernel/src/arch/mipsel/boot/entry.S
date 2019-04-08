@@ -17,9 +17,9 @@ _start:
 
     # set ebase
     la    t0, trap_entry
-    mfc0  t1, $15 # C0_EBASE
+    mfc0  t1, $15, 1 # C0_EBASE
     or    t1, t1, t0
-    mtc0  t1, $15
+    mtc0  t1, $15, 1
 
     # exit bootstrap mode
     mfc0  t0, $12 # C0_STATUS

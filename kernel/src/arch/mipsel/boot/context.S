@@ -28,13 +28,13 @@ switch_context:
 
 	// save page table address
 	la s0, _root_page_table_ptr
-	lw AT, 0(s0)
-	sw AT, 4(sp)
+	lw s1, 0(s0)
+	sw s1, 4(sp)
 
 	// restore to's registers
 	lw sp, 0(a1)
-	lw AT, 4(sp)
-	sw AT, 0(s0)
+	lw s1, 4(sp)
+	sw s1, 0(s0)
 
 	// restore kstack ptr
 	// la s0, _cur_kstack_ptr

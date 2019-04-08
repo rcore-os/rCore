@@ -118,7 +118,7 @@ impl InitStack {
     }
 }
 
-extern {
+extern "C" {
     fn trap_return();
 }
 
@@ -161,8 +161,7 @@ impl Context {
             fn switch_context(src: *mut Context, dst: *mut Context);
         }
 
-        info!("Switch to {:x}", target.sp);
-
+        tlb::clear_all_tlb();
         switch_context(self as *mut Context, target as *mut Context);
     }
 
@@ -230,7 +229,7 @@ impl Context {
                 let mut tf = tf.clone();
                 tf.sp = ustack_top;   // sp
                 tf.v1 = tls;
-                tf.a0 = 0;  // return value
+                tf.v0 = 0;  // return value
                 tf
             },
         }.push_at(kstack_top)
