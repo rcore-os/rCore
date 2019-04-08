@@ -33,7 +33,7 @@ pub fn init_serial_early() {
 pub fn init_driver() {
     // TODO: add possibly more drivers
     vga::init(0xbbe00000, 0xb2050000, 800, 600);
-    // pci::init();
+    pci::init();
     fb::init();
 }
 

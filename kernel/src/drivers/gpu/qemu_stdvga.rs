@@ -19,6 +19,7 @@ const VBE_DISPI_INDEX_VIDEO_MEMORY_64K : u16 = 0xa;
 
 const VGA_AR_PAS            : u8 =  0x20;
 const VBE_DISPI_ENABLED     : u16 = 0x01;
+const VBE_DISPI_8BIT_DAC    : u16 = 0x20;
 const VBE_DISPI_LFB_ENABLED : u16 = 0x40;
 
 const PCI_COMMAND: u8 = 0x04;
@@ -89,9 +90,10 @@ pub fn init(pci_base: usize, vga_base: usize, x_res: u16, y_res: u16) {
     debug!("VGA Endianess: {:x}", read::<u32>(vga_base + 0x604));
 
     // unblank vga output
-    vga_read_io(0x3DA);
     vga_write_io(VGA_AR_ADDR, VGA_AR_PAS);
     debug!("VGA AR: {}", vga_read_io(VGA_AR_ADDR));
+    
+    vga_write_vbe(VBE_DISPI_INDEX_ENABLE, 0);
     
     // set resolution and color depth
     vga_write_vbe(VBE_DISPI_INDEX_XRES, x_res);
@@ -106,7 +108,7 @@ pub fn init(pci_base: usize, vga_base: usize, x_res: u16, y_res: u16) {
 
     // enable vbe
     let vbe_enable = vga_read_vbe(VBE_DISPI_INDEX_ENABLE);
-    vga_write_vbe(VBE_DISPI_INDEX_ENABLE, vbe_enable | VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
+    vga_write_vbe(VBE_DISPI_INDEX_ENABLE, vbe_enable | VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED | VBE_DISPI_8BIT_DAC);
     debug!("VBE Status: {:04x}", vga_read_vbe(VBE_DISPI_INDEX_ENABLE));
 
     info!("QEMU STDVGA driver initialized @ {:x}", vga_base);
