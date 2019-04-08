@@ -147,6 +147,13 @@ trap_return:
 	lw fp, 156(sp)
 	lw ra, 160(sp)
 
+	// save kernel stack
+	la k0, _cur_kstack_ptr
+	addiu k1, sp, 168
+	sw k1, 0(k0)
+	nop
+
+	// restore stack
 	lw sp, 152(sp)
 
 	eret

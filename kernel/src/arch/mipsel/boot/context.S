@@ -6,6 +6,7 @@
 .section .text.context
 .globl switch_context
 .extern _root_page_table_ptr
+.extern _cur_kstack_ptr
 
 switch_context:
 	// save from's registers
@@ -25,6 +26,7 @@ switch_context:
 	// sw ra, 12*4(sp)
 	// sw sp, 13*4(sp)
 
+	// save page table address
 	la s0, _root_page_table_ptr
 	lw AT, 0(s0)
 	sw AT, 4(sp)
@@ -33,6 +35,11 @@ switch_context:
 	lw sp, 0(a1)
 	lw AT, 4(sp)
 	sw AT, 0(s0)
+
+	// restore kstack ptr
+	// la s0, _cur_kstack_ptr
+	// addi s1, sp, 4 * 14
+	// sw s1, 0(s0)
 
 	lw ra, 0(sp)
 	lw s0, 2*4(sp)
