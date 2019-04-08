@@ -149,6 +149,10 @@ pub struct Context {
     sp: usize,
 }
 
+extern "C" {
+    fn _cur_kstack_ptr();
+}
+
 impl Context {
     /// Switch to another kernel thread.
     ///
@@ -159,6 +163,10 @@ impl Context {
     pub unsafe fn switch(&mut self, target: &mut Self) {
         extern "C" {
             fn switch_context(src: *mut Context, dst: *mut Context);
+        }
+
+        unsafe {
+            *(_cur_kstack_ptr as *mut usize) = target.sp;
         }
 
         switch_context(self as *mut Context, target as *mut Context);

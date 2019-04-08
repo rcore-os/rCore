@@ -68,7 +68,10 @@ pub extern fn rust_trap(tf: &mut TrapFrame) {
         E::TLBModification => page_fault(tf),
         E::TLBLoadMiss => page_fault(tf),
         E::TLBStoreMiss => page_fault(tf),
-        _ => crate::trap::error(tf),
+        _ => {
+            error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
+            crate::trap::error(tf)
+        }
     }
     trace!("Interrupt end");
 }

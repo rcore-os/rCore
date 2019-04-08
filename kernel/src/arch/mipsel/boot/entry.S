@@ -3,11 +3,17 @@
 	.set noreorder
     .section .text.entry
     .globl _start
+	.extern _root_page_table_buffer
+	.extern _cur_kstack_ptr
 
 _start:
     # setup stack and gp
 	la    sp, bootstacktop
     la    gp, _gp
+
+	la    t0, _cur_kstack_ptr
+	la    t1, _root_page_table_buffer
+	sw    t1, 0(t0)
 
     # set ebase
     la    t0, trap_entry

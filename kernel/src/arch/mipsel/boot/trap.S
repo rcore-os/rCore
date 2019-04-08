@@ -21,8 +21,10 @@ general_trap_vec:
 
 trap_from_user:
 	# load kstack, we can use k0 to store something
-	la     k0, kernel_stack
-	la     sp, kernel_stack_top
+#	la     k0, kernel_stack
+#	la     sp, kernel_stack_top
+	la     k0, _cur_kstack_ptr
+	lw     sp, 0(k0)
 
 trap_from_kernel:
 	/* 
@@ -161,7 +163,10 @@ kernel_stack_top:
     .align 12  #PGSHIFT
     .global _root_page_table_buffer
 _root_page_table_buffer:
-    .space 1024 * 4 # 4KB
+    .space 1024 * 64 # 64KB
     .global _root_page_table_ptr
 _root_page_table_ptr:
+    .space 4 # 4bytes
+    .global _cur_kstack_ptr
+_cur_kstack_ptr:
     .space 4 # 4bytes
