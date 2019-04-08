@@ -348,8 +348,8 @@ pub fn e1000_init(name: String, irq: Option<u32>, header: usize, size: usize) {
     let recv_page = unsafe {
         HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
     } as usize;
-    let send_page_pa = active_table().get_entry(send_page).unwrap().target();
-    let recv_page_pa = active_table().get_entry(recv_page).unwrap().target();
+    let send_page_pa = active_table().get_entry(send_page).unwrap().target() as u64;
+    let recv_page_pa = active_table().get_entry(recv_page).unwrap().target() as u64;
     let send_queue_size = PAGE_SIZE / size_of::<E1000SendDesc>();
     let recv_queue_size = PAGE_SIZE / size_of::<E1000RecvDesc>();
     let mut send_queue =

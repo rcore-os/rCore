@@ -23,8 +23,3 @@ pub fn putfmt(fmt: Arguments) {
         console.write_fmt(fmt).unwrap();
     }
 }
-
-pub fn putchar(c: u8) {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().putchar(c);
-}
