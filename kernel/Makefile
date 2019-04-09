@@ -136,7 +136,7 @@ qemu_opts += \
 else ifeq ($(arch), mipsel)
 ifeq ($(board), malta)
 qemu_opts += \
-	-machine $(board) \
+	-machine $(board) -device VGA \
 	-serial null -serial null -serial mon:stdio \
 	-kernel $(kernel_img)
 endif

@@ -28,6 +28,7 @@ env:
     - ARCH="riscv32"
     - ARCH="x86_64"
     - ARCH="aarch64"
+    - ARCH="mipsel" OPTS="board=malta"
 
 matrix:
     allow_failures:
@@ -88,6 +89,15 @@ install:
     wget https://musl.cc/riscv64-linux-musl-cross.tgz;
     tar -xvf riscv64-linux-musl-cross.tgz;
     export PATH=$PATH:$PWD/riscv64-linux-musl-cross/bin;
+    fi;
+    fi
+  - if [ $ARCH = mipsel ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    sudo apt update;
+    sudo apt install linux-headers-$(uname -r);
+    wget https://musl.cc/mipsel-linux-musln32-cross.tgz;
+    tar -xvf mipsel-linux-musln32-cross.tgz;
+    export PATH=$PATH:$PWD/mipsel-linux-musln32-cross/bin;
     fi;
     fi
 
