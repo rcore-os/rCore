@@ -61,6 +61,7 @@ endif
 
 ifeq ($(arch), aarch64)
 board := raspi3
+need_bootloader := true
 endif
 
 # currently only mipsel architecture needs DTB linked to the kernel
@@ -275,9 +276,6 @@ sym:
 ### bootloader and kernel image ###
 
 $(bootloader): $(kernel)
-ifeq ($(arch), aarch64)
-need_bootloader := true
-endif
 ifeq ($(need_bootloader), true)
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped
