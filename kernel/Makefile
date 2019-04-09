@@ -219,6 +219,8 @@ strip := $(prefix)strip
 dtc := dtc
 export CC = $(cc)
 
+hostcc := gcc
+
 .PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
 
 all: kernel
@@ -333,7 +335,7 @@ else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
-	    $(cc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
+	    $(hostcc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
 	@cargo xbuild $(build_args)
 endif
