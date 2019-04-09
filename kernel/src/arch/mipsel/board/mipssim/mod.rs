@@ -1,13 +1,13 @@
-use once::*;
 use alloc::string::String;
+use once::*;
 
-#[path = "../../../../drivers/serial/16550_reg.rs"]
-pub mod serial;
-#[path = "../../../../drivers/gpu/fb.rs"]
-pub mod fb;
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
 pub mod consts;
+#[path = "../../../../drivers/gpu/fb.rs"]
+pub mod fb;
+#[path = "../../../../drivers/serial/16550_reg.rs"]
+pub mod serial;
 
 /// Initialize serial port first
 pub fn init_serial_early() {

@@ -1,11 +1,11 @@
 //! naive serial adapter driver for thinpad
 
-use core::fmt::{Write, Result, Arguments};
 use crate::util::{read, write};
+use core::fmt::{Arguments, Result, Write};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SerialPort {
-    base: usize
+    base: usize,
 }
 
 const UART_STATUS: usize = 0x0;
@@ -15,7 +15,6 @@ const UART_STATUS_CTS: u8 = 0x1; // clear to send signal
 const UART_STATUS_DR: u8 = 0x2; // data ready signal
 
 impl SerialPort {
-
     pub fn init(&mut self, base: usize) {
         self.base = base;
     }
@@ -34,7 +33,7 @@ impl SerialPort {
         }
         let c = read::<u8>(self.base + UART_DATA);
         match c {
-            255 => '\0',   // null
+            255 => '\0', // null
             c => c as char,
         }
     }
@@ -73,9 +72,7 @@ impl Write for SerialPort {
     }
 }
 
-pub static SERIAL_PORT: SerialPort = SerialPort { 
-    base: 0
-};
+pub static SERIAL_PORT: SerialPort = SerialPort { base: 0 };
 
 pub fn init(base: usize) {
     SERIAL_PORT.lock().init(base);

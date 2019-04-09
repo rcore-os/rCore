@@ -30,7 +30,6 @@ use x86_64::instructions::port::Port;
 
 #[cfg(target_arch = "x86_64")]
 impl PortOps for PortOpsImpl {
-
     unsafe fn read8(&self, port: u16) -> u8 {
         Port::new(port).read()
     }
@@ -51,7 +50,6 @@ impl PortOps for PortOpsImpl {
     }
 }
 
-
 #[cfg(target_arch = "mips")]
 use crate::util::{read, write};
 #[cfg(feature = "board_malta")]
@@ -59,7 +57,6 @@ const PCI_BASE: usize = 0xbbe00000;
 
 #[cfg(target_arch = "mips")]
 impl PortOps for PortOpsImpl {
-
     unsafe fn read8(&self, port: u16) -> u8 {
         read(PCI_BASE + port as usize)
     }

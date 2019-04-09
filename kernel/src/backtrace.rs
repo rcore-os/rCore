@@ -39,8 +39,7 @@ pub fn lr() -> usize {
     unsafe {
         asm!("mov $0, x30" : "=r"(ptr));
     }
-    #[cfg(any(target_arch = "riscv32",
-              target_arch = "riscv64"))]
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
         asm!("mv $0, ra" : "=r"(ptr));
     }
@@ -56,7 +55,6 @@ pub fn lr() -> usize {
 
     ptr
 }
-
 
 // Print the backtrace starting from the caller
 pub fn backtrace() {
@@ -88,7 +86,7 @@ pub fn backtrace() {
                         current_pc - size_of::<usize>(),
                         current_fp
                     );
-                },
+                }
                 _ => {
                     println!(
                         "#{:02} PC: {:#018X} FP: {:#018X}",
@@ -125,7 +123,12 @@ pub fn backtrace() {
                     code_ptr = code_ptr.offset(-1);
                 }
                 let sp_offset = (*code_ptr << 16) >> 16;
-                trace!("Found addiu sp @ {:08X}({:08x}) with sp offset {}", code_ptr as usize, *code_ptr, sp_offset);
+                trace!(
+                    "Found addiu sp @ {:08X}({:08x}) with sp offset {}",
+                    code_ptr as usize,
+                    *code_ptr,
+                    sp_offset
+                );
 
                 // get the return address offset of last function
                 let mut last_fun_found = false;
@@ -139,7 +142,12 @@ pub fn backtrace() {
                 if last_fun_found {
                     // unwind stack
                     let ra_offset = (*code_ptr << 16) >> 16;
-                    trace!("Found sw ra @ {:08X}({:08x}) with ra offset {}", code_ptr as usize, *code_ptr, ra_offset);
+                    trace!(
+                        "Found sw ra @ {:08X}({:08x}) with ra offset {}",
+                        code_ptr as usize,
+                        *code_ptr,
+                        ra_offset
+                    );
                     current_pc = *(((current_fp as isize) + ra_offset) as *const usize);
                     current_fp = ((current_fp as isize) - sp_offset) as usize;
                     trace!("New PC {:08X} FP {:08X}", current_pc, current_fp);

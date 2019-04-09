@@ -1,5 +1,5 @@
-use mips::registers::cp0;
 use log::*;
+use mips::registers::cp0;
 
 pub fn read_epoch() -> u64 {
     // TODO: support RTC
@@ -9,7 +9,7 @@ pub fn read_epoch() -> u64 {
 /// Enable timer interrupt
 pub fn init() {
     // Enable supervisor timer interrupt
-    cp0::status::enable_hard_int5();  // IP(7), timer interrupt
+    cp0::status::enable_hard_int5(); // IP(7), timer interrupt
     cp0::count::write_u32(0);
     set_next();
     info!("timer: init end");

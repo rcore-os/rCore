@@ -19,7 +19,9 @@ pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
 #[inline(always)]
 pub fn write<T>(addr: usize, content: T) {
     let cell = (addr) as *mut T;
-    unsafe { write_volatile(cell, content); }
+    unsafe {
+        write_volatile(cell, content);
+    }
 }
 
 #[inline(always)]

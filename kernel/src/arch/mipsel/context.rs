@@ -59,7 +59,7 @@ impl TrapFrame {
     ///
     /// The new thread starts at function `entry` with an usize argument `arg`.
     /// The stack pointer will be set to `sp`.
-    fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, sp: usize) -> Self {
+    fn new_kernel_thread(entry: extern "C" fn(usize) -> !, arg: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.a0 = arg;
@@ -89,7 +89,7 @@ impl TrapFrame {
     }
 }
 
-use core::fmt::{Debug, Formatter, Error};
+use core::fmt::{Debug, Error, Formatter};
 impl Debug for TrapFrame {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         f.debug_struct("TrapFrame")
@@ -136,7 +136,11 @@ struct ContextData {
 
 impl ContextData {
     fn new(satp: usize) -> Self {
-        ContextData { ra: trap_return as usize, satp, ..ContextData::default() }
+        ContextData {
+            ra: trap_return as usize,
+            satp,
+            ..ContextData::default()
+        }
     }
 }
 
@@ -175,13 +179,22 @@ impl Context {
     /// The new thread starts at function `entry` with an usize argument `arg`.
     /// The stack pointer will be set to `kstack_top`.
     /// The SATP register will be set to `satp`.
-    pub unsafe fn new_kernel_thread(entry: extern fn(usize) -> !, arg: usize, kstack_top: usize, satp: usize) -> Self {
-        info!("New kernel thread @ {:x}, stack = {:x}", entry as usize, kstack_top);
+    pub unsafe fn new_kernel_thread(
+        entry: extern "C" fn(usize) -> !,
+        arg: usize,
+        kstack_top: usize,
+        satp: usize,
+    ) -> Self {
+        info!(
+            "New kernel thread @ {:x}, stack = {:x}",
+            entry as usize, kstack_top
+        );
 
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_kernel_thread(entry, arg, kstack_top),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Constructs Context for a new user thread.
@@ -189,13 +202,23 @@ impl Context {
     /// The new thread starts at `entry_addr`.
     /// The stack pointer of user and kernel mode will be set to `ustack_top`, `kstack_top`.
     /// The SATP register will be set to `satp`.
-    pub unsafe fn new_user_thread(entry_addr: usize, ustack_top: usize, kstack_top: usize, _is32: bool, satp: usize) -> Self {
-        info!("New user thread @ {:x}, stack = {:x}", entry_addr, kstack_top);
+    pub unsafe fn new_user_thread(
+        entry_addr: usize,
+        ustack_top: usize,
+        kstack_top: usize,
+        _is32: bool,
+        satp: usize,
+    ) -> Self {
+        info!(
+            "New user thread @ {:x}, stack = {:x}",
+            entry_addr, kstack_top
+        );
 
         InitStack {
             context: ContextData::new(satp),
             tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Fork a user process and get the new Context.
@@ -212,7 +235,8 @@ impl Context {
                 tf.v0 = 0;
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Fork a user thread and get the new Context.
@@ -222,17 +246,24 @@ impl Context {
     /// The new user stack will be set to `ustack_top`.
     /// The new thread pointer will be set to `tls`.
     /// All the other registers are same as the original.
-    pub unsafe fn new_clone(tf: &TrapFrame, ustack_top: usize, kstack_top: usize, satp: usize, tls: usize) -> Self {
+    pub unsafe fn new_clone(
+        tf: &TrapFrame,
+        ustack_top: usize,
+        kstack_top: usize,
+        satp: usize,
+        tls: usize,
+    ) -> Self {
         InitStack {
             context: ContextData::new(satp),
             tf: {
                 let mut tf = tf.clone();
-                tf.sp = ustack_top;   // sp
+                tf.sp = ustack_top; // sp
                 tf.v1 = tls;
-                tf.v0 = 0;  // return value
+                tf.v0 = 0; // return value
                 tf
             },
-        }.push_at(kstack_top)
+        }
+        .push_at(kstack_top)
     }
 
     /// Used for getting the init TrapFrame of a new user context in `sys_exec`.

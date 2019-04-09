@@ -1,19 +1,21 @@
-use mips::interrupts;
-use mips::tlb;
-use mips::registers::cp0;
-use crate::drivers::DRIVERS;
-use mips::paging::{PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable};
-use mips::addr::*;
 pub use self::context::*;
 use crate::arch::paging::get_root_page_table_ptr;
+use crate::drivers::DRIVERS;
 use log::*;
+use mips::addr::*;
+use mips::interrupts;
+use mips::paging::{
+    PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable,
+};
+use mips::registers::cp0;
+use mips::tlb;
 
 #[path = "context.rs"]
 mod context;
 
 /// Initialize interrupt
 pub fn init() {
-    extern {
+    extern "C" {
         fn trap_entry();
     }
     unsafe {
@@ -59,8 +61,8 @@ pub unsafe fn restore(flags: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern fn rust_trap(tf: &mut TrapFrame) {
-    use cp0::cause::{Exception as E};
+pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+    use cp0::cause::Exception as E;
     trace!("Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
     match tf.cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
@@ -93,7 +95,7 @@ fn external() {
     let handlers = [try_process_serial, try_process_drivers];
     for handler in handlers.iter() {
         if handler() == true {
-            break
+            break;
         }
     }
 }
@@ -105,7 +107,7 @@ fn try_process_serial() -> bool {
             crate::trap::serial(ch);
             true
         }
-        None => false
+        None => false,
     }
 }
 
@@ -113,10 +115,10 @@ fn try_process_drivers() -> bool {
     // TODO
     for driver in DRIVERS.read().iter() {
         if driver.try_handle_interrupt(None) == true {
-            return true
+            return true;
         }
     }
-    return false
+    return false;
 }
 
 fn ipi() {
@@ -131,7 +133,7 @@ fn timer() {
 }
 
 fn syscall(tf: &mut TrapFrame) {
-    tf.epc += 4;   // Must before syscall, because of fork.
+    tf.epc += 4; // Must before syscall, because of fork.
     let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
     trace!("MIPS syscall {} invoked with {:?}", tf.v0, arguments);
 
@@ -153,17 +155,17 @@ fn page_fault(tf: &mut TrapFrame) {
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     let virt_addr = VirtAddr::new(addr);
-    let root_table = unsafe {
-        &mut *(get_root_page_table_ptr() as *mut MIPSPageTable)
-    };
+    let root_table = unsafe { &mut *(get_root_page_table_ptr() as *mut MIPSPageTable) };
     let tlb_result = root_table.lookup(addr);
     match tlb_result {
         Ok(tlb_entry) => {
-            trace!("PhysAddr = {:x}/{:x}",
-                   tlb_entry.entry_lo0.get_pfn() << 12,
-                   tlb_entry.entry_lo1.get_pfn() << 12);
+            trace!(
+                "PhysAddr = {:x}/{:x}",
+                tlb_entry.entry_lo0.get_pfn() << 12,
+                tlb_entry.entry_lo1.get_pfn() << 12
+            );
             tlb::write_tlb_random(tlb_entry)
-        },
+        }
         Err(()) => {
             if !crate::memory::handle_page_fault(addr) {
                 crate::trap::error(tf);

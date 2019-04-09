@@ -1,9 +1,9 @@
-use core::mem;
-use rcore_memory::PAGE_SIZE;
-use log::*;
-use crate::memory::{FRAME_ALLOCATOR, init_heap, MemoryAttr, MemorySet, Linear};
-use crate::consts::{MEMORY_OFFSET, MEMORY_END, KERNEL_OFFSET};
 use crate::arch::paging::*;
+use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET};
+use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use core::mem;
+use log::*;
+use rcore_memory::PAGE_SIZE;
 
 /// Initialize the memory management module
 pub fn init() {
@@ -29,7 +29,10 @@ fn init_frame_allocator() {
     use core::ops::Range;
 
     let mut ba = FRAME_ALLOCATOR.lock();
-    let range = to_range((end as usize) - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE, MEMORY_END);
+    let range = to_range(
+        (end as usize) - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE,
+        MEMORY_END,
+    );
     ba.insert(range);
 
     info!("frame allocator: init end");
@@ -58,7 +61,7 @@ pub unsafe fn clear_bss() {
 
 // Symbols provided by linker script
 #[allow(dead_code)]
-extern {
+extern "C" {
     fn stext();
     fn etext();
     fn sdata();

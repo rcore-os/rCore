@@ -2,19 +2,17 @@
 
 #![allow(dead_code)]
 
-use core::fmt::{Write, Result, Arguments};
 use crate::util::{read, write};
+use core::fmt::{Arguments, Result, Write};
 use spin::Mutex;
 
 pub struct SerialPort {
-    base: usize
+    base: usize,
 }
 
 impl SerialPort {
     fn new() -> SerialPort {
-        SerialPort { 
-            base: 0
-        }
+        SerialPort { base: 0 }
     }
 
     pub fn init(&mut self, base: usize) {
@@ -49,7 +47,7 @@ impl SerialPort {
         }
         let c = read::<u8>(self.base + COM_RX);
         match c {
-            255 => '\0',   // null
+            255 => '\0', // null
             c => c as char,
         }
     }
@@ -65,7 +63,6 @@ impl SerialPort {
     pub fn putfmt(&mut self, fmt: Arguments) {
         self.write_fmt(fmt).unwrap();
     }
-
 }
 
 impl Write for SerialPort {
@@ -83,27 +80,25 @@ impl Write for SerialPort {
     }
 }
 
-
-const COM_RX        :usize = 0;   // In:  Receive buffer (DLAB=0)
-const COM_TX        :usize = 0;   // Out: Transmit buffer (DLAB=0)
-const COM_DLL       :usize = 0;   // Out: Divisor Latch Low (DLAB=1)
-const COM_DLM       :usize = 1;   // Out: Divisor Latch High (DLAB=1)
-const COM_IER       :usize = 1;   // Out: Interrupt Enable Register
-const COM_IER_RDI   :u8 = 0x01;   // Enable receiver data interrupt
-const COM_IIR       :usize = 2;   // In:  Interrupt ID Register
-const COM_FCR       :usize = 2;   // Out: FIFO Control Register
-const COM_LCR       :usize = 3;   // Out: Line Control Register
-const COM_LCR_DLAB  :u8 = 0x80;   // Divisor latch access bit
-const COM_LCR_WLEN8 :u8 = 0x03;   // Wordlength: 8 bits
-const COM_MCR       :usize = 4;   // Out: Modem Control Register
-const COM_MCR_RTS   :u8 = 0x02;   // RTS complement
-const COM_MCR_DTR   :u8 = 0x01;   // DTR complement
-const COM_MCR_OUT2  :u8 = 0x08;   // Out2 complement
-const COM_LSR       :usize = 5;   // In:  Line Status Register
-const COM_LSR_DATA  :u8 = 0x01;   // Data available
-const COM_LSR_TXRDY :u8 = 0x20;   // Transmit buffer avail
-const COM_LSR_TSRE  :u8 = 0x40;   // Transmitter off
-
+const COM_RX: usize = 0; // In:  Receive buffer (DLAB=0)
+const COM_TX: usize = 0; // Out: Transmit buffer (DLAB=0)
+const COM_DLL: usize = 0; // Out: Divisor Latch Low (DLAB=1)
+const COM_DLM: usize = 1; // Out: Divisor Latch High (DLAB=1)
+const COM_IER: usize = 1; // Out: Interrupt Enable Register
+const COM_IER_RDI: u8 = 0x01; // Enable receiver data interrupt
+const COM_IIR: usize = 2; // In:  Interrupt ID Register
+const COM_FCR: usize = 2; // Out: FIFO Control Register
+const COM_LCR: usize = 3; // Out: Line Control Register
+const COM_LCR_DLAB: u8 = 0x80; // Divisor latch access bit
+const COM_LCR_WLEN8: u8 = 0x03; // Wordlength: 8 bits
+const COM_MCR: usize = 4; // Out: Modem Control Register
+const COM_MCR_RTS: u8 = 0x02; // RTS complement
+const COM_MCR_DTR: u8 = 0x01; // DTR complement
+const COM_MCR_OUT2: u8 = 0x08; // Out2 complement
+const COM_LSR: usize = 5; // In:  Line Status Register
+const COM_LSR_DATA: u8 = 0x01; // Data available
+const COM_LSR_TXRDY: u8 = 0x20; // Transmit buffer avail
+const COM_LSR_TSRE: u8 = 0x40; // Transmitter off
 
 lazy_static! {
     pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());

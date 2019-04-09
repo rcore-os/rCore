@@ -1,17 +1,17 @@
-use once::*;
+use crate::drivers::bus::pci;
 use alloc::string::String;
 use mips::registers::cp0;
-use crate::drivers::bus::pci;
+use once::*;
 
+#[path = "../../../../drivers/console/mod.rs"]
+pub mod console;
+pub mod consts;
+#[path = "../../../../drivers/gpu/fb.rs"]
+pub mod fb;
 #[path = "../../../../drivers/serial/ti_16c550c.rs"]
 pub mod serial;
 #[path = "../../../../drivers/gpu/qemu_stdvga.rs"]
 pub mod vga;
-#[path = "../../../../drivers/gpu/fb.rs"]
-pub mod fb;
-#[path = "../../../../drivers/console/mod.rs"]
-pub mod console;
-pub mod consts;
 
 use fb::FramebufferInfo;
 

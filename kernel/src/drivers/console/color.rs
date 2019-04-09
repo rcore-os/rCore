@@ -43,12 +43,20 @@ impl FramebufferColor for RgbColor {
     #[inline]
     fn pack32(&self, config: ColorConfig) -> u32 {
         match config {
-            ColorConfig::RGB332 => (((self.0 >> 5) << 5) | ((self.1 >> 5) << 2) | (self.2 >> 6)) as u32,
-            ColorConfig::RGB565 => (((self.0 as u16 & 0xF8) << 8) | ((self.1 as u16 & 0xFC) << 3) | (self.2 as u16 >> 3)) as u32,
+            ColorConfig::RGB332 => {
+                (((self.0 >> 5) << 5) | ((self.1 >> 5) << 2) | (self.2 >> 6)) as u32
+            }
+            ColorConfig::RGB565 => {
+                (((self.0 as u16 & 0xF8) << 8)
+                    | ((self.1 as u16 & 0xFC) << 3)
+                    | (self.2 as u16 >> 3)) as u32
+            }
             // FIXME: qemu and low version RPi use RGBA order for 24/32-bit color depth,
             // but RPi3 B+ uses BGRA order for 24/32-bit color depth.
-            ColorConfig::BGRA8888 => ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32),
-            _ => unimplemented!()
+            ColorConfig::BGRA8888 => {
+                ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
+            }
+            _ => unimplemented!(),
         }
     }
 }

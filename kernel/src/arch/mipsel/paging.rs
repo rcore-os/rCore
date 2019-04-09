@@ -1,11 +1,13 @@
 // Depends on kernel
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
-use mips::addr::*;
-use mips::tlb::*;
-use mips::paging::{Mapper, PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable};
-use mips::paging::{FrameAllocator, FrameDeallocator};
-use rcore_memory::paging::*;
 use log::*;
+use mips::addr::*;
+use mips::paging::{FrameAllocator, FrameDeallocator};
+use mips::paging::{
+    Mapper, PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable,
+};
+use mips::tlb::*;
+use rcore_memory::paging::*;
 
 pub struct ActivePageTable(TwoLevelPageTable<'static>, PageEntry);
 
@@ -14,7 +16,6 @@ pub struct ActivePageTable(TwoLevelPageTable<'static>, PageEntry);
 pub struct PageEntry(&'static mut PageTableEntry, Page);
 
 impl PageTable for ActivePageTable {
-
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         // map the 4K `page` to the 4K `frame` with `flags`
         let flags = EF::VALID | EF::WRITABLE | EF::CACHEABLE;
@@ -22,7 +23,10 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
-        self.0.map_to(page, frame, flags, &mut FrameAllocatorForRiscv).unwrap().flush();
+        self.0
+            .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
+            .unwrap()
+            .flush();
         self.get_entry(addr).expect("fail to get entry")
     }
 
@@ -49,7 +53,7 @@ extern "C" {
     fn _root_page_table_ptr();
 }
 
-pub fn set_root_page_table_ptr(ptr : usize) {
+pub fn set_root_page_table_ptr(ptr: usize) {
     unsafe {
         clear_all_tlb();
         *(_root_page_table_ptr as *mut usize) = ptr;
@@ -57,17 +61,12 @@ pub fn set_root_page_table_ptr(ptr : usize) {
 }
 
 pub fn get_root_page_table_ptr() -> usize {
-    unsafe {
-        *(_root_page_table_ptr as *mut usize)
-    }
+    unsafe { *(_root_page_table_ptr as *mut usize) }
 }
 
 pub fn root_page_table_buffer() -> &'static mut MIPSPageTable {
-    unsafe {
-        &mut *(_root_page_table_ptr as *mut MIPSPageTable)
-    }
+    unsafe { &mut *(_root_page_table_ptr as *mut MIPSPageTable) }
 }
-
 
 impl PageTableExt for ActivePageTable {}
 
@@ -77,7 +76,7 @@ impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(
             TwoLevelPageTable::new(root_page_table_buffer()),
-            ::core::mem::uninitialized()
+            ::core::mem::uninitialized(),
         )
     }
 }
@@ -85,34 +84,68 @@ impl ActivePageTable {
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
-        unsafe { clear_all_tlb(); }
+        unsafe {
+            clear_all_tlb();
+        }
     }
-    fn accessed(&self) -> bool { self.0.flags().contains(EF::ACCESSED) }
-    fn dirty(&self) -> bool { self.0.flags().contains(EF::DIRTY) }
-    fn writable(&self) -> bool { self.0.flags().contains(EF::WRITABLE) }
-    fn present(&self) -> bool { self.0.flags().contains(EF::VALID) }
-    fn clear_accessed(&mut self) { self.0.flags_mut().remove(EF::ACCESSED); }
-    fn clear_dirty(&mut self) { self.0.flags_mut().remove(EF::DIRTY); }
-    fn set_writable(&mut self, value: bool) { self.0.flags_mut().set(EF::WRITABLE, value); }
-    fn set_present(&mut self, value: bool) { self.0.flags_mut().set(EF::VALID, value); }
-    fn target(&self) -> usize { self.0.addr().as_usize() }
+    fn accessed(&self) -> bool {
+        self.0.flags().contains(EF::ACCESSED)
+    }
+    fn dirty(&self) -> bool {
+        self.0.flags().contains(EF::DIRTY)
+    }
+    fn writable(&self) -> bool {
+        self.0.flags().contains(EF::WRITABLE)
+    }
+    fn present(&self) -> bool {
+        self.0.flags().contains(EF::VALID)
+    }
+    fn clear_accessed(&mut self) {
+        self.0.flags_mut().remove(EF::ACCESSED);
+    }
+    fn clear_dirty(&mut self) {
+        self.0.flags_mut().remove(EF::DIRTY);
+    }
+    fn set_writable(&mut self, value: bool) {
+        self.0.flags_mut().set(EF::WRITABLE, value);
+    }
+    fn set_present(&mut self, value: bool) {
+        self.0.flags_mut().set(EF::VALID, value);
+    }
+    fn target(&self) -> usize {
+        self.0.addr().as_usize()
+    }
     fn set_target(&mut self, target: usize) {
         let flags = self.0.flags();
         let frame = Frame::of_addr(PhysAddr::new(target));
         self.0.set(frame, flags);
     }
-    fn writable_shared(&self) -> bool { false }
-    fn readonly_shared(&self) -> bool { false }
-    fn set_shared(&mut self, writable: bool) { }
-    fn clear_shared(&mut self) { }
-    fn swapped(&self) -> bool { self.0.flags().contains(EF::RESERVED1) }
-    fn set_swapped(&mut self, value: bool) { self.0.flags_mut().set(EF::RESERVED1, value); }
-    fn user(&self) -> bool { true }
-    fn set_user(&mut self, value: bool) { }
-    fn execute(&self) -> bool { true }
-    fn set_execute(&mut self, value: bool) { }
-    fn mmio(&self) -> u8 { 0 }
-    fn set_mmio(&mut self, _value: u8) { }
+    fn writable_shared(&self) -> bool {
+        false
+    }
+    fn readonly_shared(&self) -> bool {
+        false
+    }
+    fn set_shared(&mut self, writable: bool) {}
+    fn clear_shared(&mut self) {}
+    fn swapped(&self) -> bool {
+        self.0.flags().contains(EF::RESERVED1)
+    }
+    fn set_swapped(&mut self, value: bool) {
+        self.0.flags_mut().set(EF::RESERVED1, value);
+    }
+    fn user(&self) -> bool {
+        true
+    }
+    fn set_user(&mut self, value: bool) {}
+    fn execute(&self) -> bool {
+        true
+    }
+    fn set_execute(&mut self, value: bool) {}
+    fn mmio(&self) -> u8 {
+        0
+    }
+    fn set_mmio(&mut self, _value: u8) {}
 }
 
 #[derive(Debug)]
@@ -127,15 +160,15 @@ impl InactivePageTable for InactivePageTable0 {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(PhysAddr::new(target));
 
-        let table = unsafe {
-            &mut *(target as *mut MIPSPageTable)
-        };
+        let table = unsafe { &mut *(target as *mut MIPSPageTable) };
 
         table.zero();
         InactivePageTable0 { root_frame: frame }
     }
 
-    fn map_kernel(&mut self) { /* nothing to do */ }
+    fn map_kernel(&mut self) {
+        /* nothing to do */
+    }
 
     fn token(&self) -> usize {
         self.root_frame.to_kernel_unmapped().as_usize()
@@ -150,26 +183,30 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn flush_tlb() {
-        unsafe { clear_all_tlb(); }
+        unsafe {
+            clear_all_tlb();
+        }
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let pt: *mut MIPSPageTable = unsafe {
-            self.token() as *mut MIPSPageTable
-        };
+        let pt: *mut MIPSPageTable = unsafe { self.token() as *mut MIPSPageTable };
 
-        unsafe { clear_all_tlb(); } 
+        unsafe {
+            clear_all_tlb();
+        }
 
         let mut active = unsafe {
             ActivePageTable(
                 TwoLevelPageTable::new(&mut *pt),
-                ::core::mem::uninitialized()
+                ::core::mem::uninitialized(),
             )
         };
 
         let ret = f(&mut active);
 
-        unsafe { clear_all_tlb(); }
+        unsafe {
+            clear_all_tlb();
+        }
         ret
     }
 }

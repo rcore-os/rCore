@@ -3,6 +3,6 @@
 //! [atomic](http://llvm.org/docs/Atomics.html#libcalls-atomic)
 
 #[no_mangle]
-pub extern fn abort() {
+pub extern "C" fn abort() {
     panic!("abort");
 }
