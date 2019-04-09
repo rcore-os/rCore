@@ -276,7 +276,7 @@ sym:
 
 $(bootloader): $(kernel)
 ifeq ($(arch), aarch64)
-	need_bootloader := true
+need_bootloader := true
 endif
 ifeq ($(need_bootloader), true)
 	@echo Building $(arch) bootloader
