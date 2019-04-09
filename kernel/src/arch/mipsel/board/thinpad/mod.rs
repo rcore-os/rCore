@@ -1,13 +1,13 @@
-use once::*;
 use alloc::string::String;
+use once::*;
 
-#[path = "../../../../drivers/serial/simple_uart.rs"]
-pub mod serial;
-#[path = "../../../../drivers/gpu/fb.rs"]
-pub mod fb;
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
 pub mod consts;
+#[path = "../../../../drivers/gpu/fb.rs"]
+pub mod fb;
+#[path = "../../../../drivers/serial/simple_uart.rs"]
+pub mod serial;
 
 use fb::FramebufferInfo;
 use fb::FramebufferResult;

@@ -2,6 +2,7 @@ use mips::registers::cp0;
 use mips::instructions;
 use crate::consts::MAX_CPU_NUM;
 use core::ptr::{read_volatile, write_volatile};
+use mips::registers::cp0;
 
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
 

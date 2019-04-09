@@ -152,12 +152,9 @@ impl Framebuffer {
                     color_depth,
                     fb_info: info,
                 })
-            },
-            Err(e) => {
-                Err(e)?
-            },
+            }
+            Err(e) => Err(e)?,
         }
-
     }
 
     #[inline]

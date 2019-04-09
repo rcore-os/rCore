@@ -1,9 +1,8 @@
 //! Raspberry PI 3 Model B/B+
 
+use alloc::string::String;
 use bcm2837::atags::Atags;
 use once::*;
-use alloc::string::String;
-
 
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
@@ -48,13 +47,12 @@ pub fn probe_memory() -> Option<(usize, usize)> {
 }
 
 pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
-    
     let (width, height) = if width == 0 || height == 0 {
         mailbox::framebuffer_get_physical_size()?
     } else {
         (width, height)
     };
-    
+
     let depth = if depth == 0 {
         mailbox::framebuffer_get_depth()?
     } else {

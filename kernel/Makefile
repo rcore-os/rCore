@@ -61,6 +61,7 @@ endif
 
 ifeq ($(arch), aarch64)
 board := raspi3
+need_bootloader := true
 endif
 
 # currently only mipsel architecture needs DTB linked to the kernel
@@ -136,7 +137,7 @@ qemu_opts += \
 else ifeq ($(arch), mipsel)
 ifeq ($(board), malta)
 qemu_opts += \
-	-machine $(board) \
+	-machine $(board) -device VGA \
 	-serial null -serial null -serial mon:stdio \
 	-kernel $(kernel_img)
 endif
@@ -218,6 +219,8 @@ strip := $(prefix)strip
 dtc := dtc
 export CC = $(cc)
 
+hostcc := gcc
+
 .PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
 
 all: kernel
@@ -275,9 +278,6 @@ sym:
 ### bootloader and kernel image ###
 
 $(bootloader): $(kernel)
-ifeq ($(arch), aarch64)
-	need_bootloader := true
-endif
 ifeq ($(need_bootloader), true)
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped
@@ -335,7 +335,7 @@ else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
-	    $(cc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
+	    $(hostcc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
 	@cargo xbuild $(build_args)
 endif

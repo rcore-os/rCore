@@ -1,14 +1,14 @@
-pub mod io;
-pub mod interrupt;
-pub mod timer;
-pub mod paging;
-pub mod memory;
 pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
-pub mod syscall;
-pub mod rand;
 pub mod driver;
+pub mod interrupt;
+pub mod io;
+pub mod memory;
+pub mod paging;
+pub mod rand;
+pub mod syscall;
+pub mod timer;
 
 use log::*;
 use mips::registers::cp0;
@@ -25,15 +25,13 @@ pub mod board;
 #[path = "board/mipssim/mod.rs"]
 pub mod board;
 
-
 extern "C" {
     fn _dtb_start();
     fn _dtb_end();
 }
 
 #[no_mangle]
-pub extern fn rust_main() -> ! {
-
+pub extern "C" fn rust_main() -> ! {
     // unsafe { cpu::set_cpu_id(hartid); }
 
     let ebase = cp0::ebase::read_u32();
@@ -48,7 +46,9 @@ pub extern fn rust_main() -> ! {
         loop {}
     }
 
-    unsafe { memory::clear_bss(); }
+    unsafe {
+        memory::clear_bss();
+    }
 
     board::init_serial_early();
     crate::logging::init();

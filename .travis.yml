@@ -28,6 +28,7 @@ env:
     - ARCH="riscv32"
     - ARCH="x86_64"
     - ARCH="aarch64"
+    - ARCH="mipsel" OPTS="board=malta"
 
 matrix:
     allow_failures:
@@ -45,10 +46,10 @@ install:
     if [ $TRAVIS_OS_NAME = linux ]; then
       export FILE="gcc-arm-8.2-2018.11-x86_64-aarch64-elf";
       wget https://developer.arm.com/-/media/Files/downloads/gnu-a/8.2-2018.11/$FILE.tar.xz;
-      tar -xvf $FILE.tar.xz;
+      tar -xf $FILE.tar.xz;
       export PATH=$PATH:$PWD/$FILE/bin;
       wget https://musl.cc/aarch64-linux-musl-cross.tgz;
-      tar -xvf aarch64-linux-musl-cross.tgz;
+      tar -xf aarch64-linux-musl-cross.tgz;
       export PATH=$PATH:$PWD/aarch64-linux-musl-cross/bin;
     elif [ $TRAVIS_OS_NAME = osx ]; then
       brew tap SergioBenitez/osxct;
@@ -60,16 +61,16 @@ install:
     sudo apt update;
     sudo apt install linux-headers-$(uname -r);
     wget https://musl.cc/x86_64-linux-musl-cross.tgz;
-    tar -xvf x86_64-linux-musl-cross.tgz;
+    tar -xf x86_64-linux-musl-cross.tgz;
     export PATH=$PATH:$PWD/x86_64-linux-musl-cross/bin;
     fi;
     fi
 
   - if [ $TRAVIS_OS_NAME = linux ]; then
-      wget https://download.qemu.org/qemu-3.1.0.tar.xz && tar xvJf qemu-3.1.0.tar.xz > /dev/null && cd qemu-3.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
+      wget https://download.qemu.org/qemu-3.1.0.tar.xz && tar xJf qemu-3.1.0.tar.xz > /dev/null && cd qemu-3.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
       export PATH=$PATH:$PWD/qemu-3.1.0/$ARCH-softmmu:$PWD/qemu-3.1.0;
       sudo apt update;
-      sudo apt install libfuse-dev;
+      sudo apt install libfuse-dev device-tree-compiler -y;
     fi
 
   - if [ $ARCH = riscv32 ]; then
@@ -77,7 +78,7 @@ install:
     sudo apt update;
     sudo apt install linux-headers-$(uname -r);
     wget https://musl.cc/riscv32-linux-musl-cross.tgz;
-    tar -xvf riscv32-linux-musl-cross.tgz;
+    tar -xf riscv32-linux-musl-cross.tgz;
     export PATH=$PATH:$PWD/riscv32-linux-musl-cross/bin;
     fi;
     fi
@@ -86,8 +87,17 @@ install:
     sudo apt update;
     sudo apt install linux-headers-$(uname -r);
     wget https://musl.cc/riscv64-linux-musl-cross.tgz;
-    tar -xvf riscv64-linux-musl-cross.tgz;
+    tar -xf riscv64-linux-musl-cross.tgz;
     export PATH=$PATH:$PWD/riscv64-linux-musl-cross/bin;
+    fi;
+    fi
+  - if [ $ARCH = mipsel ]; then
+    if [ $TRAVIS_OS_NAME = linux ]; then
+    sudo apt update;
+    sudo apt install linux-headers-$(uname -r);
+    wget https://musl.cc/mipsel-linux-musln32-cross.tgz;
+    tar -xf mipsel-linux-musln32-cross.tgz;
+    export PATH=$PATH:$PWD/mipsel-linux-musln32-cross/bin;
     fi;
     fi
 

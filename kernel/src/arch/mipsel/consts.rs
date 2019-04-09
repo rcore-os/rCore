@@ -1,6 +1,5 @@
 /// Platform specific constants
-/// 
-
+///
 pub use super::board::consts::*;
 
 pub const KERNEL_OFFSET: usize = 0x80100000;

@@ -2,19 +2,17 @@
 
 #![allow(dead_code)]
 
-use core::fmt::{Write, Result, Arguments};
-use spin::Mutex;
 use crate::util::{read, write};
+use core::fmt::{Arguments, Result, Write};
+use spin::Mutex;
 
 pub struct SerialPort {
-    base: usize
+    base: usize,
 }
 
 impl SerialPort {
     fn new() -> SerialPort {
-        SerialPort { 
-            base: 0
-        }
+        SerialPort { base: 0 }
     }
 
     pub fn init(&mut self, base: usize) {
@@ -49,7 +47,7 @@ impl SerialPort {
         }
         let c = read::<u8>(self.base + COM_RX);
         match c {
-            255 => '\0',   // null
+            255 => '\0', // null
             c => c as char,
         }
     }
@@ -65,7 +63,6 @@ impl SerialPort {
     pub fn putfmt(&mut self, fmt: Arguments) {
         self.write_fmt(fmt).unwrap();
     }
-
 }
 
 impl Write for SerialPort {
@@ -83,12 +80,11 @@ impl Write for SerialPort {
     }
 }
 
-const COM_RX     :usize = 0x00;   // In:  Receive buffer (DLAB=0)
-const COM_TX     :usize = 0x00;   // Out: Transmit buffer (DLAB=0)
-const COM_INT_EN :usize = 0x08;   // In:  Interrupt enable
-const COM_INT_ID :usize = 0x10;   // Out: Interrupt identification
-const COM_LSR    :usize = 0x28;   // In:  Line status register
-
+const COM_RX: usize = 0x00; // In:  Receive buffer (DLAB=0)
+const COM_TX: usize = 0x00; // Out: Transmit buffer (DLAB=0)
+const COM_INT_EN: usize = 0x08; // In:  Interrupt enable
+const COM_INT_ID: usize = 0x10; // Out: Interrupt identification
+const COM_LSR: usize = 0x28; // In:  Line status register
 
 lazy_static! {
     pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
