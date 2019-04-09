@@ -50,8 +50,8 @@ pub struct TrapFrame {
     pub sp: usize,
     pub fp: usize,
     pub ra: usize,
-    /// Reserve space for hartid
-    pub _hartid: usize,
+    /// Reserved
+    pub reserved: usize,
 }
 
 impl TrapFrame {
