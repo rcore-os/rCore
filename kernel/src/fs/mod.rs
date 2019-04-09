@@ -21,7 +21,7 @@ mod stdio;
 #[cfg(feature = "link_user")]
 global_asm!(concat!(
     r#"
-	.section .data
+	.section .data.img
 	.global _user_img_start
 	.global _user_img_end
 _user_img_start:
@@ -54,6 +54,7 @@ lazy_static! {
                 fn _user_img_start();
                 fn _user_img_end();
             }
+            info!("SFS linked to kernel, from {:08x} to {:08x}", _user_img_start as usize, _user_img_end as usize);
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 

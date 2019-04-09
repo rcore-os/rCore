@@ -2,12 +2,10 @@
 
 use crate::util::color::ConsoleColor;
 
-pub trait FramebufferColor {
-    /// pack as 16-bit integer
-    fn pack16(&self) -> u16;
+use super::ColorConfig;
 
-    /// pack as 32-bit integer
-    fn pack32(&self) -> u32;
+pub trait FramebufferColor {
+    fn pack32(&self, config: ColorConfig) -> u32;
 }
 
 #[repr(C)]
@@ -43,28 +41,32 @@ impl From<ConsoleColor> for RgbColor {
 
 impl FramebufferColor for RgbColor {
     #[inline]
-    fn pack16(&self) -> u16 {
-        // BGR565
-        ((self.0 as u16 & 0xF8) << 8) | ((self.1 as u16 & 0xFC) << 3) | (self.2 as u16 >> 3)
-    }
-
-    #[inline]
-    fn pack32(&self) -> u32 {
-        // BGRA8888
-        // FIXME: qemu and low version RPi use RGBA order for 24/32-bit color depth,
-        // but RPi3 B+ uses BGRA order for 24/32-bit color depth.
-        ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
+    fn pack32(&self, config: ColorConfig) -> u32 {
+        match config {
+            ColorConfig::RGB332 => {
+                (((self.0 >> 5) << 5) | ((self.1 >> 5) << 2) | (self.2 >> 6)) as u32
+            }
+            ColorConfig::RGB565 => {
+                (((self.0 as u16 & 0xF8) << 8)
+                    | ((self.1 as u16 & 0xFC) << 3)
+                    | (self.2 as u16 >> 3)) as u32
+            }
+            // FIXME: qemu and low version RPi use RGBA order for 24/32-bit color depth,
+            // but RPi3 B+ uses BGRA order for 24/32-bit color depth.
+            ColorConfig::BGRA8888 => {
+                ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
+            }
+            _ => unimplemented!(),
+        }
     }
 }
 
 impl FramebufferColor for ConsoleColor {
     #[inline]
-    fn pack16(&self) -> u16 {
-        RgbColor::from(*self).pack16()
-    }
-
-    #[inline]
-    fn pack32(&self) -> u32 {
-        RgbColor::from(*self).pack32()
+    fn pack32(&self, config: ColorConfig) -> u32 {
+        match config {
+            ColorConfig::VgaPalette => *self as u32,
+            _ => RgbColor::from(*self).pack32(config),
+        }
     }
 }

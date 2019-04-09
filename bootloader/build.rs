@@ -10,12 +10,20 @@ fn main() {
     }
 }
 
+/// include payload and dtb in sections of asm
 fn gen_payload_asm() -> Result<std::path::PathBuf> {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let payload = std::env::var("PAYLOAD").unwrap();
+    let dtb = std::env::var("DTB").unwrap();
 
     if !Path::new(&payload).is_file() {
         panic!("Kernel payload `{}` not found", payload)
+    }
+
+    let mut has_dtb = true;
+
+    if !Path::new(&dtb).is_file() {
+        has_dtb = false;
     }
 
     let file_path = Path::new(&out_dir).join("payload.S");
@@ -31,10 +39,24 @@ fn gen_payload_asm() -> Result<std::path::PathBuf> {
 _kernel_payload_start:
     .incbin "{}"
 _kernel_payload_end:
-"#, payload)?;
+    "#, payload)?;
 
     println!("cargo:rerun-if-changed={}", payload);
     println!("cargo:rerun-if-env-changed=PAYLOAD");
+
+    if has_dtb {
+        write!(f, r#"
+    .section .dtb,"a"
+    .align 12
+    .global _dtb_start, _dtb_end
+_dtb_start:
+    .incbin "{}"
+_dtb_end:
+    "#, dtb)?;
+        println!("{:x?} {:x?}", dtb, file_path);
+        println!("cargo:rerun-if-changed={}", dtb);
+        println!("cargo:rerun-if-env-changed=DTB");
+    }
 
     Ok(file_path)
 }

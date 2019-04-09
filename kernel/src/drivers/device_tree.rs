@@ -14,6 +14,7 @@ fn walk_dt_node(dt: &Node) {
         if compatible == "virtio,mmio" {
             virtio_probe(dt);
         }
+        // TODO: initial other devices (16650, etc.)
     }
     if let Ok(bootargs) = dt.prop_str("bootargs") {
         if bootargs.len() > 0 {

@@ -13,7 +13,9 @@ authors = [
     "chenqiuhao <haohao0924@126.com>",
     "maoyuchaxue <wangjt15@mails.tsinghua.edu.cn>",
     "Jiajie Chen <jiegec@qq.com>",
-    "chyyuu <yuchen@mail.tsinghua.edu.cn>"
+    "chyyuu <yuchen@mail.tsinghua.edu.cn>",
+    "Shengqi Chen <harry-chen@outlok.com>",
+    "Yuhao Zhou <miskcoo@gmail.com>"
 ]
 
 [features]
@@ -24,6 +26,11 @@ board_u540 = ["sv39", "link_user"]
 nographic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
+# for qemu machine
+board_malta = ["link_user"]
+board_mipssim = ["link_user"]
+# for thinpad
+board_thinpad = ["link_user"]
 # Hard link user program
 link_user = []
 # Run cmdline instead of user shell, useful for automatic testing
@@ -70,6 +77,10 @@ riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
+
+[target.'cfg(target_arch = "mips")'.dependencies]
+mips = "^0.2.0"
+paste = "0.1"
 
 [package.metadata.bootimage]
 default-target = "targets/x86_64.json"

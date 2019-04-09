@@ -21,7 +21,7 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
 pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
 // Raspberry Pi 3 has 1G memory
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "mips"))]
 pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 
 lazy_static! {

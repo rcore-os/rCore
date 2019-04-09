@@ -115,7 +115,7 @@ lazy_static! {
     pub static ref SOCKET_ACTIVITY: Condvar = Condvar::new();
 }
 
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
 pub fn init(dtb: usize) {
     device_tree::init(dtb);
 }

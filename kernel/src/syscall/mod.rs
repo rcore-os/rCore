@@ -44,7 +44,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
     }
 
-    // use syscall numbers in Linux x86_64
+    // use platform-specific syscal numbers
     // See https://filippo.io/linux-syscall-table/
     // And https://fedora.juszkiewicz.com.pl/syscalls.html.
     let ret = match id {

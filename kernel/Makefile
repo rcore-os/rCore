@@ -15,8 +15,8 @@
 #   make clean                  Clean
 #
 # Options:
-#   arch    = x86_64 | riscv32 | riscv64 | aarch64
-#   d    = int | in_asm | ...    QEMU debug info
+#   arch    = x86_64 | riscv32 | riscv64 | aarch64 | mipsel
+#   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = <sfsimg>            SFS image path of user programs
@@ -50,15 +50,36 @@ bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 
+
 ### export environments ###
+
+ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
+#link user img, so use original image
+export SFSIMG = $(user_dir)/build/$(arch).img
+else
+export SFSIMG = $(user_dir)/build/$(arch).qcow2
+endif
+
+ifeq ($(arch), aarch64)
+board := raspi3
+need_bootloader := true
+endif
+
+# currently only mipsel architecture needs DTB linked to the kernel
+ifeq ($(arch), mipsel)
+dtb := src/arch/$(arch)/board/$(board)/device.dtb
+endif
+
+# mipssim does not support SMP
+ifeq ($(board), mipssim)
+smp := 1
+endif
+
 export ARCH = $(arch)
 export BOARD = $(board)
 export SMP = $(smp)
-export SFSIMG = $(user_dir)/build/$(arch).qcow2
-ifeq ($(arch), aarch64)
-board := raspi3
-export SFSIMG = $(user_dir)/build/$(arch).img
-endif
+export DTB = $(dtb)
+
 
 ### qemu options ###
 qemu_opts := \
@@ -119,6 +140,20 @@ ifneq ($(u_boot), )
 qemu_opts += \
 	-sd $(bootloader)
 endif
+
+else ifeq ($(arch), mipsel)
+ifeq ($(board), malta)
+qemu_opts += \
+	-machine $(board) -device VGA \
+	-serial null -serial null -serial mon:stdio \
+	-kernel $(kernel_img)
+endif
+ifeq ($(board), mipssim)
+qemu_opts += \
+	-machine $(board) \
+	-serial mon:stdio \
+	-kernel $(kernel_img)
+endif
 endif
 
 ifdef d
@@ -172,6 +207,8 @@ else ifeq ($(arch), riscv32)
 prefix := riscv64-unknown-elf-
 else ifeq ($(arch), riscv64)
 prefix := riscv64-unknown-elf-
+else ifeq ($(arch), mipsel)
+prefix ?= mipsel-linux-musln32-
 else ifeq ($(arch), aarch64)
 prefix ?= aarch64-none-elf-
 ifeq (,$(shell which $(prefix)ld))
@@ -186,9 +223,12 @@ cc := $(prefix)gcc
 as := $(prefix)as
 gdb := $(prefix)gdb
 strip := $(prefix)strip
+dtc := dtc
 export CC = $(cc)
 
-.PHONY: all clean build asm doc  debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
+hostcc := gcc
+
+.PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
 
 all: kernel
 
@@ -235,8 +275,17 @@ header:
 sym:
 	@$(objdump) -t $(kernel) | less
 
+### device tree process ###
+
+%.dtb: %.dts
+	@echo Generating device tree file $@
+	@$(dtc) -I dts -O dtb -o $@ $<
+	@rm -rf src/arch/${arch}/boot/dtb.gen.s
+
+### bootloader and kernel image ###
+
 $(bootloader): $(kernel)
-ifeq ($(arch), aarch64)
+ifeq ($(need_bootloader), true)
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped
 	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
@@ -272,9 +321,12 @@ ifneq ($(u_boot), )
 else
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
 endif
+else ifeq ($(arch), mipsel)
+# qemu-system-mipsel accepts ELF file only, so objcopy is not needed
+	@$(strip) $(kernel) -o $@
 endif
 
-kernel:
+kernel: $(dtb)
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
@@ -291,6 +343,11 @@ else ifeq ($(arch), riscv64)
 		src/arch/riscv32/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), aarch64)
+	@cargo xbuild $(build_args)
+else ifeq ($(arch), mipsel)
+	@for file in context entry trap ; do \
+	    $(hostcc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
+	done
 	@cargo xbuild $(build_args)
 endif
 

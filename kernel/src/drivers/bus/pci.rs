@@ -9,7 +9,6 @@ use core::cmp::Ordering;
 use pci::*;
 use rcore_memory::{paging::PageTable, PAGE_SIZE};
 use spin::Mutex;
-use x86_64::instructions::port::Port;
 
 const PCI_COMMAND: u16 = 0x04;
 const PCI_CAP_PTR: u16 = 0x34;
@@ -25,6 +24,10 @@ const PCI_CAP_ID_MSI: u8 = 0x05;
 
 struct PortOpsImpl;
 
+#[cfg(target_arch = "x86_64")]
+use x86_64::instructions::port::Port;
+
+#[cfg(target_arch = "x86_64")]
 impl PortOps for PortOpsImpl {
     unsafe fn read8(&self, port: u16) -> u8 {
         Port::new(port).read()
@@ -43,6 +46,33 @@ impl PortOps for PortOpsImpl {
     }
     unsafe fn write32(&self, port: u16, val: u32) {
         Port::new(port).write(val);
+    }
+}
+
+#[cfg(target_arch = "mips")]
+use crate::util::{read, write};
+#[cfg(feature = "board_malta")]
+const PCI_BASE: usize = 0xbbe00000;
+
+#[cfg(target_arch = "mips")]
+impl PortOps for PortOpsImpl {
+    unsafe fn read8(&self, port: u16) -> u8 {
+        read(PCI_BASE + port as usize)
+    }
+    unsafe fn read16(&self, port: u16) -> u16 {
+        read(PCI_BASE + port as usize)
+    }
+    unsafe fn read32(&self, port: u16) -> u32 {
+        read(PCI_BASE + port as usize)
+    }
+    unsafe fn write8(&self, port: u16, val: u8) {
+        write(PCI_BASE + port as usize, val);
+    }
+    unsafe fn write16(&self, port: u16, val: u16) {
+        write(PCI_BASE + port as usize, val);
+    }
+    unsafe fn write32(&self, port: u16, val: u32) {
+        write(PCI_BASE + port as usize, val);
     }
 }
 

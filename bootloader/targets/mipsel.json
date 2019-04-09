@@ -1,0 +1,36 @@
+{
+  "arch": "mips",
+  "cpu": "mips32r2",
+  "llvm-target": "mipsel-unknown-none",
+  "data-layout": "e-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64",
+  "target-endian": "little",
+  "target-pointer-width": "32",
+  "target-c-int-width": "32",
+  "os": "none",
+  "features": "+mips32r2",
+  "max-atomic-width": "32",
+  "linker": "rust-lld",
+  "linker-flavor": "ld.lld",
+  "pre-link-args": {
+    "ld.lld": [
+      "-Tsrc/arch/mipsel/boot.ld"
+    ]
+  },
+  "executables": true,
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "abi-blacklist": [
+    "cdecl",
+    "stdcall",
+    "fastcall",
+    "vectorcall",
+    "thiscall",
+    "aapcs",
+    "win64",
+    "sysv64",
+    "ptx-kernel",
+    "msp430-interrupt",
+    "x86-interrupt"
+  ],
+  "eliminate-frame-pointer": false
+}

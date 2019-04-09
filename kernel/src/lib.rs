@@ -42,6 +42,10 @@ mod trap;
 #[path = "arch/x86_64/mod.rs"]
 pub mod arch;
 
+#[cfg(target_arch = "mips")]
+#[path = "arch/mipsel/mod.rs"]
+pub mod arch;
+
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 #[path = "arch/riscv32/mod.rs"]
 pub mod arch;

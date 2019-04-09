@@ -1,6 +1,8 @@
 build
 target
 /kernel/src/arch/x86_64/interrupt/vector.asm
+*.gen.s
+*.dtb
 
 Cargo.lock
 !kernel/Cargo.lock
@@ -11,3 +13,5 @@ Cargo.lock
 
 # for eclipse
 .project
+
+.vscode
