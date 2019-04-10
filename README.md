@@ -33,7 +33,8 @@ See [Travis script](./.travis.yml) for details.
 
 ```bash
 $ rustup component add rust-src
-$ cargo install cargo-xbuild bootimage
+$ cargo install cargo-xbuild --force
+$ cargo install bootimage --version 0.5.7 --force
 ```
 
 ```bash
