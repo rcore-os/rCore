@@ -216,16 +216,11 @@ ifeq (,$(shell which $(prefix)ld))
 endif
 endif
 
-ld := $(prefix)ld
-objdump := $(prefix)objdump
-objcopy := $(prefix)objcopy
-cc := $(prefix)gcc
-as := $(prefix)as
 gdb := $(prefix)gdb
-strip := $(prefix)strip
+objdump := cargo objdump -- -arch-name=$(subst _,-,$(arch))
+objcopy := cargo objcopy -- --binary-architecture=$(subst _,-,$(arch))
+strip := cargo strip --
 dtc := dtc
-export CC = $(cc)
-
 hostcc := gcc
 
 .PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
