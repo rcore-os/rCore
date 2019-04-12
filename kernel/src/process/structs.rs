@@ -175,10 +175,6 @@ impl Thread {
     {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
-        let is32 = match elf.header.pt2 {
-            header::HeaderPt2::Header32(_) => true,
-            header::HeaderPt2::Header64(_) => false,
-        };
 
         // Check ELF type
         match elf.header.pt2.type_().as_type() {
@@ -210,12 +206,10 @@ impl Thread {
         let mut vm = elf.make_memory_set();
 
         // User stack
-        use crate::consts::{USER32_STACK_OFFSET, USER_STACK_OFFSET, USER_STACK_SIZE};
+        use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
         let mut ustack_top = {
-            let (ustack_buttom, ustack_top) = match is32 {
-                true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
-                false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
-            };
+            let ustack_buttom = USER_STACK_OFFSET;
+            let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
             vm.push(
                 ustack_buttom,
                 ustack_top,
@@ -288,7 +282,7 @@ impl Thread {
 
         Box::new(Thread {
             context: unsafe {
-                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), is32, vm.token())
+                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm.token())
             },
             kstack,
             clear_child_tid: 0,
