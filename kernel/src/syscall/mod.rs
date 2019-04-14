@@ -244,20 +244,21 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         SYS_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         SYS_EXIT_GROUP => sys_exit_group(args[0]),
-        SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
-        SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+        SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]),
+        SYS_MKDIRAT => sys_mkdirat(args[0], args[1] as *const u8, args[2]),
         //        SYS_MKNODAT => sys_mknod(),
         // 260
         SYS_FCHOWNAT => {
             warn!("sys_fchownat is unimplemented");
             Ok(0)
         }
-        SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
-        SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
-        SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
-        SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
+        SYS_NEWFSTATAT => sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3]),
+        SYS_UNLINKAT => sys_unlinkat(args[0], args[1] as *const u8, args[2]),
+        SYS_READLINKAT => sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3]),
+        SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8),
+        SYS_LINKAT => sys_linkat(args[0], args[1] as *const u8, args[2], args[3] as *const u8, args[4]),
         SYS_SYMLINKAT => Err(SysError::EACCES),
-        SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+        SYS_FACCESSAT => sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
         // 280
         SYS_UTIMENSAT => {
             warn!("sys_utimensat is unimplemented");

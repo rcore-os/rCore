@@ -123,24 +123,13 @@ impl rcore_thread::Context for Thread {
 
 impl Thread {
     /// Make a struct for the init thread
-    /// TODO: remove this, we only need `Context::null()`
     pub unsafe fn new_init() -> Box<Thread> {
         Box::new(Thread {
             context: Context::null(),
             kstack: KernelStack::new(),
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
-                vm: MemorySet::new(),
-                files: BTreeMap::default(),
-                cwd: String::from("/"),
-                futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
-                parent: None,
-                children: Vec::new(),
-                threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
-            })),
+            // safety: this field will never be used
+            proc: core::mem::uninitialized(),
         })
     }
 
