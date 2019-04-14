@@ -474,12 +474,34 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
         return Err(SysError::ENOTDIR);
     }
 
-    if path.len() > 0 && path.as_bytes()[0] == b'/' {
-        // absolute
-        proc.cwd = path;
-    } else {
-        // relative
-        proc.cwd += &path;
+    // BUGFIX: '..' and '.'
+    if path.len() > 0 {
+        let cwd = match path.as_bytes()[0] {
+            b'/' => String::from("/"),
+            _ => proc.cwd.clone()
+        };
+        let mut cwd_vec:Vec<_> =
+                   cwd.split("/")
+                           .filter(|&x| x != "")
+                           .collect();
+        let path_split = path.split("/").filter(|&x| x != "");
+        for seg in path_split {
+            if seg == ".." {
+                cwd_vec.pop();
+            } else if seg == "." {
+                // nothing to do here.
+            } else {
+                cwd_vec.push(seg);
+            }
+        }
+        proc.cwd = String::from("");
+        for seg in cwd_vec {
+            proc.cwd.push_str("/");
+            proc.cwd.push_str(seg);
+        }
+        if proc.cwd == "" {
+            proc.cwd = String::from("/");
+        }
     }
     Ok(0)
 }
