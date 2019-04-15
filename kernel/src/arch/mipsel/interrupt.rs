@@ -214,7 +214,6 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
     if opcode == 0b011111 && format == 0b111011 {
         // RDHWR
         if rd == 29 && sel == 0 {
-            info!("Read TLS by rdhdr");
             extern "C" {
                 fn _cur_tls();
             }
@@ -222,7 +221,9 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
             let tls = unsafe {
                 *(_cur_tls as *const usize)
             };
+
             set_trapframe_register(rt, tls, tf);
+            info!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
             return true;
         } else {
             return false;

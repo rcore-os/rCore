@@ -120,6 +120,7 @@ impl InitStack {
 
 extern "C" {
     fn trap_return();
+    fn _cur_tls();
 }
 
 /// Saved registers for kernel context switches.
@@ -231,8 +232,9 @@ impl Context {
     /// The SATP register will be set to `satp`.
     /// All the other registers are same as the original.
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, satp: usize) -> Self {
+        let tls = unsafe { *(_cur_tls as *const usize) };
         InitStack {
-            context: ContextData::new(satp, 0),
+            context: ContextData::new(satp, tls),
             tf: {
                 let mut tf = tf.clone();
                 // fork function's ret value, the new process is 0

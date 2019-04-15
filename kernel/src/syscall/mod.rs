@@ -319,6 +319,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 #[cfg(target_arch = "mips")]
 fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysResult> {
     let ret = match id {
+        SYS_FORK => sys_fork(tf),
         SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
         SYS_DUP2 => sys_dup2(args[0], args[1]),
         SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
@@ -329,6 +330,7 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
             Ok(0)
         }
         SYS_SET_THREAD_AREA => {
+            info!("set_thread_area: tls: 0x{:x}", args[0]);
             extern "C" {
                 fn _cur_tls();
             }
