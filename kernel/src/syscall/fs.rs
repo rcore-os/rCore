@@ -10,7 +10,7 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 
-use bitvec::{BitSlice, BitVec, LittleEndian};
+use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
 
 use super::*;
 
