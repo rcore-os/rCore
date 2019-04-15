@@ -288,7 +288,14 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             let x86_64_ret = x86_64_syscall(id, args, tf);
             #[cfg(not(target_arch = "x86_64"))]
             let x86_64_ret = None;
+
+            #[cfg(target_arch = "mips")]
+            let mips_ret = mips_syscall(id, args, tf);
+            #[cfg(not(target_arch = "mips"))]
+            let mips_ret = None;
             if let Some(ret) = x86_64_ret {
+                ret
+            } else if let Some(ret) = mips_ret {
                 ret
             } else {
                 error!("unknown syscall id: {}, args: {:x?}", id, args);
@@ -307,6 +314,27 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         Ok(code) => code as isize,
         Err(err) => -(err as isize),
     }
+}
+
+#[cfg(target_arch = "mips")]
+fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysResult> {
+    let ret = match id {
+        SYS_SET_THREAD_AREA => {
+            extern "C" {
+                fn _cur_tls();
+            }
+
+            unsafe {
+                asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
+                *(_cur_tls as *mut usize) = args[0];
+            }
+            Ok(0)
+        }
+        _ => {
+            return None;
+        }
+    };
+    Some(ret)
 }
 
 #[cfg(target_arch = "x86_64")]

@@ -177,3 +177,6 @@ _root_page_table_ptr:
     .global _cur_kstack_ptr
 _cur_kstack_ptr:
     .space 4 # 4bytes
+    .global _cur_tls
+_cur_tls:
+    .space 4 # 4bytes
