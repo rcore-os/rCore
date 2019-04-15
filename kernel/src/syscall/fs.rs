@@ -237,49 +237,24 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
         dir_fd as isize, path, flags, mode
     );
 
-    let inode = if dir_fd == AT_FDCWD {
-        // from process cwd
-        if flags.contains(OpenFlags::CREATE) {
-            let (dir_path, file_name) = split_path(&path);
-            // relative to cwd
-            let dir_inode = proc.lookup_inode(dir_path)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(SysError::EEXIST);
-                    }
-                    file_inode
+    let inode = if flags.contains(OpenFlags::CREATE) {
+        let (dir_path, file_name) = split_path(&path);
+        // relative to cwd
+        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path)?;
+        match dir_inode.find(file_name) {
+            Ok(file_inode) => {
+                if flags.contains(OpenFlags::EXCLUSIVE) {
+                    return Err(SysError::EEXIST);
                 }
-                Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode as u32)?
-                }
-                Err(e) => return Err(SysError::from(e)),
+                file_inode
             }
-        } else {
-            proc.lookup_inode(&path)?
+            Err(FsError::EntryNotFound) => {
+                dir_inode.create(file_name, FileType::File, mode as u32)?
+            }
+            Err(e) => return Err(SysError::from(e)),
         }
     } else {
-        // relative to dir_fd
-        let dir_file = proc.get_file(dir_fd)?;
-        if flags.contains(OpenFlags::CREATE) {
-            let (dir_path, file_name) = split_path(&path);
-            // relative to cwd
-            let dir_inode = dir_file.lookup_follow(dir_path, FOLLOW_MAX_DEPTH)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(SysError::EEXIST);
-                    }
-                    file_inode
-                }
-                Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode as u32)?
-                }
-                Err(e) => return Err(SysError::from(e)),
-            }
-        } else {
-            dir_file.lookup_follow(&path, FOLLOW_MAX_DEPTH)?
-        }
+        proc.lookup_inode_at(dir_fd, &path)?
     };
 
     let fd = proc.get_free_fd();
@@ -297,14 +272,22 @@ pub fn sys_close(fd: usize) -> SysResult {
 }
 
 pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
+    sys_faccessat(AT_FDCWD, path, mode, 0)
+}
+
+pub fn sys_faccessat(dirfd: usize, path: *const u8, mode: usize, flags: usize) -> SysResult {
     // TODO: check permissions based on uid/gid
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    let flags = AtFlags::from_bits_truncate(flags);
     if !proc.pid.is_init() {
         // we trust pid 0 process
-        info!("access: path: {:?}, mode: {:#o}", path, mode);
+        info!(
+            "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
+            dirfd, path, mode, flags
+        );
     }
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     Ok(0)
 }
 
@@ -322,9 +305,9 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     Ok(buf as usize)
 }
 
-pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    warn!("stat is partial implemented as lstat");
-    sys_lstat(path, stat_ptr)
+pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    warn!("lstat is partial implemented as stat");
+    sys_stat(path, stat_ptr)
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
@@ -333,20 +316,23 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     proc.vm.check_write_ptr(stat_ptr)?;
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.metadata()?);
-    // TODO: handle symlink
     unsafe {
         stat_ptr.write(stat);
     }
     Ok(0)
 }
 
-pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+pub fn sys_fstatat(dirfd: usize, path: *const u8, stat_ptr: *mut Stat, flags: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     proc.vm.check_write_ptr(stat_ptr)?;
-    info!("lstat: path: {:?}, stat_ptr: {:?}", path, stat_ptr);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "fstatat: dirfd: {}, path: {:?}, stat_ptr: {:?}, flags: {:?}",
+        dirfd, path, stat_ptr, flags
+    );
 
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     let stat = Stat::from(inode.metadata()?);
     unsafe {
         stat_ptr.write(stat);
@@ -354,13 +340,21 @@ pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     Ok(0)
 }
 
+pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    sys_fstatat(AT_FDCWD, path, stat_ptr, 0)
+}
+
 pub fn sys_readlink(path: *const u8, base: *mut u8, len: usize) -> SysResult {
+    sys_readlinkat(AT_FDCWD, path, base, len)
+}
+
+pub fn sys_readlinkat(dirfd: usize, path: *const u8, base: *mut u8, len: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     proc.vm.check_write_array(base, len)?;
     info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
 
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     if inode.metadata()?.type_ == FileType::SymLink {
         // TODO: recursive link resolution and loop detection
         let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
@@ -526,30 +520,27 @@ pub fn sys_renameat(
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = if olddirfd == AT_FDCWD {
-        proc.lookup_inode(old_dir_path)?
-    } else {
-        proc.get_file(olddirfd)?
-            .lookup_follow(old_dir_path, FOLLOW_MAX_DEPTH)?
-    };
-    let new_dir_inode = if newdirfd == AT_FDCWD {
-        proc.lookup_inode(new_dir_path)?
-    } else {
-        proc.get_file(newdirfd)?
-            .lookup_follow(new_dir_path, FOLLOW_MAX_DEPTH)?
-    };
+    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
 
 pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
+    sys_mkdirat(AT_FDCWD, path, mode)
+}
+
+pub fn sys_mkdirat(dirfd: usize, path: *const u8, mode: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     // TODO: check pathname
-    info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
+    info!(
+        "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
+        dirfd, path, mode
+    );
 
     let (dir_path, file_name) = split_path(&path);
-    let inode = proc.lookup_inode(dir_path)?;
+    let inode = proc.lookup_inode_at(dirfd, dir_path)?;
     if inode.find(file_name).is_ok() {
         return Err(SysError::EEXIST);
     }
@@ -573,25 +564,47 @@ pub fn sys_rmdir(path: *const u8) -> SysResult {
 }
 
 pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
+    sys_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0)
+}
+
+pub fn sys_linkat(
+    olddirfd: usize,
+    oldpath: *const u8,
+    newdirfd: usize,
+    newpath: *const u8,
+    flags: usize,
+) -> SysResult {
     let proc = process();
     let oldpath = unsafe { proc.vm.check_and_clone_cstr(oldpath)? };
     let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
-    info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
+        olddirfd, oldpath, newdirfd, newpath, flags
+    );
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let inode = proc.lookup_inode(&oldpath)?;
-    let new_dir_inode = proc.lookup_inode(new_dir_path)?;
+    let inode = proc.lookup_inode_at(olddirfd, &oldpath)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
     new_dir_inode.link(new_file_name, &inode)?;
     Ok(0)
 }
 
 pub fn sys_unlink(path: *const u8) -> SysResult {
+    sys_unlinkat(AT_FDCWD, path, 0)
+}
+
+pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
-    info!("unlink: path: {:?}", path);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
+        dirfd, path, flags
+    );
 
     let (dir_path, file_name) = split_path(&path);
-    let dir_inode = proc.lookup_inode(dir_path)?;
+    let dir_inode = proc.lookup_inode_at(dirfd, dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
         return Err(SysError::EISDIR);
@@ -723,11 +736,44 @@ impl Process {
             _ => Err(SysError::EBADF),
         }
     }
+    /// Lookup INode from the process.
+    ///
+    /// - If `path` is relative, then it is interpreted relative to the directory
+    ///   referred to by the file descriptor `dirfd`.
+    ///
+    /// - If the `dirfd` is the special value `AT_FDCWD`, then the directory is
+    ///   current working directory of the process.
+    ///
+    /// - If `path` is absolute, then `dirfd` is ignored.
+    ///
+    /// - If `follow` is true, then dereference `path` if it is a symbolic link.
+    pub fn lookup_inode_at(
+        &self,
+        dirfd: usize,
+        path: &str,
+        //        follow: bool,
+    ) -> Result<Arc<INode>, SysError> {
+        let follow = true;
+        debug!(
+            "lookup_inode_at: fd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
+            dirfd, self.cwd, path, follow
+        );
+        let follow_max_depth = if follow { FOLLOW_MAX_DEPTH } else { 0 };
+        if dirfd == AT_FDCWD {
+            Ok(ROOT_INODE
+                .lookup(&self.cwd)?
+                .lookup_follow(path, follow_max_depth)?)
+        } else {
+            let file = match self.files.get(&dirfd).ok_or(SysError::EBADF)? {
+                FileLike::File(file) => file,
+                _ => return Err(SysError::EBADF),
+            };
+            Ok(file.lookup_follow(path, follow_max_depth)?)
+        }
+    }
+
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
-        debug!("lookup_inode: cwd {} path {}", self.cwd, path);
-        Ok(ROOT_INODE
-            .lookup(&self.cwd)?
-            .lookup_follow(path, FOLLOW_MAX_DEPTH)?)
+        self.lookup_inode_at(AT_FDCWD, path)
     }
 }
 
@@ -759,6 +805,13 @@ impl From<FsError> for SysError {
             FsError::WrongFs => SysError::EINVAL,
             FsError::DeviceError => SysError::EIO,
         }
+    }
+}
+
+bitflags! {
+    struct AtFlags: usize {
+        const EMPTY_PATH = 0x1000;
+        const SYMLINK_NOFOLLOW = 0x100;
     }
 }
 
