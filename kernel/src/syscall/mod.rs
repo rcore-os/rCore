@@ -322,6 +322,12 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
         SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
         SYS_DUP2 => sys_dup2(args[0], args[1]),
         SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
+        SYS_FSTAT64 => sys_fstat(args[0], args[1] as *mut Stat),
+        SYS_STAT64 => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_FCNTL64 => {
+            warn!("sys_fcntl64 is unimplemented");
+            Ok(0)
+        }
         SYS_SET_THREAD_AREA => {
             extern "C" {
                 fn _cur_tls();

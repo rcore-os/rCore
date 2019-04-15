@@ -78,6 +78,9 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
                 tf.epc = tf.epc + 4;
             }
         }
+        E::CoprocessorUnusable => {
+            tf.epc = tf.epc + 4;
+        }
         _ => {
             error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
             crate::trap::error(tf)
@@ -244,6 +247,19 @@ fn page_fault(tf: &mut TrapFrame) {
                 tlb_entry.entry_lo0.get_pfn() << 12,
                 tlb_entry.entry_lo1.get_pfn() << 12
             );
+
+            let tlb_valid = if virt_addr.page_number() & 1 == 0 {
+                tlb_entry.entry_lo0.valid()
+            } else {
+                tlb_entry.entry_lo1.valid()
+            };
+
+            if !tlb_valid {
+                if !crate::memory::handle_page_fault(addr) {
+                    crate::trap::error(tf);
+                }
+            }
+
             tlb::write_tlb_random(tlb_entry)
         }
         Err(()) => {
