@@ -23,6 +23,7 @@
 #   smp     = 1 | 2 | ...           SMP core number
 #   graphic = on | off              enable/disable qemu graphical output
 #   board   = none                Running on QEMU
+#         | pc                  Only available on x86_64, run on real pc
 #         | u540                Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3              Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1 Only available on x86_64, passthrough the specified PCI device
@@ -56,8 +57,17 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
+ifeq ($(arch), x86_64)
+# board is pc or qemu?
+ifeq ($(board), pc)
+#link user img, so use original image
+export SFSIMG = $(user_dir)/build/$(arch).img
+features += link_user
+else
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
-endif
+endif # pc or qemu
+endif # x86_64
+endif # aarch64 mipsel
 
 ifeq ($(arch), aarch64)
 board := raspi3
@@ -88,10 +98,14 @@ qemu_net_opts := \
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
-	-drive format=raw,file=$(bootimage) \
+	-drive format=raw,file=$(bootimage)
+ifeq ($(board), none)
+qemu_opts += \
 	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
 	-device ahci,id=ahci0 \
-	-device ide-drive,drive=sfsimg,bus=ahci0.0 \
+	-device ide-drive,drive=sfsimg,bus=ahci0.0
+endif
+qemu_opts += \
 	-serial mon:stdio \
 	-m 4G \
 	-device isa-debug-exit
@@ -180,16 +194,17 @@ features += sv39
 riscv_pk_args += --enable-sv39
 endif
 
+ifneq ($(arch), x86_64)
 ifneq ($(board), none)
 features += board_$(board)
 endif
+endif
+
 build_args := --target targets/$(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args += --release
 endif
-
-
 
 ### prefix ###
 ifeq ($(arch), x86_64)
