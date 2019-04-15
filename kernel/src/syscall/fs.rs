@@ -1074,6 +1074,9 @@ pub struct IoVec {
     /// Starting address
     base: *mut u8,
     /// Number of bytes to transfer
+    #[cfg(target_arch = "mips")]
+    len: u32,
+    #[cfg(not(target_arch = "mips"))]
     len: u64,
 }
 
