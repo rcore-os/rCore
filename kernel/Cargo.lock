@@ -85,7 +85,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "bitvec"
 version = "0.11.0"
-source = "git+https://github.com/myrrlyn/bitvec.git#f6e1fbed95061955d96617dfed6c112ffba45a7e"
+source = "git+https://github.com/myrrlyn/bitvec.git#f8bd136426fde431f321e647e3207b28623fc569"
 
 [[package]]
 name = "bootloader"
