@@ -325,10 +325,23 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
         SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
         SYS_FSTAT64 => sys_fstat(args[0], args[1] as *mut Stat),
         SYS_STAT64 => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_PIPE => {
+            let fd_ptr = args[0] as *mut u32;
+            match sys_pipe(fd_ptr) {
+                Ok(code) => {
+                    unsafe {
+                        tf.v0 = *fd_ptr as usize;
+                        tf.v1 = *(fd_ptr.add(1)) as usize;
+                    }
+                    Ok(tf.v0)
+                },
+                Err(err) => Err(err)
+            }
+        },
         SYS_FCNTL64 => {
             warn!("sys_fcntl64 is unimplemented");
             Ok(0)
-        }
+        },
         SYS_SET_THREAD_AREA => {
             info!("set_thread_area: tls: 0x{:x}", args[0]);
             extern "C" {
