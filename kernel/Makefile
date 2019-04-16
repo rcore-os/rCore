@@ -58,16 +58,13 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
-ifeq ($(arch), x86_64)
 # board is pc or qemu?
 ifeq ($(board), pc)
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
-features += link_user
 else
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
 endif # pc or qemu
-endif # x86_64
 endif # aarch64 mipsel
 
 ifeq ($(arch), aarch64)
@@ -98,17 +95,16 @@ qemu_net_opts :=
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
-	-drive format=raw,file=$(bootimage)
+	-drive format=raw,file=$(bootimage) \
+	-serial mon:stdio \
+	-m 4G \
+	-device isa-debug-exit
 ifeq ($(board), none)
 qemu_opts += \
 	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
 	-device ahci,id=ahci0 \
 	-device ide-drive,drive=sfsimg,bus=ahci0.0
 endif
-qemu_opts += \
-	-serial mon:stdio \
-	-m 4G \
-	-device isa-debug-exit
 ifeq ($(pci_passthru), )
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
@@ -201,10 +197,8 @@ features += sv39
 riscv_pk_args += --enable-sv39
 endif
 
-ifneq ($(arch), x86_64)
 ifneq ($(board), none)
 features += board_$(board)
-endif
 endif
 
 build_args := --target targets/$(target).json --features "$(features)"

@@ -31,6 +31,8 @@ board_malta = ["link_user"]
 board_mipssim = ["link_user"]
 # for thinpad
 board_thinpad = ["link_user"]
+# for x86 PC
+board_pc = ["link_user"]
 # Hard link user program
 link_user = []
 # Run cmdline instead of user shell, useful for automatic testing
