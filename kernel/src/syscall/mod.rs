@@ -194,10 +194,18 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_getegid is unimplemented");
             Ok(0)
         }
+        SYS_SETPGID => {
+            warn!("sys_setpgid is unimplemented");
+            Ok(0)
+        }
         // 110
         SYS_GETPPID => sys_getppid(),
         SYS_SETSID => {
             warn!("sys_setsid is unimplemented");
+            Ok(0)
+        }
+        SYS_GETPGID => {
+            warn!("sys_getpgid is unimplemented");
             Ok(0)
         }
         SYS_SIGALTSTACK => {
@@ -254,9 +262,17 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         SYS_NEWFSTATAT => sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3]),
         SYS_UNLINKAT => sys_unlinkat(args[0], args[1] as *const u8, args[2]),
-        SYS_READLINKAT => sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3]),
+        SYS_READLINKAT => {
+            sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
+        }
         SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8),
-        SYS_LINKAT => sys_linkat(args[0], args[1] as *const u8, args[2], args[3] as *const u8, args[4]),
+        SYS_LINKAT => sys_linkat(
+            args[0],
+            args[1] as *const u8,
+            args[2],
+            args[3] as *const u8,
+            args[4],
+        ),
         SYS_SYMLINKAT => Err(SysError::EACCES),
         SYS_FACCESSAT => sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
         // 280

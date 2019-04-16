@@ -57,7 +57,15 @@ macro_rules! impl_inode {
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
-        fn io_control(&self, _cmd: u32, _data: u32) -> Result<()> { Err(FsError::NotSupported) }
+        fn io_control(&self, cmd: u32, data: u32) -> Result<()> {
+            match cmd {
+                TIOCGWINSZ => {
+                    // pretend to be tty
+                    Ok(())
+                },
+                _ => Err(FsError::NotSupported)
+            }
+        }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };
