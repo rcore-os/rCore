@@ -206,11 +206,11 @@ impl AsciiConsole for VgaWriter {
             CSI::CursorMove(dx, dy) => {
                 let x = (self.pos.row.0 as i8 + dx).max(0) as u8;
                 let y = (self.pos.col.0 as i8 + dy).max(0) as u8;
-                self.set_pos(Position::new(Row(x), Col(y)));
+                self.set_pos(Position::new(Row(x), Col(y))).unwrap();
             }
             CSI::CursorMoveLine(dx) => {
                 let x = (self.pos.row.0 as i8 + dx).max(0) as u8;
-                self.set_pos(Position::new(Row(x), Col(0)));
+                self.set_pos(Position::new(Row(x), Col(0))).unwrap();
             }
             _ => {}
         }

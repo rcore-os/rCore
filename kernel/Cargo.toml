@@ -70,7 +70,7 @@ bootloader = { git = "https://github.com/rcore-os/bootloader" }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.5"
 raw-cpuid = "6.0"
-uart_16550 = "0.1"
+uart_16550 = "0.2"
 pc-keyboard = "0.5"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
