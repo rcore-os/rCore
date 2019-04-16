@@ -24,7 +24,7 @@ pub unsafe fn has_started(cpu_id: usize) -> bool {
 }
 
 pub unsafe fn start_others(hart_mask: usize) {
-    for cpu_id in 0..MAX_CPU_NUM {
+    for cpu_id in 0..32 {
         if (hart_mask >> cpu_id) & 1 != 0 {
             write_volatile(&mut STARTED[cpu_id], true);
         }

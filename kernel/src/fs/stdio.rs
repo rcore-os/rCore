@@ -43,6 +43,11 @@ lazy_static! {
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
 }
 
+const TCGETS: u32 = 0x5401;
+const TIOCGPGRP: u32 = 0x540F;
+const TIOCSPGRP: u32 = 0x5410;
+const TIOCGWINSZ: u32 = 0x5413;
+
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
@@ -59,7 +64,7 @@ macro_rules! impl_inode {
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
         fn io_control(&self, cmd: u32, data: u32) -> Result<()> {
             match cmd {
-                TIOCGWINSZ => {
+                TCGETS | TIOCGWINSZ | TIOCGPGRP | TIOCSPGRP => {
                     // pretend to be tty
                     Ok(())
                 },
