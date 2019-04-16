@@ -1,5 +1,5 @@
 use crate::consts::KERNEL_OFFSET;
-use bit_allocator::BitAlloc;
+use bitmap_allocator::BitAlloc;
 // Depends on kernel
 use super::{BootInfo, MemoryRegionType};
 use crate::memory::{active_table, alloc_frame, init_heap, FRAME_ALLOCATOR};

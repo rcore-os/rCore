@@ -1,36 +1,25 @@
-use crate::memory::active_table;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::alloc::{alloc_zeroed, dealloc, Layout};
+
 use isomorphic_drivers::provider;
 use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 
-#[derive(Copy, Clone)]
+use crate::memory::active_table;
+
 pub struct Provider;
 
-impl Provider {
-    pub fn new() -> Box<Provider> {
-        Box::new(Provider {})
-    }
-}
-
 impl provider::Provider for Provider {
-    /// Get page size
-    fn get_page_size(&self) -> usize {
-        PAGE_SIZE
+    const PAGE_SIZE: usize = PAGE_SIZE;
+
+    fn alloc_dma(size: usize) -> (usize, usize) {
+        let layout = Layout::from_size_align(size, PAGE_SIZE).unwrap();
+        let vaddr = unsafe { alloc_zeroed(layout) } as usize;
+        let paddr = active_table().get_entry(vaddr).unwrap().target();
+        (vaddr, paddr)
     }
 
-    // Translate virtual address to physical address
-    fn translate_va(&self, va: usize) -> usize {
-        active_table().get_entry(va).unwrap().target()
-    }
-
-    // Bulk translate virtual addresses to physical addresses for performance
-    fn translate_vas(&self, vas: &[usize]) -> Vec<usize> {
-        let mut result = Vec::new();
-        for va in vas.iter() {
-            result.push(active_table().get_entry(*va).unwrap().target());
-        }
-        result
+    fn dealloc_dma(vaddr: usize, size: usize) {
+        let layout = Layout::from_size_align(size, PAGE_SIZE).unwrap();
+        unsafe { dealloc(vaddr as *mut u8, layout) }
     }
 }

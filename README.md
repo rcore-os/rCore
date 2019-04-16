@@ -6,7 +6,7 @@ Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 
 Going to be the next generation teaching operating system.
 
-Supported architectures: x86_64, RISCV32/64, AArch64, MIPS (planned)
+Supported architectures: x86_64, RISCV32/64, AArch64, MIPS32
 
 Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+
 
@@ -18,7 +18,7 @@ Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-02-16
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-03-05
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
 * [bootimage](https://github.com/rust-osdev/bootimage) (for x86_64)
@@ -32,16 +32,18 @@ See [Travis script](./.travis.yml) for details.
 ### How to run
 
 ```bash
-$ rustup component add rust-src
-$ cargo install cargo-xbuild bootimage
+$ rustup component add rust-src llvm-tools-preview
+$ cargo install cargo-binutils
+$ cargo install cargo-xbuild --force
+$ cargo install bootimage --version 0.5.7 --force
 ```
 
 ```bash
 $ git clone https://github.com/rcore-os/rCore.git --recursive
 $ cd rCore/user
-$ make sfsimg arch={riscv32,riscv64,x86_64,aarch64} # requires x86_64-linux-musl-gcc or musl-gcc
+$ make sfsimg arch={riscv32,riscv64,x86_64,aarch64,mipsel} # requires $(arch)-linux-musl-gcc
 $ cd ../kernel
-$ make run arch={riscv32,riscv64,x86_64,aarch64} mode=release
+$ make run arch={riscv32,riscv64,x86_64,aarch64,mipsel} mode=release
 $ make run arch=x86_64 mode=release pci_passthru=0000:00:00.1 # for ixgbe real nic, find its pci (bus, dev, func) first
 ```
 

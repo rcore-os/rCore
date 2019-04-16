@@ -15,7 +15,7 @@ use xmas_elf::{
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::net::{Socket, SOCKETS};
+use crate::net::SOCKETS;
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
@@ -123,24 +123,13 @@ impl rcore_thread::Context for Thread {
 
 impl Thread {
     /// Make a struct for the init thread
-    /// TODO: remove this, we only need `Context::null()`
     pub unsafe fn new_init() -> Box<Thread> {
         Box::new(Thread {
             context: Context::null(),
             kstack: KernelStack::new(),
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
-                vm: MemorySet::new(),
-                files: BTreeMap::default(),
-                cwd: String::from("/"),
-                futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
-                parent: None,
-                children: Vec::new(),
-                threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
-            })),
+            // safety: this field will never be used
+            proc: core::mem::uninitialized(),
         })
     }
 
@@ -175,10 +164,6 @@ impl Thread {
     {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
-        let is32 = match elf.header.pt2 {
-            header::HeaderPt2::Header32(_) => true,
-            header::HeaderPt2::Header64(_) => false,
-        };
 
         // Check ELF type
         match elf.header.pt2.type_().as_type() {
@@ -210,12 +195,10 @@ impl Thread {
         let mut vm = elf.make_memory_set();
 
         // User stack
-        use crate::consts::{USER32_STACK_OFFSET, USER_STACK_OFFSET, USER_STACK_SIZE};
+        use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
         let mut ustack_top = {
-            let (ustack_buttom, ustack_top) = match is32 {
-                true => (USER32_STACK_OFFSET, USER32_STACK_OFFSET + USER_STACK_SIZE),
-                false => (USER_STACK_OFFSET, USER_STACK_OFFSET + USER_STACK_SIZE),
-            };
+            let ustack_buttom = USER_STACK_OFFSET;
+            let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
             vm.push(
                 ustack_buttom,
                 ustack_top,
@@ -288,7 +271,7 @@ impl Thread {
 
         Box::new(Thread {
             context: unsafe {
-                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), is32, vm.token())
+                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm.token())
             },
             kstack,
             clear_child_tid: 0,

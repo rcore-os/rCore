@@ -163,7 +163,6 @@ impl Context {
         entry_addr: usize,
         ustack_top: usize,
         kstack_top: usize,
-        _is32: bool,
         ttbr: usize,
     ) -> Self {
         InitStack {

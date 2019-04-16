@@ -1,9 +1,13 @@
 //! Syscalls for networking
 
+use super::fs::IoVecs;
 use super::*;
 use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::FileLike;
-use crate::net::{RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS};
+use crate::net::{
+    Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
+    RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
+};
 use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::boxed::Box;
 use core::cmp::min;
@@ -11,16 +15,26 @@ use core::mem::size_of;
 use smoltcp::wire::*;
 
 pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResult {
+    let domain = AddressFamily::from(domain as u16);
+    let socket_type = SocketType::from(socket_type as u8 & SOCK_TYPE_MASK);
     info!(
-        "socket: domain: {}, socket_type: {}, protocol: {}",
+        "socket: domain: {:?}, socket_type: {:?}, protocol: {}",
         domain, socket_type, protocol
     );
     let mut proc = process();
     let socket: Box<dyn Socket> = match domain {
-        AF_INET | AF_UNIX => match socket_type & SOCK_TYPE_MASK {
-            SOCK_STREAM => Box::new(TcpSocketState::new()),
-            SOCK_DGRAM => Box::new(UdpSocketState::new()),
-            SOCK_RAW => Box::new(RawSocketState::new(protocol as u8)),
+        AddressFamily::Internet | AddressFamily::Unix => match socket_type {
+            SocketType::Stream => Box::new(TcpSocketState::new()),
+            SocketType::Datagram => Box::new(UdpSocketState::new()),
+            SocketType::Raw => Box::new(RawSocketState::new(protocol as u8)),
+            _ => return Err(SysError::EINVAL),
+        },
+        AddressFamily::Packet => match socket_type {
+            SocketType::Raw => Box::new(PacketSocketState::new()),
+            _ => return Err(SysError::EINVAL),
+        },
+        AddressFamily::Netlink => match socket_type {
+            SocketType::Raw => Box::new(NetlinkSocketState::new()),
             _ => return Err(SysError::EINVAL),
         },
         _ => return Err(SysError::EAFNOSUPPORT),
@@ -34,15 +48,18 @@ pub fn sys_setsockopt(
     fd: usize,
     level: usize,
     optname: usize,
-    _optval: *const u8,
-    _optlen: usize,
+    optval: *const u8,
+    optlen: usize,
 ) -> SysResult {
     info!(
         "setsockopt: fd: {}, level: {}, optname: {}",
         fd, level, optname
     );
-    warn!("sys_setsockopt is unimplemented");
-    Ok(0)
+    let mut proc = process();
+    proc.vm.check_read_array(optval, optlen)?;
+    let data = unsafe { slice::from_raw_parts(optval, optlen) };
+    let socket = proc.get_socket(fd)?;
+    socket.setsockopt(level, optname, data)
 }
 
 pub fn sys_getsockopt(
@@ -157,12 +174,34 @@ pub fn sys_recvfrom(
     result
 }
 
+pub fn sys_recvmsg(fd: usize, msg: *mut MsgHdr, flags: usize) -> SysResult {
+    info!("recvmsg: fd: {}, msg: {:?}, flags: {}", fd, msg, flags);
+    let mut proc = process();
+    proc.vm.check_read_ptr(msg)?;
+    let hdr = unsafe { &mut *msg };
+    let mut iovs = IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &proc.vm, true)?;
+
+    let mut buf = iovs.new_buf(true);
+    let socket = proc.get_socket(fd)?;
+    let (result, endpoint) = socket.read(&mut buf);
+
+    if let Ok(len) = result {
+        // copy data to user
+        iovs.write_all_from_slice(&buf[..len]);
+        let sockaddr_in = SockAddr::from(endpoint);
+        unsafe {
+            sockaddr_in.write_to(&mut proc, hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
+        }
+    }
+    result
+}
+
 pub fn sys_bind(fd: usize, addr: *const SockAddr, addr_len: usize) -> SysResult {
     info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, addr_len);
     let mut proc = process();
 
     let mut endpoint = sockaddr_to_endpoint(&mut proc, addr, addr_len)?;
-    info!("sys_bind: fd: {} bind to {}", fd, endpoint);
+    info!("sys_bind: fd: {} bind to {:?}", fd, endpoint);
 
     let socket = proc.get_socket(fd)?;
     socket.bind(endpoint)
@@ -263,45 +302,98 @@ impl Process {
     }
 }
 
-// cancel alignment
-#[repr(packed)]
+#[repr(C)]
 pub struct SockAddrIn {
-    sin_port: u16,
-    sin_addr: u32,
-    sin_zero: [u8; 8],
+    pub sin_family: u16,
+    pub sin_port: u16,
+    pub sin_addr: u32,
+    pub sin_zero: [u8; 8],
 }
 
 #[repr(C)]
 pub struct SockAddrUn {
-    sun_path: [u8; 108],
+    pub sun_family: u16,
+    pub sun_path: [u8; 108],
 }
 
 #[repr(C)]
-pub union SockAddrPayload {
-    addr_in: SockAddrIn,
-    addr_un: SockAddrUn,
+pub struct SockAddrLl {
+    pub sll_family: u16,
+    pub sll_protocol: u16,
+    pub sll_ifindex: u32,
+    pub sll_hatype: u16,
+    pub sll_pkttype: u8,
+    pub sll_halen: u8,
+    pub sll_addr: [u8; 8],
 }
 
 #[repr(C)]
-pub struct SockAddr {
-    family: u16,
-    payload: SockAddrPayload,
+pub struct SockAddrNl {
+    nl_family: u16,
+    nl_pad: u16,
+    nl_pid: u32,
+    nl_groups: u32,
 }
 
-impl From<IpEndpoint> for SockAddr {
-    fn from(endpoint: IpEndpoint) -> Self {
-        match endpoint.addr {
-            IpAddress::Ipv4(ipv4) => SockAddr {
-                family: AF_INET as u16,
-                payload: SockAddrPayload {
+#[repr(C)]
+pub union SockAddr {
+    pub family: u16,
+    pub addr_in: SockAddrIn,
+    pub addr_un: SockAddrUn,
+    pub addr_ll: SockAddrLl,
+    pub addr_nl: SockAddrNl,
+    pub addr_ph: SockAddrPlaceholder,
+}
+
+#[repr(C)]
+pub struct SockAddrPlaceholder {
+    pub family: u16,
+    pub data: [u8; 14],
+}
+
+impl From<Endpoint> for SockAddr {
+    fn from(endpoint: Endpoint) -> Self {
+        if let Endpoint::Ip(ip) = endpoint {
+            match ip.addr {
+                IpAddress::Ipv4(ipv4) => SockAddr {
                     addr_in: SockAddrIn {
-                        sin_port: u16::to_be(endpoint.port),
+                        sin_family: AddressFamily::Internet.into(),
+                        sin_port: u16::to_be(ip.port),
                         sin_addr: u32::to_be(u32::from_be_bytes(ipv4.0)),
                         sin_zero: [0; 8],
                     },
                 },
-            },
-            _ => unimplemented!("ipv6"),
+                IpAddress::Unspecified => SockAddr {
+                    addr_ph: SockAddrPlaceholder {
+                        family: AddressFamily::Unspecified.into(),
+                        data: [0; 14],
+                    },
+                },
+                _ => unimplemented!("only ipv4"),
+            }
+        } else if let Endpoint::LinkLevel(link_level) = endpoint {
+            SockAddr {
+                addr_ll: SockAddrLl {
+                    sll_family: AddressFamily::Packet.into(),
+                    sll_protocol: 0,
+                    sll_ifindex: link_level.interface_index as u32,
+                    sll_hatype: 0,
+                    sll_pkttype: 0,
+                    sll_halen: 0,
+                    sll_addr: [0; 8],
+                },
+            }
+        } else if let Endpoint::Netlink(netlink) = endpoint {
+            SockAddr {
+                addr_nl: SockAddrNl {
+                    nl_family: AddressFamily::Netlink.into(),
+                    nl_pad: 0,
+                    nl_pid: netlink.port_id,
+                    nl_groups: netlink.multicast_groups_mask,
+                },
+            }
+        } else {
+            unimplemented!("only ip");
         }
     }
 }
@@ -312,24 +404,41 @@ fn sockaddr_to_endpoint(
     proc: &mut Process,
     addr: *const SockAddr,
     len: usize,
-) -> Result<IpEndpoint, SysError> {
+) -> Result<Endpoint, SysError> {
     if len < size_of::<u16>() {
         return Err(SysError::EINVAL);
     }
     proc.vm.check_read_array(addr as *const u8, len)?;
     unsafe {
-        match (*addr).family as usize {
-            AF_INET => {
-                if len < size_of::<u16>() + size_of::<SockAddrIn>() {
+        match AddressFamily::from((*addr).family) {
+            AddressFamily::Internet => {
+                if len < size_of::<SockAddrIn>() {
                     return Err(SysError::EINVAL);
                 }
-                let port = u16::from_be((*addr).payload.addr_in.sin_port);
+                let port = u16::from_be((*addr).addr_in.sin_port);
                 let addr = IpAddress::from(Ipv4Address::from_bytes(
-                    &u32::from_be((*addr).payload.addr_in.sin_addr).to_be_bytes()[..],
+                    &u32::from_be((*addr).addr_in.sin_addr).to_be_bytes()[..],
                 ));
-                Ok((addr, port).into())
+                Ok(Endpoint::Ip((addr, port).into()))
             }
-            AF_UNIX => Err(SysError::EINVAL),
+            AddressFamily::Unix => Err(SysError::EINVAL),
+            AddressFamily::Packet => {
+                if len < size_of::<SockAddrLl>() {
+                    return Err(SysError::EINVAL);
+                }
+                Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
+                    (*addr).addr_ll.sll_ifindex as usize,
+                )))
+            }
+            AddressFamily::Netlink => {
+                if len < size_of::<SockAddrNl>() {
+                    return Err(SysError::EINVAL);
+                }
+                Ok(Endpoint::Netlink(NetlinkEndpoint::new(
+                    (*addr).addr_nl.nl_pid,
+                    (*addr).addr_nl.nl_groups,
+                )))
+            }
             _ => Err(SysError::EINVAL),
         }
     }
@@ -351,9 +460,11 @@ impl SockAddr {
 
         proc.vm.check_write_ptr(addr_len)?;
         let max_addr_len = *addr_len as usize;
-        let full_len = match self.family as usize {
-            AF_INET => size_of::<u16>() + size_of::<SockAddrIn>(),
-            AF_UNIX => return Err(SysError::EINVAL),
+        let full_len = match AddressFamily::from(self.family) {
+            AddressFamily::Internet => size_of::<SockAddrIn>(),
+            AddressFamily::Packet => size_of::<SockAddrLl>(),
+            AddressFamily::Netlink => size_of::<SockAddrNl>(),
+            AddressFamily::Unix => return Err(SysError::EINVAL),
             _ => return Err(SysError::EINVAL),
         };
 
@@ -369,13 +480,47 @@ impl SockAddr {
     }
 }
 
-const AF_UNIX: usize = 1;
-const AF_INET: usize = 2;
+#[repr(C)]
+#[derive(Debug)]
+pub struct MsgHdr {
+    msg_name: *mut SockAddr,
+    msg_namelen: u32,
+    msg_iov: *mut IoVec,
+    msg_iovlen: usize,
+    msg_control: usize,
+    msg_controllen: usize,
+    msg_flags: usize,
+}
 
-const SOCK_STREAM: usize = 1;
-const SOCK_DGRAM: usize = 2;
-const SOCK_RAW: usize = 3;
-const SOCK_TYPE_MASK: usize = 0xf;
+enum_with_unknown! {
+    /// Address families
+    pub doc enum AddressFamily(u16) {
+        /// Unspecified
+        Unspecified = 0,
+        /// Unix domain sockets
+        Unix = 1,
+        /// Internet IP Protocol
+        Internet = 2,
+        /// Netlink
+        Netlink = 16,
+        /// Packet family
+        Packet = 17,
+    }
+}
+
+const SOCK_TYPE_MASK: u8 = 0xf;
+
+enum_with_unknown! {
+    /// Socket types
+    pub doc enum SocketType(u8) {
+        /// Stream
+        Stream = 1,
+        /// Datagram
+        Datagram = 2,
+        /// Raw
+        Raw = 3,
+    }
+}
 
 const IPPROTO_IP: usize = 0;
 const IPPROTO_ICMP: usize = 1;
@@ -387,3 +532,5 @@ const SO_RCVBUF: usize = 8;
 const SO_LINGER: usize = 13;
 
 const TCP_CONGESTION: usize = 13;
+
+const IP_HDRINCL: usize = 3;

@@ -16,7 +16,7 @@ pub fn init() {
 }
 
 fn init_frame_allocator() {
-    use bit_allocator::BitAlloc;
+    use bitmap_allocator::BitAlloc;
     use core::ops::Range;
 
     let end = super::board::probe_memory()

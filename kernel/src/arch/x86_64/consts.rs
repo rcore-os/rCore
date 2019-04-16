@@ -53,7 +53,6 @@ pub const USER_GRANT_PML4: usize = (USER_GRANT_OFFSET & PML4_MASK) / PML4_SIZE;
 
 /// Offset to user stack
 pub const USER_STACK_OFFSET: usize = USER_GRANT_OFFSET + PML4_SIZE;
-pub const USER32_STACK_OFFSET: usize = 0xB000_0000;
 pub const USER_STACK_PML4: usize = (USER_STACK_OFFSET & PML4_MASK) / PML4_SIZE;
 /// Size of user stack
 pub const USER_STACK_SIZE: usize = 1024 * 1024; // 1 MB

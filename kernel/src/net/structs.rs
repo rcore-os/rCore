@@ -2,18 +2,60 @@ use crate::arch::rand;
 use crate::drivers::{NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
+use crate::util;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use bitflags::*;
+use core::cmp::min;
+use core::mem::size_of;
+use core::slice;
 
 use smoltcp::socket::*;
 use smoltcp::wire::*;
 
-///
+#[derive(Clone, Debug)]
+pub struct LinkLevelEndpoint {
+    pub interface_index: usize,
+}
+
+impl LinkLevelEndpoint {
+    pub fn new(ifindex: usize) -> Self {
+        LinkLevelEndpoint {
+            interface_index: ifindex,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NetlinkEndpoint {
+    pub port_id: u32,
+    pub multicast_groups_mask: u32,
+}
+
+impl NetlinkEndpoint {
+    pub fn new(port_id: u32, multicast_groups_mask: u32) -> Self {
+        NetlinkEndpoint {
+            port_id,
+            multicast_groups_mask,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Endpoint {
+    Ip(IpEndpoint),
+    LinkLevel(LinkLevelEndpoint),
+    Netlink(NetlinkEndpoint),
+}
+
+/// Common methods that a socket must have
 pub trait Socket: Send + Sync {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint);
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult;
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint);
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult;
-    fn bind(&mut self, endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult;
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
         Err(SysError::EINVAL)
     }
     fn listen(&mut self) -> SysResult {
@@ -22,14 +64,22 @@ pub trait Socket: Send + Sync {
     fn shutdown(&self) -> SysResult {
         Err(SysError::EINVAL)
     }
-    fn accept(&mut self) -> Result<(Box<dyn Socket>, IpEndpoint), SysError> {
+    fn accept(&mut self) -> Result<(Box<dyn Socket>, Endpoint), SysError> {
         Err(SysError::EINVAL)
     }
-    fn endpoint(&self) -> Option<IpEndpoint> {
+    fn endpoint(&self) -> Option<Endpoint> {
         None
     }
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
+    fn remote_endpoint(&self) -> Option<Endpoint> {
         None
+    }
+    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+        warn!("setsockopt is unimplemented");
+        Ok(0)
+    }
+    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+        warn!("ioctl is unimplemented for this socket");
+        Ok(0)
     }
     fn box_clone(&self) -> Box<dyn Socket>;
 }
@@ -65,6 +115,17 @@ pub struct UdpSocketState {
 #[derive(Debug, Clone)]
 pub struct RawSocketState {
     handle: GlobalSocketHandle,
+    header_included: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct PacketSocketState {
+    // no state, only ethernet egress
+}
+
+#[derive(Debug, Clone)]
+pub struct NetlinkSocketState {
+    data: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 /// A wrapper for `SocketHandle`.
@@ -107,7 +168,7 @@ impl TcpSocketState {
 }
 
 impl Socket for TcpSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         spin_and_wait(&[&SOCKET_ACTIVITY], move || {
             poll_ifaces();
             let mut sockets = SOCKETS.lock();
@@ -122,17 +183,20 @@ impl Socket for TcpSocketState {
                         drop(sockets);
 
                         poll_ifaces();
-                        return Some((Ok(size), endpoint));
+                        return Some((Ok(size), Endpoint::Ip(endpoint)));
                     }
                 }
             } else {
-                return Some((Err(SysError::ENOTCONN), IpEndpoint::UNSPECIFIED));
+                return Some((
+                    Err(SysError::ENOTCONN),
+                    Endpoint::Ip(IpEndpoint::UNSPECIFIED),
+                ));
             }
             None
         })
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
         let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
@@ -178,52 +242,60 @@ impl Socket for TcpSocketState {
         (input, output, err)
     }
 
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult {
         let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
-        let temp_port = get_ephemeral_port();
+        if let Endpoint::Ip(ip) = endpoint {
+            let temp_port = get_ephemeral_port();
 
-        match socket.connect(endpoint, temp_port) {
-            Ok(()) => {
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
+            match socket.connect(ip, temp_port) {
+                Ok(()) => {
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
 
-                // wait for connection result
-                loop {
-                    poll_ifaces();
+                    // wait for connection result
+                    loop {
+                        poll_ifaces();
 
-                    let mut sockets = SOCKETS.lock();
-                    let socket = sockets.get::<TcpSocket>(self.handle.0);
-                    match socket.state() {
-                        TcpState::SynSent => {
-                            // still connecting
-                            drop(socket);
-                            drop(sockets);
-                            debug!("poll for connection wait");
-                            SOCKET_ACTIVITY._wait();
-                        }
-                        TcpState::Established => {
-                            break Ok(0);
-                        }
-                        _ => {
-                            break Err(SysError::ECONNREFUSED);
+                        let mut sockets = SOCKETS.lock();
+                        let socket = sockets.get::<TcpSocket>(self.handle.0);
+                        match socket.state() {
+                            TcpState::SynSent => {
+                                // still connecting
+                                drop(socket);
+                                drop(sockets);
+                                debug!("poll for connection wait");
+                                SOCKET_ACTIVITY._wait();
+                            }
+                            TcpState::Established => {
+                                break Ok(0);
+                            }
+                            _ => {
+                                break Err(SysError::ECONNREFUSED);
+                            }
                         }
                     }
                 }
+                Err(_) => Err(SysError::ENOBUFS),
             }
-            Err(_) => Err(SysError::ENOBUFS),
+        } else {
+            Err(SysError::EINVAL)
         }
     }
 
-    fn bind(&mut self, mut endpoint: IpEndpoint) -> SysResult {
-        if endpoint.port == 0 {
-            endpoint.port = get_ephemeral_port();
+    fn bind(&mut self, mut endpoint: Endpoint) -> SysResult {
+        if let Endpoint::Ip(mut ip) = endpoint {
+            if ip.port == 0 {
+                ip.port = get_ephemeral_port();
+            }
+            self.local_endpoint = Some(ip);
+            self.is_listening = false;
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
         }
-        self.local_endpoint = Some(endpoint);
-        self.is_listening = false;
-        Ok(0)
     }
 
     fn listen(&mut self) -> SysResult {
@@ -255,7 +327,7 @@ impl Socket for TcpSocketState {
         Ok(0)
     }
 
-    fn accept(&mut self) -> Result<(Box<dyn Socket>, IpEndpoint), SysError> {
+    fn accept(&mut self) -> Result<(Box<dyn Socket>, Endpoint), SysError> {
         let endpoint = self.local_endpoint.ok_or(SysError::EINVAL)?;
         loop {
             let mut sockets = SOCKETS.lock();
@@ -282,7 +354,7 @@ impl Socket for TcpSocketState {
 
                 drop(sockets);
                 poll_ifaces();
-                return Ok((new_socket, remote_endpoint));
+                return Ok((new_socket, Endpoint::Ip(remote_endpoint)));
             }
 
             // avoid deadlock
@@ -292,24 +364,27 @@ impl Socket for TcpSocketState {
         }
     }
 
-    fn endpoint(&self) -> Option<IpEndpoint> {
-        self.local_endpoint.clone().or_else(|| {
-            let mut sockets = SOCKETS.lock();
-            let socket = sockets.get::<TcpSocket>(self.handle.0);
-            let endpoint = socket.local_endpoint();
-            if endpoint.port != 0 {
-                Some(endpoint)
-            } else {
-                None
-            }
-        })
+    fn endpoint(&self) -> Option<Endpoint> {
+        self.local_endpoint
+            .clone()
+            .map(|e| Endpoint::Ip(e))
+            .or_else(|| {
+                let mut sockets = SOCKETS.lock();
+                let socket = sockets.get::<TcpSocket>(self.handle.0);
+                let endpoint = socket.local_endpoint();
+                if endpoint.port != 0 {
+                    Some(Endpoint::Ip(endpoint))
+                } else {
+                    None
+                }
+            })
     }
 
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
+    fn remote_endpoint(&self) -> Option<Endpoint> {
         let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<TcpSocket>(self.handle.0);
         if socket.is_open() {
-            Some(socket.remote_endpoint())
+            Some(Endpoint::Ip(socket.remote_endpoint()))
         } else {
             None
         }
@@ -340,8 +415,17 @@ impl UdpSocketState {
     }
 }
 
+#[repr(C)]
+struct ArpReq {
+    arp_pa: SockAddrPlaceholder,
+    arp_ha: SockAddrPlaceholder,
+    arp_flags: u32,
+    arp_netmask: SockAddrPlaceholder,
+    arp_dev: [u8; 16],
+}
+
 impl Socket for UdpSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         loop {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<UdpSocket>(self.handle.0);
@@ -354,10 +438,13 @@ impl Socket for UdpSocketState {
                     drop(sockets);
 
                     poll_ifaces();
-                    return (Ok(size), endpoint);
+                    return (Ok(size), Endpoint::Ip(endpoint));
                 }
             } else {
-                return (Err(SysError::ENOTCONN), IpEndpoint::UNSPECIFIED);
+                return (
+                    Err(SysError::ENOTCONN),
+                    Endpoint::Ip(IpEndpoint::UNSPECIFIED),
+                );
             }
 
             // avoid deadlock
@@ -366,9 +453,9 @@ impl Socket for UdpSocketState {
         }
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
         let remote_endpoint = {
-            if let Some(ref endpoint) = sendto_endpoint {
+            if let Some(Endpoint::Ip(ref endpoint)) = sendto_endpoint {
                 endpoint
             } else if let Some(ref endpoint) = self.remote_endpoint {
                 endpoint
@@ -417,33 +504,78 @@ impl Socket for UdpSocketState {
         (input, output, err)
     }
 
-    fn connect(&mut self, endpoint: IpEndpoint) -> SysResult {
-        self.remote_endpoint = Some(endpoint);
-        Ok(0)
-    }
-
-    fn bind(&mut self, endpoint: IpEndpoint) -> SysResult {
-        let mut sockets = SOCKETS.lock();
-        let mut socket = sockets.get::<UdpSocket>(self.handle.0);
-        match socket.bind(endpoint) {
-            Ok(()) => Ok(0),
-            Err(_) => Err(SysError::EINVAL),
+    fn connect(&mut self, endpoint: Endpoint) -> SysResult {
+        if let Endpoint::Ip(ip) = endpoint {
+            self.remote_endpoint = Some(ip);
+            Ok(0)
+        } else {
+            Err(SysError::EINVAL)
         }
     }
 
-    fn endpoint(&self) -> Option<IpEndpoint> {
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
+        let mut sockets = SOCKETS.lock();
+        let mut socket = sockets.get::<UdpSocket>(self.handle.0);
+        if let Endpoint::Ip(ip) = endpoint {
+            match socket.bind(ip) {
+                Ok(()) => Ok(0),
+                Err(_) => Err(SysError::EINVAL),
+            }
+        } else {
+            Err(SysError::EINVAL)
+        }
+    }
+
+    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+        match request {
+            // SIOCGARP
+            0x8954 => {
+                // FIXME: check addr
+                let req = unsafe { &mut *(arg1 as *mut ArpReq) };
+                if let AddressFamily::Internet = AddressFamily::from(req.arp_pa.family) {
+                    let name = req.arp_dev.as_ptr();
+                    let ifname = unsafe { util::from_cstr(name) };
+                    let addr = &req.arp_pa as *const SockAddrPlaceholder as *const SockAddr;
+                    let addr = unsafe {
+                        IpAddress::from(Ipv4Address::from_bytes(
+                            &u32::from_be((*addr).addr_in.sin_addr).to_be_bytes()[..],
+                        ))
+                    };
+                    for iface in NET_DRIVERS.read().iter() {
+                        if iface.get_ifname() == ifname {
+                            debug!("get arp matched ifname {}", ifname);
+                            return match iface.get_arp(addr) {
+                                Some(mac) => {
+                                    // TODO: update flags
+                                    req.arp_ha.data[0..6].copy_from_slice(mac.as_bytes());
+                                    Ok(0)
+                                }
+                                None => Err(SysError::ENOENT),
+                            };
+                        }
+                    }
+                    Err(SysError::ENOENT)
+                } else {
+                    Err(SysError::EINVAL)
+                }
+            }
+            _ => Ok(0),
+        }
+    }
+
+    fn endpoint(&self) -> Option<Endpoint> {
         let mut sockets = SOCKETS.lock();
         let socket = sockets.get::<UdpSocket>(self.handle.0);
         let endpoint = socket.endpoint();
         if endpoint.port != 0 {
-            Some(endpoint)
+            Some(Endpoint::Ip(endpoint))
         } else {
             None
         }
     }
 
-    fn remote_endpoint(&self) -> Option<IpEndpoint> {
-        self.remote_endpoint.clone()
+    fn remote_endpoint(&self) -> Option<Endpoint> {
+        self.remote_endpoint.clone().map(|e| Endpoint::Ip(e))
     }
 
     fn box_clone(&self) -> Box<dyn Socket> {
@@ -469,12 +601,15 @@ impl RawSocketState {
         );
         let handle = GlobalSocketHandle(SOCKETS.lock().add(socket));
 
-        RawSocketState { handle }
+        RawSocketState {
+            handle,
+            header_included: false,
+        }
     }
 }
 
 impl Socket for RawSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, IpEndpoint) {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
         loop {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<RawSocket>(self.handle.0);
@@ -484,10 +619,10 @@ impl Socket for RawSocketState {
 
                 return (
                     Ok(size),
-                    IpEndpoint {
+                    Endpoint::Ip(IpEndpoint {
                         addr: IpAddress::Ipv4(packet.src_addr()),
                         port: 0,
-                    },
+                    }),
                 );
             }
 
@@ -498,39 +633,98 @@ impl Socket for RawSocketState {
         }
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<IpEndpoint>) -> SysResult {
-        if let Some(endpoint) = sendto_endpoint {
-            // temporary solution
-            let iface = &*(NET_DRIVERS.read()[0]);
-            let v4_src = iface.ipv4_address().unwrap();
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
+        if self.header_included {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<RawSocket>(self.handle.0);
 
-            if let IpAddress::Ipv4(v4_dst) = endpoint.addr {
-                let len = data.len();
-                // using 20-byte IPv4 header
-                let mut buffer = vec![0u8; len + 20];
-                let mut packet = Ipv4Packet::new_unchecked(&mut buffer);
-                packet.set_version(4);
-                packet.set_header_len(20);
-                packet.set_total_len((20 + len) as u16);
-                packet.set_protocol(socket.ip_protocol().into());
-                packet.set_src_addr(v4_src);
-                packet.set_dst_addr(v4_dst);
-                let payload = packet.payload_mut();
-                payload.copy_from_slice(data);
-                packet.fill_checksum();
+            match socket.send_slice(&data) {
+                Ok(()) => Ok(data.len()),
+                Err(_) => Err(SysError::ENOBUFS),
+            }
+        } else {
+            if let Some(Endpoint::Ip(endpoint)) = sendto_endpoint {
+                // temporary solution
+                let iface = &*(NET_DRIVERS.read()[0]);
+                let v4_src = iface.ipv4_address().unwrap();
+                let mut sockets = SOCKETS.lock();
+                let mut socket = sockets.get::<RawSocket>(self.handle.0);
 
-                socket.send_slice(&buffer).unwrap();
+                if let IpAddress::Ipv4(v4_dst) = endpoint.addr {
+                    let len = data.len();
+                    // using 20-byte IPv4 header
+                    let mut buffer = vec![0u8; len + 20];
+                    let mut packet = Ipv4Packet::new_unchecked(&mut buffer);
+                    packet.set_version(4);
+                    packet.set_header_len(20);
+                    packet.set_total_len((20 + len) as u16);
+                    packet.set_protocol(socket.ip_protocol().into());
+                    packet.set_src_addr(v4_src);
+                    packet.set_dst_addr(v4_dst);
+                    let payload = packet.payload_mut();
+                    payload.copy_from_slice(data);
+                    packet.fill_checksum();
 
-                // avoid deadlock
-                drop(socket);
-                drop(sockets);
-                iface.poll();
+                    socket.send_slice(&buffer).unwrap();
 
-                Ok(len)
+                    // avoid deadlock
+                    drop(socket);
+                    drop(sockets);
+                    iface.poll();
+
+                    Ok(len)
+                } else {
+                    unimplemented!("ip type")
+                }
             } else {
-                unimplemented!("ip type")
+                Err(SysError::ENOTCONN)
+            }
+        }
+    }
+
+    fn poll(&self) -> (bool, bool, bool) {
+        unimplemented!()
+    }
+
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
+        unimplemented!()
+    }
+
+    fn box_clone(&self) -> Box<dyn Socket> {
+        Box::new(self.clone())
+    }
+
+    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+        match (level, opt) {
+            (IPPROTO_IP, IP_HDRINCL) => {
+                if let Some(arg) = data.first() {
+                    self.header_included = *arg > 0;
+                    debug!("hdrincl set to {}", self.header_included);
+                }
+            }
+            _ => {}
+        }
+        Ok(0)
+    }
+}
+
+impl PacketSocketState {
+    pub fn new() -> Self {
+        PacketSocketState {}
+    }
+}
+
+impl Socket for PacketSocketState {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
+        unimplemented!()
+    }
+
+    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
+        if let Some(Endpoint::LinkLevel(endpoint)) = sendto_endpoint {
+            let ifaces = NET_DRIVERS.read();
+            match ifaces[endpoint.interface_index].send(data) {
+                Some(len) => Ok(len),
+                None => Err(SysError::ENOBUFS),
             }
         } else {
             Err(SysError::ENOTCONN)
@@ -541,8 +735,340 @@ impl Socket for RawSocketState {
         unimplemented!()
     }
 
-    fn connect(&mut self, _endpoint: IpEndpoint) -> SysResult {
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
         unimplemented!()
+    }
+
+    fn box_clone(&self) -> Box<dyn Socket> {
+        Box::new(self.clone())
+    }
+}
+
+/// Common structure:
+/// | nlmsghdr | ifinfomsg/ifaddrmsg | rtattr | rtattr | rtattr | ... | rtattr
+/// All aligned to 4 bytes boundary
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct NetlinkMessageHeader {
+    nlmsg_len: u32,                   // length of message including header
+    nlmsg_type: u16,                  // message content
+    nlmsg_flags: NetlinkMessageFlags, // additional flags
+    nlmsg_seq: u32,                   // sequence number
+    nlmsg_pid: u32,                   // sending process port id
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct IfaceInfoMsg {
+    ifi_family: u16,
+    ifi_type: u16,
+    ifi_index: u32,
+    ifi_flags: u32,
+    ifi_change: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct IfaceAddrMsg {
+    ifa_family: u8,
+    ifa_prefixlen: u8,
+    ifa_flags: u8,
+    ifa_scope: u8,
+    ifa_index: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct RouteAttr {
+    rta_len: u16,
+    rta_type: u16,
+}
+
+bitflags! {
+    struct NetlinkMessageFlags : u16 {
+        const REQUEST = 0x01;
+        const MULTI = 0x02;
+        const ACK = 0x04;
+        const ECHO = 0x08;
+        const DUMP_INTR = 0x10;
+        const DUMP_FILTERED = 0x20;
+        // GET request
+        const ROOT = 0x100;
+        const MATCH = 0x200;
+        const ATOMIC = 0x400;
+        const DUMP = 0x100 | 0x200;
+        // NEW request
+        const REPLACE = 0x100;
+        const EXCL = 0x200;
+        const CREATE = 0x400;
+        const APPEND = 0x800;
+        // DELETE request
+        const NONREC = 0x100;
+        // ACK message
+        const CAPPED = 0x100;
+        const ACK_TLVS = 0x200;
+    }
+}
+
+enum_with_unknown! {
+    /// Netlink message types
+    pub doc enum NetlinkMessageType(u16) {
+        /// Nothing
+        Noop = 1,
+        /// Error
+        Error = 2,
+        /// End of a dump
+        Done = 3,
+        /// Data lost
+        Overrun = 4,
+        /// New link
+        NewLink = 16,
+        /// Delete link
+        DelLink = 17,
+        /// Get link
+        GetLink = 18,
+        /// Set link
+        SetLink = 19,
+        /// New addr
+        NewAddr = 20,
+        /// Delete addr
+        DelAddr = 21,
+        /// Get addr
+        GetAddr = 22,
+    }
+}
+
+enum_with_unknown! {
+    /// Route Attr Types
+    pub doc enum RouteAttrTypes(u16) {
+        /// Unspecified
+        Unspecified = 0,
+        /// MAC Address
+        Address = 1,
+        /// Broadcast
+        Broadcast = 2,
+        /// Interface name
+        Ifname = 3,
+        /// MTU
+        MTU = 4,
+        /// Link
+        Link = 5,
+    }
+}
+
+impl NetlinkSocketState {
+    pub fn new() -> Self {
+        NetlinkSocketState {
+            data: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+}
+
+trait VecExt {
+    fn align4(&mut self);
+    fn push_ext<T: Sized>(&mut self, data: T);
+    fn set_ext<T: Sized>(&mut self, offset: usize, data: T);
+}
+
+impl VecExt for Vec<u8> {
+    fn align4(&mut self) {
+        let len = (self.len() + 3) & !3;
+        if len > self.len() {
+            self.resize(len, 0);
+        }
+    }
+
+    fn push_ext<T: Sized>(&mut self, data: T) {
+        let bytes =
+            unsafe { slice::from_raw_parts(&data as *const T as *const u8, size_of::<T>()) };
+        for byte in bytes {
+            self.push(*byte);
+        }
+    }
+
+    fn set_ext<T: Sized>(&mut self, offset: usize, data: T) {
+        if self.len() < offset + size_of::<T>() {
+            self.resize(offset + size_of::<T>(), 0);
+        }
+        let bytes =
+            unsafe { slice::from_raw_parts(&data as *const T as *const u8, size_of::<T>()) };
+        for i in 0..bytes.len() {
+            self[offset + i] = bytes[i];
+        }
+    }
+}
+
+impl Socket for NetlinkSocketState {
+    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
+        let mut buffer = self.data.lock();
+        if buffer.len() > 0 {
+            let msg = buffer.remove(0);
+            let len = min(msg.len(), data.len());
+            data[..len].copy_from_slice(&msg[..len]);
+            (
+                Ok(len),
+                Endpoint::Netlink(NetlinkEndpoint {
+                    port_id: 0,
+                    multicast_groups_mask: 0,
+                }),
+            )
+        } else {
+            (
+                Ok(0),
+                Endpoint::Netlink(NetlinkEndpoint {
+                    port_id: 0,
+                    multicast_groups_mask: 0,
+                }),
+            )
+        }
+    }
+
+    fn write(&self, data: &[u8], _sendto_endpoint: Option<Endpoint>) -> SysResult {
+        if data.len() < size_of::<NetlinkMessageHeader>() {
+            return Err(SysError::EINVAL);
+        }
+        let header = unsafe { &*(data.as_ptr() as *const NetlinkMessageHeader) };
+        if header.nlmsg_len as usize > data.len() {
+            return Err(SysError::EINVAL);
+        }
+        let message_type = NetlinkMessageType::from(header.nlmsg_type);
+        debug!("type: {:?}", message_type);
+        let mut buffer = self.data.lock();
+        buffer.clear();
+        match message_type {
+            NetlinkMessageType::GetLink => {
+                let ifaces = NET_DRIVERS.read();
+                for i in 0..ifaces.len() {
+                    let mut msg = Vec::new();
+                    let mut new_header = NetlinkMessageHeader {
+                        nlmsg_len: 0, // to be determined later
+                        nlmsg_type: NetlinkMessageType::NewLink.into(),
+                        nlmsg_flags: NetlinkMessageFlags::MULTI,
+                        nlmsg_seq: header.nlmsg_seq,
+                        nlmsg_pid: header.nlmsg_pid,
+                    };
+                    msg.push_ext(new_header);
+
+                    let if_info = IfaceInfoMsg {
+                        ifi_family: AddressFamily::Unspecified.into(),
+                        ifi_type: 0,
+                        ifi_index: i as u32,
+                        ifi_flags: 0,
+                        ifi_change: 0,
+                    };
+                    msg.align4();
+                    msg.push_ext(if_info);
+
+                    let mut attrs = Vec::new();
+
+                    let mac_addr = ifaces[i].get_mac();
+                    let attr = RouteAttr {
+                        rta_len: (mac_addr.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                        rta_type: RouteAttrTypes::Address.into(),
+                    };
+                    attrs.align4();
+                    attrs.push_ext(attr);
+                    for byte in mac_addr.as_bytes() {
+                        attrs.push(*byte);
+                    }
+
+                    let ifname = ifaces[i].get_ifname();
+                    let attr = RouteAttr {
+                        rta_len: (ifname.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                        rta_type: RouteAttrTypes::Ifname.into(),
+                    };
+                    attrs.align4();
+                    attrs.push_ext(attr);
+                    for byte in ifname.as_bytes() {
+                        attrs.push(*byte);
+                    }
+
+                    msg.align4();
+                    msg.append(&mut attrs);
+
+                    msg.align4();
+                    msg.set_ext(0, msg.len() as u32);
+
+                    buffer.push(msg);
+                }
+            }
+            NetlinkMessageType::GetAddr => {
+                let ifaces = NET_DRIVERS.read();
+                for i in 0..ifaces.len() {
+                    let ip_addrs = ifaces[i].get_ip_addresses();
+                    for j in 0..ip_addrs.len() {
+                        let mut msg = Vec::new();
+                        let mut new_header = NetlinkMessageHeader {
+                            nlmsg_len: 0, // to be determined later
+                            nlmsg_type: NetlinkMessageType::NewAddr.into(),
+                            nlmsg_flags: NetlinkMessageFlags::MULTI,
+                            nlmsg_seq: header.nlmsg_seq,
+                            nlmsg_pid: header.nlmsg_pid,
+                        };
+                        msg.push_ext(new_header);
+
+                        let family: u16 = AddressFamily::Internet.into();
+                        let if_addr = IfaceAddrMsg {
+                            ifa_family: family as u8,
+                            ifa_prefixlen: ip_addrs[j].prefix_len(),
+                            ifa_flags: 0,
+                            ifa_scope: 0,
+                            ifa_index: i as u32,
+                        };
+                        msg.align4();
+                        msg.push_ext(if_addr);
+
+                        let mut attrs = Vec::new();
+
+                        let ip_addr = ip_addrs[j].address();
+                        let attr = RouteAttr {
+                            rta_len: (ip_addr.as_bytes().len() + size_of::<RouteAttr>()) as u16,
+                            rta_type: RouteAttrTypes::Address.into(),
+                        };
+                        attrs.align4();
+                        attrs.push_ext(attr);
+                        for byte in ip_addr.as_bytes() {
+                            attrs.push(*byte);
+                        }
+
+                        msg.align4();
+                        msg.append(&mut attrs);
+
+                        msg.align4();
+                        msg.set_ext(0, msg.len() as u32);
+
+                        buffer.push(msg);
+                    }
+                }
+            }
+            _ => {}
+        }
+        let mut msg = Vec::new();
+        let mut new_header = NetlinkMessageHeader {
+            nlmsg_len: 0, // to be determined later
+            nlmsg_type: NetlinkMessageType::Done.into(),
+            nlmsg_flags: NetlinkMessageFlags::MULTI,
+            nlmsg_seq: header.nlmsg_seq,
+            nlmsg_pid: header.nlmsg_pid,
+        };
+        msg.push_ext(new_header);
+        msg.align4();
+        msg.set_ext(0, msg.len() as u32);
+        buffer.push(msg);
+        Ok(data.len())
+    }
+
+    fn poll(&self) -> (bool, bool, bool) {
+        unimplemented!()
+    }
+
+    fn connect(&mut self, _endpoint: Endpoint) -> SysResult {
+        unimplemented!()
+    }
+
+    fn bind(&mut self, _endpoint: Endpoint) -> SysResult {
+        Ok(0)
     }
 
     fn box_clone(&self) -> Box<dyn Socket> {
@@ -580,6 +1106,6 @@ const UDP_METADATA_BUF: usize = 1024;
 const UDP_SENDBUF: usize = 64 * 1024; // 64K
 const UDP_RECVBUF: usize = 64 * 1024; // 64K
 
-const RAW_METADATA_BUF: usize = 2;
-const RAW_SENDBUF: usize = 2 * 1024; // 2K
-const RAW_RECVBUF: usize = 2 * 1024; // 2K
+const RAW_METADATA_BUF: usize = 1024;
+const RAW_SENDBUF: usize = 64 * 1024; // 64K
+const RAW_RECVBUF: usize = 64 * 1024; // 64K

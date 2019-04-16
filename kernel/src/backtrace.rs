@@ -106,6 +106,9 @@ pub fn backtrace() {
             #[cfg(target_arch = "aarch64")]
             {
                 current_fp = *(current_fp as *const usize);
+                if current_fp < crate::arch::consts::KERNEL_OFFSET {
+                    break;
+                }
                 if current_fp != 0 {
                     current_pc = *(current_fp as *const usize).offset(1);
                 }

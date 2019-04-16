@@ -19,7 +19,7 @@ use self::custom::*;
 use self::fs::*;
 use self::mem::*;
 use self::misc::*;
-use self::net::*;
+pub use self::net::*;
 use self::proc::*;
 use self::time::*;
 
@@ -70,10 +70,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_sigprocmask is unimplemented");
             Ok(0)
         }
-        SYS_IOCTL => {
-            warn!("sys_ioctl is unimplemented");
-            Ok(0)
-        }
+        SYS_IOCTL => sys_ioctl(args[0], args[1], args[2], args[3], args[4]),
         SYS_PREAD64 => sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
         SYS_PWRITE64 => sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
         SYS_READV => sys_readv(args[0], args[1] as *const IoVec, args[2]),
@@ -112,7 +109,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             args[5] as *mut u32,
         ),
         //        SYS_SENDMSG => sys_sendmsg(),
-        //        SYS_RECVMSG => sys_recvmsg(),
+        SYS_RECVMSG => sys_recvmsg(args[0], args[1] as *mut MsgHdr, args[2]),
         SYS_SHUTDOWN => sys_shutdown(args[0], args[1]),
         SYS_BIND => sys_bind(args[0], args[1] as *const SockAddr, args[2]),
         // 50
@@ -247,20 +244,21 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         SYS_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         SYS_EXIT_GROUP => sys_exit_group(args[0]),
-        SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]), // TODO: handle `dfd`
-        SYS_MKDIRAT => sys_mkdir(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+        SYS_OPENAT => sys_openat(args[0], args[1] as *const u8, args[2], args[3]),
+        SYS_MKDIRAT => sys_mkdirat(args[0], args[1] as *const u8, args[2]),
         //        SYS_MKNODAT => sys_mknod(),
         // 260
         SYS_FCHOWNAT => {
             warn!("sys_fchownat is unimplemented");
             Ok(0)
         }
-        SYS_NEWFSTATAT => sys_stat(args[1] as *const u8, args[2] as *mut Stat), // TODO: handle `dfd`, `flag`
-        SYS_UNLINKAT => sys_unlink(args[1] as *const u8), // TODO: handle `dfd`, `flag`
-        SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`
-        SYS_LINKAT => sys_link(args[1] as *const u8, args[3] as *const u8), // TODO: handle `olddfd`, `newdfd`, `flags`
+        SYS_NEWFSTATAT => sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3]),
+        SYS_UNLINKAT => sys_unlinkat(args[0], args[1] as *const u8, args[2]),
+        SYS_READLINKAT => sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3]),
+        SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8),
+        SYS_LINKAT => sys_linkat(args[0], args[1] as *const u8, args[2], args[3] as *const u8, args[4]),
         SYS_SYMLINKAT => Err(SysError::EACCES),
-        SYS_FACCESSAT => sys_access(args[1] as *const u8, args[2]), // TODO: handle `dfd`
+        SYS_FACCESSAT => sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
         // 280
         SYS_UTIMENSAT => {
             warn!("sys_utimensat is unimplemented");

@@ -14,4 +14,8 @@ Cargo.lock
 # for eclipse
 .project
 
+# for vscode
 .vscode
+
+# for vim
+*.swp

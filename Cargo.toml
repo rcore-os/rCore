@@ -1,8 +1,6 @@
 [workspace]
 members = [
-    "crate/bit-allocator",
     "crate/memory",
     "crate/sync",
-    "crate/thread",
 ]
 exclude = ["kernel", "bootloader", "user/rust"]

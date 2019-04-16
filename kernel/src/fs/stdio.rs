@@ -47,6 +47,7 @@ lazy_static! {
 macro_rules! impl_inode {
     () => {
         fn metadata(&self) -> Result<Metadata> { Err(FsError::NotSupported) }
+        fn set_metadata(&self, _metadata: &Metadata) -> Result<()> { Ok(()) }
         fn sync_all(&self) -> Result<()> { Ok(()) }
         fn sync_data(&self) -> Result<()> { Ok(()) }
         fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
@@ -56,19 +57,26 @@ macro_rules! impl_inode {
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
+        fn io_control(&self, _cmd: u32, _data: u32) -> Result<()> { Err(FsError::NotSupported) }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
-        fn chmod(&self, _mode: u16) -> Result<()> { Ok(()) }
     };
 }
 
 impl INode for Stdin {
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         buf[0] = self.pop() as u8;
         Ok(1)
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         unimplemented!()
+    }
+    fn poll(&self) -> Result<PollStatus> {
+        Ok(PollStatus {
+            read: self.can_read(),
+            write: false,
+            error: false,
+        })
     }
     impl_inode!();
 }
@@ -83,6 +91,13 @@ impl INode for Stdout {
         let s = unsafe { str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
+    }
+    fn poll(&self) -> Result<PollStatus> {
+        Ok(PollStatus {
+            read: false,
+            write: true,
+            error: false,
+        })
     }
     impl_inode!();
 }

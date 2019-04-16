@@ -10,6 +10,8 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 
+use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
+
 use super::*;
 
 pub fn sys_read(fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -86,34 +88,24 @@ pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResu
         let proc = process();
         let mut events = 0;
         for poll in polls.iter_mut() {
-            poll.revents = PE::NONE;
-            match proc.files.get(&(poll.fd as usize)) {
-                Some(FileLike::File(_)) => {
-                    // FIXME: assume it is stdin for now
-                    if poll.events.contains(PE::IN) && STDIN.can_read() {
-                        poll.revents = poll.revents | PE::IN;
-                        events = events + 1;
-                    }
+            poll.revents = PE::empty();
+            if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
+                let status = file_like.poll()?;
+                if status.error {
+                    poll.revents |= PE::HUP;
+                    events += 1;
                 }
-                Some(FileLike::Socket(socket)) => {
-                    let (input, output, err) = socket.poll();
-                    if err {
-                        poll.revents = poll.revents | PE::HUP;
-                        events = events + 1;
-                    }
-                    if input && poll.events.contains(PE::IN) {
-                        poll.revents = poll.revents | PE::IN;
-                        events = events + 1;
-                    }
-                    if output && poll.events.contains(PE::OUT) {
-                        poll.revents = poll.revents | PE::OUT;
-                        events = events + 1;
-                    }
+                if status.read && poll.events.contains(PE::IN) {
+                    poll.revents |= PE::IN;
+                    events += 1;
                 }
-                None => {
-                    poll.revents = poll.revents | PE::ERR;
-                    events = events + 1;
+                if status.write && poll.events.contains(PE::OUT) {
+                    poll.revents |= PE::OUT;
+                    events += 1;
                 }
+            } else {
+                poll.revents |= PE::ERR;
+                events += 1;
             }
         }
         drop(proc);
@@ -160,34 +152,22 @@ pub fn sys_select(
     loop {
         let proc = process();
         let mut events = 0;
-        for (fd, file_like) in proc.files.iter() {
-            if *fd < nfds {
-                match file_like {
-                    FileLike::File(_) => {
-                        // FIXME: assume it is stdin for now
-                        if STDIN.can_read() {
-                            if read_fds.is_set(*fd) {
-                                read_fds.set(*fd);
-                                events = events + 1;
-                            }
-                        }
-                    }
-                    FileLike::Socket(socket) => {
-                        let (input, output, err) = socket.poll();
-                        if err && err_fds.is_set(*fd) {
-                            err_fds.set(*fd);
-                            events = events + 1;
-                        }
-                        if input && read_fds.is_set(*fd) {
-                            read_fds.set(*fd);
-                            events = events + 1;
-                        }
-                        if output && write_fds.is_set(*fd) {
-                            write_fds.set(*fd);
-                            events = events + 1;
-                        }
-                    }
-                }
+        for (&fd, file_like) in proc.files.iter() {
+            if fd >= nfds {
+                continue;
+            }
+            let status = file_like.poll()?;
+            if status.error && err_fds.contains(fd) {
+                err_fds.set(fd);
+                events += 1;
+            }
+            if status.read && read_fds.contains(fd) {
+                read_fds.set(fd);
+                events += 1;
+            }
+            if status.write && write_fds.contains(fd) {
+                write_fds.set(fd);
+                events += 1;
             }
         }
         drop(proc);
@@ -257,49 +237,24 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
         dir_fd as isize, path, flags, mode
     );
 
-    let inode = if dir_fd == AT_FDCWD {
-        // from process cwd
-        if flags.contains(OpenFlags::CREATE) {
-            let (dir_path, file_name) = split_path(&path);
-            // relative to cwd
-            let dir_inode = proc.lookup_inode(dir_path)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(SysError::EEXIST);
-                    }
-                    file_inode
+    let inode = if flags.contains(OpenFlags::CREATE) {
+        let (dir_path, file_name) = split_path(&path);
+        // relative to cwd
+        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path)?;
+        match dir_inode.find(file_name) {
+            Ok(file_inode) => {
+                if flags.contains(OpenFlags::EXCLUSIVE) {
+                    return Err(SysError::EEXIST);
                 }
-                Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode as u32)?
-                }
-                Err(e) => return Err(SysError::from(e)),
+                file_inode
             }
-        } else {
-            proc.lookup_inode(&path)?
+            Err(FsError::EntryNotFound) => {
+                dir_inode.create(file_name, FileType::File, mode as u32)?
+            }
+            Err(e) => return Err(SysError::from(e)),
         }
     } else {
-        // relative to dir_fd
-        let dir_file = proc.get_file(dir_fd)?;
-        if flags.contains(OpenFlags::CREATE) {
-            let (dir_path, file_name) = split_path(&path);
-            // relative to cwd
-            let dir_inode = dir_file.lookup_follow(dir_path, FOLLOW_MAX_DEPTH)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(SysError::EEXIST);
-                    }
-                    file_inode
-                }
-                Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode as u32)?
-                }
-                Err(e) => return Err(SysError::from(e)),
-            }
-        } else {
-            dir_file.lookup_follow(&path, FOLLOW_MAX_DEPTH)?
-        }
+        proc.lookup_inode_at(dir_fd, &path)?
     };
 
     let fd = proc.get_free_fd();
@@ -317,14 +272,22 @@ pub fn sys_close(fd: usize) -> SysResult {
 }
 
 pub fn sys_access(path: *const u8, mode: usize) -> SysResult {
+    sys_faccessat(AT_FDCWD, path, mode, 0)
+}
+
+pub fn sys_faccessat(dirfd: usize, path: *const u8, mode: usize, flags: usize) -> SysResult {
     // TODO: check permissions based on uid/gid
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    let flags = AtFlags::from_bits_truncate(flags);
     if !proc.pid.is_init() {
         // we trust pid 0 process
-        info!("access: path: {:?}, mode: {:#o}", path, mode);
+        info!(
+            "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
+            dirfd, path, mode, flags
+        );
     }
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     Ok(0)
 }
 
@@ -342,9 +305,9 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
     Ok(buf as usize)
 }
 
-pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    warn!("stat is partial implemented as lstat");
-    sys_lstat(path, stat_ptr)
+pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    warn!("lstat is partial implemented as stat");
+    sys_stat(path, stat_ptr)
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
@@ -353,20 +316,23 @@ pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
     proc.vm.check_write_ptr(stat_ptr)?;
     let file = proc.get_file(fd)?;
     let stat = Stat::from(file.metadata()?);
-    // TODO: handle symlink
     unsafe {
         stat_ptr.write(stat);
     }
     Ok(0)
 }
 
-pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+pub fn sys_fstatat(dirfd: usize, path: *const u8, stat_ptr: *mut Stat, flags: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     proc.vm.check_write_ptr(stat_ptr)?;
-    info!("lstat: path: {:?}, stat_ptr: {:?}", path, stat_ptr);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "fstatat: dirfd: {}, path: {:?}, stat_ptr: {:?}, flags: {:?}",
+        dirfd, path, stat_ptr, flags
+    );
 
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     let stat = Stat::from(inode.metadata()?);
     unsafe {
         stat_ptr.write(stat);
@@ -374,13 +340,21 @@ pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
     Ok(0)
 }
 
+pub fn sys_stat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
+    sys_fstatat(AT_FDCWD, path, stat_ptr, 0)
+}
+
 pub fn sys_readlink(path: *const u8, base: *mut u8, len: usize) -> SysResult {
+    sys_readlinkat(AT_FDCWD, path, base, len)
+}
+
+pub fn sys_readlinkat(dirfd: usize, path: *const u8, base: *mut u8, len: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     proc.vm.check_write_array(base, len)?;
     info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
 
-    let inode = proc.lookup_inode(&path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path)?;
     if inode.metadata()?.type_ == FileType::SymLink {
         // TODO: recursive link resolution and loop detection
         let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
@@ -470,6 +444,16 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
     Ok(fd2)
 }
 
+pub fn sys_ioctl(fd: usize, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+    info!(
+        "ioctl: fd: {}, request: {}, args: {} {} {}",
+        fd, request, arg1, arg2, arg3
+    );
+    let mut proc = process();
+    let file_like = proc.get_file_like(fd)?;
+    file_like.ioctl(request, arg1, arg2, arg3)
+}
+
 pub fn sys_chdir(path: *const u8) -> SysResult {
     let mut proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
@@ -484,12 +468,34 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
         return Err(SysError::ENOTDIR);
     }
 
-    if path.len() > 0 && path.as_bytes()[0] == b'/' {
-        // absolute
-        proc.cwd = path;
-    } else {
-        // relative
-        proc.cwd += &path;
+    // BUGFIX: '..' and '.'
+    if path.len() > 0 {
+        let cwd = match path.as_bytes()[0] {
+            b'/' => String::from("/"),
+            _ => proc.cwd.clone()
+        };
+        let mut cwd_vec:Vec<_> =
+                   cwd.split("/")
+                           .filter(|&x| x != "")
+                           .collect();
+        let path_split = path.split("/").filter(|&x| x != "");
+        for seg in path_split {
+            if seg == ".." {
+                cwd_vec.pop();
+            } else if seg == "." {
+                // nothing to do here.
+            } else {
+                cwd_vec.push(seg);
+            }
+        }
+        proc.cwd = String::from("");
+        for seg in cwd_vec {
+            proc.cwd.push_str("/");
+            proc.cwd.push_str(seg);
+        }
+        if proc.cwd == "" {
+            proc.cwd = String::from("/");
+        }
     }
     Ok(0)
 }
@@ -514,30 +520,27 @@ pub fn sys_renameat(
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = if olddirfd == AT_FDCWD {
-        proc.lookup_inode(old_dir_path)?
-    } else {
-        proc.get_file(olddirfd)?
-            .lookup_follow(old_dir_path, FOLLOW_MAX_DEPTH)?
-    };
-    let new_dir_inode = if newdirfd == AT_FDCWD {
-        proc.lookup_inode(new_dir_path)?
-    } else {
-        proc.get_file(newdirfd)?
-            .lookup_follow(new_dir_path, FOLLOW_MAX_DEPTH)?
-    };
+    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
 
 pub fn sys_mkdir(path: *const u8, mode: usize) -> SysResult {
+    sys_mkdirat(AT_FDCWD, path, mode)
+}
+
+pub fn sys_mkdirat(dirfd: usize, path: *const u8, mode: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     // TODO: check pathname
-    info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
+    info!(
+        "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
+        dirfd, path, mode
+    );
 
     let (dir_path, file_name) = split_path(&path);
-    let inode = proc.lookup_inode(dir_path)?;
+    let inode = proc.lookup_inode_at(dirfd, dir_path)?;
     if inode.find(file_name).is_ok() {
         return Err(SysError::EEXIST);
     }
@@ -561,25 +564,47 @@ pub fn sys_rmdir(path: *const u8) -> SysResult {
 }
 
 pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> SysResult {
+    sys_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0)
+}
+
+pub fn sys_linkat(
+    olddirfd: usize,
+    oldpath: *const u8,
+    newdirfd: usize,
+    newpath: *const u8,
+    flags: usize,
+) -> SysResult {
     let proc = process();
     let oldpath = unsafe { proc.vm.check_and_clone_cstr(oldpath)? };
     let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
-    info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
+        olddirfd, oldpath, newdirfd, newpath, flags
+    );
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let inode = proc.lookup_inode(&oldpath)?;
-    let new_dir_inode = proc.lookup_inode(new_dir_path)?;
+    let inode = proc.lookup_inode_at(olddirfd, &oldpath)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
     new_dir_inode.link(new_file_name, &inode)?;
     Ok(0)
 }
 
 pub fn sys_unlink(path: *const u8) -> SysResult {
+    sys_unlinkat(AT_FDCWD, path, 0)
+}
+
+pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: usize) -> SysResult {
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
-    info!("unlink: path: {:?}", path);
+    let flags = AtFlags::from_bits_truncate(flags);
+    info!(
+        "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
+        dirfd, path, flags
+    );
 
     let (dir_path, file_name) = split_path(&path);
-    let dir_inode = proc.lookup_inode(dir_path)?;
+    let dir_inode = proc.lookup_inode_at(dirfd, dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
         return Err(SysError::EISDIR);
@@ -711,11 +736,44 @@ impl Process {
             _ => Err(SysError::EBADF),
         }
     }
+    /// Lookup INode from the process.
+    ///
+    /// - If `path` is relative, then it is interpreted relative to the directory
+    ///   referred to by the file descriptor `dirfd`.
+    ///
+    /// - If the `dirfd` is the special value `AT_FDCWD`, then the directory is
+    ///   current working directory of the process.
+    ///
+    /// - If `path` is absolute, then `dirfd` is ignored.
+    ///
+    /// - If `follow` is true, then dereference `path` if it is a symbolic link.
+    pub fn lookup_inode_at(
+        &self,
+        dirfd: usize,
+        path: &str,
+        //        follow: bool,
+    ) -> Result<Arc<INode>, SysError> {
+        let follow = true;
+        debug!(
+            "lookup_inode_at: fd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
+            dirfd, self.cwd, path, follow
+        );
+        let follow_max_depth = if follow { FOLLOW_MAX_DEPTH } else { 0 };
+        if dirfd == AT_FDCWD {
+            Ok(ROOT_INODE
+                .lookup(&self.cwd)?
+                .lookup_follow(path, follow_max_depth)?)
+        } else {
+            let file = match self.files.get(&dirfd).ok_or(SysError::EBADF)? {
+                FileLike::File(file) => file,
+                _ => return Err(SysError::EBADF),
+            };
+            Ok(file.lookup_follow(path, follow_max_depth)?)
+        }
+    }
+
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
-        debug!("lookup_inode: cwd {} path {}", self.cwd, path);
-        Ok(ROOT_INODE
-            .lookup(&self.cwd)?
-            .lookup_follow(path, FOLLOW_MAX_DEPTH)?)
+        self.lookup_inode_at(AT_FDCWD, path)
     }
 }
 
@@ -747,6 +805,13 @@ impl From<FsError> for SysError {
             FsError::WrongFs => SysError::EINVAL,
             FsError::DeviceError => SysError::EIO,
         }
+    }
+}
+
+bitflags! {
+    struct AtFlags: usize {
+        const EMPTY_PATH = 0x1000;
+        const SYMLINK_NOFOLLOW = 0x100;
     }
 }
 
@@ -1079,10 +1144,10 @@ pub struct IoVec {
 
 /// A valid IoVecs request from user
 #[derive(Debug)]
-struct IoVecs(Vec<&'static mut [u8]>);
+pub struct IoVecs(Vec<&'static mut [u8]>);
 
 impl IoVecs {
-    fn check_and_new(
+    pub fn check_and_new(
         iov_ptr: *const IoVec,
         iov_count: usize,
         vm: &MemorySet,
@@ -1108,7 +1173,7 @@ impl IoVecs {
         Ok(IoVecs(slices))
     }
 
-    fn read_all_to_vec(&self) -> Vec<u8> {
+    pub fn read_all_to_vec(&self) -> Vec<u8> {
         let mut buf = self.new_buf(false);
         for slice in self.0.iter() {
             buf.extend(slice.iter());
@@ -1116,7 +1181,7 @@ impl IoVecs {
         buf
     }
 
-    fn write_all_from_slice(&mut self, buf: &[u8]) {
+    pub fn write_all_from_slice(&mut self, buf: &[u8]) {
         let mut copied_len = 0;
         for slice in self.0.iter_mut() {
             let copy_len = min(slice.len(), buf.len() - copied_len);
@@ -1132,7 +1197,7 @@ impl IoVecs {
     /// Create a new Vec buffer from IoVecs
     /// For readv:  `set_len` is true,  Vec.len = total_len.
     /// For writev: `set_len` is false, Vec.cap = total_len.
-    fn new_buf(&self, set_len: bool) -> Vec<u8> {
+    pub fn new_buf(&self, set_len: bool) -> Vec<u8> {
         let total_len = self.0.iter().map(|slice| slice.len()).sum::<usize>();
         let mut buf = Vec::with_capacity(total_len);
         if set_len {
@@ -1153,8 +1218,6 @@ pub struct PollFd {
 
 bitflags! {
     pub struct PollEvents: u16 {
-        /// Nothing Happens
-        const NONE = 0x0000;
         /// There is data to read.
         const IN = 0x0001;
         /// Writing is now possible.
@@ -1172,54 +1235,51 @@ const FD_PER_ITEM: usize = 8 * size_of::<u32>();
 const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
 
 struct FdSet {
-    addr: *mut u32,
-    nfds: usize,
-    saved: [u32; MAX_FDSET_SIZE],
+    bitset: &'static mut BitSlice<LittleEndian, u32>,
+    origin: BitVec<LittleEndian, u32>,
 }
 
 impl FdSet {
     /// Initialize a `FdSet` from pointer and number of fds
     /// Check if the array is large enough
     fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
-        let mut saved = [0u32; MAX_FDSET_SIZE];
-        if addr as usize != 0 {
+        if addr.is_null() {
+            Ok(FdSet {
+                bitset: BitSlice::empty_mut(),
+                origin: BitVec::new(),
+            })
+        } else {
             let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
             vm.check_write_array(addr, len)?;
             if len > MAX_FDSET_SIZE {
                 return Err(SysError::EINVAL);
             }
             let slice = unsafe { slice::from_raw_parts_mut(addr, len) };
+            let bitset: &'static mut BitSlice<LittleEndian, u32> = slice.into();
 
             // save the fdset, and clear it
-            for i in 0..len {
-                saved[i] = slice[i];
-                slice[i] = 0;
-            }
+            use alloc::prelude::ToOwned;
+            let origin = bitset.to_owned();
+            bitset.set_all(false);
+            Ok(FdSet { bitset, origin })
         }
-
-        Ok(FdSet { addr, nfds, saved })
     }
 
     /// Try to set fd in `FdSet`
     /// Return true when `FdSet` is valid, and false when `FdSet` is bad (i.e. null pointer)
     /// Fd should be less than nfds
     fn set(&mut self, fd: usize) -> bool {
-        if self.addr as usize != 0 {
-            assert!(fd < self.nfds);
-            unsafe {
-                *self.addr.add(fd / 8 / size_of::<u32>()) |= 1 << (fd % (8 * size_of::<u32>()));
-            }
-            true
-        } else {
-            false
+        if self.bitset.is_empty() {
+            return false;
         }
+        self.bitset.set(fd, true);
+        true
     }
 
-    /// Check to see fd is see in original `FdSet`
+    /// Check to see whether `fd` is in original `FdSet`
     /// Fd should be less than nfds
-    fn is_set(&mut self, fd: usize) -> bool {
-        assert!(fd < self.nfds);
-        self.saved[fd / 8 / size_of::<u32>()] & (1 << (fd % (8 * size_of::<u32>()))) != 0
+    fn contains(&self, fd: usize) -> bool {
+        self.origin[fd]
     }
 }
 

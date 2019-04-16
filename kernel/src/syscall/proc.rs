@@ -146,6 +146,9 @@ pub fn sys_exec(
         }
     }
     info!("exec: args {:?}", args);
+    if args.is_empty() {
+        return Err(SysError::EINVAL);
+    }
 
     // Read program file
     let path = args[0].as_str();
