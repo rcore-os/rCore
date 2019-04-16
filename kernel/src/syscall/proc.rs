@@ -231,7 +231,11 @@ pub fn sys_gettid() -> SysResult {
 
 /// Get the parent process id
 pub fn sys_getppid() -> SysResult {
-    Ok(process().parent.as_ref().unwrap().lock().pid.get())
+    if let Some(ref parent) = process().parent.as_ref() {
+        Ok(parent.lock().pid.get())
+    } else {
+        Ok(0)
+    }
 }
 
 /// Exit the current thread
