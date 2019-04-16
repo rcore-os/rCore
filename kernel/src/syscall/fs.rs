@@ -66,6 +66,21 @@ pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysR
     Ok(len)
 }
 
+pub fn sys_ppoll(ufds: *mut PollFd, nfds: usize, timeout: *const TimeSpec) -> SysResult {
+    let proc = process();
+    let timeout_msecs = if timeout.is_null() {
+        1 << 31 // infinity
+    } else {
+        proc.vm.check_read_ptr(timeout)?;
+        unsafe {
+            (*timeout).to_msec()
+        }
+    };
+    drop(proc);
+
+    sys_poll(ufds, nfds, timeout_msecs as usize)
+}
+
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
     info!(
         "poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}",
@@ -472,12 +487,9 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
     if path.len() > 0 {
         let cwd = match path.as_bytes()[0] {
             b'/' => String::from("/"),
-            _ => proc.cwd.clone()
+            _ => proc.cwd.clone(),
         };
-        let mut cwd_vec:Vec<_> =
-                   cwd.split("/")
-                           .filter(|&x| x != "")
-                           .collect();
+        let mut cwd_vec: Vec<_> = cwd.split("/").filter(|&x| x != "").collect();
         let path_split = path.split("/").filter(|&x| x != "");
         for seg in path_split {
             if seg == ".." {

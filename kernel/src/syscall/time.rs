@@ -19,6 +19,7 @@ const USEC_PER_SEC: u64 = 1_000_000;
 const MSEC_PER_SEC: u64 = 1_000;
 const USEC_PER_MSEC: u64 = 1_000;
 const NSEC_PER_USEC: u64 = 1_000;
+const NSEC_PER_MSEC: u64 = 1_000_000;
 
 /// Get time since epoch in usec
 fn get_epoch_usec() -> u64 {
@@ -58,6 +59,10 @@ pub struct TimeSpec {
 }
 
 impl TimeSpec {
+    pub fn to_msec(&self) -> u64 {
+        self.sec * MSEC_PER_SEC + self.nsec / NSEC_PER_MSEC
+    }
+
     pub fn to_duration(&self) -> Duration {
         Duration::new(self.sec, self.nsec as u32)
     }

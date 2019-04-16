@@ -275,6 +275,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         ),
         SYS_SYMLINKAT => Err(SysError::EACCES),
         SYS_FACCESSAT => sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
+        SYS_PPOLL => sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec), // ignore sigmask
         // 280
         SYS_UTIMENSAT => {
             warn!("sys_utimensat is unimplemented");
@@ -340,7 +341,10 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
             args[4] as *const TimeVal,
         ),
         SYS_DUP2 => sys_dup2(args[0], args[1]),
-        //        SYS_PAUSE => sys_pause(),
+        SYS_ALARM => {
+            warn!("sys_alarm is unimplemented");
+            Ok(0)
+        }
         SYS_FORK => sys_fork(tf),
         // use fork for vfork
         SYS_VFORK => sys_fork(tf),
@@ -355,16 +359,12 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
             warn!("sys_chmod is unimplemented");
             Ok(0)
         }
-        SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
-        SYS_TIME => sys_time(args[0] as *mut u64),
-        SYS_ALARM => {
-            warn!("sys_alarm is unimplemented");
-            Ok(0)
-        }
         SYS_CHOWN => {
             warn!("sys_chown is unimplemented");
             Ok(0)
         }
+        SYS_ARCH_PRCTL => sys_arch_prctl(args[0] as i32, args[1], tf),
+        SYS_TIME => sys_time(args[0] as *mut u64),
         SYS_EPOLL_CREATE => {
             warn!("sys_epoll_create is unimplemented");
             Err(SysError::ENOSYS)
