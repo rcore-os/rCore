@@ -24,11 +24,12 @@ pub fn sys_clone(
     newtls: usize,
     tf: &TrapFrame,
 ) -> SysResult {
+    let clone_flags = CloneFlags::from_bits_truncate(flags);
     info!(
-        "clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
-        flags, newsp, parent_tid, child_tid, newtls
+        "clone: flags: {:?}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        clone_flags, newsp, parent_tid, child_tid, newtls
     );
-    if flags == 0x4111 {
+    if flags == 0x4111 || flags == 0x11 {
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
     }
@@ -316,4 +317,31 @@ pub fn sys_set_priority(priority: usize) -> SysResult {
     let pid = thread::current().id();
     processor().manager().set_priority(pid, priority as u8);
     Ok(0)
+}
+
+bitflags! {
+    pub struct CloneFlags: usize {
+        const CSIGNAL = 0x000000ff;
+        const VM = 0x0000100;
+        const FS = 0x0000200;
+        const FILES = 0x0000400;
+        const SIGHAND = 0x0000800;
+        const PTRACE = 0x0002000;
+        const VFORK = 0x0004000;
+        const PARENT = 0x0008000;
+        const SYSVSEM = 0x0008000;
+        const SETTLS = 0x0008000;
+        const PARENT_SETTID = 0x0010000;
+        const CHILD_CLEARTID = 0x0020000;
+        const DETACHED = 0x0040000;
+        const UNTRACED = 0x0080000;
+        const CHILD_SETTID = 0x0100000;
+        const NEWCGROUP = 0x0200000;
+        const NEWUTS = 0x0400000;
+        const NEWIPC = 0x0800000;
+        const NEWUSER = 0x1000000;
+        const NEWPID = 0x2000000;
+        const NEWNET = 0x4000000;
+        const IO = 0x8000000;
+    }
 }

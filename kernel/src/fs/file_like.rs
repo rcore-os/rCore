@@ -31,7 +31,7 @@ impl FileLike {
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
         match self {
-            FileLike::File(file) => file.io_control(request as u32, arg1 as u32)?,
+            FileLike::File(file) => file.io_control(request as u32, arg1)?,
             FileLike::Socket(socket) => {
                 socket.ioctl(request, arg1, arg2, arg3)?;
             }

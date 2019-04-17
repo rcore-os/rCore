@@ -72,9 +72,7 @@ pub fn sys_ppoll(ufds: *mut PollFd, nfds: usize, timeout: *const TimeSpec) -> Sy
         1 << 31 // infinity
     } else {
         proc.vm.check_read_ptr(timeout)?;
-        unsafe {
-            (*timeout).to_msec()
-        }
+        unsafe { (*timeout).to_msec() }
     };
     drop(proc);
 
