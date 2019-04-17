@@ -339,6 +339,14 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
                 Err(err) => Err(err)
             }
         },
+        SYS_GETPGID => {
+            warn!("sys_getpgid is unimplemented");
+            Ok(0)
+        }
+        SYS_SETPGID => {
+            warn!("sys_setpgid is unimplemented");
+            Ok(0)
+        }
         SYS_FCNTL64 => {
             warn!("sys_fcntl64 is unimplemented");
             Ok(0)
