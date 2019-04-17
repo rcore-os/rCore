@@ -158,7 +158,7 @@ impl Thread {
     }
 
     /// Make a new user process from ELF `data`
-    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Thread>
+    pub fn new_user<'a, Iter>(data: &[u8], exec_path: &str, args: Iter) -> Box<Thread>
     where
         Iter: Iterator<Item = &'a str>,
     {
@@ -182,7 +182,10 @@ impl Thread {
                     // No infinite loop
                     let mut new_args: Vec<&str> = args.collect();
                     new_args.insert(0, loader_path);
-                    return Thread::new_user(buf.as_slice(), new_args.into_iter());
+                    new_args.insert(1, exec_path);
+                    new_args.remove(2);
+                    warn!("loader args: {:?}", new_args);
+                    return Thread::new_user(buf.as_slice(), exec_path,new_args.into_iter());
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);
                 }
