@@ -3,6 +3,7 @@
 use core::cell::UnsafeCell;
 use core::cmp::min;
 use core::mem::size_of;
+#[cfg(not(target_arch = "mips"))]
 use rcore_fs::vfs::Timespec;
 
 use crate::drivers::SOCKET_ACTIVITY;
@@ -914,6 +915,13 @@ pub struct Stat {
 }
 
 #[cfg(target_arch = "mips")]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+pub struct Timespec {
+    pub sec: i32,
+    pub nsec: i32,
+}
+
+#[cfg(target_arch = "mips")]
 #[repr(C)]
 #[derive(Debug)]
 pub struct Stat {
@@ -1096,9 +1104,9 @@ impl From<Metadata> for Stat {
             size: info.size as u64,
             blksize: info.blk_size as u32,
             blocks: info.blocks as u64,
-            atime: info.atime,
-            mtime: info.mtime,
-            ctime: info.ctime,
+            atime: Timespec { sec: info.atime.sec as i32, nsec: info.atime.nsec },
+            mtime: Timespec { sec: info.mtime.sec as i32, nsec: info.mtime.nsec },
+            ctime: Timespec { sec: info.ctime.sec as i32, nsec: info.ctime.nsec },
             __pad1: 0,
             __pad2: 0,
             __pad3: 0,

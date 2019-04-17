@@ -324,6 +324,7 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
         SYS_DUP2 => sys_dup2(args[0], args[1]),
         SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
         SYS_FSTAT64 => sys_fstat(args[0], args[1] as *mut Stat),
+        SYS_LSTAT64 => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
         SYS_STAT64 => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
         SYS_PIPE => {
             let fd_ptr = args[0] as *mut u32;
