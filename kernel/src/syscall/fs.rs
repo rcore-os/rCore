@@ -80,11 +80,14 @@ pub fn sys_ppoll(ufds: *mut PollFd, nfds: usize, timeout: *const TimeSpec) -> Sy
 }
 
 pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
-    info!(
-        "poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}",
-        ufds, nfds, timeout_msecs
-    );
     let proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!(
+            "poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}",
+            ufds, nfds, timeout_msecs
+        );
+    }
     proc.vm.check_write_array(ufds, nfds)?;
 
     let polls = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
@@ -222,11 +225,14 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
 }
 
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
-    info!(
-        "writev: fd: {}, iov: {:?}, count: {}",
-        fd, iov_ptr, iov_count
-    );
     let mut proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!(
+            "writev: fd: {}, iov: {:?}, count: {}",
+            fd, iov_ptr, iov_count
+        );
+    }
     let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, false)?;
 
     let buf = iovs.read_all_to_vec();
@@ -297,7 +303,7 @@ pub fn sys_faccessat(dirfd: usize, path: *const u8, mode: usize, flags: usize) -
         // we trust pid 0 process
         info!(
             "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
-            dirfd, path, mode, flags
+            dirfd as isize, path, mode, flags
         );
     }
     let inode = proc.lookup_inode_at(dirfd, &path)?;
@@ -342,7 +348,7 @@ pub fn sys_fstatat(dirfd: usize, path: *const u8, stat_ptr: *mut Stat, flags: us
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "fstatat: dirfd: {}, path: {:?}, stat_ptr: {:?}, flags: {:?}",
-        dirfd, path, stat_ptr, flags
+        dirfd as isize, path, stat_ptr, flags
     );
 
     let inode = proc.lookup_inode_at(dirfd, &path)?;
@@ -525,7 +531,7 @@ pub fn sys_renameat(
     let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
     info!(
         "renameat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}",
-        olddirfd, oldpath, newdirfd, newpath
+        olddirfd as isize, oldpath, newdirfd as isize, newpath
     );
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
@@ -546,7 +552,7 @@ pub fn sys_mkdirat(dirfd: usize, path: *const u8, mode: usize) -> SysResult {
     // TODO: check pathname
     info!(
         "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
-        dirfd, path, mode
+        dirfd as isize, path, mode
     );
 
     let (dir_path, file_name) = split_path(&path);
@@ -590,7 +596,7 @@ pub fn sys_linkat(
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
-        olddirfd, oldpath, newdirfd, newpath, flags
+        olddirfd as isize, oldpath, newdirfd as isize, newpath, flags
     );
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
@@ -610,7 +616,7 @@ pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: usize) -> SysResult {
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
-        dirfd, path, flags
+        dirfd as isize, path, flags
     );
 
     let (dir_path, file_name) = split_path(&path);
@@ -765,8 +771,8 @@ impl Process {
     ) -> Result<Arc<INode>, SysError> {
         let follow = true;
         debug!(
-            "lookup_inode_at: fd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
-            dirfd, self.cwd, path, follow
+            "lookup_inode_at: dirfd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
+            dirfd as isize, self.cwd, path, follow
         );
         let follow_max_depth = if follow { FOLLOW_MAX_DEPTH } else { 0 };
         if dirfd == AT_FDCWD {

@@ -124,7 +124,7 @@ pub fn sys_exec(
     envp: *const *const u8,
     tf: &mut TrapFrame,
 ) -> SysResult {
-    info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
+    info!("exec: name: {:?}, argv: {:?}, envp: {:?}", name, argv, envp);
     let proc = process();
     let exec_name = if name.is_null() {
         String::from("")
@@ -165,7 +165,7 @@ pub fn sys_exec(
     }
 
     info!(
-        "EXEC: name:{:?} , args {:?}, envp {:?}",
+        "exec: name: {:?}, args: {:?}, envp: {:?}",
         exec_name, args, envs
     );
 

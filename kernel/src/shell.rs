@@ -8,12 +8,12 @@ use alloc::vec::Vec;
 
 #[cfg(not(feature = "run_cmdline"))]
 pub fn run_user_shell() {
-    if let Ok(inode) = ROOT_INODE.lookup("rust/sh") {
+    if let Ok(inode) = ROOT_INODE.lookup("busybox") {
         let data = inode.read_as_vec().unwrap();
         processor().manager().add(Thread::new_user(
             data.as_slice(),
-            "rust/sh",
-            vec!["sh".into()],
+            "busybox",
+            vec!["busybox".into(), "sh".into()],
             Vec::new(),
         ));
     } else {
