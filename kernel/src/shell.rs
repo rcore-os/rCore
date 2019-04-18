@@ -13,7 +13,7 @@ pub fn run_user_shell() {
         processor().manager().add(Thread::new_user(
             data.as_slice(),
             "rust/sh",
-            "sh".split(' '),
+            vec!["sh".into()],
             Vec::new(),
         ));
     } else {
@@ -28,7 +28,7 @@ pub fn run_user_shell() {
     let data = inode.read_as_vec().unwrap();
     processor().manager().add(Thread::new_user(
         data.as_slice(),
-        cmdline.split(' '),
+        cmdline.split(' ').map(|s| s.into()).collect(),
         Vec::new(),
     ));
 }
@@ -50,7 +50,7 @@ pub extern "C" fn shell(_arg: usize) -> ! {
             let _pid = processor().manager().add(Thread::new_user(
                 data.as_slice(),
                 &cmd,
-                cmd.split(' '),
+                cmd.split(' ').map(|s| s.into()).collect(),
                 Vec::new(),
             ));
         // TODO: wait until process exits, or use user land shell completely

@@ -176,8 +176,7 @@ pub fn sys_exec(
     let buf = inode.read_as_vec()?;
 
     // Make new Thread
-    let args_iter = args.iter().map(|s| s.as_str());
-    let mut thread = Thread::new_user(buf.as_slice(), exec_path, args_iter, envs);
+    let mut thread = Thread::new_user(buf.as_slice(), exec_path, args, envs);
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table

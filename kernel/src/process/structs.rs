@@ -158,15 +158,12 @@ impl Thread {
     }
 
     /// Make a new user process from ELF `data`
-    pub fn new_user<'a, Iter>(
+    pub fn new_user(
         data: &[u8],
         exec_path: &str,
-        args: Iter,
+        mut args: Vec<String>,
         envs: Vec<String>,
-    ) -> Box<Thread>
-    where
-        Iter: Iterator<Item = &'a str>,
-    {
+    ) -> Box<Thread> {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
 
@@ -185,12 +182,11 @@ impl Thread {
                     debug!("using loader {}", &loader_path);
                     // Elf loader should not have INTERP
                     // No infinite loop
-                    let mut new_args: Vec<&str> = args.collect();
-                    new_args.insert(0, loader_path);
-                    new_args.insert(1, exec_path);
-                    new_args.remove(2);
-                    warn!("loader args: {:?}", new_args);
-                    return Thread::new_user(buf.as_slice(), exec_path, new_args.into_iter(), envs);
+                    args.insert(0, loader_path.into());
+                    args.insert(1, exec_path.into());
+                    args.remove(2);
+                    warn!("loader args: {:?}", args);
+                    return Thread::new_user(buf.as_slice(), exec_path, args, envs);
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);
                 }
@@ -219,7 +215,7 @@ impl Thread {
 
         // Make init info
         let init_info = ProcInitInfo {
-            args: args.map(|s| String::from(s)).collect(),
+            args,
             envs,
             auxv: {
                 let mut map = BTreeMap::new();
