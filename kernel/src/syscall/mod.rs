@@ -208,11 +208,11 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             warn!("sys_getpgid is unimplemented");
             Ok(0)
         }
-        SYS_GETGROUPS=> {
+        SYS_GETGROUPS => {
             warn!("sys_getgroups is unimplemented");
             Ok(0)
         }
-        SYS_SETGROUPS=> {
+        SYS_SETGROUPS => {
             warn!("sys_setgroups is unimplemented");
             Ok(0)
         }

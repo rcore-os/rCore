@@ -146,23 +146,28 @@ pub fn sys_exec(
             current_argv = current_argv.add(1);
         }
     }
-//    // Check and copy envs to kernel
-//    let mut envs = Vec::new();
-//    unsafe {
-//        let mut current_env = envp as *const *const u8;
-//        proc.vm.check_read_ptr(current_env)?;
-//        while !(*current_env).is_null() {
-//            let env = proc.vm.check_and_clone_cstr(*current_env)?;
-//            envs.push(env);
-//            current_env = current_env.add(1);
-//        }
-//    }
-//
+    // Check and copy envs to kernel
+    let mut envs = Vec::new();
+    unsafe {
+        let mut current_env = envp as *const *const u8;
+        if !current_env.is_null() {
+            proc.vm.check_read_ptr(current_env)?;
+            while !(*current_env).is_null() {
+                let env = proc.vm.check_and_clone_cstr(*current_env)?;
+                envs.push(env);
+                current_env = current_env.add(1);
+            }
+        }
+    }
+
     if args.is_empty() {
         return Err(SysError::EINVAL);
     }
 
-    info!("EXEC: name:{:?} , args {:?}", exec_name, args);
+    info!(
+        "EXEC: name:{:?} , args {:?}, envp {:?}",
+        exec_name, args, envs
+    );
 
     // Read program file
     //let path = args[0].as_str();
@@ -171,8 +176,8 @@ pub fn sys_exec(
     let buf = inode.read_as_vec()?;
 
     // Make new Thread
-    let iter = args.iter().map(|s| s.as_str());
-    let mut thread = Thread::new_user(buf.as_slice(), exec_path, iter);
+    let args_iter = args.iter().map(|s| s.as_str());
+    let mut thread = Thread::new_user(buf.as_slice(), exec_path, args_iter, envs);
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table

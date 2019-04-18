@@ -10,9 +10,12 @@ use alloc::vec::Vec;
 pub fn run_user_shell() {
     if let Ok(inode) = ROOT_INODE.lookup("rust/sh") {
         let data = inode.read_as_vec().unwrap();
-        processor()
-            .manager()
-            .add(Thread::new_user(data.as_slice(), "rust/sh", "sh".split(' ')));
+        processor().manager().add(Thread::new_user(
+            data.as_slice(),
+            "rust/sh",
+            "sh".split(' '),
+            Vec::new(),
+        ));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
     }
@@ -23,9 +26,11 @@ pub fn run_user_shell() {
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
     let data = inode.read_as_vec().unwrap();
-    processor()
-        .manager()
-        .add(Thread::new_user(data.as_slice(), cmdline.split(' ')));
+    processor().manager().add(Thread::new_user(
+        data.as_slice(),
+        cmdline.split(' '),
+        Vec::new(),
+    ));
 }
 
 pub extern "C" fn shell(_arg: usize) -> ! {
@@ -42,9 +47,12 @@ pub extern "C" fn shell(_arg: usize) -> ! {
         let name = cmd.trim().split(' ').next().unwrap();
         if let Ok(file) = ROOT_INODE.lookup(name) {
             let data = file.read_as_vec().unwrap();
-            let _pid = processor()
-                .manager()
-                .add(Thread::new_user(data.as_slice(), &cmd, cmd.split(' ')));
+            let _pid = processor().manager().add(Thread::new_user(
+                data.as_slice(),
+                &cmd,
+                cmd.split(' '),
+                Vec::new(),
+            ));
         // TODO: wait until process exits, or use user land shell completely
         //unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
         } else {

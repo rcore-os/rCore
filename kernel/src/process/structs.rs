@@ -158,7 +158,12 @@ impl Thread {
     }
 
     /// Make a new user process from ELF `data`
-    pub fn new_user<'a, Iter>(data: &[u8], exec_path: &str, args: Iter) -> Box<Thread>
+    pub fn new_user<'a, Iter>(
+        data: &[u8],
+        exec_path: &str,
+        args: Iter,
+        envs: Vec<String>,
+    ) -> Box<Thread>
     where
         Iter: Iterator<Item = &'a str>,
     {
@@ -185,7 +190,7 @@ impl Thread {
                     new_args.insert(1, exec_path);
                     new_args.remove(2);
                     warn!("loader args: {:?}", new_args);
-                    return Thread::new_user(buf.as_slice(), exec_path,new_args.into_iter());
+                    return Thread::new_user(buf.as_slice(), exec_path, new_args.into_iter(), envs);
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);
                 }
@@ -215,7 +220,7 @@ impl Thread {
         // Make init info
         let init_info = ProcInitInfo {
             args: args.map(|s| String::from(s)).collect(),
-            envs: BTreeMap::new(),
+            envs,
             auxv: {
                 let mut map = BTreeMap::new();
                 if let Some(phdr_vaddr) = elf.get_phdr_vaddr() {
@@ -421,7 +426,7 @@ impl ElfExt for ElfFile<'_> {
                     virt_addr + mem_size,
                     ph.flags().to_attr(),
                     ByFrame::new(GlobalFrameAlloc),
-                    "",
+                    "elf",
                 );
                 unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
             };
