@@ -1155,7 +1155,7 @@ pub struct IoVec {
     /// Starting address
     base: *mut u8,
     /// Number of bytes to transfer
-    len: u64,
+    len: usize,
 }
 
 /// A valid IoVecs request from user
@@ -1176,15 +1176,15 @@ impl IoVecs {
             if iov.len > 0 {
                 // skip empty iov
                 if readv {
-                    vm.check_write_array(iov.base, iov.len as usize)?;
+                    vm.check_write_array(iov.base, iov.len)?;
                 } else {
-                    vm.check_read_array(iov.base, iov.len as usize)?;
+                    vm.check_read_array(iov.base, iov.len)?;
                 }
             }
         }
         let slices = iovs
             .iter()
-            .map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) })
+            .map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len) })
             .collect();
         Ok(IoVecs(slices))
     }
@@ -1215,6 +1215,7 @@ impl IoVecs {
     /// For writev: `set_len` is false, Vec.cap = total_len.
     pub fn new_buf(&self, set_len: bool) -> Vec<u8> {
         let total_len = self.0.iter().map(|slice| slice.len()).sum::<usize>();
+        info!("{}", total_len);
         let mut buf = Vec::with_capacity(total_len);
         if set_len {
             unsafe {
