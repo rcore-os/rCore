@@ -229,6 +229,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             Err(SysError::EACCES)
         }
         SYS_SETPRIORITY => sys_set_priority(args[0]),
+        SYS_PRCTL => {
+            warn!("ptctl is unimplemented");
+            Ok(0)
+        }
         //        SYS_SETRLIMIT => sys_setrlimit(),
         SYS_SYNC => sys_sync(),
         SYS_MOUNT => {
@@ -264,6 +268,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_MKDIRAT => sys_mkdirat(args[0], args[1] as *const u8, args[2]),
         //        SYS_MKNODAT => sys_mknod(),
         // 260
+        SYS_FCHMODAT => {
+            warn!("sys_fchmodat is unimplemented");
+            Ok(0)
+        }
         SYS_FCHOWNAT => {
             warn!("sys_fchownat is unimplemented");
             Ok(0)

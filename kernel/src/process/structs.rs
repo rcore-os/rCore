@@ -174,18 +174,30 @@ impl Thread {
             _ => panic!("ELF is not executable or shared object"),
         }
 
-        // Check interpreter
+        // Check ELF arch
+        match elf.header.pt2.machine().as_machine() {
+            #[cfg(target_arch = "x86_64")]
+            header::Machine::X86_64 => {}
+            #[cfg(target_arch = "aarch64")]
+            header::Machine::AArch64 => {}
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            header::Machine::Other(243) => {}
+            #[cfg(target_arch = "mips")]
+            header::Machine::Mips => {}
+            machine @ _ => panic!("invalid elf arch: {:?}", machine),
+        }
+
+        // Check interpreter (for dynamic link)
         if let Ok(loader_path) = elf.get_interpreter() {
             // assuming absolute path
             if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(loader_path, FOLLOW_MAX_DEPTH) {
                 if let Ok(buf) = inode.read_as_vec() {
-                    debug!("using loader {}", &loader_path);
                     // Elf loader should not have INTERP
                     // No infinite loop
                     args.insert(0, loader_path.into());
                     args.insert(1, exec_path.into());
                     args.remove(2);
-                    warn!("loader args: {:?}", args);
+                    info!("loader args: {:?}", args);
                     return Thread::new_user(buf.as_slice(), exec_path, args, envs);
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);

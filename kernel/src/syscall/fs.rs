@@ -662,8 +662,8 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     );
 
     unsafe {
-        *fds = read_fd as u32;
-        *(fds.add(1)) = write_fd as u32;
+        fds.write(read_fd as u32);
+        fds.add(1).write(write_fd as u32);
     }
 
     info!("pipe: created rfd: {} wfd: {}", read_fd, write_fd);
@@ -676,69 +676,60 @@ pub fn sys_sync() -> SysResult {
     Ok(0)
 }
 
-pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usize) -> SysResult {
+pub fn sys_sendfile(
+    out_fd: usize,
+    in_fd: usize,
+    offset_ptr: *mut usize,
+    count: usize,
+) -> SysResult {
     info!(
-        "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
-        out_fd, in_fd, offset, count
+        "sendfile: out: {}, in: {}, offset_ptr: {:?}, count: {}",
+        out_fd, in_fd, offset_ptr, count
     );
     let proc = process();
     // We know it's save, pacify the borrow checker
     let proc_cell = UnsafeCell::new(proc);
-    let proc_in = unsafe { &mut *proc_cell.get() };
-    let proc_out = unsafe { &mut *proc_cell.get() };
-    //let in_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(in_fd)?).get() };
-    //let out_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(out_fd)?).get() };
-    let in_file = proc_in.get_file(in_fd)?;
-    let out_file = proc_out.get_file(out_fd)?;
+    let in_file = unsafe { (*proc_cell.get()).get_file(in_fd)? };
+    let out_file = unsafe { (*proc_cell.get()).get_file(out_fd)? };
     let mut buffer = [0u8; 1024];
-    if offset.is_null() {
-        // read from current file offset
-        let mut bytes_read = 0;
-        while bytes_read < count {
-            let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read(&mut buffer[..len])?;
-            if read_len == 0 {
-                break;
-            }
-            bytes_read += read_len;
-            let mut bytes_written = 0;
-            while bytes_written < read_len {
-                let write_len = out_file.write(&buffer[bytes_written..])?;
-                if write_len == 0 {
-                    return Err(SysError::EBADF);
-                }
-                bytes_written += write_len;
-            }
-        }
-        return Ok(bytes_read);
-    } else {
-        let proc_mem = unsafe { &mut *proc_cell.get() };
-        proc_mem.vm.check_read_ptr(offset)?;
-        let mut read_offset = unsafe { *offset };
-        // read from specified offset and write new offset back
-        let mut bytes_read = 0;
-        while bytes_read < count {
-            let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
-            if read_len == 0 {
-                break;
-            }
-            bytes_read += read_len;
-            read_offset += read_len;
-            let mut bytes_written = 0;
-            while bytes_written < read_len {
-                let write_len = out_file.write(&buffer[bytes_written..])?;
-                if write_len == 0 {
-                    return Err(SysError::EBADF);
-                }
-                bytes_written += write_len;
-            }
-        }
+
+    let mut read_offset = if !offset_ptr.is_null() {
         unsafe {
-            *offset = read_offset;
+            (*proc_cell.get()).vm.check_read_ptr(offset_ptr)?;
+            offset_ptr.read()
         }
-        return Ok(bytes_read);
+    } else {
+        in_file.seek(SeekFrom::Current(0))? as usize
+    };
+
+    // read from specified offset and write new offset back
+    let mut bytes_read = 0;
+    while bytes_read < count {
+        let len = min(buffer.len(), count - bytes_read);
+        let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
+        if read_len == 0 {
+            break;
+        }
+        bytes_read += read_len;
+        read_offset += read_len;
+        let mut bytes_written = 0;
+        while bytes_written < read_len {
+            let write_len = out_file.write(&buffer[bytes_written..])?;
+            if write_len == 0 {
+                return Err(SysError::EBADF);
+            }
+            bytes_written += write_len;
+        }
     }
+
+    if !offset_ptr.is_null() {
+        unsafe {
+            offset_ptr.write(read_offset);
+        }
+    } else {
+        in_file.seek(SeekFrom::Current(bytes_read as i64))?;
+    }
+    return Ok(bytes_read);
 }
 
 impl Process {
