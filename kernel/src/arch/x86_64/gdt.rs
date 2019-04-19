@@ -17,22 +17,19 @@ pub fn init() {
 
 static mut CPUS: [Option<Cpu>; MAX_CPU_NUM] = [
     // TODO: More elegant ?
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
-//    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
+    //    None, None, None, None, None, None, None, None,
 ];
 
 pub struct Cpu {

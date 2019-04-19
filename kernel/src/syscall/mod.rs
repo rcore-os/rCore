@@ -229,6 +229,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             Err(SysError::EACCES)
         }
         SYS_SETPRIORITY => sys_set_priority(args[0]),
+        SYS_PRCTL => {
+            warn!("prctl is unimplemented");
+            Ok(0)
+        }
         //        SYS_SETRLIMIT => sys_setrlimit(),
         SYS_SYNC => sys_sync(),
         SYS_MOUNT => {
@@ -270,9 +274,6 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         }
         SYS_NEWFSTATAT => sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3]),
         SYS_UNLINKAT => sys_unlinkat(args[0], args[1] as *const u8, args[2]),
-        SYS_READLINKAT => {
-            sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
-        }
         SYS_RENAMEAT => sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8),
         SYS_LINKAT => sys_linkat(
             args[0],
@@ -282,6 +283,13 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             args[4],
         ),
         SYS_SYMLINKAT => Err(SysError::EACCES),
+        SYS_READLINKAT => {
+            sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
+        }
+        SYS_FCHMODAT => {
+            warn!("sys_fchmodat is unimplemented");
+            Ok(0)
+        }
         SYS_FACCESSAT => sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
         SYS_PPOLL => sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec), // ignore sigmask
         // 280
