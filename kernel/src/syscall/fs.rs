@@ -259,7 +259,7 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
     let inode = if flags.contains(OpenFlags::CREATE) {
         let (dir_path, file_name) = split_path(&path);
         // relative to cwd
-        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path)?;
+        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path, true)?;
         match dir_inode.find(file_name) {
             Ok(file_inode) => {
                 if flags.contains(OpenFlags::EXCLUSIVE) {
@@ -273,7 +273,7 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
             Err(e) => return Err(SysError::from(e)),
         }
     } else {
-        proc.lookup_inode_at(dir_fd, &path)?
+        proc.lookup_inode_at(dir_fd, &path, true)?
     };
 
     let fd = proc.get_free_fd();
@@ -306,7 +306,7 @@ pub fn sys_faccessat(dirfd: usize, path: *const u8, mode: usize, flags: usize) -
             dirfd as isize, path, mode, flags
         );
     }
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, !flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
     Ok(0)
 }
 
@@ -325,8 +325,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
 }
 
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    warn!("lstat is partial implemented as stat");
-    sys_stat(path, stat_ptr)
+    sys_fstatat(AT_FDCWD, path, stat_ptr, AtFlags::SYMLINK_NOFOLLOW.bits())
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
@@ -351,7 +350,7 @@ pub fn sys_fstatat(dirfd: usize, path: *const u8, stat_ptr: *mut Stat, flags: us
         dirfd as isize, path, stat_ptr, flags
     );
 
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, !flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
     let stat = Stat::from(inode.metadata()?);
     unsafe {
         stat_ptr.write(stat);
@@ -373,7 +372,7 @@ pub fn sys_readlinkat(dirfd: usize, path: *const u8, base: *mut u8, len: usize) 
     proc.vm.check_write_array(base, len)?;
     info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
 
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, false)?;
     if inode.metadata()?.type_ == FileType::SymLink {
         // TODO: recursive link resolution and loop detection
         let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
@@ -536,8 +535,8 @@ pub fn sys_renameat(
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path)?;
-    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
+    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path, false)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path, false)?;
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
@@ -556,7 +555,7 @@ pub fn sys_mkdirat(dirfd: usize, path: *const u8, mode: usize) -> SysResult {
     );
 
     let (dir_path, file_name) = split_path(&path);
-    let inode = proc.lookup_inode_at(dirfd, dir_path)?;
+    let inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
     if inode.find(file_name).is_ok() {
         return Err(SysError::EEXIST);
     }
@@ -600,8 +599,8 @@ pub fn sys_linkat(
     );
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let inode = proc.lookup_inode_at(olddirfd, &oldpath)?;
-    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
+    let inode = proc.lookup_inode_at(olddirfd, &oldpath, true)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path, true)?;
     new_dir_inode.link(new_file_name, &inode)?;
     Ok(0)
 }
@@ -620,7 +619,7 @@ pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: usize) -> SysResult {
     );
 
     let (dir_path, file_name) = split_path(&path);
-    let dir_inode = proc.lookup_inode_at(dirfd, dir_path)?;
+    let dir_inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
         return Err(SysError::EISDIR);
@@ -767,9 +766,8 @@ impl Process {
         &self,
         dirfd: usize,
         path: &str,
-        //        follow: bool,
+        follow: bool,
     ) -> Result<Arc<INode>, SysError> {
-        let follow = true;
         debug!(
             "lookup_inode_at: dirfd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
             dirfd as isize, self.cwd, path, follow
@@ -789,7 +787,7 @@ impl Process {
     }
 
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
-        self.lookup_inode_at(AT_FDCWD, path)
+        self.lookup_inode_at(AT_FDCWD, path, true)
     }
 }
 
@@ -1215,7 +1213,6 @@ impl IoVecs {
     /// For writev: `set_len` is false, Vec.cap = total_len.
     pub fn new_buf(&self, set_len: bool) -> Vec<u8> {
         let total_len = self.0.iter().map(|slice| slice.len()).sum::<usize>();
-        info!("{}", total_len);
         let mut buf = Vec::with_capacity(total_len);
         if set_len {
             unsafe {
