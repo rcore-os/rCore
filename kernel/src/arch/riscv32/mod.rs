@@ -1,6 +1,10 @@
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 mod board;
+#[cfg(not(feature = "board_u540"))]
+#[path = "board/virt/mod.rs"]
+mod board;
+
 pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
@@ -13,19 +17,24 @@ mod sbi;
 pub mod syscall;
 pub mod timer;
 
+use self::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use core::sync::atomic::{AtomicBool, Ordering};
 use log::*;
 
 #[no_mangle]
-pub extern "C" fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
-    // An initial recursive page table has been set by BBL (shared by all cores)
+pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
+    let device_tree_vaddr = device_tree_paddr - MEMORY_OFFSET + KERNEL_OFFSET;
 
     unsafe {
         cpu::set_cpu_id(hartid);
     }
 
     if hartid != BOOT_HART_ID {
-        while unsafe { !cpu::has_started(hartid) } {}
-        println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
+        while !AP_CAN_INIT.load(Ordering::Relaxed) {}
+        println!(
+            "Hello RISCV! in hart {}, device tree @ {:#x}",
+            hartid, device_tree_vaddr
+        );
         others_main();
         //other_main -> !
     }
@@ -34,24 +43,25 @@ pub extern "C" fn rust_main(hartid: usize, dtb: usize, hart_mask: usize) -> ! {
         memory::clear_bss();
     }
 
-    println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
+    println!(
+        "Hello RISCV! in hart {}, device tree @ {:#x}",
+        hartid, device_tree_vaddr
+    );
 
     crate::logging::init();
     interrupt::init();
-    memory::init(dtb);
+    memory::init(device_tree_vaddr);
     timer::init();
     // FIXME: init driver on u540
     #[cfg(not(feature = "board_u540"))]
-    crate::drivers::init(dtb);
-    #[cfg(feature = "board_u540")]
+    crate::drivers::init(device_tree_vaddr);
     unsafe {
+        board::enable_serial_interrupt();
         board::init_external_interrupt();
     }
     crate::process::init();
 
-    unsafe {
-        cpu::start_others(hart_mask);
-    }
+    AP_CAN_INIT.store(true, Ordering::Relaxed);
     crate::kmain();
 }
 
@@ -61,6 +71,8 @@ fn others_main() -> ! {
     timer::init();
     crate::kmain();
 }
+
+static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(not(feature = "board_u540"))]
 const BOOT_HART_ID: usize = 0;
@@ -94,6 +106,8 @@ global_asm!(
     .endm
 "
 );
-
-global_asm!(include_str!("boot/entry.asm"));
+#[cfg(target_arch = "riscv32")]
+global_asm!(include_str!("boot/entry32.asm"));
+#[cfg(target_arch = "riscv64")]
+global_asm!(include_str!("boot/entry64.asm"));
 global_asm!(include_str!("boot/trap.asm"));

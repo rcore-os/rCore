@@ -20,8 +20,6 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
-        // QEMU v3.0 don't support M-mode external interrupt (bug?)
-        // So we have to use polling.
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {

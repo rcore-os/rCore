@@ -124,7 +124,8 @@ endif
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-kernel ../tools/opensbi/virt_rv32.elf \
+	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
@@ -132,11 +133,19 @@ qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), riscv64)
+ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-kernel ../tools/opensbi/fu540.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img)
+else
+qemu_opts += \
+	-machine virt \
+	-kernel ../tools/opensbi/virt_rv64.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
+endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
@@ -297,28 +306,8 @@ ifeq ($(need_bootloader), true)
 endif
 
 $(kernel_img): kernel $(bootloader)
-ifeq ($(arch), riscv32)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv32imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
-else ifeq ($(arch), riscv64)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv64imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
+ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
 ifneq ($(u_boot), )
 	@cp $(u_boot) $@
@@ -335,13 +324,7 @@ kernel: $(dtb)
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 	@mv target/x86_64/bootimage.bin $(bootimage)
-else ifeq ($(arch), riscv32)
-	@-patch -p0 -N -b \
-		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
-		src/arch/riscv32/atomic.patch
-	@cargo xbuild $(build_args)
-else ifeq ($(arch), riscv64)
-	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
