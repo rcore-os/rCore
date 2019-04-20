@@ -19,6 +19,7 @@ authors = [
 ]
 
 [features]
+default = ["sv39"]
 # Page table sv39 or sv48 (for riscv64)
 sv39 = []
 board_u540 = ["sv39", "link_user"]

@@ -198,7 +198,7 @@ impl InactivePageTable for InactivePageTable0 {
             fn start();
             fn end();
         }
-        let mut entrys: [PageTableEntry; 16] = unsafe { core::mem::uninitialized() };
+        let mut entrys: [PageTableEntry; 256] = unsafe { core::mem::uninitialized() };
         let entry_start = start as usize >> 22;
         let entry_end = (end as usize >> 22) + 1;
         let entry_count = entry_end - entry_start;
@@ -298,4 +298,14 @@ impl FrameDeallocator for FrameAllocatorForRiscv {
     fn dealloc(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_usize());
     }
+}
+
+pub unsafe fn setup_recursive_mapping() {
+    let frame = satp::read().frame();
+    let root_page_table = unsafe { &mut *(frame.start_address().as_usize() as *mut RvPageTable) };
+    root_page_table.set_recursive(RECURSIVE_INDEX, frame);
+    unsafe {
+        sfence_vma_all();
+    }
+    info!("setup recursive mapping end");
 }
