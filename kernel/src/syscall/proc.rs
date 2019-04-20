@@ -13,7 +13,7 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 
 /// Create a new thread in the current process.
 /// The new thread's stack pointer will be set to `newsp`,
-///   and thread pointer will be set to `newtls`.
+/// and thread pointer will be set to `newtls`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
 pub fn sys_clone(
@@ -26,16 +26,17 @@ pub fn sys_clone(
 ) -> SysResult {
     let clone_flags = CloneFlags::from_bits_truncate(flags);
     info!(
-        "clone: flags: {:?}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
-        clone_flags, newsp, parent_tid, child_tid, newtls
+        "clone: flags: {:?} == {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        clone_flags, flags, newsp, parent_tid, child_tid, newtls
     );
     if flags == 0x4111 || flags == 0x11 {
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
     }
-    if flags != 0x7d0f00 {
-        warn!("sys_clone only support musl pthread_create");
-        return Err(SysError::ENOSYS);
+    if (flags != 0x7d0f00) && (flags!= 0x5d0f00)  { //0x5d0f00 is the args from gcc of alpine linux
+        //warn!("sys_clone only support musl pthread_create");
+        panic!("sys_clone only support sys_fork OR musl pthread_create without flags{:x}", flags);
+        //return Err(SysError::ENOSYS);
     }
     {
         let proc = process();
