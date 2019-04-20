@@ -366,7 +366,8 @@ endif
 ifeq ($(board), u540)
 .PHONY:
 install: $(kernel_img)
-	@$(objcopy) -S -O binary --change-addresses -0x80000000 $< $(build_path)/bin
+	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
+	@dd if=$< of=$(build_path)/bin bs=131072 seek=16
 	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
 endif
 
