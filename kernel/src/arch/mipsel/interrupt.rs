@@ -70,6 +70,17 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         E::TLBModification => page_fault(tf),
         E::TLBLoadMiss => page_fault(tf),
         E::TLBStoreMiss => page_fault(tf),
+        E::ReservedInstruction => {
+            if !reserved_inst(tf) {
+                error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
+                crate::trap::error(tf)
+            } else {
+                tf.epc = tf.epc + 4;
+            }
+        }
+        E::CoprocessorUnusable => {
+            tf.epc = tf.epc + 4;
+        }
         _ => {
             error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
             crate::trap::error(tf)
@@ -149,6 +160,79 @@ fn syscall(tf: &mut TrapFrame) {
     }
 }
 
+fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
+    match rt {
+        1 => tf.at = val,
+        2 => tf.v0 = val,
+        3 => tf.v1 = val,
+        4 => tf.a0 = val,
+        5 => tf.a1 = val,
+        6 => tf.a2 = val,
+        7 => tf.a3 = val,
+        8 => tf.t0 = val,
+        9 => tf.t1 = val,
+        10 => tf.t2 = val,
+        11 => tf.t3 = val,
+        12 => tf.t4 = val,
+        13 => tf.t5 = val,
+        14 => tf.t6 = val,
+        15 => tf.t7 = val,
+        16 => tf.s0 = val,
+        17 => tf.s1 = val,
+        18 => tf.s2 = val,
+        19 => tf.s3 = val,
+        20 => tf.s4 = val,
+        21 => tf.s5 = val,
+        22 => tf.s6 = val,
+        23 => tf.s7 = val,
+        24 => tf.t8 = val,
+        25 => tf.t9 = val,
+        26 => tf.k0 = val,
+        27 => tf.k1 = val,
+        28 => tf.gp = val,
+        29 => tf.sp = val,
+        30 => tf.fp = val,
+        31 => tf.ra = val,
+        _ => {
+            error!("Unknown register {:?} ", rt);
+            crate::trap::error(tf)
+        }
+    }
+}
+
+fn reserved_inst(tf: &mut TrapFrame) -> bool {
+    let inst = unsafe {
+        *(tf.epc as *const usize)
+    };
+
+    let opcode = inst >> 26;
+    let rt = (inst >> 16) & 0b11111;
+    let rd = (inst >> 11) & 0b11111;
+    let sel = (inst >> 6) & 0b111;
+    let format = inst & 0b111111;
+
+    if opcode == 0b011111 && format == 0b111011 {
+        // RDHWR
+        if rd == 29 && sel == 0 {
+            extern "C" {
+                fn _cur_tls();
+            }
+
+            let tls = unsafe {
+                *(_cur_tls as *const usize)
+            };
+
+            set_trapframe_register(rt, tls, tf);
+            info!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    false
+}
+
 fn page_fault(tf: &mut TrapFrame) {
     // TODO: set access/dirty bit
     let addr = tf.vaddr;
@@ -164,6 +248,19 @@ fn page_fault(tf: &mut TrapFrame) {
                 tlb_entry.entry_lo0.get_pfn() << 12,
                 tlb_entry.entry_lo1.get_pfn() << 12
             );
+
+            let tlb_valid = if virt_addr.page_number() & 1 == 0 {
+                tlb_entry.entry_lo0.valid()
+            } else {
+                tlb_entry.entry_lo1.valid()
+            };
+
+            if !tlb_valid {
+                if !crate::memory::handle_page_fault(addr) {
+                    crate::trap::error(tf);
+                }
+            }
+
             tlb::write_tlb_random(tlb_entry)
         }
         Err(()) => {

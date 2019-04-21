@@ -319,7 +319,14 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
             let x86_64_ret = x86_64_syscall(id, args, tf);
             #[cfg(not(target_arch = "x86_64"))]
             let x86_64_ret = None;
+
+            #[cfg(target_arch = "mips")]
+            let mips_ret = mips_syscall(id, args, tf);
+            #[cfg(not(target_arch = "mips"))]
+            let mips_ret = None;
             if let Some(ret) = x86_64_ret {
+                ret
+            } else if let Some(ret) = mips_ret {
                 ret
             } else {
                 error!("unknown syscall id: {}, args: {:x?}", id, args);
@@ -338,6 +345,60 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         Ok(code) => code as isize,
         Err(err) => -(err as isize),
     }
+}
+
+#[cfg(target_arch = "mips")]
+fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysResult> {
+    let ret = match id {
+        SYS_FORK => sys_fork(tf),
+        SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
+        SYS_DUP2 => sys_dup2(args[0], args[1]),
+        SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
+        SYS_FSTAT64 => sys_fstat(args[0], args[1] as *mut Stat),
+        SYS_LSTAT64 => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_STAT64 => sys_stat(args[0] as *const u8, args[1] as *mut Stat),
+        SYS_PIPE => {
+            let fd_ptr = args[0] as *mut u32;
+            match sys_pipe(fd_ptr) {
+                Ok(code) => {
+                    unsafe {
+                        tf.v0 = *fd_ptr as usize;
+                        tf.v1 = *(fd_ptr.add(1)) as usize;
+                    }
+                    Ok(tf.v0)
+                },
+                Err(err) => Err(err)
+            }
+        },
+        SYS_GETPGID => {
+            warn!("sys_getpgid is unimplemented");
+            Ok(0)
+        }
+        SYS_SETPGID => {
+            warn!("sys_setpgid is unimplemented");
+            Ok(0)
+        }
+        SYS_FCNTL64 => {
+            warn!("sys_fcntl64 is unimplemented");
+            Ok(0)
+        },
+        SYS_SET_THREAD_AREA => {
+            info!("set_thread_area: tls: 0x{:x}", args[0]);
+            extern "C" {
+                fn _cur_tls();
+            }
+
+            unsafe {
+                asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
+                *(_cur_tls as *mut usize) = args[0];
+            }
+            Ok(0)
+        }
+        _ => {
+            return None;
+        }
+    };
+    Some(ret)
 }
 
 #[cfg(target_arch = "x86_64")]

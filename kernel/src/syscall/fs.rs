@@ -3,6 +3,7 @@
 use core::cell::UnsafeCell;
 use core::cmp::min;
 use core::mem::size_of;
+#[cfg(not(target_arch = "mips"))]
 use rcore_fs::vfs::Timespec;
 
 use crate::drivers::SOCKET_ACTIVITY;
@@ -983,7 +984,55 @@ pub struct Stat {
     ctime: Timespec,
 }
 
-#[cfg(not(target_arch = "x86_64"))]
+#[cfg(target_arch = "mips")]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+pub struct Timespec {
+    pub sec: i32,
+    pub nsec: i32,
+}
+
+#[cfg(target_arch = "mips")]
+#[repr(C)]
+#[derive(Debug)]
+pub struct Stat {
+    /// ID of device containing file
+    dev: u64,
+    /// padding
+    __pad1: u64,
+    /// inode number
+    ino: u64,
+    /// file type and mode
+    mode: StatMode,
+    /// number of hard links
+    nlink: u32,
+
+    /// user ID of owner
+    uid: u32,
+    /// group ID of owner
+    gid: u32,
+    /// device ID (if special file)
+    rdev: u64,
+    /// padding
+    __pad2: u64,
+    /// total size, in bytes
+    size: u64,
+
+    /// last access time
+    atime: Timespec,
+    /// last modification time
+    mtime: Timespec,
+    /// last status change time
+    ctime: Timespec,
+
+    /// blocksize for filesystem I/O
+    blksize: u32,
+    /// padding
+    __pad3: u32,
+    /// number of 512B blocks allocated
+    blocks: u64,
+}
+
+#[cfg(not(any(target_arch = "x86_64", target_arch = "mips"))]
 #[repr(C)]
 #[derive(Debug)]
 pub struct Stat {
@@ -1112,7 +1161,29 @@ impl From<Metadata> for Stat {
         }
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    #[cfg(target_arch = "mips")]
+    fn from(info: Metadata) -> Self {
+        Stat {
+            dev: info.dev as u64,
+            ino: info.inode as u64,
+            mode: StatMode::from_type_mode(info.type_, info.mode as u16),
+            nlink: info.nlinks as u32,
+            uid: info.uid as u32,
+            gid: info.gid as u32,
+            rdev: 0,
+            size: info.size as u64,
+            blksize: info.blk_size as u32,
+            blocks: info.blocks as u64,
+            atime: Timespec { sec: info.atime.sec as i32, nsec: info.atime.nsec },
+            mtime: Timespec { sec: info.mtime.sec as i32, nsec: info.mtime.nsec },
+            ctime: Timespec { sec: info.ctime.sec as i32, nsec: info.ctime.nsec },
+            __pad1: 0,
+            __pad2: 0,
+            __pad3: 0,
+        }
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch="mips")))]
     fn from(info: Metadata) -> Self {
         Stat {
             dev: info.dev as u64,
