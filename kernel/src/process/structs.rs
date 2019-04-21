@@ -158,10 +158,12 @@ impl Thread {
     }
 
     /// Make a new user process from ELF `data`
-    pub fn new_user<'a, Iter>(data: &[u8], args: Iter) -> Box<Thread>
-    where
-        Iter: Iterator<Item = &'a str>,
-    {
+    pub fn new_user(
+        data: &[u8],
+        exec_path: &str,
+        mut args: Vec<String>,
+        envs: Vec<String>,
+    ) -> Box<Thread> {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
 
@@ -172,17 +174,31 @@ impl Thread {
             _ => panic!("ELF is not executable or shared object"),
         }
 
-        // Check interpreter
+        // Check ELF arch
+        match elf.header.pt2.machine().as_machine() {
+            #[cfg(target_arch = "x86_64")]
+            header::Machine::X86_64 => {}
+            #[cfg(target_arch = "aarch64")]
+            header::Machine::AArch64 => {}
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            header::Machine::Other(243) => {}
+            #[cfg(target_arch = "mips")]
+            header::Machine::Mips => {}
+            machine @ _ => panic!("invalid elf arch: {:?}", machine),
+        }
+
+        // Check interpreter (for dynamic link)
         if let Ok(loader_path) = elf.get_interpreter() {
             // assuming absolute path
             if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(loader_path, FOLLOW_MAX_DEPTH) {
                 if let Ok(buf) = inode.read_as_vec() {
-                    debug!("using loader {}", &loader_path);
                     // Elf loader should not have INTERP
                     // No infinite loop
-                    let mut new_args: Vec<&str> = args.collect();
-                    new_args.insert(0, loader_path);
-                    return Thread::new_user(buf.as_slice(), new_args.into_iter());
+                    args.insert(0, loader_path.into());
+                    args.insert(1, exec_path.into());
+                    args.remove(2);
+                    info!("loader args: {:?}", args);
+                    return Thread::new_user(buf.as_slice(), exec_path, args, envs);
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);
                 }
@@ -211,8 +227,8 @@ impl Thread {
 
         // Make init info
         let init_info = ProcInitInfo {
-            args: args.map(|s| String::from(s)).collect(),
-            envs: BTreeMap::new(),
+            args,
+            envs,
             auxv: {
                 let mut map = BTreeMap::new();
                 if let Some(phdr_vaddr) = elf.get_phdr_vaddr() {
@@ -418,7 +434,7 @@ impl ElfExt for ElfFile<'_> {
                     virt_addr + mem_size,
                     ph.flags().to_attr(),
                     ByFrame::new(GlobalFrameAlloc),
-                    "",
+                    "elf",
                 );
                 unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
             };
