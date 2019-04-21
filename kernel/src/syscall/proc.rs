@@ -13,7 +13,7 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
 
 /// Create a new thread in the current process.
 /// The new thread's stack pointer will be set to `newsp`,
-///   and thread pointer will be set to `newtls`.
+/// and thread pointer will be set to `newtls`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
 pub fn sys_clone(
@@ -24,17 +24,19 @@ pub fn sys_clone(
     newtls: usize,
     tf: &TrapFrame,
 ) -> SysResult {
+    let clone_flags = CloneFlags::from_bits_truncate(flags);
     info!(
-        "clone: flags: {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
-        flags, newsp, parent_tid, child_tid, newtls
+        "clone: flags: {:?} == {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        clone_flags, flags, newsp, parent_tid, child_tid, newtls
     );
-    if flags == 0x4111 {
+    if flags == 0x4111 || flags == 0x11 {
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
     }
-    if flags != 0x7d0f00 {
-        warn!("sys_clone only support musl pthread_create");
-        return Err(SysError::ENOSYS);
+    if (flags != 0x7d0f00) && (flags!= 0x5d0f00)  { //0x5d0f00 is the args from gcc of alpine linux
+        //warn!("sys_clone only support musl pthread_create");
+        panic!("sys_clone only support sys_fork OR musl pthread_create without flags{:x}", flags);
+        //return Err(SysError::ENOSYS);
     }
     {
         let proc = process();
@@ -123,9 +125,9 @@ pub fn sys_exec(
     envp: *const *const u8,
     tf: &mut TrapFrame,
 ) -> SysResult {
-    info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
+    info!("exec: name: {:?}, argv: {:?}, envp: {:?}", name, argv, envp);
     let proc = process();
-    let _name = if name.is_null() {
+    let exec_name = if name.is_null() {
         String::from("")
     } else {
         unsafe { proc.vm.check_and_clone_cstr(name)? }
@@ -145,16 +147,37 @@ pub fn sys_exec(
             current_argv = current_argv.add(1);
         }
     }
-    info!("exec: args {:?}", args);
+    // Check and copy envs to kernel
+    let mut envs = Vec::new();
+    unsafe {
+        let mut current_env = envp as *const *const u8;
+        if !current_env.is_null() {
+            proc.vm.check_read_ptr(current_env)?;
+            while !(*current_env).is_null() {
+                let env = proc.vm.check_and_clone_cstr(*current_env)?;
+                envs.push(env);
+                current_env = current_env.add(1);
+            }
+        }
+    }
+
+    if args.is_empty() {
+        return Err(SysError::EINVAL);
+    }
+
+    info!(
+        "exec: name: {:?}, args: {:?}, envp: {:?}",
+        exec_name, args, envs
+    );
 
     // Read program file
-    let path = args[0].as_str();
-    let inode = proc.lookup_inode(path)?;
+    //let path = args[0].as_str();
+    let exec_path = exec_name.as_str();
+    let inode = proc.lookup_inode(exec_path)?;
     let buf = inode.read_as_vec()?;
 
     // Make new Thread
-    let iter = args.iter().map(|s| s.as_str());
-    let mut thread = Thread::new_user(buf.as_slice(), iter);
+    let mut thread = Thread::new_user(buf.as_slice(), exec_path, args, envs);
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table
@@ -228,7 +251,11 @@ pub fn sys_gettid() -> SysResult {
 
 /// Get the parent process id
 pub fn sys_getppid() -> SysResult {
-    Ok(process().parent.as_ref().unwrap().lock().pid.get())
+    if let Some(ref parent) = process().parent.as_ref() {
+        Ok(parent.lock().pid.get())
+    } else {
+        Ok(0)
+    }
 }
 
 /// Exit the current thread
@@ -309,4 +336,31 @@ pub fn sys_set_priority(priority: usize) -> SysResult {
     let pid = thread::current().id();
     processor().manager().set_priority(pid, priority as u8);
     Ok(0)
+}
+
+bitflags! {
+    pub struct CloneFlags: usize {
+        const CSIGNAL = 0x000000ff;
+        const VM = 0x0000100;
+        const FS = 0x0000200;
+        const FILES = 0x0000400;
+        const SIGHAND = 0x0000800;
+        const PTRACE = 0x0002000;
+        const VFORK = 0x0004000;
+        const PARENT = 0x0008000;
+        const SYSVSEM = 0x0008000;
+        const SETTLS = 0x0008000;
+        const PARENT_SETTID = 0x0010000;
+        const CHILD_CLEARTID = 0x0020000;
+        const DETACHED = 0x0040000;
+        const UNTRACED = 0x0080000;
+        const CHILD_SETTID = 0x0100000;
+        const NEWCGROUP = 0x0200000;
+        const NEWUTS = 0x0400000;
+        const NEWIPC = 0x0800000;
+        const NEWUSER = 0x1000000;
+        const NEWPID = 0x2000000;
+        const NEWNET = 0x4000000;
+        const IO = 0x8000000;
+    }
 }

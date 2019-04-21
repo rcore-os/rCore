@@ -23,6 +23,7 @@
 #   smp     = 1 | 2 | ...        SMP core number
 #   graphic = on | off           Enable/disable qemu graphical output
 #   board   = none               Running on QEMU
+#         | pc                  Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
 #         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
@@ -32,8 +33,8 @@
 
 arch ?= riscv64
 board ?= none
-mode ?= debug
-LOG  ?= debug
+mode ?= release
+LOG  ?=
 graphic ?= off
 smp  ?= 4
 pci_passthru ?=
@@ -57,8 +58,14 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
+# board is pc or qemu?
+ifeq ($(board), pc)
+#link user img, so use original image
+export SFSIMG = $(user_dir)/build/$(arch).img
+else
 export SFSIMG = $(user_dir)/build/$(arch).qcow2
-endif
+endif # pc or qemu
+endif # aarch64 mipsel
 
 ifeq ($(arch), aarch64)
 board := raspi3
@@ -89,12 +96,15 @@ qemu_net_opts :=
 ifeq ($(arch), x86_64)
 qemu_opts += \
 	-drive format=raw,file=$(bootimage) \
-	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
-	-device ahci,id=ahci0 \
-	-device ide-drive,drive=sfsimg,bus=ahci0.0 \
 	-serial mon:stdio \
 	-m 4G \
 	-device isa-debug-exit
+ifeq ($(board), none)
+qemu_opts += \
+	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
+	-device ahci,id=ahci0 \
+	-device ide-drive,drive=sfsimg,bus=ahci0.0
+endif
 ifeq ($(pci_passthru), )
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
@@ -114,7 +124,8 @@ endif
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-kernel ../tools/opensbi/virt_rv32.elf \
+	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
@@ -122,11 +133,19 @@ qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), riscv64)
+ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-kernel ../tools/opensbi/fu540.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img)
+else
+qemu_opts += \
+	-machine virt \
+	-kernel ../tools/opensbi/virt_rv64.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
+endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
@@ -190,13 +209,12 @@ endif
 ifneq ($(board), none)
 features += board_$(board)
 endif
+
 build_args := --target targets/$(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args += --release
 endif
-
-
 
 ### prefix ###
 ifeq ($(arch), x86_64)
@@ -288,28 +306,8 @@ ifeq ($(need_bootloader), true)
 endif
 
 $(kernel_img): kernel $(bootloader)
-ifeq ($(arch), riscv32)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv32imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
-else ifeq ($(arch), riscv64)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv64imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
+ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
 ifneq ($(u_boot), )
 	@cp $(u_boot) $@
@@ -326,13 +324,7 @@ kernel: $(dtb)
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 	@mv target/x86_64/bootimage.bin $(bootimage)
-else ifeq ($(arch), riscv32)
-	@-patch -p0 -N -b \
-		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
-		src/arch/riscv32/atomic.patch
-	@cargo xbuild $(build_args)
-else ifeq ($(arch), riscv64)
-	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
@@ -374,7 +366,8 @@ endif
 ifeq ($(board), u540)
 .PHONY:
 install: $(kernel_img)
-	@$(objcopy) -S -O binary --change-addresses -0x80000000 $< $(build_path)/bin
+	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
+	@dd if=$< of=$(build_path)/bin bs=131072 seek=16
 	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
 endif
 

@@ -20,8 +20,6 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
-        // QEMU v3.0 don't support M-mode external interrupt (bug?)
-        // So we have to use polling.
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {
@@ -43,6 +41,11 @@ lazy_static! {
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
 }
 
+const TCGETS: u32 = 0x5401;
+const TIOCGPGRP: u32 = 0x540F;
+const TIOCSPGRP: u32 = 0x5410;
+const TIOCGWINSZ: u32 = 0x5413;
+
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
@@ -57,7 +60,23 @@ macro_rules! impl_inode {
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
-        fn io_control(&self, _cmd: u32, _data: u32) -> Result<()> { Err(FsError::NotSupported) }
+        fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+            match cmd {
+                TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+                    // pretend to be tty
+                    Ok(())
+                },
+                TIOCGPGRP => {
+                    // pretend to be have a tty process group
+                    // TODO: verify pointer
+                    unsafe {
+                        *(data as *mut u32) = 0
+                    };
+                    Ok(())
+                }
+                _ => Err(FsError::NotSupported)
+            }
+        }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };

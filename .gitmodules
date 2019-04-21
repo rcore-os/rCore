@@ -1,6 +1,3 @@
-[submodule "riscv-pk"]
-	path = riscv-pk
-	url = https://github.com/rcore-os/riscv-pk.git
 [submodule "user"]
     path = user
     url = https://github.com/rcore-os/rcore-user.git

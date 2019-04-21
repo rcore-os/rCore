@@ -10,7 +10,7 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 
-use bitvec::{BitSlice, BitVec, LittleEndian};
+use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
 
 use super::*;
 
@@ -66,12 +66,28 @@ pub fn sys_pwrite(fd: usize, base: *const u8, len: usize, offset: usize) -> SysR
     Ok(len)
 }
 
-pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
-    info!(
-        "poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}",
-        ufds, nfds, timeout_msecs
-    );
+pub fn sys_ppoll(ufds: *mut PollFd, nfds: usize, timeout: *const TimeSpec) -> SysResult {
     let proc = process();
+    let timeout_msecs = if timeout.is_null() {
+        1 << 31 // infinity
+    } else {
+        proc.vm.check_read_ptr(timeout)?;
+        unsafe { (*timeout).to_msec() }
+    };
+    drop(proc);
+
+    sys_poll(ufds, nfds, timeout_msecs as usize)
+}
+
+pub fn sys_poll(ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
+    let proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!(
+            "poll: ufds: {:?}, nfds: {}, timeout_msecs: {:#x}",
+            ufds, nfds, timeout_msecs
+        );
+    }
     proc.vm.check_write_array(ufds, nfds)?;
 
     let polls = unsafe { slice::from_raw_parts_mut(ufds, nfds) };
@@ -209,11 +225,14 @@ pub fn sys_readv(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResul
 }
 
 pub fn sys_writev(fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
-    info!(
-        "writev: fd: {}, iov: {:?}, count: {}",
-        fd, iov_ptr, iov_count
-    );
     let mut proc = process();
+    if !proc.pid.is_init() {
+        // we trust pid 0 process
+        info!(
+            "writev: fd: {}, iov: {:?}, count: {}",
+            fd, iov_ptr, iov_count
+        );
+    }
     let iovs = IoVecs::check_and_new(iov_ptr, iov_count, &proc.vm, false)?;
 
     let buf = iovs.read_all_to_vec();
@@ -240,7 +259,7 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
     let inode = if flags.contains(OpenFlags::CREATE) {
         let (dir_path, file_name) = split_path(&path);
         // relative to cwd
-        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path)?;
+        let dir_inode = proc.lookup_inode_at(dir_fd, dir_path, true)?;
         match dir_inode.find(file_name) {
             Ok(file_inode) => {
                 if flags.contains(OpenFlags::EXCLUSIVE) {
@@ -254,7 +273,7 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
             Err(e) => return Err(SysError::from(e)),
         }
     } else {
-        proc.lookup_inode_at(dir_fd, &path)?
+        proc.lookup_inode_at(dir_fd, &path, true)?
     };
 
     let fd = proc.get_free_fd();
@@ -284,10 +303,10 @@ pub fn sys_faccessat(dirfd: usize, path: *const u8, mode: usize, flags: usize) -
         // we trust pid 0 process
         info!(
             "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
-            dirfd, path, mode, flags
+            dirfd as isize, path, mode, flags
         );
     }
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, !flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
     Ok(0)
 }
 
@@ -306,8 +325,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> SysResult {
 }
 
 pub fn sys_lstat(path: *const u8, stat_ptr: *mut Stat) -> SysResult {
-    warn!("lstat is partial implemented as stat");
-    sys_stat(path, stat_ptr)
+    sys_fstatat(AT_FDCWD, path, stat_ptr, AtFlags::SYMLINK_NOFOLLOW.bits())
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: *mut Stat) -> SysResult {
@@ -329,10 +347,10 @@ pub fn sys_fstatat(dirfd: usize, path: *const u8, stat_ptr: *mut Stat, flags: us
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "fstatat: dirfd: {}, path: {:?}, stat_ptr: {:?}, flags: {:?}",
-        dirfd, path, stat_ptr, flags
+        dirfd as isize, path, stat_ptr, flags
     );
 
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, !flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
     let stat = Stat::from(inode.metadata()?);
     unsafe {
         stat_ptr.write(stat);
@@ -354,7 +372,7 @@ pub fn sys_readlinkat(dirfd: usize, path: *const u8, base: *mut u8, len: usize) 
     proc.vm.check_write_array(base, len)?;
     info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
 
-    let inode = proc.lookup_inode_at(dirfd, &path)?;
+    let inode = proc.lookup_inode_at(dirfd, &path, false)?;
     if inode.metadata()?.type_ == FileType::SymLink {
         // TODO: recursive link resolution and loop detection
         let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
@@ -472,12 +490,9 @@ pub fn sys_chdir(path: *const u8) -> SysResult {
     if path.len() > 0 {
         let cwd = match path.as_bytes()[0] {
             b'/' => String::from("/"),
-            _ => proc.cwd.clone()
+            _ => proc.cwd.clone(),
         };
-        let mut cwd_vec:Vec<_> =
-                   cwd.split("/")
-                           .filter(|&x| x != "")
-                           .collect();
+        let mut cwd_vec: Vec<_> = cwd.split("/").filter(|&x| x != "").collect();
         let path_split = path.split("/").filter(|&x| x != "");
         for seg in path_split {
             if seg == ".." {
@@ -515,13 +530,13 @@ pub fn sys_renameat(
     let newpath = unsafe { proc.vm.check_and_clone_cstr(newpath)? };
     info!(
         "renameat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}",
-        olddirfd, oldpath, newdirfd, newpath
+        olddirfd as isize, oldpath, newdirfd as isize, newpath
     );
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path)?;
-    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
+    let old_dir_inode = proc.lookup_inode_at(olddirfd, old_dir_path, false)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path, false)?;
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(0)
 }
@@ -536,11 +551,11 @@ pub fn sys_mkdirat(dirfd: usize, path: *const u8, mode: usize) -> SysResult {
     // TODO: check pathname
     info!(
         "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
-        dirfd, path, mode
+        dirfd as isize, path, mode
     );
 
     let (dir_path, file_name) = split_path(&path);
-    let inode = proc.lookup_inode_at(dirfd, dir_path)?;
+    let inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
     if inode.find(file_name).is_ok() {
         return Err(SysError::EEXIST);
     }
@@ -580,12 +595,12 @@ pub fn sys_linkat(
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
-        olddirfd, oldpath, newdirfd, newpath, flags
+        olddirfd as isize, oldpath, newdirfd as isize, newpath, flags
     );
 
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let inode = proc.lookup_inode_at(olddirfd, &oldpath)?;
-    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path)?;
+    let inode = proc.lookup_inode_at(olddirfd, &oldpath, true)?;
+    let new_dir_inode = proc.lookup_inode_at(newdirfd, new_dir_path, true)?;
     new_dir_inode.link(new_file_name, &inode)?;
     Ok(0)
 }
@@ -600,11 +615,11 @@ pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: usize) -> SysResult {
     let flags = AtFlags::from_bits_truncate(flags);
     info!(
         "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
-        dirfd, path, flags
+        dirfd as isize, path, flags
     );
 
     let (dir_path, file_name) = split_path(&path);
-    let dir_inode = proc.lookup_inode_at(dirfd, dir_path)?;
+    let dir_inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
         return Err(SysError::EISDIR);
@@ -647,8 +662,8 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     );
 
     unsafe {
-        *fds = read_fd as u32;
-        *(fds.add(1)) = write_fd as u32;
+        fds.write(read_fd as u32);
+        fds.add(1).write(write_fd as u32);
     }
 
     info!("pipe: created rfd: {} wfd: {}", read_fd, write_fd);
@@ -661,69 +676,60 @@ pub fn sys_sync() -> SysResult {
     Ok(0)
 }
 
-pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: *mut usize, count: usize) -> SysResult {
+pub fn sys_sendfile(
+    out_fd: usize,
+    in_fd: usize,
+    offset_ptr: *mut usize,
+    count: usize,
+) -> SysResult {
     info!(
-        "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
-        out_fd, in_fd, offset, count
+        "sendfile: out: {}, in: {}, offset_ptr: {:?}, count: {}",
+        out_fd, in_fd, offset_ptr, count
     );
     let proc = process();
     // We know it's save, pacify the borrow checker
     let proc_cell = UnsafeCell::new(proc);
-    let proc_in = unsafe { &mut *proc_cell.get() };
-    let proc_out = unsafe { &mut *proc_cell.get() };
-    //let in_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(in_fd)?).get() };
-    //let out_file: &mut FileHandle = unsafe { &mut *UnsafeCell::new(proc.get_file(out_fd)?).get() };
-    let in_file = proc_in.get_file(in_fd)?;
-    let out_file = proc_out.get_file(out_fd)?;
+    let in_file = unsafe { (*proc_cell.get()).get_file(in_fd)? };
+    let out_file = unsafe { (*proc_cell.get()).get_file(out_fd)? };
     let mut buffer = [0u8; 1024];
-    if offset.is_null() {
-        // read from current file offset
-        let mut bytes_read = 0;
-        while bytes_read < count {
-            let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read(&mut buffer[..len])?;
-            if read_len == 0 {
-                break;
-            }
-            bytes_read += read_len;
-            let mut bytes_written = 0;
-            while bytes_written < read_len {
-                let write_len = out_file.write(&buffer[bytes_written..])?;
-                if write_len == 0 {
-                    return Err(SysError::EBADF);
-                }
-                bytes_written += write_len;
-            }
-        }
-        return Ok(bytes_read);
-    } else {
-        let proc_mem = unsafe { &mut *proc_cell.get() };
-        proc_mem.vm.check_read_ptr(offset)?;
-        let mut read_offset = unsafe { *offset };
-        // read from specified offset and write new offset back
-        let mut bytes_read = 0;
-        while bytes_read < count {
-            let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
-            if read_len == 0 {
-                break;
-            }
-            bytes_read += read_len;
-            read_offset += read_len;
-            let mut bytes_written = 0;
-            while bytes_written < read_len {
-                let write_len = out_file.write(&buffer[bytes_written..])?;
-                if write_len == 0 {
-                    return Err(SysError::EBADF);
-                }
-                bytes_written += write_len;
-            }
-        }
+
+    let mut read_offset = if !offset_ptr.is_null() {
         unsafe {
-            *offset = read_offset;
+            (*proc_cell.get()).vm.check_read_ptr(offset_ptr)?;
+            offset_ptr.read()
         }
-        return Ok(bytes_read);
+    } else {
+        in_file.seek(SeekFrom::Current(0))? as usize
+    };
+
+    // read from specified offset and write new offset back
+    let mut bytes_read = 0;
+    while bytes_read < count {
+        let len = min(buffer.len(), count - bytes_read);
+        let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
+        if read_len == 0 {
+            break;
+        }
+        bytes_read += read_len;
+        read_offset += read_len;
+        let mut bytes_written = 0;
+        while bytes_written < read_len {
+            let write_len = out_file.write(&buffer[bytes_written..])?;
+            if write_len == 0 {
+                return Err(SysError::EBADF);
+            }
+            bytes_written += write_len;
+        }
     }
+
+    if !offset_ptr.is_null() {
+        unsafe {
+            offset_ptr.write(read_offset);
+        }
+    } else {
+        in_file.seek(SeekFrom::Current(bytes_read as i64))?;
+    }
+    return Ok(bytes_read);
 }
 
 impl Process {
@@ -751,12 +757,11 @@ impl Process {
         &self,
         dirfd: usize,
         path: &str,
-        //        follow: bool,
+        follow: bool,
     ) -> Result<Arc<INode>, SysError> {
-        let follow = true;
         debug!(
-            "lookup_inode_at: fd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
-            dirfd, self.cwd, path, follow
+            "lookup_inode_at: dirfd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
+            dirfd as isize, self.cwd, path, follow
         );
         let follow_max_depth = if follow { FOLLOW_MAX_DEPTH } else { 0 };
         if dirfd == AT_FDCWD {
@@ -773,7 +778,7 @@ impl Process {
     }
 
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
-        self.lookup_inode_at(AT_FDCWD, path)
+        self.lookup_inode_at(AT_FDCWD, path, true)
     }
 }
 
@@ -1139,7 +1144,7 @@ pub struct IoVec {
     /// Starting address
     base: *mut u8,
     /// Number of bytes to transfer
-    len: u64,
+    len: usize,
 }
 
 /// A valid IoVecs request from user
@@ -1160,15 +1165,15 @@ impl IoVecs {
             if iov.len > 0 {
                 // skip empty iov
                 if readv {
-                    vm.check_write_array(iov.base, iov.len as usize)?;
+                    vm.check_write_array(iov.base, iov.len)?;
                 } else {
-                    vm.check_read_array(iov.base, iov.len as usize)?;
+                    vm.check_read_array(iov.base, iov.len)?;
                 }
             }
         }
         let slices = iovs
             .iter()
-            .map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len as usize) })
+            .map(|iov| unsafe { slice::from_raw_parts_mut(iov.base, iov.len) })
             .collect();
         Ok(IoVecs(slices))
     }
