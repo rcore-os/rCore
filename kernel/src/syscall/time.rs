@@ -53,20 +53,20 @@ impl TimeVal {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TimeSpec {
-    sec: u64,
-    nsec: u64,
+    sec: usize,
+    nsec: usize,
 }
 
 impl TimeSpec {
     pub fn to_duration(&self) -> Duration {
-        Duration::new(self.sec, self.nsec as u32)
+        Duration::new(self.sec as u64, self.nsec as u32)
     }
 
     pub fn get_epoch() -> Self {
         let usec = get_epoch_usec();
         TimeSpec {
-            sec: usec / USEC_PER_SEC,
-            nsec: usec % USEC_PER_SEC * NSEC_PER_USEC,
+            sec: (usec / USEC_PER_SEC) as usize,
+            nsec: (usec % USEC_PER_SEC * NSEC_PER_USEC) as usize,
         }
     }
 }
