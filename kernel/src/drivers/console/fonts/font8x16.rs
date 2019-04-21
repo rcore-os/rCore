@@ -33,8 +33,7 @@ impl Font for Font8x16 {
         // + Character row offset (row 0 = 0, row 1 = (192 * 8) = 1536)
         // + X offset for the pixel block that comprises this char
         // + Y offset for pixel block
-        let bitmap_bit_index = char_x + x
-            + (FONT_IMAGE_WIDTH * (char_y + y));
+        let bitmap_bit_index = char_x + x + (FONT_IMAGE_WIDTH * (char_y + y));
 
         let bitmap_byte = bitmap_bit_index / 8;
         let bitmap_bit = 7 - (bitmap_bit_index % 8);
