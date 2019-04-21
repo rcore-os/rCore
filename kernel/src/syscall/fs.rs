@@ -465,7 +465,7 @@ pub fn sys_dup2(fd1: usize, fd2: usize) -> SysResult {
 
 pub fn sys_ioctl(fd: usize, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
     info!(
-        "ioctl: fd: {}, request: {}, args: {} {} {}",
+        "ioctl: fd: {}, request: {:x}, args: {} {} {}",
         fd, request, arg1, arg2, arg3
     );
     let mut proc = process();
@@ -1032,7 +1032,7 @@ pub struct Stat {
     blocks: u64,
 }
 
-#[cfg(not(any(target_arch = "x86_64", target_arch = "mips"))]
+#[cfg(not(any(target_arch = "x86_64", target_arch = "mips")))]
 #[repr(C)]
 #[derive(Debug)]
 pub struct Stat {
@@ -1174,16 +1174,25 @@ impl From<Metadata> for Stat {
             size: info.size as u64,
             blksize: info.blk_size as u32,
             blocks: info.blocks as u64,
-            atime: Timespec { sec: info.atime.sec as i32, nsec: info.atime.nsec },
-            mtime: Timespec { sec: info.mtime.sec as i32, nsec: info.mtime.nsec },
-            ctime: Timespec { sec: info.ctime.sec as i32, nsec: info.ctime.nsec },
+            atime: Timespec {
+                sec: info.atime.sec as i32,
+                nsec: info.atime.nsec,
+            },
+            mtime: Timespec {
+                sec: info.mtime.sec as i32,
+                nsec: info.mtime.nsec,
+            },
+            ctime: Timespec {
+                sec: info.ctime.sec as i32,
+                nsec: info.ctime.nsec,
+            },
             __pad1: 0,
             __pad2: 0,
             __pad3: 0,
         }
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch="mips")))]
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "mips")))]
     fn from(info: Metadata) -> Self {
         Stat {
             dev: info.dev as u64,

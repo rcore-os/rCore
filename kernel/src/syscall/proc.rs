@@ -33,9 +33,13 @@ pub fn sys_clone(
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
     }
-    if (flags != 0x7d0f00) && (flags!= 0x5d0f00)  { //0x5d0f00 is the args from gcc of alpine linux
+    if (flags != 0x7d0f00) && (flags != 0x5d0f00) {
+        //0x5d0f00 is the args from gcc of alpine linux
         //warn!("sys_clone only support musl pthread_create");
-        panic!("sys_clone only support sys_fork OR musl pthread_create without flags{:x}", flags);
+        panic!(
+            "sys_clone only support sys_fork OR musl pthread_create without flags{:x}",
+            flags
+        );
         //return Err(SysError::ENOSYS);
     }
     {

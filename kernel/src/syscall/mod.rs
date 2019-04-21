@@ -350,9 +350,10 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
 #[cfg(target_arch = "mips")]
 fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysResult> {
     let ret = match id {
-        SYS_FORK => sys_fork(tf),
         SYS_OPEN => sys_open(args[0] as *const u8, args[1], args[2]),
+        SYS_POLL => sys_poll(args[0] as *mut PollFd, args[1], args[2]),
         SYS_DUP2 => sys_dup2(args[0], args[1]),
+        SYS_FORK => sys_fork(tf),
         SYS_MMAP2 => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
         SYS_FSTAT64 => sys_fstat(args[0], args[1] as *mut Stat),
         SYS_LSTAT64 => sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
@@ -366,10 +367,10 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
                         tf.v1 = *(fd_ptr.add(1)) as usize;
                     }
                     Ok(tf.v0)
-                },
-                Err(err) => Err(err)
+                }
+                Err(err) => Err(err),
             }
-        },
+        }
         SYS_GETPGID => {
             warn!("sys_getpgid is unimplemented");
             Ok(0)
@@ -381,7 +382,7 @@ fn mips_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<SysRe
         SYS_FCNTL64 => {
             warn!("sys_fcntl64 is unimplemented");
             Ok(0)
-        },
+        }
         SYS_SET_THREAD_AREA => {
             info!("set_thread_area: tls: 0x{:x}", args[0]);
             extern "C" {

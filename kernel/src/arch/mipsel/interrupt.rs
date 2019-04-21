@@ -201,9 +201,7 @@ fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
 }
 
 fn reserved_inst(tf: &mut TrapFrame) -> bool {
-    let inst = unsafe {
-        *(tf.epc as *const usize)
-    };
+    let inst = unsafe { *(tf.epc as *const usize) };
 
     let opcode = inst >> 26;
     let rt = (inst >> 16) & 0b11111;
@@ -218,9 +216,7 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
                 fn _cur_tls();
             }
 
-            let tls = unsafe {
-                *(_cur_tls as *const usize)
-            };
+            let tls = unsafe { *(_cur_tls as *const usize) };
 
             set_trapframe_register(rt, tls, tf);
             info!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
