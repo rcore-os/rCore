@@ -126,10 +126,8 @@ impl Thread {
     pub unsafe fn new_init() -> Box<Thread> {
         Box::new(Thread {
             context: Context::null(),
-            kstack: KernelStack::new(),
-            clear_child_tid: 0,
-            // safety: this field will never be used
-            proc: core::mem::uninitialized(),
+            // safety: other fields will never be used
+            .. core::mem::uninitialized()
         })
     }
 

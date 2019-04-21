@@ -77,7 +77,7 @@ pub fn dealloc_frame(target: usize) {
 }
 
 pub struct KernelStack(usize);
-const STACK_SIZE: usize = 0x8000;
+const STACK_SIZE: usize = 0x4000;
 
 impl KernelStack {
     pub fn new() -> Self {
