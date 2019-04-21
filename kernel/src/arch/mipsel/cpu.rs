@@ -1,5 +1,6 @@
 use crate::consts::MAX_CPU_NUM;
 use core::ptr::{read_volatile, write_volatile};
+use mips::instructions;
 use mips::registers::cp0;
 
 static mut STARTED: [bool; MAX_CPU_NUM] = [false; MAX_CPU_NUM];
@@ -21,7 +22,9 @@ pub unsafe fn start_others(hart_mask: usize) {
 }
 
 pub fn halt() {
-    /* nothing to do */
+    unsafe {
+        instructions::wait();
+    }
 }
 
 pub unsafe fn exit_in_qemu(error_code: u8) -> ! {

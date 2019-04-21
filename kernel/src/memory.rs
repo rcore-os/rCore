@@ -106,7 +106,7 @@ impl Drop for KernelStack {
 /// Handle page fault at `addr`.
 /// Return true to continue, false to halt.
 pub fn handle_page_fault(addr: usize) -> bool {
-    debug!("page fault @ {:#x}", addr);
+    // debug!("page fault @ {:#x}", addr);
 
     // This is safe as long as page fault never happens in page fault handler
     unsafe { process_unsafe().vm.handle_page_fault(addr) }
