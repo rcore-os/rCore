@@ -127,7 +127,7 @@ impl Thread {
         Box::new(Thread {
             context: Context::null(),
             // safety: other fields will never be used
-            .. core::mem::uninitialized()
+            ..core::mem::uninitialized()
         })
     }
 

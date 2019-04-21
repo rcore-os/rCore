@@ -55,6 +55,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     // FIXME: init driver on u540
     #[cfg(not(feature = "board_u540"))]
     crate::drivers::init(device_tree_vaddr);
+    #[cfg(not(feature = "board_k210"))]
     unsafe {
         board::enable_serial_interrupt();
         board::init_external_interrupt();
@@ -108,6 +109,8 @@ global_asm!(
 );
 #[cfg(target_arch = "riscv32")]
 global_asm!(include_str!("boot/entry32.asm"));
-#[cfg(target_arch = "riscv64")]
+#[cfg(all(target_arch = "riscv64", not(feature = "board_k210")))]
 global_asm!(include_str!("boot/entry64.asm"));
+#[cfg(feature = "board_k210")]
+global_asm!(include_str!("boot/entry_k210.asm"));
 global_asm!(include_str!("boot/trap.asm"));

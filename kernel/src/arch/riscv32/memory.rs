@@ -9,6 +9,8 @@ use riscv::{addr::*, register::sstatus};
 /// Initialize the memory management module
 pub fn init(dtb: usize) {
     // allow user memory access
+    // NOTE: In K210 priv v1.9.1, sstatus.SUM is PUM which has opposite meaning!
+    #[cfg(not(feature = "board_k210"))]
     unsafe {
         sstatus::set_sum();
     }

@@ -20,6 +20,15 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
+        #[cfg(feature = "board_k210")]
+        loop {
+            // polling
+            let c = crate::arch::io::getchar();
+            if c != '\0' {
+                return c;
+            }
+        }
+        #[cfg(not(feature = "board_k210"))]
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {

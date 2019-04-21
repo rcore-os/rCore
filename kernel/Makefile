@@ -23,8 +23,9 @@
 #   smp     = 1 | 2 | ...        SMP core number
 #   graphic = on | off           Enable/disable qemu graphical output
 #   board   = none               Running on QEMU
-#         | pc                  Only available on x86_64, run on real pc
+#         | pc                   Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
+#         | k210                 Only available on riscv64, run on K210, use Sv39
 #         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
@@ -59,7 +60,7 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
 # board is pc or qemu?
-ifeq ($(board), pc)
+ifeq ($(board), $(filter $(board), pc u540 k210))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
@@ -201,11 +202,6 @@ features += raspi3_use_generic_timer
 endif
 endif
 
-ifeq ($(board), u540)
-features += sv39
-riscv_pk_args += --enable-sv39
-endif
-
 ifneq ($(board), none)
 features += board_$(board)
 endif
@@ -325,6 +321,11 @@ ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 	@mv target/x86_64/bootimage.bin $(bootimage)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+ifeq ($(board), k210)
+	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+else
+	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
@@ -367,8 +368,16 @@ ifeq ($(board), u540)
 .PHONY:
 install: $(kernel_img)
 	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
-	@dd if=$< of=$(build_path)/bin bs=131072 seek=16
-	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
+	@dd if=$< of=$(build_path)/bin bs=0x20000 seek=16
+	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/u540.img
+endif
+
+ifeq ($(board), k210)
+.PHONY:
+install: $(kernel_img)
+	@$(objcopy) -S -O binary ../tools/opensbi/k210.elf $(build_path)/k210.img
+	@dd if=$< of=$(build_path)/k210.img bs=0x10000 seek=1
+	@python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
 endif
 
 .PHONY:

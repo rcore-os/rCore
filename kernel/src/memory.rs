@@ -16,13 +16,21 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 #[cfg(target_arch = "x86_64")]
 pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
 
-// RISCV has 1G memory
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+// RISCV, ARM, MIPS has 1G memory
+#[cfg(all(
+    any(
+        target_arch = "riscv32",
+        target_arch = "riscv64",
+        target_arch = "aarch64",
+        target_arch = "mips"
+    ),
+    not(feature = "board_k210")
+))]
 pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 
-// Raspberry Pi 3 has 1G memory
-#[cfg(any(target_arch = "aarch64", target_arch = "mips"))]
-pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
+// K210 has 8M memory
+#[cfg(feature = "board_k210")]
+pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
