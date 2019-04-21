@@ -146,3 +146,33 @@ pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
     unsafe { *rusage = new_rusage };
     Ok(0)
 }
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Tms {
+    tms_utime: u64, /* user time */
+    tms_stime: u64,  /* system time */
+    tms_cutime: u64, /* user time of children */
+    tms_cstime: u64, /* system time of children */
+}
+
+
+pub fn sys_times(buf:*mut Tms)-> SysResult {
+    info!("times: buf: {:?}", buf);
+    let proc = process();
+    proc.vm.check_write_ptr(buf)?;
+
+    let tick_base = *TICK_BASE;
+    let tick = unsafe { crate::trap::TICK as u64 };
+
+    let new_buf = Tms {
+        tms_utime: 0,
+        tms_stime: 0,
+        tms_cutime: 0,
+        tms_cstime: 0,
+    };
+
+    unsafe { *buf = new_buf };
+    Ok(tick as usize)
+}

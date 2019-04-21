@@ -59,8 +59,8 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_MPROTECT => sys_mprotect(args[0], args[1], args[2]),
         SYS_MUNMAP => sys_munmap(args[0], args[1]),
         SYS_BRK => {
-            warn!("sys_brk is unimplemented");
-            Ok(0)
+            warn!("sys_brk is unimplemented, return -1");
+            Err(SysError::ENOMEM)
         }
         SYS_RT_SIGACTION => {
             warn!("sys_sigaction is unimplemented");
@@ -174,6 +174,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         //        SYS_GETRLIMIT => sys_getrlimit(),
         SYS_GETRUSAGE => sys_getrusage(args[0], args[1] as *mut RUsage),
         SYS_SYSINFO => sys_sysinfo(args[0] as *mut SysInfo),
+        SYS_TIMES => sys_times(args[0] as *mut Tms),
         SYS_GETUID => {
             warn!("sys_getuid is unimplemented");
             Ok(0)
