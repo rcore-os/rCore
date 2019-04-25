@@ -196,6 +196,7 @@ impl Thread {
                     args.insert(1, exec_path.into());
                     args.remove(2);
                     info!("loader args: {:?}", args);
+                    info!("loader envs: {:?}", envs);	
                     return Thread::new_user(buf.as_slice(), exec_path, args, envs);
                 } else {
                     warn!("loader specified as {} but failed to read", &loader_path);
