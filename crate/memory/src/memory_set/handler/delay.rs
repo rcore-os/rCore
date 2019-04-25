@@ -44,6 +44,11 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         entry.set_target(frame);
         entry.set_present(true);
         entry.update();
+        //init with zero for delay mmap mode
+        let data = pt.get_page_slice_mut(addr);
+        for x in data {
+            *x = 0;
+        }
         true
     }
 }
