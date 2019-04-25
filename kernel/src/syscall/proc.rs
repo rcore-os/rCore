@@ -129,7 +129,7 @@ pub fn sys_exec(
     envp: *const *const u8,
     tf: &mut TrapFrame,
 ) -> SysResult {
-    info!("exec: name: {:?}, argv: {:?}, envp: {:?}", name, argv, envp);
+    info!("exec:BEG: name: {:?}, argv: {:?}, envp: {:?}", name, argv, envp);
     let proc = process();
     let exec_name = if name.is_null() {
         String::from("")
@@ -138,6 +138,7 @@ pub fn sys_exec(
     };
 
     if argv.is_null() {
+        info!("exec:END:ERR1: exec_name: {:?}, name: {:?}, argv: is NULL", exec_name, name);
         return Err(SysError::EINVAL);
     }
     // Check and copy args to kernel
@@ -147,6 +148,7 @@ pub fn sys_exec(
         proc.vm.check_read_ptr(current_argv)?;
         while !(*current_argv).is_null() {
             let arg = proc.vm.check_and_clone_cstr(*current_argv)?;
+            info!(" arg: {}",arg);
             args.push(arg);
             current_argv = current_argv.add(1);
         }
@@ -159,6 +161,7 @@ pub fn sys_exec(
             proc.vm.check_read_ptr(current_env)?;
             while !(*current_env).is_null() {
                 let env = proc.vm.check_and_clone_cstr(*current_env)?;
+                info!(" env: {}",env);
                 envs.push(env);
                 current_env = current_env.add(1);
             }
@@ -166,12 +169,13 @@ pub fn sys_exec(
     }
 
     if args.is_empty() {
+        info!("exec:END:ERR2: exec_name: {:?}, name: {:?}, args is empty", exec_name, name);
         return Err(SysError::EINVAL);
     }
 
     info!(
-        "exec: name: {:?}, args: {:?}, envp: {:?}",
-        exec_name, args, envs
+        "exec:STEP2: exec_name: {:?}, name{:?}, args: {:?}, envp: {:?}",
+        exec_name, name, args, envs
     );
 
     // Read program file
@@ -196,6 +200,10 @@ pub fn sys_exec(
     ::core::mem::swap(&mut current_thread().kstack, &mut thread.kstack);
     ::core::mem::swap(current_thread(), &mut *thread);
 
+    info!(
+        "exec:END: exec_name: {:?}",
+        exec_name
+    );
     Ok(0)
 }
 

@@ -14,7 +14,7 @@ pub fn run_user_shell() {
             data.as_slice(),
             "busybox",
             vec!["busybox".into(), "sh".into()],
-            Vec::new(),
+            vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()],
         ));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
