@@ -684,7 +684,7 @@ pub fn sys_sendfile(
     count: usize,
 ) -> SysResult {
     info!(
-        "sendfile: out: {}, in: {}, offset_ptr: {:?}, count: {}",
+        "sendfile:BEG out: {}, in: {}, offset_ptr: {:?}, count: {}",
         out_fd, in_fd, offset_ptr, count
     );
     let proc = process();
@@ -705,6 +705,7 @@ pub fn sys_sendfile(
 
     // read from specified offset and write new offset back
     let mut bytes_read = 0;
+    let mut bytes_written = 0;
     while bytes_read < count {
         let len = min(buffer.len(), count - bytes_read);
         let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
@@ -713,13 +714,20 @@ pub fn sys_sendfile(
         }
         bytes_read += read_len;
         read_offset += read_len;
-        let mut bytes_written = 0;
+
+        bytes_written = 0;
+        let mut rlen = read_len;
         while bytes_written < read_len {
-            let write_len = out_file.write(&buffer[bytes_written..])?;
+            let write_len = out_file.write(&buffer[bytes_written..(bytes_written+rlen)])?;
             if write_len == 0 {
+                info!(
+                    "sendfile:END_ERR out: {}, in: {}, offset_ptr: {:?}, count: {} = bytes_read {}, bytes_written {}",
+                    out_fd, in_fd, offset_ptr, count, bytes_read, bytes_written
+                );
                 return Err(SysError::EBADF);
             }
             bytes_written += write_len;
+            rlen-=write_len;
         }
     }
 
@@ -730,7 +738,11 @@ pub fn sys_sendfile(
     } else {
         in_file.seek(SeekFrom::Current(bytes_read as i64))?;
     }
-    return Ok(bytes_read);
+    info!(
+        "sendfile:END out: {}, in: {}, offset_ptr: {:?}, count: {} = bytes_read {}, bytes_written {}",
+        out_fd, in_fd, offset_ptr, count, bytes_read, bytes_written
+    );
+    return Ok(bytes_written);
 }
 
 impl Process {
