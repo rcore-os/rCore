@@ -147,18 +147,16 @@ pub fn sys_getrusage(who: usize, rusage: *mut RUsage) -> SysResult {
     Ok(0)
 }
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Tms {
-    tms_utime: u64, /* user time */
+    tms_utime: u64,  /* user time */
     tms_stime: u64,  /* system time */
     tms_cutime: u64, /* user time of children */
     tms_cstime: u64, /* system time of children */
 }
 
-
-pub fn sys_times(buf:*mut Tms)-> SysResult {
+pub fn sys_times(buf: *mut Tms) -> SysResult {
     info!("times: buf: {:?}", buf);
     let proc = process();
     proc.vm.check_write_ptr(buf)?;

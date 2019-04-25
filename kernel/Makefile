@@ -125,6 +125,7 @@ endif
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
+	-serial mon:stdio \
 	-kernel ../tools/opensbi/virt_rv32.elf \
 	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
@@ -137,11 +138,13 @@ else ifeq ($(arch), riscv64)
 ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
+	-serial mon:stdio \
 	-kernel ../tools/opensbi/fu540.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img)
 else
 qemu_opts += \
 	-machine virt \
+	-serial mon:stdio \
 	-kernel ../tools/opensbi/virt_rv64.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
