@@ -62,7 +62,7 @@ pub fn sys_clone(
 /// Wait for the process exit.
 /// Return the PID. Store exit code to `wstatus` if it's not null.
 pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
-    info!("wait4: pid: {}, code: {:?}", pid, wstatus);
+    //info!("wait4: pid: {}, code: {:?}", pid, wstatus);
     if !wstatus.is_null() {
         process().vm.check_write_ptr(wstatus)?;
     }
