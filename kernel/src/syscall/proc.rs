@@ -6,7 +6,8 @@ use crate::fs::INodeExt;
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     let new_thread = current_thread().fork(tf);
-    let pid = processor().manager().add(new_thread);
+    let pid = new_thread.proc.lock().pid.get();
+    processor().manager().add(new_thread);
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid)
 }

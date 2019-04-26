@@ -39,8 +39,7 @@ pub fn sys_socket(domain: usize, socket_type: usize, protocol: usize) -> SysResu
         },
         _ => return Err(SysError::EAFNOSUPPORT),
     };
-    let fd = proc.get_free_fd();
-    proc.files.insert(fd, FileLike::Socket(socket));
+    let fd = proc.add_file(FileLike::Socket(socket));
     Ok(fd)
 }
 
@@ -237,8 +236,7 @@ pub fn sys_accept(fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResu
     let socket = proc.get_socket(fd)?;
     let (new_socket, remote_endpoint) = socket.accept()?;
 
-    let new_fd = proc.get_free_fd();
-    proc.files.insert(new_fd, FileLike::Socket(new_socket));
+    let new_fd = proc.add_file(FileLike::Socket(new_socket));
 
     if !addr.is_null() {
         let sockaddr_in = SockAddr::from(remote_endpoint);

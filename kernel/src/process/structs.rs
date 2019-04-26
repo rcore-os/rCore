@@ -32,41 +32,23 @@ pub struct Thread {
 
 /// Pid type
 /// For strong type separation
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pid(Option<usize>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Pid(usize);
 
 impl Pid {
-    pub fn uninitialized() -> Self {
-        Pid(None)
-    }
-
-    /// Return if it was uninitialized before this call
-    /// When returning true, it usually means this is the first thread
-    pub fn set_if_uninitialized(&mut self, tid: Tid) -> bool {
-        if self.0 == None {
-            self.0 = Some(tid as usize);
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn get(&self) -> usize {
-        self.0.unwrap()
+        self.0
     }
 
     /// Return whether this pid represents the init process
     pub fn is_init(&self) -> bool {
-        self.0 == Some(0)
+        self.0 == 0
     }
 }
 
 impl fmt::Display for Pid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            Some(pid) => write!(f, "{}", pid),
-            None => write!(f, "None"),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
@@ -103,21 +85,9 @@ impl rcore_thread::Context for Thread {
     }
 
     fn set_tid(&mut self, tid: Tid) {
-        // set pid=tid if unspecified
         let mut proc = self.proc.lock();
-        if proc.pid.set_if_uninitialized(tid) {
-            // first thread in the process
-            // link to its ppid
-            if let Some(parent) = &proc.parent {
-                let mut parent = parent.lock();
-                parent.children.push(Arc::downgrade(&self.proc));
-            }
-        }
         // add it to threads
         proc.threads.push(tid);
-        PROCESSES
-            .write()
-            .insert(proc.pid.get(), Arc::downgrade(&self.proc));
     }
 }
 
@@ -140,18 +110,19 @@ impl Thread {
             kstack,
             clear_child_tid: 0,
             // TODO: kernel thread should not have a process
-            proc: Arc::new(Mutex::new(Process {
+            proc: Process {
                 vm,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
+                pid: Pid(0),
                 parent: None,
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-            })),
+            }
+            .add_to_table(),
         })
     }
 
@@ -290,18 +261,19 @@ impl Thread {
             },
             kstack,
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
+            proc: Process {
                 vm,
                 files,
                 cwd: String::from("/"),
                 futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
+                pid: Pid(0),
                 parent: None,
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-            })),
+            }
+            .add_to_table(),
         })
     }
 
@@ -330,18 +302,19 @@ impl Thread {
             context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },
             kstack,
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
+            proc: Process {
                 vm,
                 files,
                 cwd,
                 futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
+                pid: Pid(0),
                 parent,
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-            })),
+            }
+            .add_to_table(),
         })
     }
 
@@ -365,8 +338,38 @@ impl Thread {
 }
 
 impl Process {
-    pub fn get_free_fd(&self) -> usize {
+    /// Assign a pid and put itself to global process table.
+    fn add_to_table(mut self) -> Arc<Mutex<Self>> {
+        let mut process_table = PROCESSES.write();
+
+        // assign pid
+        let pid = (0..)
+            .find(|i| match process_table.get(i) {
+                Some(p) if p.upgrade().is_some() => false,
+                _ => true,
+            })
+            .unwrap();
+        self.pid = Pid(pid);
+
+        // put to process table
+        let self_ref = Arc::new(Mutex::new(self));
+        process_table.insert(pid, Arc::downgrade(&self_ref));
+
+        // link to parent
+        if let Some(parent) = &self_ref.lock().parent {
+            parent.lock().children.push(Arc::downgrade(&self_ref));
+        }
+
+        self_ref
+    }
+    fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
+    /// Add a file to the process, return its fd.
+    pub fn add_file(&mut self, file_like: FileLike) -> usize {
+        let fd = self.get_free_fd();
+        self.files.insert(fd, file_like);
+        fd
     }
     pub fn get_futex(&mut self, uaddr: usize) -> Arc<Condvar> {
         if !self.futexes.contains_key(&uaddr) {

@@ -277,10 +277,8 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
         proc.lookup_inode_at(dir_fd, &path, true)?
     };
 
-    let fd = proc.get_free_fd();
-
     let file = FileHandle::new(inode, flags.to_options());
-    proc.files.insert(fd, FileLike::File(file));
+    let fd = proc.add_file(FileLike::File(file));
     Ok(fd)
 }
 
@@ -636,9 +634,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     proc.vm.check_write_array(fds, 2)?;
     let (read, write) = Pipe::create_pair();
 
-    let read_fd = proc.get_free_fd();
-    proc.files.insert(
-        read_fd,
+    let read_fd = proc.add_file(
         FileLike::File(FileHandle::new(
             Arc::new(read),
             OpenOptions {
@@ -649,9 +645,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
         )),
     );
 
-    let write_fd = proc.get_free_fd();
-    proc.files.insert(
-        write_fd,
+    let write_fd = proc.add_file(
         FileLike::File(FileHandle::new(
             Arc::new(write),
             OpenOptions {
