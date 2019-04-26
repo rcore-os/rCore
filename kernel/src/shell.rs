@@ -6,15 +6,30 @@ use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+
 #[cfg(not(feature = "run_cmdline"))]
 pub fn run_user_shell() {
-    if let Ok(inode) = ROOT_INODE.lookup("busybox") {
+    #[cfg(target_arch = "x86_64")]
+        let init_shell="/bin/busybox";
+
+    #[cfg(not(target_arch = "x86_64"))]
+        let init_shell="/busybox";
+
+    #[cfg(target_arch = "x86_64")]
+        let init_envs=vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()];
+
+    #[cfg(not(target_arch = "x86_64"))]
+        let init_envs=Vec::new();
+
+    let init_args=vec!["busybox".into(), "ash".into()];
+
+    if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
         let data = inode.read_as_vec().unwrap();
         processor().manager().add(Thread::new_user(
             data.as_slice(),
-            "busybox",
-            vec!["busybox".into(), "sh".into()],
-            vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()],
+            init_shell,
+            init_args,
+            init_envs,
         ));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
