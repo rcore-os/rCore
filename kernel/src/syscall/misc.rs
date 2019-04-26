@@ -201,3 +201,18 @@ pub struct RLimit {
     cur: u64, // soft limit
     max: u64, // hard limit
 }
+
+pub fn sys_getrandom( buf: *mut u8, len: usize, flag: u32)  -> SysResult {
+
+    //info!("getrandom: buf: {:?}, len: {:?}, falg {:?}", buf, len,flag);
+    let mut proc = process();
+    proc.vm.check_write_array(buf, len)?;
+    let slice = unsafe { slice::from_raw_parts_mut(buf, len) };
+    let mut i=0;
+    for elm in slice {
+        unsafe{ *elm=i+ crate::trap::TICK as u8;}
+        i+=1;
+    }
+
+    Ok(len)
+}
