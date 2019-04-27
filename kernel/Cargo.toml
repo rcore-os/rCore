@@ -24,6 +24,7 @@ default = ["sv39"]
 sv39 = []
 board_u540 = ["sv39", "link_user"]
 board_k210 = ["sv39", "link_user"]
+board_rocket_chip = ["sv39", "link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
 board_raspi3 = ["bcm2837", "link_user"]

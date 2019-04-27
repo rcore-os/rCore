@@ -26,6 +26,7 @@
 #         | pc                   Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
 #         | k210                 Only available on riscv64, run on K210, use Sv39
+#         | rocket_chip          Only available on riscv64, run on Rocket Chip, use Sv39
 #         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
@@ -60,7 +61,7 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
 # board is pc or qemu?
-ifeq ($(board), $(filter $(board), pc u540 k210))
+ifeq ($(board), $(filter $(board), pc u540 k210 rocket_chip))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
