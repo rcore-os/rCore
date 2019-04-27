@@ -92,6 +92,8 @@ fn remap_the_kernel(dtb: usize) {
         Linear::new(offset),
         "bss",
     );
+    // TODO: dtb on rocket chip
+    #[cfg(not(feature = "board_rocket_chip"))]
     ms.push(
         dtb,
         dtb + super::consts::MAX_DTB_SIZE,
