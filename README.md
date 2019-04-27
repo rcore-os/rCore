@@ -8,7 +8,7 @@ Going to be the next generation teaching operating system.
 
 Supported architectures: x86_64, RISCV32/64, AArch64, MIPS32
 
-Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+
+Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kendryte K210 and FPGA running Rocket Chip
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 

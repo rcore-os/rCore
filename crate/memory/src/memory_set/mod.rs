@@ -58,7 +58,8 @@ impl MemoryArea {
     fn check_read_array<S>(&self, ptr: *const S, count: usize) -> bool {
         // page align
         ptr as usize >= Page::of_addr(self.start_addr).start_address()
-            && unsafe { ptr.add(count) as usize } < Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address()
+            && unsafe { ptr.add(count) as usize }
+                < Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address()
     }
     /// Check the array is within the writable memory
     fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> bool {
