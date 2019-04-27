@@ -40,26 +40,33 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     memory::init(boot_info);
 
     // Now heap is available
+
+    // Init GDT
     gdt::init();
-
+    //get local apic id of cpu
     cpu::init();
-
+    // Use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
     driver::init();
-
+    // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
     crate::drivers::init();
-
+    // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
-
+    //wake up other CPUs
     AP_CAN_INIT.store(true, Ordering::Relaxed);
-
+    //call the first main function in kernel.
     crate::kmain();
 }
 
 /// The entry point for other processors
 fn other_start() -> ! {
+    // Init trap handling.
     idt::init();
+    // init gdt
     gdt::init();
+    // init local apic
     cpu::init();
+    // setup fast syscall in xv6-64
     interrupt::fast_syscall::init();
+    //call the first main function in kernel.
     crate::kmain();
 }

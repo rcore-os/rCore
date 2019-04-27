@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 
 
 #[cfg(not(feature = "run_cmdline"))]
-pub fn run_user_shell() {
+pub fn add_user_shell() {
 /// the busybox of alpine linux can not transfer env vars into child process
 /// Now we use busybox from
 /// https://raw.githubusercontent.com/docker-library/busybox/82bc0333a9ae148fbb4246bcbff1487b3fc0c510/musl/busybox.tar.xz -O busybox.tar.xz
@@ -43,7 +43,7 @@ pub fn run_user_shell() {
 }
 
 #[cfg(feature = "run_cmdline")]
-pub fn run_user_shell() {
+pub fn add_user_shell() {
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
     let data = inode.read_as_vec().unwrap();

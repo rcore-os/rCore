@@ -1,3 +1,17 @@
+//! Define the FrameAllocator for physical memory
+//! x86_64      --  64GB
+//! AARCH64/MIPS/RV --  1GB
+//! K210(rv64)  --  8MB
+//! NOTICE:
+//! type FrameAlloc = bitmap_allocator::BitAllocXXX
+//! KSTACK_SIZE         -- 16KB
+//!
+//! KERNEL_HEAP_SIZE:
+//! x86-64              -- 32MB
+//! AARCH64/RV64        -- 8MB
+//! MIPS/RV32           -- 2MB
+//! mipssim/malta(MIPS) -- 10MB
+
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
 use crate::consts::MEMORY_OFFSET;
@@ -85,17 +99,17 @@ pub fn dealloc_frame(target: usize) {
 }
 
 pub struct KernelStack(usize);
-const STACK_SIZE: usize = 0x4000;
+const KSTACK_SIZE: usize = 0x4000; //16KB
 
 impl KernelStack {
     pub fn new() -> Self {
         use alloc::alloc::{alloc, Layout};
         let bottom =
-            unsafe { alloc(Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap()) } as usize;
+            unsafe { alloc(Layout::from_size_align(KSTACK_SIZE, KSTACK_SIZE).unwrap())} as usize;
         KernelStack(bottom)
     }
     pub fn top(&self) -> usize {
-        self.0 + STACK_SIZE
+        self.0 + KSTACK_SIZE
     }
 }
 
@@ -105,7 +119,7 @@ impl Drop for KernelStack {
         unsafe {
             dealloc(
                 self.0 as _,
-                Layout::from_size_align(STACK_SIZE, STACK_SIZE).unwrap(),
+                Layout::from_size_align(KSTACK_SIZE, KSTACK_SIZE).unwrap(),
             );
         }
     }
