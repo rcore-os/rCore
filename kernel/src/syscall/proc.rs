@@ -7,7 +7,8 @@ use crate::fs::INodeExt;
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     let new_thread = current_thread().fork(tf);
     let pid = new_thread.proc.lock().pid.get();
-    processor().manager().add(new_thread);
+    let tid = processor().manager().add(new_thread);
+    processor().manager().detach(tid);
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid)
 }
@@ -48,6 +49,7 @@ pub fn sys_clone(
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
     let tid = processor().manager().add(new_thread);
+    processor().manager().detach(tid);
     info!("clone: {} -> {}", thread::current().id(), tid);
     *parent_tid_ref = tid as u32;
     *child_tid_ref = tid as u32;
