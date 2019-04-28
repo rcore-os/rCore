@@ -39,10 +39,6 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn current() -> &'static mut Self {
-        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
-    }
-
     fn new() -> Self {
         Cpu {
             gdt: GlobalDescriptorTable::new(),
@@ -72,18 +68,9 @@ impl Cpu {
         set_cs(KCODE_SELECTOR);
         // load TSS
         load_tss(TSS_SELECTOR);
-        // for fast syscall:
-        // store address of TSS to kernel_gsbase
-        let mut kernel_gsbase = Msr::new(0xC0000102);
-        kernel_gsbase.write(&self.tss as *const _ as u64);
-    }
-
-    /// 设置从Ring3跳到Ring0时，自动切换栈的地址
-    ///
-    /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
-    pub fn set_ring0_rsp(&mut self, rsp: usize) {
-        trace!("gdt.set_ring0_rsp: {:#x}", rsp);
-        self.tss.privilege_stack_table[0] = VirtAddr::new(rsp as u64);
+        // store address of TSS to GSBase
+        let mut gsbase = Msr::new(0xC0000101);
+        gsbase.write(&self.tss as *const _ as u64);
     }
 }
 
