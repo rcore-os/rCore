@@ -32,16 +32,13 @@ impl TrapFrame {
         tf.spsr = 0b1101_00_0101; // To EL 1, enable IRQ
         tf
     }
-    fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
+    pub fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.sp = sp;
         tf.elr = entry_addr;
         tf.spsr = 0b1101_00_0000; // To EL 0, enable IRQ
         tf
-    }
-    pub fn is_user(&self) -> bool {
-        unimplemented!()
     }
 }
 
@@ -200,11 +197,6 @@ impl Context {
             },
         }
         .push_at(kstack_top, ttbr)
-    }
-    /// Called at a new user context
-    /// To get the init TrapFrame in sys_exec
-    pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.stack_top as *const InitStack)).tf.clone()
     }
 }
 

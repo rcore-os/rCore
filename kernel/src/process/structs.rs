@@ -126,13 +126,14 @@ impl Thread {
         })
     }
 
-    /// Make a new user process from ELF `data`
-    pub fn new_user(
+    /// Construct virtual memory of a new user process from ELF `data`.
+    /// Return `(MemorySet, entry_point, ustack_top)`
+    pub fn new_user_vm(
         data: &[u8],
         exec_path: &str,
         mut args: Vec<String>,
         envs: Vec<String>,
-    ) -> Box<Thread> {
+    ) -> (MemorySet, usize, usize) {
         // Parse ELF
         let elf = ElfFile::new(data).expect("failed to read elf");
 
@@ -159,22 +160,16 @@ impl Thread {
         // Check interpreter (for dynamic link)
         if let Ok(loader_path) = elf.get_interpreter() {
             // assuming absolute path
-            if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(loader_path, FOLLOW_MAX_DEPTH) {
-                if let Ok(buf) = inode.read_as_vec() {
-                    // Elf loader should not have INTERP
-                    // No infinite loop
-                    args.insert(0, loader_path.into());
-                    args.insert(1, exec_path.into());
-                    args.remove(2);
-                    //info!("loader args: {:?}", args);
-                    //info!("loader envs: {:?}", envs);
-                    return Thread::new_user(buf.as_slice(), exec_path, args, envs);
-                } else {
-                    warn!("loader specified as {} but failed to read", &loader_path);
-                }
-            } else {
-                warn!("loader specified as {} but not found", &loader_path);
-            }
+            let inode = crate::fs::ROOT_INODE
+                .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
+                .expect("interpreter not found");
+            let buf = inode.read_as_vec().expect("failed to load interpreter");
+            // modify args for loader
+            args[0] = exec_path.into();
+            args.insert(0, loader_path.into());
+            // Elf loader should not have INTERP
+            // No infinite loop
+            return Thread::new_user_vm(buf.as_slice(), exec_path, args, envs);
         }
 
         // Make page table
@@ -216,6 +211,19 @@ impl Thread {
 
         trace!("{:#x?}", vm);
 
+        let entry_addr = elf.header.pt2.entry_point() as usize;
+        (vm, entry_addr, ustack_top)
+    }
+
+    /// Make a new user process from ELF `data`
+    pub fn new_user(
+        data: &[u8],
+        exec_path: &str,
+        mut args: Vec<String>,
+        envs: Vec<String>,
+    ) -> Box<Thread> {
+        let (vm, entry_addr, ustack_top) = Self::new_user_vm(data, exec_path, args, envs);
+
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
@@ -252,8 +260,6 @@ impl Thread {
                 },
             )),
         );
-
-        let entry_addr = elf.header.pt2.entry_point() as usize;
 
         Box::new(Thread {
             context: unsafe {
@@ -376,13 +382,6 @@ impl Process {
             self.futexes.insert(uaddr, Arc::new(Condvar::new()));
         }
         self.futexes.get(&uaddr).unwrap().clone()
-    }
-    pub fn clone_for_exec(&mut self, other: &Self) {
-        self.files = other.files.clone();
-        self.cwd = other.cwd.clone();
-        self.pid = other.pid.clone();
-        self.parent = other.parent.clone();
-        self.threads = other.threads.clone();
     }
 }
 

@@ -143,7 +143,7 @@ pub fn sys_exec(
         "exec:BEG: path: {:?}, argv: {:?}, envp: {:?}",
         path, argv, envp
     );
-    let proc = process();
+    let mut proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     let args = unsafe { proc.vm.check_and_clone_cstr_array(argv)? };
     let envs = unsafe { proc.vm.check_and_clone_cstr_array(envp)? };
@@ -158,25 +158,29 @@ pub fn sys_exec(
         path, args, envs
     );
 
+    // Kill other threads
+    proc.threads.retain(|&tid| {
+        if tid != processor().tid() {
+            processor().manager().exit(tid, 1);
+        }
+        tid == processor().tid()
+    });
+
     // Read program file
     let inode = proc.lookup_inode(&path)?;
-    let buf = inode.read_as_vec()?;
+    let data = inode.read_as_vec()?;
 
     // Make new Thread
-    let mut thread = Thread::new_user(buf.as_slice(), &path, args, envs);
-    thread.proc.lock().clone_for_exec(&proc);
+    let (mut vm, entry_addr, ustack_top) = Thread::new_user_vm(data.as_slice(), &path, args, envs);
 
     // Activate new page table
     unsafe {
-        thread.proc.lock().vm.activate();
+        vm.activate();
     }
+    core::mem::swap(&mut proc.vm, &mut vm);
 
     // Modify the TrapFrame
-    *tf = unsafe { thread.context.get_init_tf() };
-
-    // Swap Context but keep KStack
-    ::core::mem::swap(&mut current_thread().kstack, &mut thread.kstack);
-    ::core::mem::swap(current_thread(), &mut *thread);
+    *tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
 
     info!("exec:END: path: {:?}", path);
     Ok(0)
