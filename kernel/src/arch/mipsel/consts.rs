@@ -2,7 +2,7 @@
 ///
 pub use super::board::consts::*;
 
-pub const KERNEL_OFFSET: usize = 0x80100000;
+pub const KERNEL_OFFSET: usize = 0x80000000;
 
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
 
