@@ -205,28 +205,54 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     /// Check the pointer is within the readable memory
-    pub fn check_read_ptr<S>(&self, ptr: *const S) -> VMResult<()> {
-        self.check_read_array(ptr, 1)
+    pub unsafe fn check_read_ptr<S>(&self, ptr: *const S) -> VMResult<&'static S> {
+        self.check_read_array(ptr, 1).map(|s| &s[0])
     }
     /// Check the pointer is within the writable memory
-    pub fn check_write_ptr<S>(&self, ptr: *mut S) -> VMResult<()> {
-        self.check_write_array(ptr, 1)
+    pub unsafe fn check_write_ptr<S>(&self, ptr: *mut S) -> VMResult<&'static mut S> {
+        self.check_write_array(ptr, 1).map(|s| &mut s[0])
     }
     /// Check the array is within the readable memory
-    pub fn check_read_array<S>(&self, ptr: *const S, count: usize) -> VMResult<()> {
+    pub unsafe fn check_read_array<S>(
+        &self,
+        ptr: *const S,
+        count: usize,
+    ) -> VMResult<&'static [S]> {
         self.areas
             .iter()
             .find(|area| area.check_read_array(ptr, count))
-            .map(|_| ())
+            .map(|_| core::slice::from_raw_parts(ptr, count))
             .ok_or(VMError::InvalidPtr)
     }
     /// Check the array is within the writable memory
-    pub fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> VMResult<()> {
+    pub unsafe fn check_write_array<S>(
+        &self,
+        ptr: *mut S,
+        count: usize,
+    ) -> VMResult<&'static mut [S]> {
         self.areas
             .iter()
             .find(|area| area.check_write_array(ptr, count))
-            .map(|_| ())
+            .map(|_| core::slice::from_raw_parts_mut(ptr, count))
             .ok_or(VMError::InvalidPtr)
+    }
+    /// Check the null-end C string pointer array
+    /// Used for getting argv & envp
+    pub unsafe fn check_and_clone_cstr_array(
+        &self,
+        mut argv: *const *const u8,
+    ) -> VMResult<Vec<String>> {
+        let mut args = Vec::new();
+        loop {
+            let cstr = *self.check_read_ptr(argv)?;
+            if cstr.is_null() {
+                break;
+            }
+            let arg = self.check_and_clone_cstr(cstr)?;
+            args.push(arg);
+            argv = argv.add(1);
+        }
+        Ok(args)
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.

@@ -55,8 +55,7 @@ pub fn sys_setsockopt(
         fd, level, optname
     );
     let mut proc = process();
-    proc.vm.check_read_array(optval, optlen)?;
-    let data = unsafe { slice::from_raw_parts(optval, optlen) };
+    let data = unsafe { proc.vm.check_read_array(optval, optlen)? };
     let socket = proc.get_socket(fd)?;
     socket.setsockopt(level, optname, data)
 }
@@ -73,23 +72,19 @@ pub fn sys_getsockopt(
         fd, level, optname, optval, optlen
     );
     let proc = process();
-    proc.vm.check_write_ptr(optlen)?;
+    let optlen = unsafe { proc.vm.check_write_ptr(optlen)? };
     match level {
         SOL_SOCKET => match optname {
             SO_SNDBUF => {
-                proc.vm.check_write_array(optval, 4)?;
-                unsafe {
-                    *(optval as *mut u32) = crate::net::TCP_SENDBUF as u32;
-                    *optlen = 4;
-                }
+                let optval = unsafe { proc.vm.check_write_ptr(optval as *mut u32)? };
+                *optval = crate::net::TCP_SENDBUF as u32;
+                *optlen = 4;
                 Ok(0)
             }
             SO_RCVBUF => {
-                proc.vm.check_write_array(optval, 4)?;
-                unsafe {
-                    *(optval as *mut u32) = crate::net::TCP_RECVBUF as u32;
-                    *optlen = 4;
-                }
+                let optval = unsafe { proc.vm.check_write_ptr(optval as *mut u32)? };
+                *optval = crate::net::TCP_RECVBUF as u32;
+                *optlen = 4;
                 Ok(0)
             }
             _ => Err(SysError::ENOPROTOOPT),
@@ -129,9 +124,8 @@ pub fn sys_sendto(
     );
 
     let mut proc = process();
-    proc.vm.check_read_array(base, len)?;
 
-    let slice = unsafe { slice::from_raw_parts(base, len) };
+    let slice = unsafe { proc.vm.check_read_array(base, len)? };
     let endpoint = if addr.is_null() {
         None
     } else {
@@ -157,10 +151,9 @@ pub fn sys_recvfrom(
     );
 
     let mut proc = process();
-    proc.vm.check_write_array(base, len)?;
 
+    let mut slice = unsafe { proc.vm.check_write_array(base, len)? };
     let socket = proc.get_socket(fd)?;
-    let mut slice = unsafe { slice::from_raw_parts_mut(base, len) };
     let (result, endpoint) = socket.read(&mut slice);
 
     if result.is_ok() && !addr.is_null() {
@@ -176,9 +169,8 @@ pub fn sys_recvfrom(
 pub fn sys_recvmsg(fd: usize, msg: *mut MsgHdr, flags: usize) -> SysResult {
     info!("recvmsg: fd: {}, msg: {:?}, flags: {}", fd, msg, flags);
     let mut proc = process();
-    proc.vm.check_read_ptr(msg)?;
-    let hdr = unsafe { &mut *msg };
-    let mut iovs = IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &proc.vm, true)?;
+    let hdr = unsafe { proc.vm.check_write_ptr(msg)? };
+    let mut iovs = unsafe { IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &proc.vm, true)? };
 
     let mut buf = iovs.new_buf(true);
     let socket = proc.get_socket(fd)?;
@@ -406,16 +398,16 @@ fn sockaddr_to_endpoint(
     if len < size_of::<u16>() {
         return Err(SysError::EINVAL);
     }
-    proc.vm.check_read_array(addr as *const u8, len)?;
+    let addr = unsafe { proc.vm.check_read_ptr(addr)? };
     unsafe {
-        match AddressFamily::from((*addr).family) {
+        match AddressFamily::from(addr.family) {
             AddressFamily::Internet => {
                 if len < size_of::<SockAddrIn>() {
                     return Err(SysError::EINVAL);
                 }
-                let port = u16::from_be((*addr).addr_in.sin_port);
+                let port = u16::from_be(addr.addr_in.sin_port);
                 let addr = IpAddress::from(Ipv4Address::from_bytes(
-                    &u32::from_be((*addr).addr_in.sin_addr).to_be_bytes()[..],
+                    &u32::from_be(addr.addr_in.sin_addr).to_be_bytes()[..],
                 ));
                 Ok(Endpoint::Ip((addr, port).into()))
             }
@@ -425,7 +417,7 @@ fn sockaddr_to_endpoint(
                     return Err(SysError::EINVAL);
                 }
                 Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
-                    (*addr).addr_ll.sll_ifindex as usize,
+                    addr.addr_ll.sll_ifindex as usize,
                 )))
             }
             AddressFamily::Netlink => {
@@ -433,8 +425,8 @@ fn sockaddr_to_endpoint(
                     return Err(SysError::EINVAL);
                 }
                 Ok(Endpoint::Netlink(NetlinkEndpoint::new(
-                    (*addr).addr_nl.nl_pid,
-                    (*addr).addr_nl.nl_groups,
+                    addr.addr_nl.nl_pid,
+                    addr.addr_nl.nl_groups,
                 )))
             }
             _ => Err(SysError::EINVAL),
@@ -456,7 +448,7 @@ impl SockAddr {
             return Ok(0);
         }
 
-        proc.vm.check_write_ptr(addr_len)?;
+        let addr_len = unsafe { proc.vm.check_write_ptr(addr_len)? };
         let max_addr_len = *addr_len as usize;
         let full_len = match AddressFamily::from(self.family) {
             AddressFamily::Internet => size_of::<SockAddrIn>(),
@@ -468,12 +460,11 @@ impl SockAddr {
 
         let written_len = min(max_addr_len, full_len);
         if written_len > 0 {
-            proc.vm.check_write_array(addr as *mut u8, written_len)?;
+            let target = unsafe { proc.vm.check_write_array(addr as *mut u8, written_len)? };
             let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
-            let target = slice::from_raw_parts_mut(addr as *mut u8, written_len);
             target.copy_from_slice(source);
         }
-        addr_len.write(full_len as u32);
+        *addr_len = full_len as u32;
         return Ok(0);
     }
 }

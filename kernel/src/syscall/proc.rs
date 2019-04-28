@@ -43,19 +43,14 @@ pub fn sys_clone(
         );
         //return Err(SysError::ENOSYS);
     }
-    {
-        let proc = process();
-        proc.vm.check_write_ptr(parent_tid)?;
-        proc.vm.check_write_ptr(child_tid)?;
-    }
+    let parent_tid_ref = unsafe { process().vm.check_write_ptr(parent_tid)? };
+    let child_tid_ref = unsafe { process().vm.check_write_ptr(child_tid)? };
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
     let tid = processor().manager().add(new_thread);
     info!("clone: {} -> {}", thread::current().id(), tid);
-    unsafe {
-        parent_tid.write(tid as u32);
-        child_tid.write(tid as u32);
-    }
+    *parent_tid_ref = tid as u32;
+    *child_tid_ref = tid as u32;
     Ok(tid)
 }
 
@@ -63,9 +58,11 @@ pub fn sys_clone(
 /// Return the PID. Store exit code to `wstatus` if it's not null.
 pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     //info!("wait4: pid: {}, code: {:?}", pid, wstatus);
-    if !wstatus.is_null() {
-        process().vm.check_write_ptr(wstatus)?;
-    }
+    let wstatus = if !wstatus.is_null() {
+        Some(unsafe { process().vm.check_write_ptr(wstatus)? })
+    } else {
+        None
+    };
     #[derive(Debug)]
     enum WaitFor {
         AnyChild,
@@ -90,10 +87,8 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
         // if found, return
         if let Some((pid, exit_code)) = find {
             proc.child_exit_code.remove(&pid);
-            if !wstatus.is_null() {
-                unsafe {
-                    wstatus.write(exit_code as i32);
-                }
+            if let Some(wstatus) = wstatus {
+                *wstatus = exit_code as i32;
             }
             return Ok(pid);
         }
@@ -124,69 +119,49 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     }
 }
 
+/// Replaces the current ** process ** with a new process image
+///
+/// `argv` is an array of argument strings passed to the new program.
+/// `envp` is an array of strings, conventionally of the form `key=value`,
+/// which are passed as environment to the new program.
+///
+/// NOTICE: `argv` & `envp` can not be NULL (different from Linux)
+///
+/// NOTICE: for multi-thread programs
+/// A call to any exec function from a process with more than one thread
+/// shall result in all threads being terminated and the new executable image
+/// being loaded and executed.
 pub fn sys_exec(
-    name: *const u8,
+    path: *const u8,
     argv: *const *const u8,
     envp: *const *const u8,
     tf: &mut TrapFrame,
 ) -> SysResult {
-    info!("exec:BEG: name: {:?}, argv: {:?}, envp: {:?}", name, argv, envp);
+    info!(
+        "exec:BEG: path: {:?}, argv: {:?}, envp: {:?}",
+        path, argv, envp
+    );
     let proc = process();
-    let exec_name = if name.is_null() {
-        String::from("")
-    } else {
-        unsafe { proc.vm.check_and_clone_cstr(name)? }
-    };
-
-    if argv.is_null() {
-        info!("exec:END:ERR1: exec_name: {:?}, name: {:?}, argv: is NULL", exec_name, name);
-        return Err(SysError::EINVAL);
-    }
-    // Check and copy args to kernel
-    let mut args = Vec::new();
-    unsafe {
-        let mut current_argv = argv as *const *const u8;
-        proc.vm.check_read_ptr(current_argv)?;
-        while !(*current_argv).is_null() {
-            let arg = proc.vm.check_and_clone_cstr(*current_argv)?;
-            info!(" arg: {}",arg);
-            args.push(arg);
-            current_argv = current_argv.add(1);
-        }
-    }
-    // Check and copy envs to kernel
-    let mut envs = Vec::new();
-    unsafe {
-        let mut current_env = envp as *const *const u8;
-        if !current_env.is_null() {
-            proc.vm.check_read_ptr(current_env)?;
-            while !(*current_env).is_null() {
-                let env = proc.vm.check_and_clone_cstr(*current_env)?;
-                info!(" env: {}",env);
-                envs.push(env);
-                current_env = current_env.add(1);
-            }
-        }
-    }
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    let args = unsafe { proc.vm.check_and_clone_cstr_array(argv)? };
+    let envs = unsafe { proc.vm.check_and_clone_cstr_array(envp)? };
 
     if args.is_empty() {
-        info!("exec:END:ERR2: exec_name: {:?}, name: {:?}, args is empty", exec_name, name);
+        error!("exec: args is null");
         return Err(SysError::EINVAL);
     }
 
     info!(
-        "exec:STEP2: exec_name: {:?}, name{:?}, args: {:?}, envp: {:?}",
-        exec_name, name, args, envs
+        "exec:STEP2: path: {:?}, args: {:?}, envs: {:?}",
+        path, args, envs
     );
 
     // Read program file
-    //let path = args[0].as_str();
-    let exec_path = exec_name.as_str();
-    let inode = proc.lookup_inode(exec_path)?;
+    let inode = proc.lookup_inode(&path)?;
     let buf = inode.read_as_vec()?;
 
     // Make new Thread
-    let mut thread = Thread::new_user(buf.as_slice(), exec_path, args, envs);
+    let mut thread = Thread::new_user(buf.as_slice(), &path, args, envs);
     thread.proc.lock().clone_for_exec(&proc);
 
     // Activate new page table
@@ -201,10 +176,7 @@ pub fn sys_exec(
     ::core::mem::swap(&mut current_thread().kstack, &mut thread.kstack);
     ::core::mem::swap(current_thread(), &mut *thread);
 
-    info!(
-        "exec:END: exec_name: {:?}",
-        exec_name
-    );
+    info!("exec:END: path: {:?}", path);
     Ok(0)
 }
 
@@ -337,8 +309,7 @@ pub fn sys_exit_group(exit_code: usize) -> ! {
 }
 
 pub fn sys_nanosleep(req: *const TimeSpec) -> SysResult {
-    process().vm.check_read_ptr(req)?;
-    let time = unsafe { req.read() };
+    let time = unsafe { *process().vm.check_read_ptr(req)? };
     info!("nanosleep: time: {:#?}", time);
     // TODO: handle spurious wakeup
     thread::sleep(time.to_duration());
