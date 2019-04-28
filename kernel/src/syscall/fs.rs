@@ -166,6 +166,9 @@ pub fn sys_select(
             if fd >= nfds {
                 continue;
             }
+            if !err_fds.contains(fd) && !read_fds.contains(fd) && !write_fds.contains(fd) {
+                continue;
+            }
             let status = file_like.poll()?;
             if status.error && err_fds.contains(fd) {
                 err_fds.set(fd);
@@ -1334,6 +1337,7 @@ impl FdSet {
             }
             let slice = unsafe { vm.check_write_array(addr, len)? };
             let bitset: &'static mut BitSlice<LittleEndian, u32> = slice.into();
+            debug!("bitset {:?}", bitset);
 
             // save the fdset, and clear it
             use alloc::prelude::ToOwned;
@@ -1357,7 +1361,11 @@ impl FdSet {
     /// Check to see whether `fd` is in original `FdSet`
     /// Fd should be less than nfds
     fn contains(&self, fd: usize) -> bool {
-        self.origin[fd]
+        if fd < self.bitset.len() {
+            self.origin[fd]
+        } else {
+            false
+        }
     }
 }
 
