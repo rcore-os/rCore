@@ -1,4 +1,5 @@
 use super::HEAP_ALLOCATOR;
+use core::mem;
 pub use crate::arch::paging::*;
 use crate::consts::MEMORY_OFFSET;
 use crate::process::process_unsafe;
@@ -114,11 +115,13 @@ pub fn handle_page_fault(addr: usize) -> bool {
 
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
-    static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+    const machine_align: usize = mem::size_of::<usize>();
+    const heap_block: usize = KERNEL_HEAP_SIZE / machine_align;
+    static mut HEAP: [usize; heap_block] = [0; heap_block];
     unsafe {
         HEAP_ALLOCATOR
             .lock()
-            .init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE);
+            .init(HEAP.as_ptr() as usize, heap_block * machine_align);
     }
     info!("heap init end");
 }
