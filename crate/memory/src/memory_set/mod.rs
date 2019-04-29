@@ -310,7 +310,15 @@ impl<T: InactivePageTable> MemorySet<T> {
             name,
         };
         self.page_table.edit(|pt| area.map(pt));
-        self.areas.push(area);
+        // keep order by start address
+        let idx = self
+            .areas
+            .iter()
+            .enumerate()
+            .find(|(_, other)| start_addr < other.start_addr)
+            .map(|(i, _)| i)
+            .unwrap_or(self.areas.len());
+        self.areas.insert(idx, area);
     }
 
     /*
