@@ -386,4 +386,4 @@ endif
 
 .PHONY:
 addr2line:
-	@python3 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)
+	@python3.7 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)
