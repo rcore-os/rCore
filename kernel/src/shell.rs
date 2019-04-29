@@ -6,28 +6,28 @@ use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-
 #[cfg(not(feature = "run_cmdline"))]
 pub fn add_user_shell() {
-/// the busybox of alpine linux can not transfer env vars into child process
-/// Now we use busybox from
-/// https://raw.githubusercontent.com/docker-library/busybox/82bc0333a9ae148fbb4246bcbff1487b3fc0c510/musl/busybox.tar.xz -O busybox.tar.xz
-/// This one can transfer env vars!
-/// Why???
+    // the busybox of alpine linux can not transfer env vars into child process
+    // Now we use busybox from
+    // https://raw.githubusercontent.com/docker-library/busybox/82bc0333a9ae148fbb4246bcbff1487b3fc0c510/musl/busybox.tar.xz -O busybox.tar.xz
+    // This one can transfer env vars!
+    // Why???
 
-//    #[cfg(target_arch = "x86_64")]
-//        let init_shell="/bin/busybox"; // from alpine linux
-//
-//    #[cfg(not(target_arch = "x86_64"))]
-        let init_shell="/busybox"; //from docker-library
+    //    #[cfg(target_arch = "x86_64")]
+    //        let init_shell="/bin/busybox"; // from alpine linux
+    //
+    //    #[cfg(not(target_arch = "x86_64"))]
+    let init_shell = "/busybox"; //from docker-library
 
     #[cfg(target_arch = "x86_64")]
-        let init_envs=vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()];
+    let init_envs =
+        vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()];
 
     #[cfg(not(target_arch = "x86_64"))]
-        let init_envs=Vec::new();
+    let init_envs = Vec::new();
 
-    let init_args=vec!["busybox".into(), "ash".into()];
+    let init_args = vec!["busybox".into(), "ash".into()];
 
     if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
         let data = inode.read_as_vec().unwrap();

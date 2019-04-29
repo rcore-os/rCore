@@ -46,15 +46,15 @@ pub fn sys_mmap(
             addr,
             addr + len,
             prot.to_attr(),
-//            ByFrame::new(GlobalFrameAlloc),   //eagle mmap mode
+            //            ByFrame::new(GlobalFrameAlloc),   //eagle mmap mode
             Delay::new(GlobalFrameAlloc),
             "mmap_anon",
         );
         //init with zero for eagle mmap mode
-//        let data = unsafe { slice::from_raw_parts_mut(addr as *mut u8, len) };
-//        for x in data {
-//            *x = 0;
-//        }
+        //        let data = unsafe { slice::from_raw_parts_mut(addr as *mut u8, len) };
+        //        for x in data {
+        //            *x = 0;
+        //        }
         return Ok(addr);
     } else {
         // only check

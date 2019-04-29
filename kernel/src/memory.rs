@@ -105,7 +105,7 @@ impl KernelStack {
     pub fn new() -> Self {
         use alloc::alloc::{alloc, Layout};
         let bottom =
-            unsafe { alloc(Layout::from_size_align(KSTACK_SIZE, KSTACK_SIZE).unwrap())} as usize;
+            unsafe { alloc(Layout::from_size_align(KSTACK_SIZE, KSTACK_SIZE).unwrap()) } as usize;
         KernelStack(bottom)
     }
     pub fn top(&self) -> usize {

@@ -10,8 +10,8 @@ pub fn init() {
             *flags |= EferFlags::SYSTEM_CALL_EXTENSIONS;
         });
 
-        let mut star = Msr::new(0xC0000081);   // legacy mode SYSCALL target
-        let mut lstar = Msr::new(0xC0000082);  // long mode SYSCALL target
+        let mut star = Msr::new(0xC0000081); // legacy mode SYSCALL target
+        let mut lstar = Msr::new(0xC0000082); // long mode SYSCALL target
         let mut sfmask = Msr::new(0xC0000084); // EFLAGS mask for syscall
 
         // flags to clear on syscall

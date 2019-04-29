@@ -625,27 +625,23 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
     let fds = unsafe { proc.vm.check_write_array(fds, 2)? };
     let (read, write) = Pipe::create_pair();
 
-    let read_fd = proc.add_file(
-        FileLike::File(FileHandle::new(
-            Arc::new(read),
-            OpenOptions {
-                read: true,
-                write: false,
-                append: false,
-            },
-        )),
-    );
+    let read_fd = proc.add_file(FileLike::File(FileHandle::new(
+        Arc::new(read),
+        OpenOptions {
+            read: true,
+            write: false,
+            append: false,
+        },
+    )));
 
-    let write_fd = proc.add_file(
-        FileLike::File(FileHandle::new(
-            Arc::new(write),
-            OpenOptions {
-                read: false,
-                write: true,
-                append: false,
-            },
-        )),
-    );
+    let write_fd = proc.add_file(FileLike::File(FileHandle::new(
+        Arc::new(write),
+        OpenOptions {
+            read: false,
+            write: true,
+            append: false,
+        },
+    )));
 
     fds[0] = read_fd as u32;
     fds[1] = write_fd as u32;
@@ -678,9 +674,7 @@ pub fn sys_sendfile(
     let mut buffer = [0u8; 1024];
 
     let mut read_offset = if !offset_ptr.is_null() {
-        unsafe {
-            *(*proc_cell.get()).vm.check_read_ptr(offset_ptr)?
-        }
+        unsafe { *(*proc_cell.get()).vm.check_read_ptr(offset_ptr)? }
     } else {
         in_file.seek(SeekFrom::Current(0))? as usize
     };
@@ -700,7 +694,7 @@ pub fn sys_sendfile(
         let mut bytes_written = 0;
         let mut rlen = read_len;
         while bytes_written < read_len {
-            let write_len = out_file.write(&buffer[bytes_written..(bytes_written+rlen)])?;
+            let write_len = out_file.write(&buffer[bytes_written..(bytes_written + rlen)])?;
             if write_len == 0 {
                 info!(
                     "sendfile:END_ERR out: {}, in: {}, offset_ptr: {:?}, count: {} = bytes_read {}, bytes_written {}, write_len {}",
@@ -709,9 +703,9 @@ pub fn sys_sendfile(
                 return Err(SysError::EBADF);
             }
             bytes_written += write_len;
-            rlen-=write_len;
+            rlen -= write_len;
         }
-        total_written+=bytes_written;
+        total_written += bytes_written;
     }
 
     if !offset_ptr.is_null() {
