@@ -2,6 +2,7 @@
 
 use crate::util::{read, write};
 use core::fmt::{Arguments, Result, Write};
+use spin::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SerialPort {
@@ -15,6 +16,10 @@ const UART_STATUS_CTS: u8 = 0x1; // clear to send signal
 const UART_STATUS_DR: u8 = 0x2; // data ready signal
 
 impl SerialPort {
+    fn new() -> SerialPort {
+        SerialPort { base: 0 }
+    }
+
     pub fn init(&mut self, base: usize) {
         self.base = base;
     }
@@ -49,12 +54,6 @@ impl SerialPort {
     pub fn putfmt(&mut self, fmt: Arguments) {
         self.write_fmt(fmt).unwrap();
     }
-
-    pub fn lock(&self) -> SerialPort {
-        self.clone()
-    }
-
-    pub fn force_unlock(&self) {}
 }
 
 impl Write for SerialPort {
@@ -72,7 +71,10 @@ impl Write for SerialPort {
     }
 }
 
-pub static SERIAL_PORT: SerialPort = SerialPort { base: 0 };
+// pub static SERIAL_PORT: SerialPort = SerialPort { base: 0xa3000000 };
+lazy_static! {
+    pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
+}
 
 pub fn init(base: usize) {
     SERIAL_PORT.lock().init(base);
