@@ -14,7 +14,7 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
+use crate::memory::{ByFrame, Delay, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
@@ -181,6 +181,14 @@ impl Thread {
             let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
             vm.push(
                 ustack_buttom,
+                ustack_top - PAGE_SIZE,
+                MemoryAttr::default().user(),
+                Delay::new(GlobalFrameAlloc),
+                "user_stack_delay",
+            );
+            // We are going to write init info now. So map the last page eagerly.
+            vm.push(
+                ustack_top - PAGE_SIZE,
                 ustack_top,
                 MemoryAttr::default().user(),
                 ByFrame::new(GlobalFrameAlloc),
@@ -284,42 +292,30 @@ impl Thread {
 
     /// Fork a new process from current one
     pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
-        // Clone memory set, make a new page table
-        let proc = self.proc.lock();
-        let vm = proc.vm.clone();
-        let files = proc.files.clone();
-        let cwd = proc.cwd.clone();
-        drop(proc);
-        let parent = Some(self.proc.clone());
-        debug!("fork: finish clone MemorySet");
-
-        // MMU:   copy data to the new space
-        // NoMMU: coping data has been done in `vm.clone()`
-        for area in vm.iter() {
-            let data = Vec::<u8>::from(unsafe { area.as_slice() });
-            unsafe { vm.with(|| area.as_slice_mut().copy_from_slice(data.as_slice())) }
-        }
-
-        debug!("fork: temporary copy data!");
+        let mut proc = self.proc.lock();
         let kstack = KernelStack::new();
+        let vm = proc.vm.clone();
+        let context = unsafe { Context::new_fork(tf, kstack.top(), vm.token()) };
+        let new_proc = Process {
+            vm,
+            files: proc.files.clone(),
+            cwd: proc.cwd.clone(),
+            futexes: BTreeMap::default(),
+            pid: Pid(0),
+            parent: Some(self.proc.clone()),
+            children: Vec::new(),
+            threads: Vec::new(),
+            child_exit: Arc::new(Condvar::new()),
+            child_exit_code: BTreeMap::new(),
+        }.add_to_table();
+        // link to parent
+        proc.children.push(Arc::downgrade(&new_proc));
 
         Box::new(Thread {
-            context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },
+            context,
             kstack,
             clear_child_tid: 0,
-            proc: Process {
-                vm,
-                files,
-                cwd,
-                futexes: BTreeMap::default(),
-                pid: Pid(0),
-                parent,
-                children: Vec::new(),
-                threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
-            }
-            .add_to_table(),
+            proc: new_proc,
         })
     }
 
@@ -359,11 +355,6 @@ impl Process {
         // put to process table
         let self_ref = Arc::new(Mutex::new(self));
         process_table.insert(pid, Arc::downgrade(&self_ref));
-
-        // link to parent
-        if let Some(parent) = &self_ref.lock().parent {
-            parent.lock().children.push(Arc::downgrade(&self_ref));
-        }
 
         self_ref
     }
