@@ -3,6 +3,7 @@
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt::{Debug, Error, Formatter};
+use core::mem::size_of;
 
 use crate::paging::*;
 
@@ -52,16 +53,27 @@ impl MemoryArea {
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
     }
-    /// Check the array is within the readable memory
-    fn check_read_array<S>(&self, ptr: *const S, count: usize) -> bool {
+    /// Check the array is within the readable memory.
+    /// Return the size of space covered in the area.
+    fn check_read_array<S>(&self, ptr: *const S, count: usize) -> usize {
         // page align
-        ptr as usize >= Page::of_addr(self.start_addr).start_address()
-            && unsafe { ptr.add(count) as usize }
-                < Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address()
+        let min_bound = (ptr as usize).max(Page::of_addr(self.start_addr).start_address());
+        let max_bound = unsafe { ptr.add(count) as usize }
+            .min(Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address());
+        if max_bound >= min_bound {
+            max_bound - min_bound
+        } else {
+            0
+        }
     }
-    /// Check the array is within the writable memory
-    fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> bool {
-        !self.attr.readonly && self.check_read_array(ptr, count)
+    /// Check the array is within the writable memory.
+    /// Return the size of space covered in the area.
+    fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> usize {
+        if self.attr.readonly {
+            0
+        } else {
+            self.check_read_array(ptr, count)
+        }
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.
@@ -198,11 +210,14 @@ impl<T: InactivePageTable> MemorySet<T> {
         ptr: *const S,
         count: usize,
     ) -> VMResult<&'static [S]> {
-        self.areas
-            .iter()
-            .find(|area| area.check_read_array(ptr, count))
-            .map(|_| core::slice::from_raw_parts(ptr, count))
-            .ok_or(VMError::InvalidPtr)
+        let mut valid_size = 0;
+        for area in self.areas.iter() {
+            valid_size += area.check_read_array(ptr, count);
+            if valid_size == size_of::<S>() * count {
+                return Ok(core::slice::from_raw_parts(ptr, count));
+            }
+        }
+        Err(VMError::InvalidPtr)
     }
     /// Check the array is within the writable memory
     pub unsafe fn check_write_array<S>(
@@ -210,11 +225,14 @@ impl<T: InactivePageTable> MemorySet<T> {
         ptr: *mut S,
         count: usize,
     ) -> VMResult<&'static mut [S]> {
-        self.areas
-            .iter()
-            .find(|area| area.check_write_array(ptr, count))
-            .map(|_| core::slice::from_raw_parts_mut(ptr, count))
-            .ok_or(VMError::InvalidPtr)
+        let mut valid_size = 0;
+        for area in self.areas.iter() {
+            valid_size += area.check_write_array(ptr, count);
+            if valid_size == size_of::<S>() * count {
+                return Ok(core::slice::from_raw_parts_mut(ptr, count));
+            }
+        }
+        Err(VMError::InvalidPtr)
     }
     /// Check the null-end C string pointer array
     /// Used for getting argv & envp

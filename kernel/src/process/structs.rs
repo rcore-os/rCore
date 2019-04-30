@@ -189,14 +189,14 @@ impl Thread {
             let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
             vm.push(
                 ustack_buttom,
-                ustack_top - PAGE_SIZE,
+                ustack_top - PAGE_SIZE * 4,
                 MemoryAttr::default().user(),
                 Delay::new(GlobalFrameAlloc),
                 "user_stack_delay",
             );
-            // We are going to write init info now. So map the last page eagerly.
+            // We are going to write init info now. So map the last 4 pages eagerly.
             vm.push(
-                ustack_top - PAGE_SIZE,
+                ustack_top - PAGE_SIZE * 4,
                 ustack_top,
                 MemoryAttr::default().user(),
                 ByFrame::new(GlobalFrameAlloc),
