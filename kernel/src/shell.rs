@@ -30,12 +30,9 @@ pub fn add_user_shell() {
     let init_args = vec!["busybox".into(), "ash".into()];
 
     if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
-        processor().manager().add(Thread::new_user(
-            &inode,
-            init_shell,
-            init_args,
-            init_envs,
-        ));
+        processor()
+            .manager()
+            .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
     }

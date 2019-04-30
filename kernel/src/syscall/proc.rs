@@ -174,19 +174,25 @@ pub fn sys_exec(
     let inode = proc.lookup_inode(&path)?;
 
     // Make new Thread
-    let (mut vm, entry_addr, ustack_top) = Thread::new_user_vm(&inode, &path, args, envs).unwrap();
+    match Thread::new_user_vm(&inode, &path, args, envs) {
+        Ok((mut vm, entry_addr, ustack_top)) => {
+            // Activate new page table
+            core::mem::swap(&mut proc.vm, &mut vm);
+            unsafe {
+                proc.vm.activate();
+            }
 
-    // Activate new page table
-    core::mem::swap(&mut proc.vm, &mut vm);
-    unsafe {
-        proc.vm.activate();
+            // Modify the TrapFrame
+            *tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
+
+            info!("exec:END: path: {:?}", path);
+            Ok(0)
+        }
+        Err(err) => {
+            info!("exec failed with {}", err);
+            Err(SysError::EINVAL)
+        }
     }
-
-    // Modify the TrapFrame
-    *tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
-
-    info!("exec:END: path: {:?}", path);
-    Ok(0)
 }
 
 pub fn sys_yield() -> SysResult {
