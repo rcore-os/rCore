@@ -23,6 +23,10 @@ pub fn init_serial_early() {
 pub fn init_driver() {
     // TODO: add possibly more drivers
     // timer::init();
+    fb::init();
+    if let Some(fb) = fb::FRAME_BUFFER.lock().as_mut() {
+        fb.clear();
+    }
 }
 
 pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
