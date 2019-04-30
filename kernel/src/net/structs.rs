@@ -55,7 +55,7 @@ pub trait Socket: Send + Sync {
     fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)
     fn connect(&mut self, endpoint: Endpoint) -> SysResult;
-    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
+    fn bind(&mut self, _endpoint: Endpoint) -> SysResult {
         Err(SysError::EINVAL)
     }
     fn listen(&mut self) -> SysResult {
@@ -73,11 +73,11 @@ pub trait Socket: Send + Sync {
     fn remote_endpoint(&self) -> Option<Endpoint> {
         None
     }
-    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+    fn setsockopt(&mut self, _level: usize, _opt: usize, _data: &[u8]) -> SysResult {
         warn!("setsockopt is unimplemented");
         Ok(0)
     }
-    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+    fn ioctl(&mut self, _request: usize, _arg1: usize, _arg2: usize, _arg3: usize) -> SysResult {
         warn!("ioctl is unimplemented for this socket");
         Ok(0)
     }

@@ -5,7 +5,7 @@ use core::ptr::null;
 
 pub struct ProcInitInfo {
     pub args: Vec<String>,
-    pub envs: BTreeMap<String, String>,
+    pub envs: Vec<String>,
     pub auxv: BTreeMap<u8, usize>,
 }
 
@@ -19,10 +19,8 @@ impl ProcInitInfo {
         let envs: Vec<_> = self
             .envs
             .iter()
-            .map(|(key, value)| {
-                writer.push_str(value.as_str());
-                writer.push_slice(&[b"="]);
-                writer.push_slice(key.as_bytes());
+            .map(|arg| {
+                writer.push_str(arg.as_str());
                 writer.sp
             })
             .collect();

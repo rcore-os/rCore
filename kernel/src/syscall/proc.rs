@@ -6,14 +6,20 @@ use crate::fs::INodeExt;
 /// Fork the current process. Return the child's PID.
 pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     let new_thread = current_thread().fork(tf);
-    let pid = processor().manager().add(new_thread);
+    let pid = new_thread.proc.lock().pid.get();
+    let tid = processor().manager().add(new_thread);
+    processor().manager().detach(tid);
     info!("fork: {} -> {}", thread::current().id(), pid);
     Ok(pid)
 }
 
+pub fn sys_vfork(tf: &TrapFrame) -> SysResult {
+    sys_fork(tf)
+}
+
 /// Create a new thread in the current process.
 /// The new thread's stack pointer will be set to `newsp`,
-///   and thread pointer will be set to `newtls`.
+/// and thread pointer will be set to `newtls`.
 /// The child tid will be stored at both `parent_tid` and `child_tid`.
 /// This is partially implemented for musl only.
 pub fn sys_clone(
@@ -26,40 +32,43 @@ pub fn sys_clone(
 ) -> SysResult {
     let clone_flags = CloneFlags::from_bits_truncate(flags);
     info!(
-        "clone: flags: {:?}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
-        clone_flags, newsp, parent_tid, child_tid, newtls
+        "clone: flags: {:?} == {:#x}, newsp: {:#x}, parent_tid: {:?}, child_tid: {:?}, newtls: {:#x}",
+        clone_flags, flags, newsp, parent_tid, child_tid, newtls
     );
     if flags == 0x4111 || flags == 0x11 {
         warn!("sys_clone is calling sys_fork instead, ignoring other args");
         return sys_fork(tf);
     }
-    if flags != 0x7d0f00 {
-        warn!("sys_clone only support musl pthread_create");
-        return Err(SysError::ENOSYS);
+    if (flags != 0x7d0f00) && (flags != 0x5d0f00) {
+        //0x5d0f00 is the args from gcc of alpine linux
+        //warn!("sys_clone only support musl pthread_create");
+        panic!(
+            "sys_clone only support sys_fork OR musl pthread_create without flags{:x}",
+            flags
+        );
+        //return Err(SysError::ENOSYS);
     }
-    {
-        let proc = process();
-        proc.vm.check_write_ptr(parent_tid)?;
-        proc.vm.check_write_ptr(child_tid)?;
-    }
+    let parent_tid_ref = unsafe { process().vm.check_write_ptr(parent_tid)? };
+    let child_tid_ref = unsafe { process().vm.check_write_ptr(child_tid)? };
     let new_thread = current_thread().clone(tf, newsp, newtls, child_tid as usize);
     // FIXME: parent pid
     let tid = processor().manager().add(new_thread);
+    processor().manager().detach(tid);
     info!("clone: {} -> {}", thread::current().id(), tid);
-    unsafe {
-        parent_tid.write(tid as u32);
-        child_tid.write(tid as u32);
-    }
+    *parent_tid_ref = tid as u32;
+    *child_tid_ref = tid as u32;
     Ok(tid)
 }
 
 /// Wait for the process exit.
 /// Return the PID. Store exit code to `wstatus` if it's not null.
 pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
-    info!("wait4: pid: {}, code: {:?}", pid, wstatus);
-    if !wstatus.is_null() {
-        process().vm.check_write_ptr(wstatus)?;
-    }
+    //info!("wait4: pid: {}, code: {:?}", pid, wstatus);
+    let wstatus = if !wstatus.is_null() {
+        Some(unsafe { process().vm.check_write_ptr(wstatus)? })
+    } else {
+        None
+    };
     #[derive(Debug)]
     enum WaitFor {
         AnyChild,
@@ -84,10 +93,8 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
         // if found, return
         if let Some((pid, exit_code)) = find {
             proc.child_exit_code.remove(&pid);
-            if !wstatus.is_null() {
-                unsafe {
-                    wstatus.write(exit_code as i32);
-                }
+            if let Some(wstatus) = wstatus {
+                *wstatus = exit_code as i32;
             }
             return Ok(pid);
         }
@@ -118,75 +125,71 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
     }
 }
 
+/// Replaces the current ** process ** with a new process image
+///
+/// `argv` is an array of argument strings passed to the new program.
+/// `envp` is an array of strings, conventionally of the form `key=value`,
+/// which are passed as environment to the new program.
+///
+/// NOTICE: `argv` & `envp` can not be NULL (different from Linux)
+///
+/// NOTICE: for multi-thread programs
+/// A call to any exec function from a process with more than one thread
+/// shall result in all threads being terminated and the new executable image
+/// being loaded and executed.
 pub fn sys_exec(
-    name: *const u8,
+    path: *const u8,
     argv: *const *const u8,
     envp: *const *const u8,
     tf: &mut TrapFrame,
 ) -> SysResult {
-    info!("exec: name: {:?}, argv: {:?} envp: {:?}", name, argv, envp);
-    let proc = process();
-    let exec_name = if name.is_null() {
-        String::from("")
-    } else {
-        unsafe { proc.vm.check_and_clone_cstr(name)? }
-    };
+    info!(
+        "exec:BEG: path: {:?}, argv: {:?}, envp: {:?}",
+        path, argv, envp
+    );
+    let mut proc = process();
+    let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
+    let args = unsafe { proc.vm.check_and_clone_cstr_array(argv)? };
+    let envs = unsafe { proc.vm.check_and_clone_cstr_array(envp)? };
 
-    if argv.is_null() {
-        return Err(SysError::EINVAL);
-    }
-    // Check and copy args to kernel
-    let mut args = Vec::new();
-    unsafe {
-        let mut current_argv = argv as *const *const u8;
-        proc.vm.check_read_ptr(current_argv)?;
-        while !(*current_argv).is_null() {
-            let arg = proc.vm.check_and_clone_cstr(*current_argv)?;
-            args.push(arg);
-            current_argv = current_argv.add(1);
-        }
-    }
-//    // Check and copy envs to kernel
-//    let mut envs = Vec::new();
-//    unsafe {
-//        let mut current_env = envp as *const *const u8;
-//        proc.vm.check_read_ptr(current_env)?;
-//        while !(*current_env).is_null() {
-//            let env = proc.vm.check_and_clone_cstr(*current_env)?;
-//            envs.push(env);
-//            current_env = current_env.add(1);
-//        }
-//    }
-//
     if args.is_empty() {
+        error!("exec: args is null");
         return Err(SysError::EINVAL);
     }
 
-    info!("EXEC: name:{:?} , args {:?}", exec_name, args);
+    info!(
+        "exec:STEP2: path: {:?}, args: {:?}, envs: {:?}",
+        path, args, envs
+    );
+
+    // Kill other threads
+    proc.threads.retain(|&tid| {
+        if tid != processor().tid() {
+            processor().manager().exit(tid, 1);
+        }
+        tid == processor().tid()
+    });
 
     // Read program file
-    //let path = args[0].as_str();
-    let exec_path = exec_name.as_str();
-    let inode = proc.lookup_inode(exec_path)?;
-    let buf = inode.read_as_vec()?;
+    let inode = proc.lookup_inode(&path)?;
 
     // Make new Thread
-    let iter = args.iter().map(|s| s.as_str());
-    let mut thread = Thread::new_user(buf.as_slice(), exec_path, iter);
-    thread.proc.lock().clone_for_exec(&proc);
+    let (mut vm, entry_addr, ustack_top) =
+        Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
 
     // Activate new page table
+    core::mem::swap(&mut proc.vm, &mut vm);
     unsafe {
-        thread.proc.lock().vm.activate();
+        proc.vm.activate();
     }
 
+    // Modify exec path
+    proc.exec_path = path.clone();
+
     // Modify the TrapFrame
-    *tf = unsafe { thread.context.get_init_tf() };
+    *tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
 
-    // Swap Context but keep KStack
-    ::core::mem::swap(&mut current_thread().kstack, &mut thread.kstack);
-    ::core::mem::swap(current_thread(), &mut *thread);
-
+    info!("exec:END: path: {:?}", path);
     Ok(0)
 }
 
@@ -319,8 +322,7 @@ pub fn sys_exit_group(exit_code: usize) -> ! {
 }
 
 pub fn sys_nanosleep(req: *const TimeSpec) -> SysResult {
-    process().vm.check_read_ptr(req)?;
-    let time = unsafe { req.read() };
+    let time = unsafe { *process().vm.check_read_ptr(req)? };
     info!("nanosleep: time: {:#?}", time);
     // TODO: handle spurious wakeup
     thread::sleep(time.to_duration());

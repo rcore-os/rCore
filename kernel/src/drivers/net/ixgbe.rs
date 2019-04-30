@@ -15,7 +15,6 @@ use smoltcp::wire::EthernetAddress;
 use smoltcp::wire::*;
 use smoltcp::Result;
 
-use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;

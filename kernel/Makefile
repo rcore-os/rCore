@@ -23,18 +23,21 @@
 #   smp     = 1 | 2 | ...        SMP core number
 #   graphic = on | off           Enable/disable qemu graphical output
 #   board   = none               Running on QEMU
-#         | pc                  Only available on x86_64, run on real pc
+#         | pc                   Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
+#         | k210                 Only available on riscv64, run on K210, use Sv39
+#         | rocket_chip          Only available on riscv64, run on Rocket Chip, use Sv39
 #         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
 #   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
 #   u_boot = /path/to/u-boot.bin Only available on aarch64, use u-boot to boot rcore
+# . extra_features = profile | ... Add additional features
 
 arch ?= riscv64
 board ?= none
-mode ?= debug
-LOG  ?= debug
+mode ?= release
+LOG  ?=
 graphic ?= off
 smp  ?= 4
 pci_passthru ?=
@@ -59,7 +62,7 @@ ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
 # board is pc or qemu?
-ifeq ($(board), pc)
+ifeq ($(board), $(filter $(board), pc u540 k210 rocket_chip))
 #link user img, so use original image
 export SFSIMG = $(user_dir)/build/$(arch).img
 else
@@ -124,7 +127,9 @@ endif
 else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-serial mon:stdio \
+	-kernel ../tools/opensbi/virt_rv32.elf \
+	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
@@ -132,11 +137,21 @@ qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(arch), riscv64)
+ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
-	-kernel $(kernel_img) \
+	-serial mon:stdio \
+	-kernel ../tools/opensbi/fu540.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img)
+else
+qemu_opts += \
+	-machine virt \
+	-serial mon:stdio \
+	-kernel ../tools/opensbi/virt_rv64.elf \
+	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(SFSIMG),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
+endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
@@ -192,14 +207,11 @@ features += raspi3_use_generic_timer
 endif
 endif
 
-ifeq ($(board), u540)
-features += sv39
-riscv_pk_args += --enable-sv39
-endif
-
 ifneq ($(board), none)
 features += board_$(board)
 endif
+
+features += $(extra_features)
 
 build_args := --target targets/$(target).json --features "$(features)"
 
@@ -297,28 +309,8 @@ ifeq ($(need_bootloader), true)
 endif
 
 $(kernel_img): kernel $(bootloader)
-ifeq ($(arch), riscv32)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv32imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
-else ifeq ($(arch), riscv64)
-	@mkdir -p target/$(target)/bbl && \
-	cd target/$(target)/bbl && \
-	$(bbl_path)/configure \
-		$(riscv_pk_args) \
-		--with-arch=rv64imac \
-		--disable-fp-emulation \
-		--host=riscv64-unknown-elf \
-		--with-payload=$(abspath $(kernel)) && \
-	make -j && \
-	cp bbl $(abspath $@)
+ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
 ifneq ($(u_boot), )
 	@cp $(u_boot) $@
@@ -335,13 +327,12 @@ kernel: $(dtb)
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 	@mv target/x86_64/bootimage.bin $(bootimage)
-else ifeq ($(arch), riscv32)
-	@-patch -p0 -N -b \
-		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
-		src/arch/riscv32/atomic.patch
-	@cargo xbuild $(build_args)
-else ifeq ($(arch), riscv64)
+else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+ifeq ($(board), k210)
+	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+else
 	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv32/atomic.patch
@@ -383,10 +374,19 @@ endif
 ifeq ($(board), u540)
 .PHONY:
 install: $(kernel_img)
-	@$(objcopy) -S -O binary --change-addresses -0x80000000 $< $(build_path)/bin
-	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/sd.img
+	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
+	@dd if=$< of=$(build_path)/bin bs=0x20000 seek=16
+	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/u540.img
+endif
+
+ifeq ($(board), k210)
+.PHONY:
+install: $(kernel_img)
+	@$(objcopy) -S -O binary ../tools/opensbi/k210.elf $(build_path)/k210.img
+	@dd if=$< of=$(build_path)/k210.img bs=0x10000 seek=1
+	@python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
 endif
 
 .PHONY:
 addr2line:
-	@python3 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)
+	@python3.7 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)

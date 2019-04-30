@@ -1,4 +1,4 @@
-use rcore_memory::memory_set::handler::{ByFrame, Delay};
+use rcore_memory::memory_set::handler::{ByFrame, Delay, File};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::paging::PageTable;
 use rcore_memory::Page;
@@ -51,24 +51,20 @@ pub fn sys_mmap(
         );
         return Ok(addr);
     } else {
-        // only check
-        let _ = proc.get_file(fd)?;
-
-        // TODO: delay mmap file
+        let inode = proc.get_file(fd)?.inode();
         proc.vm.push(
             addr,
             addr + len,
             prot.to_attr(),
-            ByFrame::new(GlobalFrameAlloc),
+            File {
+                file: INodeForMap(inode),
+                mem_start: addr,
+                file_start: offset,
+                file_end: offset + len,
+                allocator: GlobalFrameAlloc,
+            },
             "mmap_file",
         );
-        let data = unsafe { slice::from_raw_parts_mut(addr as *mut u8, len) };
-        let file = proc.get_file(fd)?;
-        let read_len = file.read_at(offset, data)?;
-        if read_len != data.len() {
-            // use count() to consume the iterator
-            data[read_len..].iter_mut().map(|x| *x = 0).count();
-        }
         return Ok(addr);
     }
 }
@@ -123,6 +119,21 @@ bitflags! {
     }
 }
 
+#[cfg(target_arch = "mips")]
+bitflags! {
+    pub struct MmapFlags: usize {
+        /// Changes are shared.
+        const SHARED = 1 << 0;
+        /// Changes are private.
+        const PRIVATE = 1 << 1;
+        /// Place the mapping at the exact address
+        const FIXED = 1 << 4;
+        /// The mapping is not backed by any file. (non-POSIX)
+        const ANONYMOUS = 0x800;
+    }
+}
+
+#[cfg(not(target_arch = "mips"))]
 bitflags! {
     pub struct MmapFlags: usize {
         /// Changes are shared.

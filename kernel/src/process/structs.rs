@@ -14,11 +14,14 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::memory::{ByFrame, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
-use crate::net::SOCKETS;
+use crate::memory::{
+    ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
+};
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
+use core::mem::uninitialized;
+use rcore_fs::vfs::INode;
 
 // TODO: avoid pub
 pub struct Thread {
@@ -32,41 +35,23 @@ pub struct Thread {
 
 /// Pid type
 /// For strong type separation
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pid(Option<usize>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Pid(usize);
 
 impl Pid {
-    pub fn uninitialized() -> Self {
-        Pid(None)
-    }
-
-    /// Return if it was uninitialized before this call
-    /// When returning true, it usually means this is the first thread
-    pub fn set_if_uninitialized(&mut self, tid: Tid) -> bool {
-        if self.0 == None {
-            self.0 = Some(tid as usize);
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn get(&self) -> usize {
-        self.0.unwrap()
+        self.0
     }
 
     /// Return whether this pid represents the init process
     pub fn is_init(&self) -> bool {
-        self.0 == Some(0)
+        self.0 == 0
     }
 }
 
 impl fmt::Display for Pid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            Some(pid) => write!(f, "{}", pid),
-            None => write!(f, "None"),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
@@ -75,6 +60,7 @@ pub struct Process {
     pub vm: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
+    pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
 
     // relationship
@@ -103,21 +89,9 @@ impl rcore_thread::Context for Thread {
     }
 
     fn set_tid(&mut self, tid: Tid) {
-        // set pid=tid if unspecified
         let mut proc = self.proc.lock();
-        if proc.pid.set_if_uninitialized(tid) {
-            // first thread in the process
-            // link to its ppid
-            if let Some(parent) = &proc.parent {
-                let mut parent = parent.lock();
-                parent.children.push(Arc::downgrade(&self.proc));
-            }
-        }
         // add it to threads
         proc.threads.push(tid);
-        PROCESSES
-            .write()
-            .insert(proc.pid.get(), Arc::downgrade(&self.proc));
     }
 }
 
@@ -126,10 +100,8 @@ impl Thread {
     pub unsafe fn new_init() -> Box<Thread> {
         Box::new(Thread {
             context: Context::null(),
-            kstack: KernelStack::new(),
-            clear_child_tid: 0,
-            // safety: this field will never be used
-            proc: core::mem::uninitialized(),
+            // safety: other fields will never be used
+            ..core::mem::uninitialized()
         })
     }
 
@@ -142,60 +114,77 @@ impl Thread {
             kstack,
             clear_child_tid: 0,
             // TODO: kernel thread should not have a process
-            proc: Arc::new(Mutex::new(Process {
+            proc: Process {
                 vm,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
+                exec_path: String::new(),
                 futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
+                pid: Pid(0),
                 parent: None,
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-            })),
+            }
+            .add_to_table(),
         })
     }
 
-    /// Make a new user process from ELF `data`
-    pub fn new_user<'a, Iter>(data: &[u8], exec_path: &str, args: Iter) -> Box<Thread>
-    where
-        Iter: Iterator<Item = &'a str>,
-    {
+    /// Construct virtual memory of a new user process from ELF `data`.
+    /// Return `(MemorySet, entry_point, ustack_top)`
+    pub fn new_user_vm(
+        inode: &Arc<INode>,
+        exec_path: &str,
+        mut args: Vec<String>,
+        envs: Vec<String>,
+    ) -> Result<(MemorySet, usize, usize), &'static str> {
+        // Read ELF header
+        // 0x3c0: magic number from ld-musl.so
+        let mut data: [u8; 0x3c0] = unsafe { uninitialized() };
+        inode
+            .read_at(0, &mut data)
+            .map_err(|_| "failed to read from INode")?;
+
         // Parse ELF
-        let elf = ElfFile::new(data).expect("failed to read elf");
+        let elf = ElfFile::new(&data)?;
 
         // Check ELF type
         match elf.header.pt2.type_().as_type() {
             header::Type::Executable => {}
             header::Type::SharedObject => {}
-            _ => panic!("ELF is not executable or shared object"),
+            _ => return Err("ELF is not executable or shared object"),
         }
 
-        // Check interpreter
+        // Check ELF arch
+        match elf.header.pt2.machine().as_machine() {
+            #[cfg(target_arch = "x86_64")]
+            header::Machine::X86_64 => {}
+            #[cfg(target_arch = "aarch64")]
+            header::Machine::AArch64 => {}
+            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            header::Machine::Other(243) => {}
+            #[cfg(target_arch = "mips")]
+            header::Machine::Mips => {}
+            machine @ _ => return Err("invalid ELF arch"),
+        }
+
+        // Check interpreter (for dynamic link)
         if let Ok(loader_path) = elf.get_interpreter() {
             // assuming absolute path
-            if let Ok(inode) = crate::fs::ROOT_INODE.lookup_follow(loader_path, FOLLOW_MAX_DEPTH) {
-                if let Ok(buf) = inode.read_as_vec() {
-                    debug!("using loader {}", &loader_path);
-                    // Elf loader should not have INTERP
-                    // No infinite loop
-                    let mut new_args: Vec<&str> = args.collect();
-                    new_args.insert(0, loader_path);
-                    new_args.insert(1, exec_path);
-                    new_args.remove(2);
-                    warn!("loader args: {:?}", new_args);
-                    return Thread::new_user(buf.as_slice(), exec_path,new_args.into_iter());
-                } else {
-                    warn!("loader specified as {} but failed to read", &loader_path);
-                }
-            } else {
-                warn!("loader specified as {} but not found", &loader_path);
-            }
+            let inode = crate::fs::ROOT_INODE
+                .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
+                .map_err(|_| "interpreter not found")?;
+            // modify args for loader
+            args[0] = exec_path.into();
+            args.insert(0, loader_path.into());
+            // Elf loader should not have INTERP
+            // No infinite loop
+            return Thread::new_user_vm(&inode, exec_path, args, envs);
         }
 
         // Make page table
-        let mut vm = elf.make_memory_set();
+        let mut vm = elf.make_memory_set(inode);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
@@ -204,6 +193,14 @@ impl Thread {
             let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
             vm.push(
                 ustack_buttom,
+                ustack_top - PAGE_SIZE * 4,
+                MemoryAttr::default().user(),
+                Delay::new(GlobalFrameAlloc),
+                "user_stack_delay",
+            );
+            // We are going to write init info now. So map the last 4 pages eagerly.
+            vm.push(
+                ustack_top - PAGE_SIZE * 4,
                 ustack_top,
                 MemoryAttr::default().user(),
                 ByFrame::new(GlobalFrameAlloc),
@@ -214,8 +211,8 @@ impl Thread {
 
         // Make init info
         let init_info = ProcInitInfo {
-            args: args.map(|s| String::from(s)).collect(),
-            envs: BTreeMap::new(),
+            args,
+            envs,
             auxv: {
                 let mut map = BTreeMap::new();
                 if let Some(phdr_vaddr) = elf.get_phdr_vaddr() {
@@ -232,6 +229,19 @@ impl Thread {
         }
 
         trace!("{:#x?}", vm);
+
+        let entry_addr = elf.header.pt2.entry_point() as usize;
+        Ok((vm, entry_addr, ustack_top))
+    }
+
+    /// Make a new user process from ELF `data`
+    pub fn new_user(
+        inode: &Arc<INode>,
+        exec_path: &str,
+        mut args: Vec<String>,
+        envs: Vec<String>,
+    ) -> Box<Thread> {
+        let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();
 
         let kstack = KernelStack::new();
 
@@ -270,66 +280,57 @@ impl Thread {
             )),
         );
 
-        let entry_addr = elf.header.pt2.entry_point() as usize;
-
         Box::new(Thread {
             context: unsafe {
                 Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm.token())
             },
             kstack,
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
+            proc: Process {
                 vm,
                 files,
                 cwd: String::from("/"),
+                exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
+                pid: Pid(0),
                 parent: None,
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-            })),
+            }
+            .add_to_table(),
         })
     }
 
     /// Fork a new process from current one
     pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
-        // Clone memory set, make a new page table
-        let proc = self.proc.lock();
-        let vm = proc.vm.clone();
-        let files = proc.files.clone();
-        let cwd = proc.cwd.clone();
-        drop(proc);
-        let parent = Some(self.proc.clone());
-        debug!("fork: finish clone MemorySet");
-
-        // MMU:   copy data to the new space
-        // NoMMU: coping data has been done in `vm.clone()`
-        for area in vm.iter() {
-            let data = Vec::<u8>::from(unsafe { area.as_slice() });
-            unsafe { vm.with(|| area.as_slice_mut().copy_from_slice(data.as_slice())) }
-        }
-
-        debug!("fork: temporary copy data!");
+        let mut proc = self.proc.lock();
         let kstack = KernelStack::new();
+        let vm = proc.vm.clone();
+        let context = unsafe { Context::new_fork(tf, kstack.top(), vm.token()) };
+        let new_proc = Process {
+            vm,
+            files: proc.files.clone(),
+            cwd: proc.cwd.clone(),
+            exec_path: proc.exec_path.clone(),
+            futexes: BTreeMap::default(),
+            pid: Pid(0),
+            parent: Some(self.proc.clone()),
+            children: Vec::new(),
+            threads: Vec::new(),
+            child_exit: Arc::new(Condvar::new()),
+            child_exit_code: BTreeMap::new(),
+        }
+        .add_to_table();
+        // link to parent
+        proc.children.push(Arc::downgrade(&new_proc));
 
         Box::new(Thread {
-            context: unsafe { Context::new_fork(tf, kstack.top(), vm.token()) },
+            context,
             kstack,
             clear_child_tid: 0,
-            proc: Arc::new(Mutex::new(Process {
-                vm,
-                files,
-                cwd,
-                futexes: BTreeMap::default(),
-                pid: Pid::uninitialized(),
-                parent,
-                children: Vec::new(),
-                threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
-            })),
+            proc: new_proc,
         })
     }
 
@@ -353,21 +354,39 @@ impl Thread {
 }
 
 impl Process {
-    pub fn get_free_fd(&self) -> usize {
+    /// Assign a pid and put itself to global process table.
+    fn add_to_table(mut self) -> Arc<Mutex<Self>> {
+        let mut process_table = PROCESSES.write();
+
+        // assign pid
+        let pid = (0..)
+            .find(|i| match process_table.get(i) {
+                Some(p) if p.upgrade().is_some() => false,
+                _ => true,
+            })
+            .unwrap();
+        self.pid = Pid(pid);
+
+        // put to process table
+        let self_ref = Arc::new(Mutex::new(self));
+        process_table.insert(pid, Arc::downgrade(&self_ref));
+
+        self_ref
+    }
+    fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
+    /// Add a file to the process, return its fd.
+    pub fn add_file(&mut self, file_like: FileLike) -> usize {
+        let fd = self.get_free_fd();
+        self.files.insert(fd, file_like);
+        fd
     }
     pub fn get_futex(&mut self, uaddr: usize) -> Arc<Condvar> {
         if !self.futexes.contains_key(&uaddr) {
             self.futexes.insert(uaddr, Arc::new(Condvar::new()));
         }
         self.futexes.get(&uaddr).unwrap().clone()
-    }
-    pub fn clone_for_exec(&mut self, other: &Self) {
-        self.files = other.files.clone();
-        self.cwd = other.cwd.clone();
-        self.pid = other.pid.clone();
-        self.parent = other.parent.clone();
-        self.threads = other.threads.clone();
     }
 }
 
@@ -378,9 +397,11 @@ trait ToMemoryAttr {
 impl ToMemoryAttr for Flags {
     fn to_attr(&self) -> MemoryAttr {
         let mut flags = MemoryAttr::default().user();
-        // FIXME: handle readonly
         if self.is_execute() {
             flags = flags.execute();
+        }
+        if !self.is_write() {
+            flags = flags.readonly();
         }
         flags
     }
@@ -389,7 +410,7 @@ impl ToMemoryAttr for Flags {
 /// Helper functions to process ELF file
 trait ElfExt {
     /// Generate a MemorySet according to the ELF file.
-    fn make_memory_set(&self) -> MemorySet;
+    fn make_memory_set(&self, inode: &Arc<INode>) -> MemorySet;
 
     /// Get interpreter string if it has.
     fn get_interpreter(&self) -> Result<&str, &str>;
@@ -399,7 +420,7 @@ trait ElfExt {
 }
 
 impl ElfExt for ElfFile<'_> {
-    fn make_memory_set(&self) -> MemorySet {
+    fn make_memory_set(&self, inode: &Arc<INode>) -> MemorySet {
         debug!("creating MemorySet from ELF");
         let mut ms = MemorySet::new();
 
@@ -407,33 +428,19 @@ impl ElfExt for ElfFile<'_> {
             if ph.get_type() != Ok(Type::Load) {
                 continue;
             }
-            let virt_addr = ph.virtual_addr() as usize;
-            let mem_size = ph.mem_size() as usize;
-            let data = match ph.get_data(self).unwrap() {
-                SegmentData::Undefined(data) => data,
-                _ => unreachable!(),
-            };
-
-            // Get target slice
-            let target = {
-                ms.push(
-                    virt_addr,
-                    virt_addr + mem_size,
-                    ph.flags().to_attr(),
-                    ByFrame::new(GlobalFrameAlloc),
-                    "",
-                );
-                unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
-            };
-            // Copy data
-            unsafe {
-                ms.with(|| {
-                    if data.len() != 0 {
-                        target[..data.len()].copy_from_slice(data);
-                    }
-                    target[data.len()..].iter_mut().for_each(|x| *x = 0);
-                });
-            }
+            ms.push(
+                ph.virtual_addr() as usize,
+                ph.virtual_addr() as usize + ph.mem_size() as usize,
+                ph.flags().to_attr(),
+                File {
+                    file: INodeForMap(inode.clone()),
+                    mem_start: ph.virtual_addr() as usize,
+                    file_start: ph.offset() as usize,
+                    file_end: ph.offset() as usize + ph.file_size() as usize,
+                    allocator: GlobalFrameAlloc,
+                },
+                "elf",
+            );
         }
         ms
     }
@@ -473,5 +480,14 @@ impl ElfExt for ElfFile<'_> {
             warn!("elf: no phdr found, tls might not work");
             None
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct INodeForMap(pub Arc<INode>);
+
+impl Read for INodeForMap {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        self.0.read_at(offset, buf).unwrap()
     }
 }

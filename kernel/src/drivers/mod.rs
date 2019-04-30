@@ -72,21 +72,21 @@ pub trait Driver: Send + Sync {
     }
 
     // send an ethernet frame, only use it when necessary
-    fn send(&self, data: &[u8]) -> Option<usize> {
+    fn send(&self, _data: &[u8]) -> Option<usize> {
         unimplemented!("not a net driver")
     }
 
     // get mac address from ip address in arp table
-    fn get_arp(&self, ip: IpAddress) -> Option<EthernetAddress> {
+    fn get_arp(&self, _ip: IpAddress) -> Option<EthernetAddress> {
         unimplemented!("not a net driver")
     }
 
     // block related drivers should implement these
-    fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
+    fn read_block(&self, _block_id: usize, _buf: &mut [u8]) -> bool {
         unimplemented!("not a block driver")
     }
 
-    fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
+    fn write_block(&self, _block_id: usize, _buf: &[u8]) -> bool {
         unimplemented!("not a block driver")
     }
 }

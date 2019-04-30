@@ -116,4 +116,8 @@ impl FileHandle {
     pub fn io_control(&self, cmd: u32, arg: usize) -> Result<()> {
         self.inode.io_control(cmd, arg)
     }
+
+    pub fn inode(&self) -> Arc<INode> {
+        self.inode.clone()
+    }
 }

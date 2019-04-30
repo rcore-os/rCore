@@ -18,16 +18,16 @@ pub fn sys_arch_prctl(code: i32, addr: usize, tf: &mut TrapFrame) -> SysResult {
 }
 
 pub fn sys_uname(buf: *mut u8) -> SysResult {
-    info!("sched_uname: buf: {:?}", buf);
+    info!("uname: buf: {:?}", buf);
 
     let offset = 65;
     let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
     let proc = process();
-    proc.vm.check_write_array(buf, strings.len() * offset)?;
+    let buf = unsafe { proc.vm.check_write_array(buf, strings.len() * offset)? };
 
     for i in 0..strings.len() {
         unsafe {
-            util::write_cstr(buf.add(i * offset), &strings[i]);
+            util::write_cstr(&mut buf[i * offset], &strings[i]);
         }
     }
     Ok(0)
@@ -39,22 +39,20 @@ pub fn sys_sched_getaffinity(pid: usize, size: usize, mask: *mut u32) -> SysResu
         pid, size, mask
     );
     let proc = process();
-    proc.vm.check_write_array(mask, size / size_of::<u32>())?;
+    let mask = unsafe { proc.vm.check_write_array(mask, size / size_of::<u32>())? };
 
     // we only have 4 cpu at most.
     // so just set it.
-    unsafe {
-        *mask = 0b1111;
-    }
+    mask[0] = 0b1111;
     Ok(0)
 }
 
 pub fn sys_sysinfo(sys_info: *mut SysInfo) -> SysResult {
     let proc = process();
-    proc.vm.check_write_ptr(sys_info)?;
+    let sys_info = unsafe { proc.vm.check_write_ptr(sys_info)? };
 
     let sysinfo = SysInfo::default();
-    unsafe { *sys_info = sysinfo };
+    *sys_info = sysinfo;
     Ok(0)
 }
 
@@ -74,13 +72,11 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
     if uaddr % size_of::<u32>() != 0 {
         return Err(SysError::EINVAL);
     }
-    process().vm.check_write_ptr(uaddr as *mut AtomicI32)?;
-    let atomic = unsafe { &mut *(uaddr as *mut AtomicI32) };
+    let atomic = unsafe { process().vm.check_write_ptr(uaddr as *mut AtomicI32)? };
     let _timeout = if timeout.is_null() {
         None
     } else {
-        process().vm.check_read_ptr(timeout)?;
-        Some(unsafe { *timeout })
+        Some(unsafe { *process().vm.check_read_ptr(timeout)? })
     };
 
     const OP_WAIT: u32 = 0;
@@ -156,38 +152,32 @@ pub fn sys_prlimit64(
     match resource {
         RLIMIT_STACK => {
             if !old_limit.is_null() {
-                proc.vm.check_write_ptr(old_limit)?;
-                unsafe {
-                    *old_limit = RLimit {
-                        cur: USER_STACK_SIZE as u64,
-                        max: USER_STACK_SIZE as u64,
-                    };
-                }
+                let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                *old_limit = RLimit {
+                    cur: USER_STACK_SIZE as u64,
+                    max: USER_STACK_SIZE as u64,
+                };
             }
             Ok(0)
         }
         RLIMIT_NOFILE => {
             if !old_limit.is_null() {
-                proc.vm.check_write_ptr(old_limit)?;
-                unsafe {
-                    *old_limit = RLimit {
-                        cur: 1024,
-                        max: 1024,
-                    };
-                }
+                let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                *old_limit = RLimit {
+                    cur: 1024,
+                    max: 1024,
+                };
             }
             Ok(0)
         }
         RLIMIT_RSS | RLIMIT_AS => {
             if !old_limit.is_null() {
-                proc.vm.check_write_ptr(old_limit)?;
-                unsafe {
-                    // 1GB
-                    *old_limit = RLimit {
-                        cur: 1024 * 1024 * 1024,
-                        max: 1024 * 1024 * 1024,
-                    };
-                }
+                let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                // 1GB
+                *old_limit = RLimit {
+                    cur: 1024 * 1024 * 1024,
+                    max: 1024 * 1024 * 1024,
+                };
             }
             Ok(0)
         }
@@ -200,4 +190,19 @@ pub fn sys_prlimit64(
 pub struct RLimit {
     cur: u64, // soft limit
     max: u64, // hard limit
+}
+
+pub fn sys_getrandom(buf: *mut u8, len: usize, flag: u32) -> SysResult {
+    //info!("getrandom: buf: {:?}, len: {:?}, falg {:?}", buf, len,flag);
+    let mut proc = process();
+    let slice = unsafe { proc.vm.check_write_array(buf, len)? };
+    let mut i = 0;
+    for elm in slice {
+        unsafe {
+            *elm = i + crate::trap::TICK as u8;
+        }
+        i += 1;
+    }
+
+    Ok(len)
 }

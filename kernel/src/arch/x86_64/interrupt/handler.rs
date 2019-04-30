@@ -213,9 +213,3 @@ fn invalid_opcode(tf: &mut TrapFrame) {
 fn error(tf: &TrapFrame) {
     crate::trap::error(tf);
 }
-
-#[no_mangle]
-pub unsafe extern "C" fn set_return_rsp(tf: *const TrapFrame) {
-    use crate::arch::gdt::Cpu;
-    Cpu::current().set_ring0_rsp(tf.add(1) as usize);
-}
