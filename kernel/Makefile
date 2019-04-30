@@ -32,6 +32,7 @@
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
 #   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
 #   u_boot = /path/to/u-boot.bin Only available on aarch64, use u-boot to boot rcore
+# . extra_features = profile | ... Add additional features
 
 arch ?= riscv64
 board ?= none
@@ -209,6 +210,8 @@ endif
 ifneq ($(board), none)
 features += board_$(board)
 endif
+
+features += $(extra_features)
 
 build_args := --target targets/$(target).json --features "$(features)"
 

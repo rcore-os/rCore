@@ -31,11 +31,23 @@ mod net;
 mod proc;
 mod time;
 
+use spin::Mutex;
+use alloc::collections::BTreeMap;
+
+#[cfg(feature = "profile")]
+lazy_static! {
+    static ref SYSCALL_TIMING: Mutex<BTreeMap<usize, i64>> = Mutex::new(BTreeMap::new());
+}
+
 /// System call dispatcher
 // This #[deny(unreachable_patterns)] checks if each match arm is defined
 // See discussion in https://github.com/oscourse-tsinghua/rcore_plus/commit/17e644e54e494835f1a49b34b80c2c4f15ed0dbe.
 #[deny(unreachable_patterns)]
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
+    #[cfg(feature = "profile")]
+    let begin_time = unsafe {
+        core::arch::x86_64::_rdtsc()
+    };
     let cid = cpu::id();
     let pid = process().pid.clone();
     let tid = processor().tid();
@@ -253,6 +265,21 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     if !pid.is_init() {
         // we trust pid 0 process
         info!("=> {:x?}", ret);
+    }
+    #[cfg(feature = "profile")]
+    {
+        let end_time = unsafe {
+            core::arch::x86_64::_rdtsc()
+        };
+        *SYSCALL_TIMING.lock().entry(id).or_insert(0) += end_time - begin_time;
+        if end_time % 1000 == 0 {
+            let timing = SYSCALL_TIMING.lock();
+            let mut count_vec: Vec<(&usize, &i64)> = timing.iter().collect();
+            count_vec.sort_by(|a, b| b.1.cmp(a.1));
+            for (id, time) in count_vec.iter().take(5) {
+                warn!("timing {:03} time {:012}", id, time);
+            }
+        }
     }
     match ret {
         Ok(code) => code as isize,

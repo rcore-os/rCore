@@ -40,6 +40,8 @@ board_pc = ["link_user"]
 link_user = []
 # Run cmdline instead of user shell, useful for automatic testing
 run_cmdline = []
+# Add performance profiling
+profile = []
 
 [profile.dev]
 # MUST >= 2 : Enable RVO to avoid stack overflow
