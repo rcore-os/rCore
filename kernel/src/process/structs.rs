@@ -14,10 +14,13 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::memory::{ByFrame, Delay, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet};
+use crate::memory::{
+    ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
+};
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
+use rcore_fs::vfs::INode;
 
 // TODO: avoid pub
 pub struct Thread {
@@ -128,19 +131,25 @@ impl Thread {
     /// Construct virtual memory of a new user process from ELF `data`.
     /// Return `(MemorySet, entry_point, ustack_top)`
     pub fn new_user_vm(
-        data: &[u8],
+        inode: &Arc<INode>,
         exec_path: &str,
         mut args: Vec<String>,
         envs: Vec<String>,
-    ) -> (MemorySet, usize, usize) {
+    ) -> Result<(MemorySet, usize, usize), &'static str> {
+        // Read data
+        use crate::fs::INodeExt;
+        let data = inode
+            .read_as_vec()
+            .map_err(|_| "failed to read from INode")?;
+
         // Parse ELF
-        let elf = ElfFile::new(data).expect("failed to read elf");
+        let elf = ElfFile::new(&data)?;
 
         // Check ELF type
         match elf.header.pt2.type_().as_type() {
             header::Type::Executable => {}
             header::Type::SharedObject => {}
-            _ => panic!("ELF is not executable or shared object"),
+            _ => return Err("ELF is not executable or shared object"),
         }
 
         // Check ELF arch
@@ -153,7 +162,7 @@ impl Thread {
             header::Machine::Other(243) => {}
             #[cfg(target_arch = "mips")]
             header::Machine::Mips => {}
-            machine @ _ => panic!("invalid elf arch: {:?}", machine),
+            machine @ _ => return Err("invalid ELF arch"),
         }
 
         // Check interpreter (for dynamic link)
@@ -161,18 +170,17 @@ impl Thread {
             // assuming absolute path
             let inode = crate::fs::ROOT_INODE
                 .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
-                .expect("interpreter not found");
-            let buf = inode.read_as_vec().expect("failed to load interpreter");
+                .map_err(|_| "interpreter not found")?;
             // modify args for loader
             args[0] = exec_path.into();
             args.insert(0, loader_path.into());
             // Elf loader should not have INTERP
             // No infinite loop
-            return Thread::new_user_vm(buf.as_slice(), exec_path, args, envs);
+            return Thread::new_user_vm(&inode, exec_path, args, envs);
         }
 
         // Make page table
-        let mut vm = elf.make_memory_set();
+        let mut vm = elf.make_memory_set(inode);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
@@ -219,17 +227,17 @@ impl Thread {
         trace!("{:#x?}", vm);
 
         let entry_addr = elf.header.pt2.entry_point() as usize;
-        (vm, entry_addr, ustack_top)
+        Ok((vm, entry_addr, ustack_top))
     }
 
     /// Make a new user process from ELF `data`
     pub fn new_user(
-        data: &[u8],
+        inode: &Arc<INode>,
         exec_path: &str,
         mut args: Vec<String>,
         envs: Vec<String>,
     ) -> Box<Thread> {
-        let (vm, entry_addr, ustack_top) = Self::new_user_vm(data, exec_path, args, envs);
+        let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();
 
         let kstack = KernelStack::new();
 
@@ -307,7 +315,8 @@ impl Thread {
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
             child_exit_code: BTreeMap::new(),
-        }.add_to_table();
+        }
+        .add_to_table();
         // link to parent
         proc.children.push(Arc::downgrade(&new_proc));
 
@@ -382,9 +391,11 @@ trait ToMemoryAttr {
 impl ToMemoryAttr for Flags {
     fn to_attr(&self) -> MemoryAttr {
         let mut flags = MemoryAttr::default().user();
-        // FIXME: handle readonly
         if self.is_execute() {
             flags = flags.execute();
+        }
+        if !self.is_write() {
+            flags = flags.readonly();
         }
         flags
     }
@@ -393,7 +404,7 @@ impl ToMemoryAttr for Flags {
 /// Helper functions to process ELF file
 trait ElfExt {
     /// Generate a MemorySet according to the ELF file.
-    fn make_memory_set(&self) -> MemorySet;
+    fn make_memory_set(&self, inode: &Arc<INode>) -> MemorySet;
 
     /// Get interpreter string if it has.
     fn get_interpreter(&self) -> Result<&str, &str>;
@@ -403,7 +414,7 @@ trait ElfExt {
 }
 
 impl ElfExt for ElfFile<'_> {
-    fn make_memory_set(&self) -> MemorySet {
+    fn make_memory_set(&self, inode: &Arc<INode>) -> MemorySet {
         debug!("creating MemorySet from ELF");
         let mut ms = MemorySet::new();
 
@@ -411,33 +422,19 @@ impl ElfExt for ElfFile<'_> {
             if ph.get_type() != Ok(Type::Load) {
                 continue;
             }
-            let virt_addr = ph.virtual_addr() as usize;
-            let mem_size = ph.mem_size() as usize;
-            let data = match ph.get_data(self).unwrap() {
-                SegmentData::Undefined(data) => data,
-                _ => unreachable!(),
-            };
-
-            // Get target slice
-            let target = {
-                ms.push(
-                    virt_addr,
-                    virt_addr + mem_size,
-                    ph.flags().to_attr(),
-                    ByFrame::new(GlobalFrameAlloc),
-                    "elf",
-                );
-                unsafe { ::core::slice::from_raw_parts_mut(virt_addr as *mut u8, mem_size) }
-            };
-            // Copy data
-            unsafe {
-                ms.with(|| {
-                    if data.len() != 0 {
-                        target[..data.len()].copy_from_slice(data);
-                    }
-                    target[data.len()..].iter_mut().for_each(|x| *x = 0);
-                });
-            }
+            ms.push(
+                ph.virtual_addr() as usize,
+                ph.virtual_addr() as usize + ph.mem_size() as usize,
+                ph.flags().to_attr(),
+                File {
+                    file: INodeForMap(inode.clone()),
+                    mem_start: ph.virtual_addr() as usize,
+                    file_start: ph.offset() as usize,
+                    file_end: ph.offset() as usize + ph.file_size() as usize,
+                    allocator: GlobalFrameAlloc,
+                },
+                "elf",
+            );
         }
         ms
     }
@@ -477,5 +474,14 @@ impl ElfExt for ElfFile<'_> {
             warn!("elf: no phdr found, tls might not work");
             None
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct INodeForMap(pub Arc<INode>);
+
+impl Read for INodeForMap {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        self.0.read_at(offset, buf).unwrap()
     }
 }

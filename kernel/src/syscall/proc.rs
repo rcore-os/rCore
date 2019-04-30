@@ -13,6 +13,10 @@ pub fn sys_fork(tf: &TrapFrame) -> SysResult {
     Ok(pid)
 }
 
+pub fn sys_vfork(tf: &TrapFrame) -> SysResult {
+    sys_fork(tf)
+}
+
 /// Create a new thread in the current process.
 /// The new thread's stack pointer will be set to `newsp`,
 /// and thread pointer will be set to `newtls`.
@@ -168,16 +172,15 @@ pub fn sys_exec(
 
     // Read program file
     let inode = proc.lookup_inode(&path)?;
-    let data = inode.read_as_vec()?;
 
     // Make new Thread
-    let (mut vm, entry_addr, ustack_top) = Thread::new_user_vm(data.as_slice(), &path, args, envs);
+    let (mut vm, entry_addr, ustack_top) = Thread::new_user_vm(&inode, &path, args, envs).unwrap();
 
     // Activate new page table
-    unsafe {
-        vm.activate();
-    }
     core::mem::swap(&mut proc.vm, &mut vm);
+    unsafe {
+        proc.vm.activate();
+    }
 
     // Modify the TrapFrame
     *tf = TrapFrame::new_user_thread(entry_addr, ustack_top);

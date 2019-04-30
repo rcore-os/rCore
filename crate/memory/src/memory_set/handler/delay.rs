@@ -40,9 +40,10 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
             let data = Vec::from(pt.get_page_slice_mut(addr));
             with(&mut || {
                 let target = self.allocator.alloc().expect("failed to alloc frame");
+                let target_data = pt.get_page_slice_mut(addr);
                 let entry = pt.map(addr, target);
+                target_data.copy_from_slice(&data);
                 attr.apply(entry);
-                pt.get_page_slice_mut(addr).copy_from_slice(&data);
             });
         } else {
             // delay map

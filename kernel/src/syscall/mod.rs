@@ -329,7 +329,7 @@ fn x86_64_syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> Option<Sys
         SYS_DUP2 => sys_dup2(args[0], args[1]),
         SYS_ALARM => unimplemented("alarm", Ok(0)),
         SYS_FORK => sys_fork(tf),
-        SYS_VFORK => sys_fork(tf), // use fork for vfork
+        SYS_VFORK => sys_vfork(tf),
         SYS_RENAME => sys_rename(args[0] as *const u8, args[1] as *const u8),
         SYS_MKDIR => sys_mkdir(args[0] as *const u8, args[1]),
         SYS_RMDIR => sys_rmdir(args[0] as *const u8),
