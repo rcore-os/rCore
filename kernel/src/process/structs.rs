@@ -59,6 +59,7 @@ pub struct Process {
     pub vm: MemorySet,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
+    pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
 
     // relationship
@@ -116,6 +117,7 @@ impl Thread {
                 vm,
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
+                exec_path: String::new(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: None,
@@ -137,7 +139,6 @@ impl Thread {
         envs: Vec<String>,
     ) -> Result<(MemorySet, usize, usize), &'static str> {
         // Read data
-        use crate::fs::INodeExt;
         let data = inode
             .read_as_vec()
             .map_err(|_| "failed to read from INode")?;
@@ -286,6 +287,7 @@ impl Thread {
                 vm,
                 files,
                 cwd: String::from("/"),
+                exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: None,
@@ -308,6 +310,7 @@ impl Thread {
             vm,
             files: proc.files.clone(),
             cwd: proc.cwd.clone(),
+            exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             pid: Pid(0),
             parent: Some(self.proc.clone()),

@@ -361,7 +361,10 @@ pub fn sys_readlinkat(dirfd: usize, path: *const u8, base: *mut u8, len: usize) 
     let proc = process();
     let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
     let slice = unsafe { proc.vm.check_write_array(base, len)? };
-    info!("readlink: path: {:?}, base: {:?}, len: {}", path, base, len);
+    info!(
+        "readlinkat: dirfd: {}, path: {:?}, base: {:?}, len: {}",
+        dirfd as isize, path, base, len
+    );
 
     let inode = proc.lookup_inode_at(dirfd, &path, false)?;
     if inode.metadata()?.type_ == FileType::SymLink {
@@ -753,6 +756,14 @@ impl Process {
             "lookup_inode_at: dirfd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
             dirfd as isize, self.cwd, path, follow
         );
+        // hard code special path
+        match path {
+            "/proc/self/exe" => {
+                return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
+            }
+            _ => {}
+        }
+
         let follow_max_depth = if follow { FOLLOW_MAX_DEPTH } else { 0 };
         if dirfd == AT_FDCWD {
             Ok(ROOT_INODE

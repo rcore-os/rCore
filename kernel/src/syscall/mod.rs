@@ -252,10 +252,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     };
     if !pid.is_init() {
         // we trust pid 0 process
-        debug!(
-            "{}:{}:{} syscall id {} ret with {:x?}",
-            cid, pid, tid, id, ret
-        );
+        info!("=> {:x?}", ret);
     }
     match ret {
         Ok(code) => code as isize,
