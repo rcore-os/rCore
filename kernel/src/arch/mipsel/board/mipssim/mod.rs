@@ -1,5 +1,4 @@
 use alloc::string::String;
-use once::*;
 
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
@@ -11,7 +10,6 @@ pub mod serial;
 
 /// Initialize serial port first
 pub fn init_serial_early() {
-    assert_has_not_been_called!("board::init must be called only once");
     serial::init(0xbfd003f8);
     println!("Hello QEMU MIPSSIM!");
 }

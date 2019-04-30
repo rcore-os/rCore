@@ -2,7 +2,6 @@
 
 use alloc::string::String;
 use bcm2837::atags::Atags;
-use once::*;
 
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
@@ -18,10 +17,7 @@ pub const IO_REMAP_END: usize = bcm2837::consts::KERNEL_OFFSET + 0x4000_1000;
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
-    assert_has_not_been_called!("board::init must be called only once");
-
     serial::init();
-
     println!("Hello Raspberry Pi!");
 }
 

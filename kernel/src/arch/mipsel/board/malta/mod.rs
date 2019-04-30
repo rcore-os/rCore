@@ -1,7 +1,6 @@
 use crate::drivers::bus::pci;
 use alloc::string::String;
 use mips::registers::cp0;
-use once::*;
 
 #[path = "../../../../drivers/console/mod.rs"]
 pub mod console;
@@ -17,7 +16,6 @@ use fb::FramebufferInfo;
 
 /// Initialize serial port first
 pub fn init_serial_early() {
-    assert_has_not_been_called!("board::init must be called only once");
     // initialize serial driver
     serial::init(0xbf000900);
     // Enable serial interrupt

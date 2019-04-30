@@ -4,12 +4,10 @@ use bitmap_allocator::BitAlloc;
 use super::{BootInfo, MemoryRegionType};
 use crate::memory::{active_table, init_heap, FRAME_ALLOCATOR};
 use log::*;
-use once::*;
 use rcore_memory::paging::*;
 use rcore_memory::PAGE_SIZE;
 
 pub fn init(boot_info: &BootInfo) {
-    assert_has_not_been_called!("memory::init must be called only once");
     init_frame_allocator(boot_info);
     init_device_vm_map();
     init_heap();

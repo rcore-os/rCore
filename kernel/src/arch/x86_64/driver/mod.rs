@@ -1,5 +1,3 @@
-use once::*;
-
 pub mod ide;
 pub mod keyboard;
 pub mod pic;
@@ -9,8 +7,6 @@ pub mod serial;
 pub mod vga;
 
 pub fn init() {
-    assert_has_not_been_called!();
-
     // Use IOAPIC instead of PIC
     pic::disable();
 

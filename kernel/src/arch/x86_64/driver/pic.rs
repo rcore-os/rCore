@@ -1,7 +1,6 @@
 // Copy from Redox
 
 use log::*;
-use once::*;
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 
@@ -18,8 +17,6 @@ pub fn disable() {
 }
 
 pub unsafe fn init() {
-    assert_has_not_been_called!("pic::init must be called only once");
-
     let mut master = MASTER.lock();
     let mut slave = SLAVE.lock();
 
