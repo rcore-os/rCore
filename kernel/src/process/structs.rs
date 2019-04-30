@@ -20,6 +20,7 @@ use crate::memory::{
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
+use core::mem::uninitialized;
 use rcore_fs::vfs::INode;
 
 // TODO: avoid pub
@@ -138,9 +139,11 @@ impl Thread {
         mut args: Vec<String>,
         envs: Vec<String>,
     ) -> Result<(MemorySet, usize, usize), &'static str> {
-        // Read data
-        let data = inode
-            .read_as_vec()
+        // Read ELF header
+        // 0x3c0: magic number from ld-musl.so
+        let mut data: [u8; 0x3c0] = unsafe { uninitialized() };
+        inode
+            .read_at(0, &mut data)
             .map_err(|_| "failed to read from INode")?;
 
         // Parse ELF
