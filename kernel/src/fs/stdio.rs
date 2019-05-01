@@ -30,10 +30,12 @@ impl Stdin {
         }
         #[cfg(not(feature = "board_k210"))]
         loop {
-            let ret = self.buf.lock().pop_front();
-            match ret {
+            let mut buf_lock = self.buf.lock();
+            match buf_lock.pop_front() {
                 Some(c) => return c,
-                None => self.pushed._wait(),
+                None => {
+                    self.pushed.wait(buf_lock);
+                }
             }
         }
     }

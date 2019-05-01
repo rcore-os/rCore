@@ -120,8 +120,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32) -> SysResult {
             target
         );
         let condvar = proc.child_exit.clone();
-        drop(proc); // must release lock of current process
-        condvar._wait();
+        condvar.wait(proc);
     }
 }
 

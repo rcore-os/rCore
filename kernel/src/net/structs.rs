@@ -265,9 +265,8 @@ impl Socket for TcpSocketState {
                             TcpState::SynSent => {
                                 // still connecting
                                 drop(socket);
-                                drop(sockets);
                                 debug!("poll for connection wait");
-                                SOCKET_ACTIVITY._wait();
+                                SOCKET_ACTIVITY.wait(sockets);
                             }
                             TcpState::Established => {
                                 break Ok(0);
@@ -357,10 +356,8 @@ impl Socket for TcpSocketState {
                 return Ok((new_socket, Endpoint::Ip(remote_endpoint)));
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait();
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -447,9 +444,8 @@ impl Socket for UdpSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -626,10 +622,8 @@ impl Socket for RawSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
