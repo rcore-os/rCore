@@ -41,11 +41,11 @@ pub trait FrameAllocator: Debug + Clone + Send + Sync + 'static {
 
 mod byframe;
 mod delay;
-mod linear;
 mod file;
+mod linear;
 //mod swap;
 
 pub use self::byframe::ByFrame;
 pub use self::delay::Delay;
-pub use self::linear::Linear;
 pub use self::file::{File, Read};
+pub use self::linear::Linear;

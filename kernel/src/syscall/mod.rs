@@ -31,8 +31,8 @@ mod net;
 mod proc;
 mod time;
 
-use spin::Mutex;
 use alloc::collections::BTreeMap;
+use spin::Mutex;
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -45,9 +45,7 @@ lazy_static! {
 #[deny(unreachable_patterns)]
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     #[cfg(feature = "profile")]
-    let begin_time = unsafe {
-        core::arch::x86_64::_rdtsc()
-    };
+    let begin_time = unsafe { core::arch::x86_64::_rdtsc() };
     let cid = cpu::id();
     let pid = process().pid.clone();
     let tid = processor().tid();
@@ -268,9 +266,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     }
     #[cfg(feature = "profile")]
     {
-        let end_time = unsafe {
-            core::arch::x86_64::_rdtsc()
-        };
+        let end_time = unsafe { core::arch::x86_64::_rdtsc() };
         *SYSCALL_TIMING.lock().entry(id).or_insert(0) += end_time - begin_time;
         if end_time % 1000 == 0 {
             let timing = SYSCALL_TIMING.lock();

@@ -14,14 +14,17 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::MEMORY_OFFSET;
+use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use bitmap_allocator::BitAlloc;
-use buddy_system_allocator::LockedHeap;
+use buddy_system_allocator::{Heap, LockedHeap};
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
+use rcore_memory::paging::PageTable;
 use rcore_memory::*;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
@@ -145,5 +148,32 @@ pub fn init_heap() {
     info!("heap init end");
 }
 
-/// Allocator for the rest memory space on NO-MMU case.
-pub static MEMORY_ALLOCATOR: LockedHeap = LockedHeap::empty();
+pub fn enlarge_heap(heap: &mut Heap) {
+    let mut page_table = active_table();
+    let mut addrs = [(0, 0); 32];
+    let mut addr_len = 0;
+    let va_offset = KERNEL_OFFSET + 0xe0000000;
+    for i in 0..16384 {
+        let page = alloc_frame().unwrap();
+        let va = KERNEL_OFFSET + 0xe0000000 + page;
+        if addr_len > 0 {
+            let (ref mut addr, ref mut len) = addrs[addr_len-1];
+            if *addr - PAGE_SIZE == va {
+                *len += PAGE_SIZE;
+                *addr -= PAGE_SIZE;
+                continue;
+            }
+        }
+        addrs[addr_len] = (va, PAGE_SIZE);
+        addr_len += 1;
+    }
+    for (addr, len) in addrs[..addr_len].into_iter() {
+        for va in (*addr..(*addr + *len)).step_by(PAGE_SIZE) {
+            page_table.map(va, va - va_offset).update();
+        }
+        info!("Adding {:#X} {:#X} to heap", addr, len);
+        unsafe {
+            heap.init(*addr, *len);
+        }
+    }
+}

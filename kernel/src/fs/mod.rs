@@ -9,15 +9,15 @@ use crate::arch::driver::ide;
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
-pub use self::stdio::{STDIN, STDOUT};
 pub use self::pseudo::*;
+pub use self::stdio::{STDIN, STDOUT};
 
 mod device;
 mod file;
 mod file_like;
 mod pipe;
-mod stdio;
 mod pseudo;
+mod stdio;
 
 /// Hard link user programs
 #[cfg(feature = "link_user")]
