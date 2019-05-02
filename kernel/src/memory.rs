@@ -18,9 +18,8 @@ use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use bitmap_allocator::BitAlloc;
-use buddy_system_allocator::{Heap, LockedHeap};
+use buddy_system_allocator::Heap;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
@@ -149,13 +148,18 @@ pub fn init_heap() {
 }
 
 pub fn enlarge_heap(heap: &mut Heap) {
+    info!("Enlarging heap to avoid oom");
+
     let mut page_table = active_table();
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
+    #[cfg(target_arch = "x86_64")]
     let va_offset = KERNEL_OFFSET + 0xe0000000;
+    #[cfg(not(target_arch = "x86_64"))]
+    let va_offset = KERNEL_OFFSET + 0x00e00000;
     for i in 0..16384 {
         let page = alloc_frame().unwrap();
-        let va = KERNEL_OFFSET + 0xe0000000 + page;
+        let va = va_offset + page;
         if addr_len > 0 {
             let (ref mut addr, ref mut len) = addrs[addr_len - 1];
             if *addr - PAGE_SIZE == va {

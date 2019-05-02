@@ -2,7 +2,6 @@
 
 use super::fs::IoVecs;
 use super::*;
-use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::FileLike;
 use crate::net::{
     Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,

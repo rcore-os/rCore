@@ -1,7 +1,6 @@
 //! Kernel shell
 
-use crate::drivers::CMDLINE;
-use crate::fs::{INodeExt, ROOT_INODE};
+use crate::fs::ROOT_INODE;
 use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -40,6 +39,7 @@ pub fn add_user_shell() {
 
 #[cfg(feature = "run_cmdline")]
 pub fn add_user_shell() {
+    use crate::drivers::CMDLINE;
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
     processor().manager().add(Thread::new_user(

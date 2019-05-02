@@ -5,7 +5,6 @@ use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
 use crate::memory::active_table;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use core::cmp::Ordering;
 use pci::*;
 use rcore_memory::{paging::PageTable, PAGE_SIZE};
 use spin::Mutex;

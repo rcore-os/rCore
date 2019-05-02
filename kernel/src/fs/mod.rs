@@ -3,9 +3,6 @@ use alloc::{sync::Arc, vec::Vec};
 use rcore_fs::vfs::*;
 use rcore_fs_sfs::SimpleFileSystem;
 
-#[cfg(target_arch = "x86_64")]
-use crate::arch::driver::ide;
-
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
