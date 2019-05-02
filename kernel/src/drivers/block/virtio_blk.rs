@@ -222,5 +222,5 @@ pub fn virtio_blk_init(node: &Node) {
 
     let driver = Arc::new(driver);
     DRIVERS.write().push(driver.clone());
-    BLK_DRIVERS.write().push(Arc::new(BlockDriver(driver)));
+    BLK_DRIVERS.write().push(driver);
 }
