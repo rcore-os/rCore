@@ -255,6 +255,7 @@ impl Thread {
                     write: false,
                     append: false,
                 },
+                String::from("stdin"),
             )),
         );
         files.insert(
@@ -266,6 +267,7 @@ impl Thread {
                     write: true,
                     append: false,
                 },
+                String::from("stdout"),
             )),
         );
         files.insert(
@@ -277,6 +279,7 @@ impl Thread {
                     write: true,
                     append: false,
                 },
+                String::from("stderr"),
             )),
         );
 

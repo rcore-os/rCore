@@ -10,9 +10,6 @@ pub struct FileHandle {
     inode: Arc<INode>,
     offset: u64,
     options: OpenOptions,
-
-    // for debugging
-    #[cfg(debug_assertions)]
     path: String,
 }
 
@@ -32,30 +29,13 @@ pub enum SeekFrom {
 }
 
 impl FileHandle {
-    pub fn new(inode: Arc<INode>, options: OpenOptions) -> Self {
-        #[cfg(debug_assertions)]
+    pub fn new(inode: Arc<INode>, options: OpenOptions, path: String) -> Self {
         return FileHandle {
             inode,
             offset: 0,
             options,
-            path: String::from("unknown"),
+            path,
         };
-        #[cfg(not(debug_assertions))]
-        return FileHandle {
-            inode,
-            offset: 0,
-            options,
-        };
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn set_path(&mut self, path: &str) {
-        self.path = String::from(path);
-    }
-
-    #[cfg(not(debug_assertions))]
-    pub fn set_path(&mut self, _path: &str) {
-        unreachable!()
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
@@ -147,19 +127,11 @@ impl FileHandle {
 
 impl fmt::Debug for FileHandle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // for debugging
-        #[cfg(debug_assertions)]
         return f
             .debug_struct("FileHandle")
             .field("offset", &self.offset)
             .field("options", &self.options)
             .field("path", &self.path)
-            .finish();
-        #[cfg(not(debug_assertions))]
-        return f
-            .debug_struct("FileHandle")
-            .field("offset", &self.offset)
-            .field("options", &self.options)
             .finish();
     }
 }

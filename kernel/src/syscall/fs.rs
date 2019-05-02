@@ -156,6 +156,11 @@ pub fn sys_select(
         // infinity
         1 << 31
     };
+
+    // for debugging
+    if cfg!(debug_assertions) {
+        debug!("files before select {:#?}", proc.files);
+    }
     drop(proc);
 
     let begin_time_ms = crate::trap::uptime_msec();
@@ -273,11 +278,10 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
         proc.lookup_inode_at(dir_fd, &path, true)?
     };
 
-    let mut file = FileHandle::new(inode, flags.to_options());
+    let mut file = FileHandle::new(inode, flags.to_options(), String::from(path));
 
     // for debugging
     if cfg!(debug_assertions) {
-        file.set_path(&path);
         debug!("files before open {:#?}", proc.files);
     }
 
@@ -648,6 +652,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
             write: false,
             append: false,
         },
+        String::from(":pipe_r:"),
     )));
 
     let write_fd = proc.add_file(FileLike::File(FileHandle::new(
@@ -657,6 +662,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
             write: true,
             append: false,
         },
+        String::from(":pipe_w:"),
     )));
 
     fds[0] = read_fd as u32;

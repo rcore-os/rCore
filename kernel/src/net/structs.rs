@@ -4,6 +4,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 use crate::util;
 use alloc::boxed::Box;
+use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -50,7 +51,7 @@ pub enum Endpoint {
 }
 
 /// Common methods that a socket must have
-pub trait Socket: Send + Sync {
+pub trait Socket: Send + Sync + Debug {
     fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint);
     fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)

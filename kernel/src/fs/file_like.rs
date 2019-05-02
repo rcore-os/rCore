@@ -54,7 +54,7 @@ impl fmt::Debug for FileLike {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FileLike::File(file) => write!(f, "File({:?})", file),
-            FileLike::Socket(_) => write!(f, "Socket(..)"),
+            FileLike::Socket(socket) => write!(f, "Socket({:?})", socket),
         }
     }
 }
