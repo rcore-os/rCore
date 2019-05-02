@@ -57,7 +57,6 @@ impl Pipe {
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
-        fn poll(&self) -> Result<PollStatus> { Err(FsError::NotSupported) }
         fn metadata(&self) -> Result<Metadata> { Err(FsError::NotSupported) }
         fn set_metadata(&self, _metadata: &Metadata) -> Result<()> { Ok(()) }
         fn sync_all(&self) -> Result<()> { Ok(()) }
@@ -102,6 +101,42 @@ impl INode for Pipe {
             }
         } else {
             Ok(0)
+        }
+    }
+
+    fn poll(&self) -> Result<PollStatus> {
+        let data = self.data.lock();
+        match self.direction {
+            PipeEnd::Read => {
+                if data.buf.len() > 0 {
+                    Ok(PollStatus {
+                        read: true,
+                        write: false,
+                        error: false,
+                    })
+                } else {
+                    Ok(PollStatus {
+                        read: false,
+                        write: false,
+                        error: false,
+                    })
+                }
+            }
+            PipeEnd::Write => {
+                if data.buf.len() > 0 {
+                    Ok(PollStatus {
+                        read: false,
+                        write: true,
+                        error: false,
+                    })
+                } else {
+                    Ok(PollStatus {
+                        read: false,
+                        write: false,
+                        error: false,
+                    })
+                }
+            }
         }
     }
     impl_inode!();

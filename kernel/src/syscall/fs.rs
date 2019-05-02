@@ -652,7 +652,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
             write: false,
             append: false,
         },
-        String::from(":pipe_r:"),
+        String::from("pipe_r:[]"),
     )));
 
     let write_fd = proc.add_file(FileLike::File(FileHandle::new(
@@ -662,7 +662,7 @@ pub fn sys_pipe(fds: *mut u32) -> SysResult {
             write: true,
             append: false,
         },
-        String::from(":pipe_w:"),
+        String::from("pipe_w:[]"),
     )));
 
     fds[0] = read_fd as u32;
