@@ -19,6 +19,7 @@ pub fn add_user_shell() {
     //
     //    #[cfg(not(target_arch = "x86_64"))]
     let init_shell = "/busybox"; //from docker-library
+    println!("use the fucking up busybox");
 
     #[cfg(target_arch = "x86_64")]
     let init_envs =
@@ -42,9 +43,11 @@ pub fn add_user_shell() {
 pub fn add_user_shell() {
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
+    println!("not use the fucking up busybox");
     processor().manager().add(Thread::new_user(
         &inode,
         cmdline.split(' ').map(|s| s.into()).collect(),
+        Vec::new(),
         Vec::new(),
     ));
 }
