@@ -273,7 +273,14 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
         proc.lookup_inode_at(dir_fd, &path, true)?
     };
 
-    let file = FileHandle::new(inode, flags.to_options());
+    let mut file = FileHandle::new(inode, flags.to_options());
+
+    // for debugging
+    if cfg!(debug_assertions) {
+        file.set_path(&path);
+        debug!("files before open {:#?}", proc.files);
+    }
+
     let fd = proc.add_file(FileLike::File(file));
     Ok(fd)
 }
@@ -281,6 +288,12 @@ pub fn sys_openat(dir_fd: usize, path: *const u8, flags: usize, mode: usize) -> 
 pub fn sys_close(fd: usize) -> SysResult {
     info!("close: fd: {:?}", fd);
     let mut proc = process();
+
+    // for debugging
+    if cfg!(debug_assertions) {
+        debug!("files before close {:#?}", proc.files);
+    }
+
     proc.files.remove(&fd).ok_or(SysError::EBADF)?;
     Ok(0)
 }

@@ -157,7 +157,7 @@ pub fn enlarge_heap(heap: &mut Heap) {
         let page = alloc_frame().unwrap();
         let va = KERNEL_OFFSET + 0xe0000000 + page;
         if addr_len > 0 {
-            let (ref mut addr, ref mut len) = addrs[addr_len-1];
+            let (ref mut addr, ref mut len) = addrs[addr_len - 1];
             if *addr - PAGE_SIZE == va {
                 *len += PAGE_SIZE;
                 *addr -= PAGE_SIZE;

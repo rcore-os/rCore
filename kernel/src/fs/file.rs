@@ -1,6 +1,7 @@
 //! File handle for process
 
 use alloc::{string::String, sync::Arc};
+use core::fmt;
 
 use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 
@@ -9,6 +10,10 @@ pub struct FileHandle {
     inode: Arc<INode>,
     offset: u64,
     options: OpenOptions,
+
+    // for debugging
+    #[cfg(debug_assertions)]
+    path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -28,11 +33,29 @@ pub enum SeekFrom {
 
 impl FileHandle {
     pub fn new(inode: Arc<INode>, options: OpenOptions) -> Self {
-        FileHandle {
+        #[cfg(debug_assertions)]
+        return FileHandle {
             inode,
             offset: 0,
             options,
-        }
+            path: String::from("unknown"),
+        };
+        #[cfg(not(debug_assertions))]
+        return FileHandle {
+            inode,
+            offset: 0,
+            options,
+        };
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn set_path(&mut self, path: &str) {
+        self.path = String::from(path);
+    }
+
+    #[cfg(not(debug_assertions))]
+    pub fn set_path(&mut self, _path: &str) {
+        unreachable!()
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
@@ -119,5 +142,24 @@ impl FileHandle {
 
     pub fn inode(&self) -> Arc<INode> {
         self.inode.clone()
+    }
+}
+
+impl fmt::Debug for FileHandle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // for debugging
+        #[cfg(debug_assertions)]
+        return f
+            .debug_struct("FileHandle")
+            .field("offset", &self.offset)
+            .field("options", &self.options)
+            .field("path", &self.path)
+            .finish();
+        #[cfg(not(debug_assertions))]
+        return f
+            .debug_struct("FileHandle")
+            .field("offset", &self.offset)
+            .field("options", &self.options)
+            .finish();
     }
 }
