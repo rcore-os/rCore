@@ -45,9 +45,9 @@ pub fn add_user_shell() {
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
     processor().manager().add(Thread::new_user(
         &inode,
-        "/busybox",
         cmdline.split(' ').map(|s| s.into()).collect(),
         Vec::new(),
+        Vec::new()
     ));
 }
 

@@ -28,7 +28,7 @@ pub const TIOCGWINSZ: usize = 0x4_008_74_68;
 #[cfg(not(target_arch = "mips"))]
 pub const FIONCLEX: usize = 0x5450;
 #[cfg(target_arch = "mips")]
-pub const FIOCLEX: usize = 0x6602;
+pub const FIONCLEX: usize = 0x6602;
 
 #[cfg(not(target_arch = "mips"))]
 pub const FIOCLEX: usize = 0x5451;
