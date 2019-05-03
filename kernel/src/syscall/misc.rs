@@ -91,6 +91,7 @@ pub fn sys_futex(uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> S
                 return Err(SysError::EAGAIN);
             }
             // FIXME: support timeout
+            // FIXME: fix racing
             queue._wait();
             Ok(0)
         }

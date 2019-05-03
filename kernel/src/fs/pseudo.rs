@@ -14,7 +14,7 @@ impl Pseudo {
     pub fn new(s: &str, type_: FileType) -> Self {
         Pseudo {
             content: Vec::from(s.as_bytes()),
-            type_
+            type_,
         }
     }
 }

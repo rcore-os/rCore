@@ -1,23 +1,24 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use rcore_fs::vfs::*;
+use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs_sfs::SimpleFileSystem;
 
-#[cfg(target_arch = "x86_64")]
-use crate::arch::driver::ide;
+use crate::drivers::BlockDriver;
 
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
-pub use self::stdio::{STDIN, STDOUT};
 pub use self::pseudo::*;
+pub use self::stdio::{STDIN, STDOUT};
 
 mod device;
 mod file;
 mod file_like;
 mod pipe;
-mod stdio;
 mod pseudo;
+mod stdio;
+mod ioctl;
 
 /// Hard link user programs
 #[cfg(feature = "link_user")]
@@ -41,9 +42,15 @@ lazy_static! {
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
             {
-                crate::drivers::BLK_DRIVERS.read().iter()
-                    .next().expect("Block device not found")
-                    .clone()
+                let driver = BlockDriver(
+                    crate::drivers::BLK_DRIVERS
+                        .read().iter()
+                        .next().expect("Block device not found")
+                        .clone()
+                );
+                // enable block cache
+                Arc::new(BlockCache::new(driver, 0x100))
+                // Arc::new(driver)
             }
             #[cfg(target_arch = "aarch64")]
             {

@@ -7,6 +7,7 @@ use rcore_fs::vfs::*;
 
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use super::ioctl::*;
 
 #[derive(Default)]
 pub struct Stdin {
@@ -37,10 +38,12 @@ impl Stdin {
         }
         #[cfg(not(any(feature = "board_k210", feature = "board_rocket_chip")))]
         loop {
-            let ret = self.buf.lock().pop_front();
-            match ret {
+            let mut buf_lock = self.buf.lock();
+            match buf_lock.pop_front() {
                 Some(c) => return c,
-                None => self.pushed._wait(),
+                None => {
+                    self.pushed.wait(buf_lock);
+                }
             }
         }
     }
@@ -62,32 +65,6 @@ lazy_static! {
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
 }
 
-// 32bits total, command in lower 16bits, size of the parameter structure in the lower 14 bits of the upper 16 bits
-// higher 2 bits: 01 = write, 10 = read
-
-#[cfg(not(target_arch = "mips"))]
-const TCGETS: u32 = 0x5401;
-#[cfg(target_arch = "mips")]
-const TCGETS: u32 = 0x540D;
-
-#[cfg(not(target_arch = "mips"))]
-const TIOCGPGRP: u32 = 0x540F;
-// _IOR('t', 119, int)
-#[cfg(target_arch = "mips")]
-const TIOCGPGRP: u32 = 0x4_004_74_77;
-
-#[cfg(not(target_arch = "mips"))]
-const TIOCSPGRP: u32 = 0x5410;
-// _IOW('t', 118, int)
-#[cfg(target_arch = "mips")]
-const TIOCSPGRP: u32 = 0x8_004_74_76;
-
-#[cfg(not(target_arch = "mips"))]
-const TIOCGWINSZ: u32 = 0x5413;
-// _IOR('t', 104, struct winsize)
-#[cfg(target_arch = "mips")]
-const TIOCGWINSZ: u32 = 0x4_008_74_68;
-
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
@@ -103,7 +80,7 @@ macro_rules! impl_inode {
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
         fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
-            match cmd {
+            match cmd as usize {
                 TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                     // pretend to be tty
                     Ok(())

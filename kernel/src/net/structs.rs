@@ -4,6 +4,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 use crate::util;
 use alloc::boxed::Box;
+use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -50,7 +51,7 @@ pub enum Endpoint {
 }
 
 /// Common methods that a socket must have
-pub trait Socket: Send + Sync {
+pub trait Socket: Send + Sync + Debug {
     fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint);
     fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)
@@ -265,9 +266,8 @@ impl Socket for TcpSocketState {
                             TcpState::SynSent => {
                                 // still connecting
                                 drop(socket);
-                                drop(sockets);
                                 debug!("poll for connection wait");
-                                SOCKET_ACTIVITY._wait();
+                                SOCKET_ACTIVITY.wait(sockets);
                             }
                             TcpState::Established => {
                                 break Ok(0);
@@ -357,10 +357,8 @@ impl Socket for TcpSocketState {
                 return Ok((new_socket, Endpoint::Ip(remote_endpoint)));
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait();
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -447,9 +445,8 @@ impl Socket for UdpSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -626,10 +623,8 @@ impl Socket for RawSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 

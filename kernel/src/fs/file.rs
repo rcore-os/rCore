@@ -1,6 +1,7 @@
 //! File handle for process
 
 use alloc::{string::String, sync::Arc};
+use core::fmt;
 
 use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 
@@ -9,6 +10,7 @@ pub struct FileHandle {
     inode: Arc<INode>,
     offset: u64,
     options: OpenOptions,
+    path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -27,12 +29,13 @@ pub enum SeekFrom {
 }
 
 impl FileHandle {
-    pub fn new(inode: Arc<INode>, options: OpenOptions) -> Self {
-        FileHandle {
+    pub fn new(inode: Arc<INode>, options: OpenOptions, path: String) -> Self {
+        return FileHandle {
             inode,
             offset: 0,
             options,
-        }
+            path,
+        };
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
@@ -119,5 +122,16 @@ impl FileHandle {
 
     pub fn inode(&self) -> Arc<INode> {
         self.inode.clone()
+    }
+}
+
+impl fmt::Debug for FileHandle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return f
+            .debug_struct("FileHandle")
+            .field("offset", &self.offset)
+            .field("options", &self.options)
+            .field("path", &self.path)
+            .finish();
     }
 }

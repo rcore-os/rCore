@@ -13,7 +13,7 @@ use xmas_elf::{
 };
 
 use crate::arch::interrupt::{Context, TrapFrame};
-use crate::fs::{FileHandle, FileLike, INodeExt, OpenOptions, FOLLOW_MAX_DEPTH};
+use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -255,6 +255,7 @@ impl Thread {
                     write: false,
                     append: false,
                 },
+                String::from("stdin"),
             )),
         );
         files.insert(
@@ -266,6 +267,7 @@ impl Thread {
                     write: true,
                     append: false,
                 },
+                String::from("stdout"),
             )),
         );
         files.insert(
@@ -277,6 +279,7 @@ impl Thread {
                     write: true,
                     append: false,
                 },
+                String::from("stderr"),
             )),
         );
 

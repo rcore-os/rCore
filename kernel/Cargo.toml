@@ -50,7 +50,6 @@ opt-level = 2
 [dependencies]
 log = "0.4"
 spin = "0.5"
-once = "0.3"
 xmas-elf = "0.6"
 bitflags = "1.0"
 bit_field = "0.9"
@@ -58,7 +57,7 @@ volatile = "0.2"
 heapless = "0.4"
 bitvec = { git = "https://github.com/myrrlyn/bitvec.git", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
-buddy_system_allocator = "0.1"
+buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers" }

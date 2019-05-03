@@ -1,4 +1,3 @@
-use once::*;
 use spin::Mutex;
 use uart_16550::SerialPort;
 use x86_64::instructions::port::Port;
@@ -9,8 +8,6 @@ pub static COM1: Mutex<SerialPort> = Mutex::new(unsafe { SerialPort::new(0x3F8) 
 pub static COM2: Mutex<SerialPort> = Mutex::new(unsafe { SerialPort::new(0x2F8) });
 
 pub fn init() {
-    assert_has_not_been_called!("serial::init must be called only once");
-
     COM1.lock().init();
     COM2.lock().init();
     enable_irq(consts::COM1);

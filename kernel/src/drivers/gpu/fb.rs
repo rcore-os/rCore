@@ -4,7 +4,6 @@ use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
 use log::*;
-use once::*;
 use spin::Mutex;
 
 /// Framebuffer information
@@ -134,8 +133,6 @@ impl fmt::Debug for Framebuffer {
 
 impl Framebuffer {
     fn new(width: u32, height: u32, depth: u32) -> Result<Framebuffer, String> {
-        assert_has_not_been_called!("Framebuffer::new must be called only once");
-
         let probed_info = super::probe_fb_info(width, height, depth);
 
         match probed_info {
