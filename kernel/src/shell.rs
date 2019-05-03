@@ -5,6 +5,7 @@ use crate::fs::{INodeExt, ROOT_INODE};
 use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
+use crate::arch::io;
 
 #[cfg(not(feature = "run_cmdline"))]
 pub fn add_user_shell() {
@@ -31,10 +32,12 @@ pub fn add_user_shell() {
     let init_args = vec!["busybox".into(), "ash".into()];
 
     if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
+        println!("use fucking up busybox");
         processor()
             .manager()
             .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
     } else {
+        println!("not use fucking up busybox, but shell");
         processor().manager().add(Thread::new_kernel(shell, 0));
     }
 }
@@ -46,8 +49,8 @@ pub fn add_user_shell() {
     println!("not use the fucking up busybox");
     processor().manager().add(Thread::new_user(
         &inode,
+        "/busybox",
         cmdline.split(' ').map(|s| s.into()).collect(),
-        Vec::new(),
         Vec::new(),
     ));
 }

@@ -48,13 +48,6 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         hartid, device_tree_vaddr
     );
 
-    //while true {
-        //let fuck_char = get_char_fuck();
-        //if fuck_char as u8 != 254 {
-            //print!("{0}", fuck_char as char);
-        //}
-    //}
-
     crate::logging::init();
     interrupt::init();
     memory::init(device_tree_vaddr);
