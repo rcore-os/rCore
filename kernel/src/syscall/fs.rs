@@ -754,6 +754,12 @@ impl Process {
             _ => Err(SysError::EBADF),
         }
     }
+    pub fn get_file_const(&self, fd: usize) -> Result<&FileHandle, SysError> {
+        match self.files.get(&fd).ok_or(SysError::EBADF)? {
+            FileLike::File(file) => Ok(file),
+            _ => Err(SysError::EBADF),
+        }
+    }
     /// Lookup INode from the process.
     ///
     /// - If `path` is relative, then it is interpreted relative to the directory
@@ -776,30 +782,18 @@ impl Process {
             dirfd as isize, self.cwd, path, follow
         );
         // hard code special path
-        let (fd_dir_path, fd_name) = split_path(&path);
         match path {
             "/proc/self/exe" => {
                 return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
             }
             _ => {}
         }
+        let (fd_dir_path, fd_name) = split_path(&path);
         match fd_dir_path {
             "/proc/self/fd" => {
-                let fd: u32 = fd_name.parse::<u32>().unwrap();
-                let fd_path = match self.files.get(&(fd as usize)) {
-                    Some(FileLike::File(file)) => Some(&file.path),
-                    _ => return Err(SysError::ENOENT),
-                };
-                info!(
-                    "lookup_inode_at:BEG  /proc/self/fd {}, path {}",
-                    fd,
-                    fd_path.unwrap()
-                );
-                if (fd_path.is_some()) {
-                    return Ok(Arc::new(Pseudo::new(fd_path.unwrap(), FileType::SymLink)));
-                } else {
-                    {}
-                }
+                let fd: usize = fd_name.parse().map_err(|_| SysError::EINVAL)?;
+                let fd_path = &self.get_file_const(fd)?.path;
+                return Ok(Arc::new(Pseudo::new(fd_path, FileType::SymLink)));
             }
             _ => {}
         }
@@ -1413,5 +1407,6 @@ impl FdSet {
         }
     }
 }
-//pathname is interpreted relative to the current working directory(CWD)
+
+/// Pathname is interpreted relative to the current working directory(CWD)
 const AT_FDCWD: usize = -100isize as usize;
