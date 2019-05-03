@@ -18,6 +18,7 @@ mod file_like;
 mod pipe;
 mod pseudo;
 mod stdio;
+mod ioctl;
 
 /// Hard link user programs
 #[cfg(feature = "link_user")]
@@ -48,8 +49,8 @@ lazy_static! {
                         .clone()
                 );
                 // enable block cache
-                // Arc::new(BlockCache::new(driver, 0x100))
-                Arc::new(driver)
+                Arc::new(BlockCache::new(driver, 0x100))
+                // Arc::new(driver)
             }
             #[cfg(target_arch = "aarch64")]
             {

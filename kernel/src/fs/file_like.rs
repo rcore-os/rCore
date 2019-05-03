@@ -5,6 +5,7 @@ use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
 use rcore_fs::vfs::PollStatus;
+use super::ioctl::*;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -30,13 +31,19 @@ impl FileLike {
         Ok(len)
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
-        match self {
-            FileLike::File(file) => file.io_control(request as u32, arg1)?,
-            FileLike::Socket(socket) => {
-                socket.ioctl(request, arg1, arg2, arg3)?;
+        match request {
+            // TODO: place flags & path in FileLike in stead of FileHandle/Socket
+            FIOCLEX => Ok(0),
+            _ => {
+                match self {
+                    FileLike::File(file) => file.io_control(request as u32, arg1)?,
+                    FileLike::Socket(socket) => {
+                        socket.ioctl(request, arg1, arg2, arg3)?;
+                    }
+                }
+                Ok(0)
             }
         }
-        Ok(0)
     }
     pub fn poll(&self) -> Result<PollStatus, SysError> {
         let status = match self {
