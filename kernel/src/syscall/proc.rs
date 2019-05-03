@@ -281,14 +281,17 @@ pub fn sys_exit(exit_code: usize) -> ! {
     // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
     // FIXME: do it in all possible ways a thread can exit
     //        it has memory access so we can't move it to Thread::drop?
-    let clear_child_tid = current_thread().clear_child_tid;
-    if clear_child_tid != 0 {
-        unsafe {
-            (clear_child_tid as *mut u32).write(0);
+    let mut proc = process();
+    let clear_child_tid = current_thread().clear_child_tid as *mut u32;
+    if !clear_child_tid.is_null() {
+        info!("exit: futex {:#?} wake 1", clear_child_tid);
+        if let Ok(clear_child_tid_ref) = unsafe { proc.vm.check_write_ptr(clear_child_tid) } {
+            *clear_child_tid_ref = 0;
+            let queue = proc.get_futex(clear_child_tid as usize);
+            queue.notify_one();
         }
-        let queue = process().get_futex(clear_child_tid);
-        queue.notify_one();
     }
+    drop(proc);
 
     processor().manager().exit(tid, exit_code as usize);
     processor().yield_now();
@@ -332,6 +335,12 @@ pub fn sys_set_priority(priority: usize) -> SysResult {
     let pid = thread::current().id();
     processor().manager().set_priority(pid, priority as u8);
     Ok(0)
+}
+
+pub fn sys_set_tid_address(tidptr: *mut u32) -> SysResult {
+    info!("set_tid_address: {:?}", tidptr);
+    current_thread().clear_child_tid = tidptr as usize;
+    Ok(thread::current().id())
 }
 
 bitflags! {

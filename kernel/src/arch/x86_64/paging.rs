@@ -47,23 +47,21 @@ impl PageTable for ActivePageTable {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         unsafe {
-            if let Ok(flush) = self.0.map_to(
-                Page::of_addr(addr),
-                Frame::of_addr(target),
-                flags,
-                &mut FrameAllocatorForX86,
-            ) {
-                flush.flush();
-            }
+            self.0
+                .map_to(
+                    Page::of_addr(addr),
+                    Frame::of_addr(target),
+                    flags,
+                    &mut FrameAllocatorForX86,
+                )
+                .unwrap()
+                .flush();
         }
         unsafe { &mut *(get_entry_ptr(addr, 1)) }
     }
 
     fn unmap(&mut self, addr: usize) {
-        // unmap and flush if it is mapped
-        if let Ok((_, flush)) = self.0.unmap(Page::of_addr(addr)) {
-            flush.flush();
-        }
+        self.0.unmap(Page::of_addr(addr)).unwrap().1.flush();
     }
 
     fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
@@ -238,6 +236,9 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
         let target = Cr3::read().0.start_address().as_u64() as usize;
+        if self.p4_frame == Cr3::read().0 {
+            return f(&mut active_table());
+        }
         active_table().with_temporary_map(target, |active_table, p4_table: &mut x86PageTable| {
             let backup = p4_table[0o777].clone();
 

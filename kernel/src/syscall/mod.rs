@@ -187,7 +187,7 @@ pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
         SYS_EXIT => sys_exit(args[0] as usize),
         SYS_EXIT_GROUP => sys_exit_group(args[0]),
         SYS_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
-        SYS_SET_TID_ADDRESS => unimplemented("set_tid_address", Ok(thread::current().id())),
+        SYS_SET_TID_ADDRESS => sys_set_tid_address(args[0] as *mut u32),
         SYS_FUTEX => sys_futex(
             args[0],
             args[1] as u32,

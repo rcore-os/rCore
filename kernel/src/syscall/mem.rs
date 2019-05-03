@@ -88,14 +88,6 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: usize) -> SysResult {
     if memory_area.is_none() {
         return Err(SysError::ENOMEM);
     }
-    proc.vm.edit(|pt| {
-        for page in Page::range_of(addr, addr + len) {
-            let entry = pt
-                .get_entry(page.start_address())
-                .expect("failed to get entry");
-            attr.apply(entry);
-        }
-    });
     Ok(0)
 }
 
