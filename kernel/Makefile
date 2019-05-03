@@ -273,7 +273,7 @@ justrunui: build
 		-device virtio-mouse-device
 
 justruntest: build
-	@qemu-system-$(arch) $(qemu_opts) --append $(init) -serial file:../tests/stdout -monitor null
+	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
 	@qemu-system-$(arch) $(qemu_opts) -s -S &
