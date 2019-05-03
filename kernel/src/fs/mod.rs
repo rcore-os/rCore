@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use rcore_fs::vfs::*;
 use rcore_fs::dev::block_cache::BlockCache;
+use rcore_fs::vfs::*;
 use rcore_fs_sfs::SimpleFileSystem;
 
 use crate::drivers::BlockDriver;
@@ -15,10 +15,10 @@ pub use self::stdio::{STDIN, STDOUT};
 mod device;
 mod file;
 mod file_like;
+mod ioctl;
 mod pipe;
 mod pseudo;
 mod stdio;
-mod ioctl;
 
 /// Hard link user programs
 #[cfg(feature = "link_user")]

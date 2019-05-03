@@ -1,11 +1,11 @@
 use core::fmt;
 
+use super::ioctl::*;
 use super::FileHandle;
 use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
 use rcore_fs::vfs::PollStatus;
-use super::ioctl::*;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone

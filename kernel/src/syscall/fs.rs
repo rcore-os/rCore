@@ -784,14 +784,18 @@ impl Process {
             _ => {}
         }
         match fd_dir_path {
-            "/proc/self/fd" =>{
-                let fd:u32= fd_name.parse::<u32>().unwrap();
-                let fd_path= match self.files.get(&(fd as usize)).unwrap() {
-                    FileLike::File(file) => Some(&file.path),
-                    _ => None,
+            "/proc/self/fd" => {
+                let fd: u32 = fd_name.parse::<u32>().unwrap();
+                let fd_path = match self.files.get(&(fd as usize)) {
+                    Some(FileLike::File(file)) => Some(&file.path),
+                    _ => return Err(SysError::ENOENT),
                 };
-                info!("lookup_inode_at:BEG  /proc/sefl/fd {}, path {}", fd, fd_path.unwrap());
-                if(fd_path.is_some()) {
+                info!(
+                    "lookup_inode_at:BEG  /proc/self/fd {}, path {}",
+                    fd,
+                    fd_path.unwrap()
+                );
+                if (fd_path.is_some()) {
                     return Ok(Arc::new(Pseudo::new(fd_path.unwrap(), FileType::SymLink)));
                 } else {
                     {}

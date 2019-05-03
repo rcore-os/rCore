@@ -1,10 +1,10 @@
 //! Kernel shell
 
+use crate::arch::io;
 use crate::fs::ROOT_INODE;
 use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::arch::io;
 
 #[cfg(not(feature = "run_cmdline"))]
 pub fn add_user_shell() {
@@ -47,7 +47,7 @@ pub fn add_user_shell() {
         &inode,
         cmdline.split(' ').map(|s| s.into()).collect(),
         Vec::new(),
-        Vec::new()
+        Vec::new(),
     ));
 }
 

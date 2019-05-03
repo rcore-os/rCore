@@ -5,9 +5,9 @@ use core::any::Any;
 
 use rcore_fs::vfs::*;
 
+use super::ioctl::*;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
-use super::ioctl::*;
 
 #[derive(Default)]
 pub struct Stdin {
