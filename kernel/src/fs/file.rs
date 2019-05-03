@@ -10,7 +10,7 @@ pub struct FileHandle {
     inode: Arc<INode>,
     offset: u64,
     options: OpenOptions,
-    path: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone)]

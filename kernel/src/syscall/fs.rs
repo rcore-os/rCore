@@ -776,9 +776,26 @@ impl Process {
             dirfd as isize, self.cwd, path, follow
         );
         // hard code special path
+        let (fd_dir_path, fd_name) = split_path(&path);
         match path {
             "/proc/self/exe" => {
                 return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
+            }
+            _ => {}
+        }
+        match fd_dir_path {
+            "/proc/self/fd" =>{
+                let fd:u32= fd_name.parse::<u32>().unwrap();
+                let fd_path= match self.files.get(&(fd as usize)).unwrap() {
+                    FileLike::File(file) => Some(&file.path),
+                    _ => None,
+                };
+                info!("lookup_inode_at:BEG  /proc/sefl/fd {}, path {}", fd, fd_path.unwrap());
+                if(fd_path.is_some()) {
+                    return Ok(Arc::new(Pseudo::new(fd_path.unwrap(), FileType::SymLink)));
+                } else {
+                    {}
+                }
             }
             _ => {}
         }
@@ -1392,5 +1409,5 @@ impl FdSet {
         }
     }
 }
-
+//pathname is interpreted relative to the current working directory(CWD)
 const AT_FDCWD: usize = -100isize as usize;
