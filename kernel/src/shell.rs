@@ -19,7 +19,6 @@ pub fn add_user_shell() {
     //
     //    #[cfg(not(target_arch = "x86_64"))]
     let init_shell = "/busybox"; //from docker-library
-    println!("use the fucking up busybox");
 
     #[cfg(target_arch = "x86_64")]
     let init_envs =
@@ -31,12 +30,10 @@ pub fn add_user_shell() {
     let init_args = vec!["busybox".into(), "ash".into()];
 
     if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
-        println!("use fucking up busybox");
         processor()
             .manager()
             .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
     } else {
-        println!("not use fucking up busybox, but shell");
         processor().manager().add(Thread::new_kernel(shell, 0));
     }
 }
@@ -46,7 +43,6 @@ pub fn add_user_shell() {
     use crate::drivers::CMDLINE;
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
-    println!("not use the fucking up busybox");
     processor().manager().add(Thread::new_user(
         &inode,
         "/busybox",

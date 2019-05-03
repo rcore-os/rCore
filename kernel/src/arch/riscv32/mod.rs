@@ -44,7 +44,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     }
 
     println!(
-        "Hello fucking RISCV! in hart {}, device tree @ {:#x}",
+        "Hello RISCV! in hart {}, device tree @ {:#x}",
         hartid, device_tree_vaddr
     );
 
@@ -72,10 +72,6 @@ fn others_main() -> ! {
     memory::init_other();
     timer::init();
     crate::kmain();
-}
-
-fn get_char_fuck() -> char {
-    io::getchar()
 }
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
