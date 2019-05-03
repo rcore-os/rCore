@@ -29,7 +29,14 @@ impl Stdin {
                 return c;
             }
         }
-        #[cfg(not(feature = "board_k210"))]
+        #[cfg(feature = "board_rocket_chip")]
+        loop {
+            let c = crate::arch::io::getchar();
+            if c != '\0' && c as u8 != 254 {
+                return c;
+            }
+        }
+        #[cfg(not(any(feature = "board_k210", feature = "board_rocket_chip")))]
         loop {
             let mut buf_lock = self.buf.lock();
             match buf_lock.pop_front() {
@@ -41,7 +48,12 @@ impl Stdin {
         }
     }
     pub fn can_read(&self) -> bool {
-        self.buf.lock().len() > 0
+        // Currently, rocket-chip implementation rely on htif interface, the serial interrupt DO
+        // NOT work, so return true always
+        #[cfg(feature = "board_rocket_chip")]
+        return true;
+        #[cfg(not(feature = "board_rocket_chip"))]
+        return self.buf.lock().len() > 0;
     }
 }
 
