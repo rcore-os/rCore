@@ -52,7 +52,7 @@ bitflags = "1.0"
 bit_field = "0.9"
 volatile = "0.2"
 heapless = "0.4"
-bitvec = { git = "https://github.com/myrrlyn/bitvec.git", default-features = false, features = ["alloc"] }
+bitvec = { git = "https://github.com/myrrlyn/bitvec.git", rev = "ed2aec38bfb5b1116e3585b1574c50655b9c85ec", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
 buddy_system_allocator = "0.1"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
@@ -79,7 +79,7 @@ riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64" }
-bcm2837 = { git = "https://github.com/rcore-os/bcm2837", optional = true }
+bcm2837 = { git = "https://github.com/GeminiLab/bcm2837", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
 mips = "^0.2.0"

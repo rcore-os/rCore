@@ -3,6 +3,7 @@
 pub mod consts;
 pub mod cpu;
 pub mod driver;
+pub mod emmc;
 pub mod interrupt;
 pub mod io;
 pub mod memory;
