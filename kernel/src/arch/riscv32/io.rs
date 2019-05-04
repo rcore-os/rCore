@@ -47,6 +47,3 @@ pub fn getchar_option() -> Option<char> {
 pub fn putfmt(fmt: Arguments) {
     SerialPort.write_fmt(fmt).unwrap();
 }
-
-const TXDATA: *mut u32 = 0x38000000 as *mut u32;
-const RXDATA: *mut u32 = 0x38000004 as *mut u32;

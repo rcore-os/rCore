@@ -1,31 +1,54 @@
 //! Kernel shell
 
-use crate::drivers::CMDLINE;
-use crate::fs::{INodeExt, ROOT_INODE};
+use crate::arch::io;
+use crate::fs::ROOT_INODE;
 use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 #[cfg(not(feature = "run_cmdline"))]
-pub fn run_user_shell() {
-    if let Ok(inode) = ROOT_INODE.lookup("rust/sh") {
-        let data = inode.read_as_vec().unwrap();
+pub fn add_user_shell() {
+    // the busybox of alpine linux can not transfer env vars into child process
+    // Now we use busybox from
+    // https://raw.githubusercontent.com/docker-library/busybox/82bc0333a9ae148fbb4246bcbff1487b3fc0c510/musl/busybox.tar.xz -O busybox.tar.xz
+    // This one can transfer env vars!
+    // Why???
+
+    //    #[cfg(target_arch = "x86_64")]
+    //        let init_shell="/bin/busybox"; // from alpine linux
+    //
+    //    #[cfg(not(target_arch = "x86_64"))]
+    let init_shell = "/busybox"; //from docker-library
+
+    #[cfg(target_arch = "x86_64")]
+    let init_envs =
+        vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()];
+
+    #[cfg(not(target_arch = "x86_64"))]
+    let init_envs = Vec::new();
+
+    let init_args = vec!["busybox".into(), "ash".into()];
+
+    if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
         processor()
             .manager()
-            .add(Thread::new_user(data.as_slice(), "sh".split(' ')));
+            .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
     }
 }
 
 #[cfg(feature = "run_cmdline")]
-pub fn run_user_shell() {
+pub fn add_user_shell() {
+    use crate::drivers::CMDLINE;
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
-    let data = inode.read_as_vec().unwrap();
-    processor()
-        .manager()
-        .add(Thread::new_user(data.as_slice(), cmdline.split(' ')));
+    processor().manager().add(Thread::new_user(
+        &inode,
+        &cmdline,
+        cmdline.split(' ').map(|s| s.into()).collect(),
+        Vec::new(),
+    ));
 }
 
 pub extern "C" fn shell(_arg: usize) -> ! {
@@ -40,13 +63,14 @@ pub extern "C" fn shell(_arg: usize) -> ! {
             continue;
         }
         let name = cmd.trim().split(' ').next().unwrap();
-        if let Ok(file) = ROOT_INODE.lookup(name) {
-            let data = file.read_as_vec().unwrap();
-            let _pid = processor()
-                .manager()
-                .add(Thread::new_user(data.as_slice(), cmd.split(' ')));
+        if let Ok(inode) = ROOT_INODE.lookup(name) {
+            let _tid = processor().manager().add(Thread::new_user(
+                &inode,
+                &cmd,
+                cmd.split(' ').map(|s| s.into()).collect(),
+                Vec::new(),
+            ));
         // TODO: wait until process exits, or use user land shell completely
-        //unsafe { thread::JoinHandle::<()>::_of(pid) }.join().unwrap();
         } else {
             println!("Program not exist");
         }

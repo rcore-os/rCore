@@ -5,6 +5,7 @@ use core::any::Any;
 
 use rcore_fs::vfs::*;
 
+use super::ioctl::*;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 
@@ -20,18 +21,39 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
-        // QEMU v3.0 don't support M-mode external interrupt (bug?)
-        // So we have to use polling.
+        #[cfg(feature = "board_k210")]
         loop {
-            let ret = self.buf.lock().pop_front();
-            match ret {
+            // polling
+            let c = crate::arch::io::getchar();
+            if c != '\0' {
+                return c;
+            }
+        }
+        #[cfg(feature = "board_rocket_chip")]
+        loop {
+            let c = crate::arch::io::getchar();
+            if c != '\0' && c as u8 != 254 {
+                return c;
+            }
+        }
+        #[cfg(not(any(feature = "board_k210", feature = "board_rocket_chip")))]
+        loop {
+            let mut buf_lock = self.buf.lock();
+            match buf_lock.pop_front() {
                 Some(c) => return c,
-                None => self.pushed._wait(),
+                None => {
+                    self.pushed.wait(buf_lock);
+                }
             }
         }
     }
     pub fn can_read(&self) -> bool {
-        self.buf.lock().len() > 0
+        // Currently, rocket-chip implementation rely on htif interface, the serial interrupt DO
+        // NOT work, so return true always
+        #[cfg(feature = "board_rocket_chip")]
+        return true;
+        #[cfg(not(feature = "board_rocket_chip"))]
+        return self.buf.lock().len() > 0;
     }
 }
 
@@ -57,7 +79,23 @@ macro_rules! impl_inode {
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
-        fn io_control(&self, _cmd: u32, _data: u32) -> Result<()> { Err(FsError::NotSupported) }
+        fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+            match cmd as usize {
+                TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+                    // pretend to be tty
+                    Ok(())
+                },
+                TIOCGPGRP => {
+                    // pretend to be have a tty process group
+                    // TODO: verify pointer
+                    unsafe {
+                        *(data as *mut u32) = 0
+                    };
+                    Ok(())
+                }
+                _ => Err(FsError::NotSupported)
+            }
+        }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
     };

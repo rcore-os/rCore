@@ -73,23 +73,16 @@ impl TrapFrame {
         tf.fpstate_offset = 16; // skip restoring for first time
         tf
     }
-    fn new_user_thread(entry_addr: usize, rsp: usize, is32: bool) -> Self {
+    pub fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
         use crate::arch::gdt;
         let mut tf = TrapFrame::default();
-        tf.cs = if is32 {
-            gdt::UCODE32_SELECTOR.0
-        } else {
-            gdt::UCODE_SELECTOR.0
-        } as usize;
+        tf.cs = gdt::UCODE_SELECTOR.0 as usize;
         tf.rip = entry_addr;
         tf.ss = gdt::UDATA32_SELECTOR.0 as usize;
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
         tf
-    }
-    pub fn is_user(&self) -> bool {
-        self.cs & 0x3 == 0x3
     }
 }
 
@@ -203,12 +196,11 @@ impl Context {
         entry_addr: usize,
         ustack_top: usize,
         kstack_top: usize,
-        is32: bool,
         cr3: usize,
     ) -> Self {
         InitStack {
             context: ContextData::new(cr3),
-            tf: TrapFrame::new_user_thread(entry_addr, ustack_top, is32),
+            tf: TrapFrame::new_user_thread(entry_addr, ustack_top),
         }
         .push_at(kstack_top)
     }
@@ -241,10 +233,5 @@ impl Context {
             },
         }
         .push_at(kstack_top)
-    }
-    /// Called at a new user context
-    /// To get the init TrapFrame in sys_exec
-    pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.0 as *const InitStack)).tf.clone()
     }
 }

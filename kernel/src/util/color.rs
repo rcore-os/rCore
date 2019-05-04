@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ConsoleColor {
     Black,

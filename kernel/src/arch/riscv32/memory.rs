@@ -8,13 +8,19 @@ use riscv::{addr::*, register::sstatus};
 
 /// Initialize the memory management module
 pub fn init(dtb: usize) {
+    // allow user memory access
+    // NOTE: In K210 priv v1.9.1, sstatus.SUM is PUM which has opposite meaning!
+    #[cfg(not(feature = "board_k210"))]
     unsafe {
         sstatus::set_sum();
-    } // Allow user memory access
-      // initialize heap and Frame allocator
+    }
+    // initialize heap and Frame allocator
     init_frame_allocator();
     init_heap();
     // remap the kernel use 4K page
+    unsafe {
+        super::paging::setup_recursive_mapping();
+    }
     remap_the_kernel(dtb);
 }
 
@@ -86,6 +92,8 @@ fn remap_the_kernel(dtb: usize) {
         Linear::new(offset),
         "bss",
     );
+    // TODO: dtb on rocket chip
+    #[cfg(not(feature = "board_rocket_chip"))]
     ms.push(
         dtb,
         dtb + super::consts::MAX_DTB_SIZE,
@@ -93,7 +101,7 @@ fn remap_the_kernel(dtb: usize) {
         Linear::new(offset),
         "dts",
     );
-    // map PLIC for HiFiveU
+    // map PLIC for HiFiveU & VirtIO
     let offset = -(KERNEL_OFFSET as isize);
     ms.push(
         KERNEL_OFFSET + 0x0C00_2000,
@@ -108,6 +116,22 @@ fn remap_the_kernel(dtb: usize) {
         MemoryAttr::default(),
         Linear::new(offset),
         "plic1",
+    );
+    // map UART for HiFiveU
+    ms.push(
+        KERNEL_OFFSET + 0x10010000,
+        KERNEL_OFFSET + 0x10010000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(offset),
+        "uart",
+    );
+    // map UART for VirtIO
+    ms.push(
+        KERNEL_OFFSET + 0x10000000,
+        KERNEL_OFFSET + 0x10000000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(offset),
+        "uart16550",
     );
     unsafe {
         ms.activate();

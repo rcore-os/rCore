@@ -16,13 +16,6 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         attr.apply(entry);
     }
 
-    fn map_eager(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
-        let target = self.allocator.alloc().expect("failed to alloc frame");
-        let entry = pt.map(addr, target);
-        entry.set_present(true);
-        attr.apply(entry);
-    }
-
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
@@ -32,6 +25,30 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         // PageTable::unmap requires page to be present
         entry.set_present(true);
         pt.unmap(addr);
+    }
+
+    fn clone_map(
+        &self,
+        pt: &mut PageTable,
+        with: &Fn(&mut FnMut()),
+        addr: VirtAddr,
+        attr: &MemoryAttr,
+    ) {
+        let entry = pt.get_entry(addr).expect("failed to get entry");
+        if entry.present() {
+            // eager map and copy data
+            let data = Vec::from(pt.get_page_slice_mut(addr));
+            with(&mut || {
+                let target = self.allocator.alloc().expect("failed to alloc frame");
+                let target_data = pt.get_page_slice_mut(addr);
+                let entry = pt.map(addr, target);
+                target_data.copy_from_slice(&data);
+                attr.apply(entry);
+            });
+        } else {
+            // delay map
+            with(&mut || self.map(pt, addr, attr));
+        }
     }
 
     fn handle_page_fault(&self, pt: &mut PageTable, addr: VirtAddr) -> bool {
@@ -44,6 +61,11 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         entry.set_target(frame);
         entry.set_present(true);
         entry.update();
+        //init with zero for delay mmap mode
+        let data = pt.get_page_slice_mut(addr);
+        for x in data {
+            *x = 0;
+        }
         true
     }
 }
