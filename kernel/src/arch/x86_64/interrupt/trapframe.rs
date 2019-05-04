@@ -73,7 +73,7 @@ impl TrapFrame {
         tf.fpstate_offset = 16; // skip restoring for first time
         tf
     }
-    fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
+    pub fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
         use crate::arch::gdt;
         let mut tf = TrapFrame::default();
         tf.cs = gdt::UCODE_SELECTOR.0 as usize;
@@ -233,10 +233,5 @@ impl Context {
             },
         }
         .push_at(kstack_top)
-    }
-    /// Called at a new user context
-    /// To get the init TrapFrame in sys_exec
-    pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.0 as *const InitStack)).tf.clone()
     }
 }

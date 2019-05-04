@@ -15,6 +15,7 @@ impl Condvar {
     }
 
     /// Park current thread and wait for this condvar to be notified.
+    #[deprecated(note = "this may leads to lost wakeup problem. please use `wait` instead.")]
     pub fn _wait(&self) {
         // The condvar might be notified between adding to queue and thread parking.
         // So park current thread before wait queue lock is freed.
@@ -25,6 +26,7 @@ impl Condvar {
         });
     }
 
+    #[deprecated(note = "this may leads to lost wakeup problem. please use `wait` instead.")]
     pub fn wait_any(condvars: &[&Condvar]) {
         let token = Arc::new(thread::current());
         // Avoid racing in the same way as the function above
@@ -40,19 +42,23 @@ impl Condvar {
         });
     }
 
-    pub fn add_to_wait_queue(&self) -> MutexGuard<VecDeque<Arc<thread::Thread>>, SpinNoIrq> {
+    fn add_to_wait_queue(&self) -> MutexGuard<VecDeque<Arc<thread::Thread>>, SpinNoIrq> {
         let mut lock = self.wait_queue.lock();
         lock.push_back(Arc::new(thread::current()));
         return lock;
     }
 
+    /// Park current thread and wait for this condvar to be notified.
     pub fn wait<'a, T, S>(&self, guard: MutexGuard<'a, T, S>) -> MutexGuard<'a, T, S>
     where
         S: MutexSupport,
     {
         let mutex = guard.mutex;
-        drop(guard);
-        self._wait();
+        let lock = self.add_to_wait_queue();
+        thread::park_action(move || {
+            drop(lock);
+            drop(guard);
+        });
         mutex.lock()
     }
 
@@ -79,8 +85,5 @@ impl Condvar {
             }
         }
         count
-    }
-    pub fn _clear(&self) {
-        self.wait_queue.lock().clear();
     }
 }

@@ -3,6 +3,7 @@
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt::{Debug, Error, Formatter};
+use core::mem::size_of;
 
 use crate::paging::*;
 
@@ -22,8 +23,6 @@ pub struct MemoryArea {
     handler: Box<MemoryHandler>,
     name: &'static str,
 }
-
-unsafe impl Send for MemoryArea {}
 
 impl MemoryArea {
     /*
@@ -54,15 +53,27 @@ impl MemoryArea {
     pub fn contains(&self, addr: VirtAddr) -> bool {
         addr >= self.start_addr && addr < self.end_addr
     }
-    /// Check the array is within the readable memory
-    fn check_read_array<S>(&self, ptr: *const S, count: usize) -> bool {
+    /// Check the array is within the readable memory.
+    /// Return the size of space covered in the area.
+    fn check_read_array<S>(&self, ptr: *const S, count: usize) -> usize {
         // page align
-        ptr as usize >= Page::of_addr(self.start_addr).start_address()
-            && unsafe { ptr.add(count) as usize } < Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address()
+        let min_bound = (ptr as usize).max(Page::of_addr(self.start_addr).start_address());
+        let max_bound = unsafe { ptr.add(count) as usize }
+            .min(Page::of_addr(self.end_addr + PAGE_SIZE - 1).start_address());
+        if max_bound >= min_bound {
+            max_bound - min_bound
+        } else {
+            0
+        }
     }
-    /// Check the array is within the writable memory
-    fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> bool {
-        !self.attr.readonly && self.check_read_array(ptr, count)
+    /// Check the array is within the writable memory.
+    /// Return the size of space covered in the area.
+    fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> usize {
+        if self.attr.readonly {
+            0
+        } else {
+            self.check_read_array(ptr, count)
+        }
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.
@@ -86,31 +97,13 @@ impl MemoryArea {
         let p3 = Page::of_addr(end_addr - 1) + 1;
         !(p1 <= p2 || p0 >= p3)
     }
-    /*
-     **  @brief  map the memory area to the physice address in a page table
-     **  @param  pt: &mut T::Active   the page table to use
-     **  @retval none
-     */
+    /// Map all pages in the area to page table `pt`
     fn map(&self, pt: &mut PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             self.handler.map(pt, page.start_address(), &self.attr);
         }
     }
-    /*
-     **  @brief  map the memory area to the physice address in a page table eagerly
-     **  @param  pt: &mut T::Active   the page table to use
-     **  @retval none
-     */
-    fn map_eager(&self, pt: &mut PageTable) {
-        for page in Page::range_of(self.start_addr, self.end_addr) {
-            self.handler.map_eager(pt, page.start_address(), &self.attr);
-        }
-    }
-    /*
-     **  @brief  unmap the memory area from the physice address in a page table
-     **  @param  pt: &mut T::Active   the page table to use
-     **  @retval none
-     */
+    /// Unmap all pages in the area from page table `pt`
     fn unmap(&self, pt: &mut PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             self.handler.unmap(pt, page.start_address());
@@ -204,28 +197,60 @@ impl<T: InactivePageTable> MemorySet<T> {
         }
     }
     /// Check the pointer is within the readable memory
-    pub fn check_read_ptr<S>(&self, ptr: *const S) -> VMResult<()> {
-        self.check_read_array(ptr, 1)
+    pub unsafe fn check_read_ptr<S>(&self, ptr: *const S) -> VMResult<&'static S> {
+        self.check_read_array(ptr, 1).map(|s| &s[0])
     }
     /// Check the pointer is within the writable memory
-    pub fn check_write_ptr<S>(&self, ptr: *mut S) -> VMResult<()> {
-        self.check_write_array(ptr, 1)
+    pub unsafe fn check_write_ptr<S>(&self, ptr: *mut S) -> VMResult<&'static mut S> {
+        self.check_write_array(ptr, 1).map(|s| &mut s[0])
     }
     /// Check the array is within the readable memory
-    pub fn check_read_array<S>(&self, ptr: *const S, count: usize) -> VMResult<()> {
-        self.areas
-            .iter()
-            .find(|area| area.check_read_array(ptr, count))
-            .map(|_| ())
-            .ok_or(VMError::InvalidPtr)
+    pub unsafe fn check_read_array<S>(
+        &self,
+        ptr: *const S,
+        count: usize,
+    ) -> VMResult<&'static [S]> {
+        let mut valid_size = 0;
+        for area in self.areas.iter() {
+            valid_size += area.check_read_array(ptr, count);
+            if valid_size == size_of::<S>() * count {
+                return Ok(core::slice::from_raw_parts(ptr, count));
+            }
+        }
+        Err(VMError::InvalidPtr)
     }
     /// Check the array is within the writable memory
-    pub fn check_write_array<S>(&self, ptr: *mut S, count: usize) -> VMResult<()> {
-        self.areas
-            .iter()
-            .find(|area| area.check_write_array(ptr, count))
-            .map(|_| ())
-            .ok_or(VMError::InvalidPtr)
+    pub unsafe fn check_write_array<S>(
+        &self,
+        ptr: *mut S,
+        count: usize,
+    ) -> VMResult<&'static mut [S]> {
+        let mut valid_size = 0;
+        for area in self.areas.iter() {
+            valid_size += area.check_write_array(ptr, count);
+            if valid_size == size_of::<S>() * count {
+                return Ok(core::slice::from_raw_parts_mut(ptr, count));
+            }
+        }
+        Err(VMError::InvalidPtr)
+    }
+    /// Check the null-end C string pointer array
+    /// Used for getting argv & envp
+    pub unsafe fn check_and_clone_cstr_array(
+        &self,
+        mut argv: *const *const u8,
+    ) -> VMResult<Vec<String>> {
+        let mut args = Vec::new();
+        loop {
+            let cstr = *self.check_read_ptr(argv)?;
+            if cstr.is_null() {
+                break;
+            }
+            let arg = self.check_and_clone_cstr(cstr)?;
+            args.push(arg);
+            argv = argv.add(1);
+        }
+        Ok(args)
     }
     /// Check the null-end C string is within the readable memory, and is valid.
     /// If so, clone it to a String.
@@ -283,7 +308,15 @@ impl<T: InactivePageTable> MemorySet<T> {
             name,
         };
         self.page_table.edit(|pt| area.map(pt));
-        self.areas.push(area);
+        // keep order by start address
+        let idx = self
+            .areas
+            .iter()
+            .enumerate()
+            .find(|(_, other)| start_addr < other.start_addr)
+            .map(|(i, _)| i)
+            .unwrap_or(self.areas.len());
+        self.areas.insert(idx, area);
     }
 
     /*
@@ -474,20 +507,29 @@ impl<T: InactivePageTable> MemorySet<T> {
             None => false,
         }
     }
-}
 
-impl<T: InactivePageTable> Clone for MemorySet<T> {
-    fn clone(&self) -> Self {
-        let mut page_table = T::new();
+    pub fn clone(&mut self) -> Self {
+        let new_page_table = T::new();
+        let Self {
+            ref mut page_table,
+            ref areas,
+            ..
+        } = self;
         page_table.edit(|pt| {
-            // without CoW, we should allocate the pages eagerly
-            for area in self.areas.iter() {
-                area.map_eager(pt);
+            for area in areas.iter() {
+                for page in Page::range_of(area.start_addr, area.end_addr) {
+                    area.handler.clone_map(
+                        pt,
+                        &|f| unsafe { new_page_table.with(f) },
+                        page.start_address(),
+                        &area.attr,
+                    );
+                }
             }
         });
         MemorySet {
-            areas: self.areas.clone(),
-            page_table,
+            areas: areas.clone(),
+            page_table: new_page_table,
         }
     }
 }

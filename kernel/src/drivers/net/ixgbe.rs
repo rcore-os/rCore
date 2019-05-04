@@ -15,7 +15,6 @@ use smoltcp::wire::EthernetAddress;
 use smoltcp::wire::*;
 use smoltcp::Result;
 
-use crate::memory::active_table;
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -203,7 +202,7 @@ pub fn ixgbe_init(
     let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, index as u8, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     let routes = Routes::new(BTreeMap::new());
-    let mut iface = EthernetInterfaceBuilder::new(net_driver.clone())
+    let iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
         .ip_addrs(ip_addrs)
         .neighbor_cache(neighbor_cache)

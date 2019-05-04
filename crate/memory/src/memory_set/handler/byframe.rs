@@ -22,6 +22,20 @@ impl<T: FrameAllocator> MemoryHandler for ByFrame<T> {
         pt.unmap(addr);
     }
 
+    fn clone_map(
+        &self,
+        pt: &mut PageTable,
+        with: &Fn(&mut FnMut()),
+        addr: VirtAddr,
+        attr: &MemoryAttr,
+    ) {
+        let data = Vec::from(pt.get_page_slice_mut(addr));
+        with(&mut || {
+            self.map(pt, addr, attr);
+            pt.get_page_slice_mut(addr).copy_from_slice(&data);
+        });
+    }
+
     fn handle_page_fault(&self, _pt: &mut PageTable, _addr: VirtAddr) -> bool {
         false
     }

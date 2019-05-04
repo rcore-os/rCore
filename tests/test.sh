@@ -13,7 +13,9 @@ do
 
     wait $pid
 
-    diff -I 'bbl loader' -I 'Hello RISCV! in hart' -u ${f%.cmd}.out stdout || { echo 'testing failed for' $f; exit 1; }
+    awk 'NR > 25 { print }' < stdout > stdout.new
+
+    diff -u ${f%.cmd}.out stdout.new || { echo 'testing failed for' $f; exit 1; }
 
     echo testing $f pass
 done

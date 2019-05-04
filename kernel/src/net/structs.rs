@@ -4,6 +4,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::syscall::*;
 use crate::util;
 use alloc::boxed::Box;
+use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -50,12 +51,12 @@ pub enum Endpoint {
 }
 
 /// Common methods that a socket must have
-pub trait Socket: Send + Sync {
+pub trait Socket: Send + Sync + Debug {
     fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint);
     fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult;
     fn poll(&self) -> (bool, bool, bool); // (in, out, err)
     fn connect(&mut self, endpoint: Endpoint) -> SysResult;
-    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
+    fn bind(&mut self, _endpoint: Endpoint) -> SysResult {
         Err(SysError::EINVAL)
     }
     fn listen(&mut self) -> SysResult {
@@ -73,11 +74,11 @@ pub trait Socket: Send + Sync {
     fn remote_endpoint(&self) -> Option<Endpoint> {
         None
     }
-    fn setsockopt(&mut self, level: usize, opt: usize, data: &[u8]) -> SysResult {
+    fn setsockopt(&mut self, _level: usize, _opt: usize, _data: &[u8]) -> SysResult {
         warn!("setsockopt is unimplemented");
         Ok(0)
     }
-    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+    fn ioctl(&mut self, _request: usize, _arg1: usize, _arg2: usize, _arg3: usize) -> SysResult {
         warn!("ioctl is unimplemented for this socket");
         Ok(0)
     }
@@ -265,9 +266,8 @@ impl Socket for TcpSocketState {
                             TcpState::SynSent => {
                                 // still connecting
                                 drop(socket);
-                                drop(sockets);
                                 debug!("poll for connection wait");
-                                SOCKET_ACTIVITY._wait();
+                                SOCKET_ACTIVITY.wait(sockets);
                             }
                             TcpState::Established => {
                                 break Ok(0);
@@ -285,7 +285,7 @@ impl Socket for TcpSocketState {
         }
     }
 
-    fn bind(&mut self, mut endpoint: Endpoint) -> SysResult {
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
         if let Endpoint::Ip(mut ip) = endpoint {
             if ip.port == 0 {
                 ip.port = get_ephemeral_port();
@@ -357,10 +357,8 @@ impl Socket for TcpSocketState {
                 return Ok((new_socket, Endpoint::Ip(remote_endpoint)));
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait();
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -447,9 +445,8 @@ impl Socket for UdpSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -626,10 +623,8 @@ impl Socket for RawSocketState {
                 );
             }
 
-            // avoid deadlock
             drop(socket);
-            drop(sockets);
-            SOCKET_ACTIVITY._wait()
+            SOCKET_ACTIVITY.wait(sockets);
         }
     }
 
@@ -941,7 +936,7 @@ impl Socket for NetlinkSocketState {
                 let ifaces = NET_DRIVERS.read();
                 for i in 0..ifaces.len() {
                     let mut msg = Vec::new();
-                    let mut new_header = NetlinkMessageHeader {
+                    let new_header = NetlinkMessageHeader {
                         nlmsg_len: 0, // to be determined later
                         nlmsg_type: NetlinkMessageType::NewLink.into(),
                         nlmsg_flags: NetlinkMessageFlags::MULTI,
@@ -999,7 +994,7 @@ impl Socket for NetlinkSocketState {
                     let ip_addrs = ifaces[i].get_ip_addresses();
                     for j in 0..ip_addrs.len() {
                         let mut msg = Vec::new();
-                        let mut new_header = NetlinkMessageHeader {
+                        let new_header = NetlinkMessageHeader {
                             nlmsg_len: 0, // to be determined later
                             nlmsg_type: NetlinkMessageType::NewAddr.into(),
                             nlmsg_flags: NetlinkMessageFlags::MULTI,
@@ -1045,7 +1040,7 @@ impl Socket for NetlinkSocketState {
             _ => {}
         }
         let mut msg = Vec::new();
-        let mut new_header = NetlinkMessageHeader {
+        let new_header = NetlinkMessageHeader {
             nlmsg_len: 0, // to be determined later
             nlmsg_type: NetlinkMessageType::Done.into(),
             nlmsg_flags: NetlinkMessageFlags::MULTI,

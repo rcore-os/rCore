@@ -76,7 +76,7 @@ impl TrapFrame {
     ///
     /// The new thread starts at `entry_addr`.
     /// The stack pointer will be set to `sp`.
-    fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
+    pub fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
         tf.sp = sp;
@@ -268,10 +268,5 @@ impl Context {
             },
         }
         .push_at(kstack_top)
-    }
-
-    /// Used for getting the init TrapFrame of a new user context in `sys_exec`.
-    pub unsafe fn get_init_tf(&self) -> TrapFrame {
-        (*(self.sp as *const InitStack)).tf.clone()
     }
 }

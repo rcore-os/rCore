@@ -1,9 +1,7 @@
 use log::*;
-use once::*;
 use x86_64::instructions::port::Port;
 
 pub fn init() {
-    assert_has_not_been_called!("pit::init must be called only once");
     Pit::new(0x40).init(100);
     info!("pit: init end");
 }

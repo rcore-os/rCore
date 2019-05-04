@@ -1,6 +1,8 @@
 //! ANSI escape sequences parser
 //! (ref: https://en.wikipedia.org/wiki/ANSI_escape_code)
 
+#![allow(dead_code)]
+
 use super::color::ConsoleColor;
 use heapless::consts::U8;
 use heapless::Vec;

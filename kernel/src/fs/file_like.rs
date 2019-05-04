@@ -1,5 +1,6 @@
 use core::fmt;
 
+use super::ioctl::*;
 use super::FileHandle;
 use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
@@ -30,13 +31,19 @@ impl FileLike {
         Ok(len)
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
-        match self {
-            FileLike::File(file) => file.io_control(request as u32, arg1)?,
-            FileLike::Socket(socket) => {
-                socket.ioctl(request, arg1, arg2, arg3)?;
+        match request {
+            // TODO: place flags & path in FileLike in stead of FileHandle/Socket
+            FIOCLEX => Ok(0),
+            _ => {
+                match self {
+                    FileLike::File(file) => file.io_control(request as u32, arg1)?,
+                    FileLike::Socket(socket) => {
+                        socket.ioctl(request, arg1, arg2, arg3)?;
+                    }
+                }
+                Ok(0)
             }
         }
-        Ok(0)
     }
     pub fn poll(&self) -> Result<PollStatus, SysError> {
         let status = match self {
@@ -53,8 +60,8 @@ impl FileLike {
 impl fmt::Debug for FileLike {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            FileLike::File(_) => write!(f, "File"),
-            FileLike::Socket(_) => write!(f, "Socket"),
+            FileLike::File(file) => write!(f, "File({:?})", file),
+            FileLike::Socket(socket) => write!(f, "Socket({:?})", socket),
         }
     }
 }
