@@ -15,7 +15,6 @@
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
-use crate::process::process_unsafe;
 use crate::sync::SpinNoIrqLock;
 use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
@@ -25,6 +24,7 @@ use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::paging::PageTable;
 use rcore_memory::*;
+use crate::process::current_thread;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 
@@ -132,8 +132,12 @@ impl Drop for KernelStack {
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
 
-    // This is safe as long as page fault never happens in page fault handler
-    unsafe { process_unsafe().vm.handle_page_fault(addr) }
+    // FIXME: fix racing caused by force_unlock
+    unsafe {
+        let thread = current_thread();
+        thread.proc.force_unlock();
+        thread.proc.lock().vm.handle_page_fault(addr)
+    }
 }
 
 pub fn init_heap() {

@@ -109,25 +109,13 @@ static PROCESSORS: [Processor; MAX_CPU_NUM] = [
     //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
 ];
 
-/// Get current process
-pub fn process() -> MutexGuard<'static, Process, SpinNoIrq> {
-    current_thread().proc.lock()
-}
-
-/// Get current process, ignoring its lock
-/// Only use this when necessary
-pub unsafe fn process_unsafe() -> MutexGuard<'static, Process, SpinNoIrq> {
-    let thread = current_thread();
-    thread.proc.force_unlock();
-    thread.proc.lock()
-}
-
 /// Get current thread
 ///
-/// FIXME: It's obviously unsafe to get &mut !
-pub fn current_thread() -> &'static mut Thread {
-    use core::mem::transmute;
-    let (process, _): (&mut Thread, *const ()) = unsafe { transmute(processor().context()) };
+/// `Thread` is a thread-local object.
+/// It is safe to call this once, and pass `&mut Thread` as a function argument.
+pub unsafe fn current_thread() -> &'static mut Thread {
+    // trick: force downcast from trait object
+    let (process, _): (&mut Thread, *const ()) = core::mem::transmute(processor().context());
     process
 }
 
