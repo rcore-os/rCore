@@ -3,6 +3,7 @@
 use super::fs::IoVecs;
 use super::*;
 use crate::fs::FileLike;
+use crate::memory::MemorySet;
 use crate::net::{
     Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
     RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
@@ -12,7 +13,6 @@ use alloc::boxed::Box;
 use core::cmp::min;
 use core::mem::size_of;
 use smoltcp::wire::*;
-use crate::memory::MemorySet;
 
 impl Syscall<'_> {
     pub fn sys_socket(&mut self, domain: usize, socket_type: usize, protocol: usize) -> SysResult {
@@ -57,7 +57,7 @@ impl Syscall<'_> {
             fd, level, optname
         );
         let mut proc = self.process();
-        let data = unsafe { proc.vm.check_read_array(optval, optlen)? };
+        let data = unsafe { self.vm().check_read_array(optval, optlen)? };
         let socket = proc.get_socket(fd)?;
         socket.setsockopt(level, optname, data)
     }
@@ -75,17 +75,17 @@ impl Syscall<'_> {
             fd, level, optname, optval, optlen
         );
         let proc = self.process();
-        let optlen = unsafe { proc.vm.check_write_ptr(optlen)? };
+        let optlen = unsafe { self.vm().check_write_ptr(optlen)? };
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let optval = unsafe { proc.vm.check_write_ptr(optval as *mut u32)? };
+                    let optval = unsafe { self.vm().check_write_ptr(optval as *mut u32)? };
                     *optval = crate::net::TCP_SENDBUF as u32;
                     *optlen = 4;
                     Ok(0)
                 }
                 SO_RCVBUF => {
-                    let optval = unsafe { proc.vm.check_write_ptr(optval as *mut u32)? };
+                    let optval = unsafe { self.vm().check_write_ptr(optval as *mut u32)? };
                     *optval = crate::net::TCP_RECVBUF as u32;
                     *optlen = 4;
                     Ok(0)
@@ -107,7 +107,7 @@ impl Syscall<'_> {
         );
 
         let mut proc = self.process();
-        let endpoint = sockaddr_to_endpoint(&mut proc.vm, addr, addr_len)?;
+        let endpoint = sockaddr_to_endpoint(&mut self.vm(), addr, addr_len)?;
         let socket = proc.get_socket(fd)?;
         socket.connect(endpoint)?;
         Ok(0)
@@ -129,11 +129,11 @@ impl Syscall<'_> {
 
         let mut proc = self.process();
 
-        let slice = unsafe { proc.vm.check_read_array(base, len)? };
+        let slice = unsafe { self.vm().check_read_array(base, len)? };
         let endpoint = if addr.is_null() {
             None
         } else {
-            let endpoint = sockaddr_to_endpoint(&mut proc.vm, addr, addr_len)?;
+            let endpoint = sockaddr_to_endpoint(&mut self.vm(), addr, addr_len)?;
             info!("sys_sendto: sending to endpoint {:?}", endpoint);
             Some(endpoint)
         };
@@ -157,14 +157,14 @@ impl Syscall<'_> {
 
         let mut proc = self.process();
 
-        let mut slice = unsafe { proc.vm.check_write_array(base, len)? };
+        let mut slice = unsafe { self.vm().check_write_array(base, len)? };
         let socket = proc.get_socket(fd)?;
         let (result, endpoint) = socket.read(&mut slice);
 
         if result.is_ok() && !addr.is_null() {
             let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+                sockaddr_in.write_to(&mut self.vm(), addr, addr_len)?;
             }
         }
 
@@ -174,8 +174,9 @@ impl Syscall<'_> {
     pub fn sys_recvmsg(&mut self, fd: usize, msg: *mut MsgHdr, flags: usize) -> SysResult {
         info!("recvmsg: fd: {}, msg: {:?}, flags: {}", fd, msg, flags);
         let mut proc = self.process();
-        let hdr = unsafe { proc.vm.check_write_ptr(msg)? };
-        let mut iovs = unsafe { IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &proc.vm, true)? };
+        let hdr = unsafe { self.vm().check_write_ptr(msg)? };
+        let mut iovs =
+            unsafe { IoVecs::check_and_new(hdr.msg_iov, hdr.msg_iovlen, &self.vm(), true)? };
 
         let mut buf = iovs.new_buf(true);
         let socket = proc.get_socket(fd)?;
@@ -186,7 +187,7 @@ impl Syscall<'_> {
             iovs.write_all_from_slice(&buf[..len]);
             let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
-                sockaddr_in.write_to(&mut proc, hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
+                sockaddr_in.write_to(&mut self.vm(), hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
             }
         }
         result
@@ -196,7 +197,7 @@ impl Syscall<'_> {
         info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, addr_len);
         let mut proc = self.process();
 
-        let mut endpoint = sockaddr_to_endpoint(&mut proc.vm, addr, addr_len)?;
+        let mut endpoint = sockaddr_to_endpoint(&mut self.vm(), addr, addr_len)?;
         info!("sys_bind: fd: {} bind to {:?}", fd, endpoint);
 
         let socket = proc.get_socket(fd)?;
@@ -238,13 +239,18 @@ impl Syscall<'_> {
         if !addr.is_null() {
             let sockaddr_in = SockAddr::from(remote_endpoint);
             unsafe {
-                sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+                sockaddr_in.write_to(&mut self.vm(), addr, addr_len)?;
             }
         }
         Ok(new_fd)
     }
 
-    pub fn sys_getsockname(&mut self, fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
+    pub fn sys_getsockname(
+        &mut self,
+        fd: usize,
+        addr: *mut SockAddr,
+        addr_len: *mut u32,
+    ) -> SysResult {
         info!(
             "sys_getsockname: fd: {} addr: {:?} addr_len: {:?}",
             fd, addr, addr_len
@@ -260,12 +266,17 @@ impl Syscall<'_> {
         let endpoint = socket.endpoint().ok_or(SysError::EINVAL)?;
         let sockaddr_in = SockAddr::from(endpoint);
         unsafe {
-            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+            sockaddr_in.write_to(&mut self.vm(), addr, addr_len)?;
         }
         Ok(0)
     }
 
-    pub fn sys_getpeername(&mut self, fd: usize, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
+    pub fn sys_getpeername(
+        &mut self,
+        fd: usize,
+        addr: *mut SockAddr,
+        addr_len: *mut u32,
+    ) -> SysResult {
         info!(
             "sys_getpeername: fd: {} addr: {:?} addr_len: {:?}",
             fd, addr, addr_len
@@ -283,7 +294,7 @@ impl Syscall<'_> {
         let remote_endpoint = socket.remote_endpoint().ok_or(SysError::EINVAL)?;
         let sockaddr_in = SockAddr::from(remote_endpoint);
         unsafe {
-            sockaddr_in.write_to(&mut proc, addr, addr_len)?;
+            sockaddr_in.write_to(&mut self.vm(), addr, addr_len)?;
         }
         Ok(0)
     }
@@ -405,12 +416,12 @@ fn sockaddr_to_endpoint(
         return Err(SysError::EINVAL);
     }
     let addr = unsafe { vm.check_read_ptr(addr)? };
+    if len < addr.len()? {
+        return Err(SysError::EINVAL);
+    }
     unsafe {
         match AddressFamily::from(addr.family) {
             AddressFamily::Internet => {
-                if len < size_of::<SockAddrIn>() {
-                    return Err(SysError::EINVAL);
-                }
                 let port = u16::from_be(addr.addr_in.sin_port);
                 let addr = IpAddress::from(Ipv4Address::from_bytes(
                     &u32::from_be(addr.addr_in.sin_addr).to_be_bytes()[..],
@@ -419,17 +430,11 @@ fn sockaddr_to_endpoint(
             }
             AddressFamily::Unix => Err(SysError::EINVAL),
             AddressFamily::Packet => {
-                if len < size_of::<SockAddrLl>() {
-                    return Err(SysError::EINVAL);
-                }
                 Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
                     addr.addr_ll.sll_ifindex as usize,
                 )))
             }
             AddressFamily::Netlink => {
-                if len < size_of::<SockAddrNl>() {
-                    return Err(SysError::EINVAL);
-                }
                 Ok(Endpoint::Netlink(NetlinkEndpoint::new(
                     addr.addr_nl.nl_pid,
                     addr.addr_nl.nl_groups,
@@ -441,11 +446,21 @@ fn sockaddr_to_endpoint(
 }
 
 impl SockAddr {
+    fn len(&self) -> Result<usize, SysError> {
+        match AddressFamily::from(unsafe { self.family }) {
+            AddressFamily::Internet => Ok(size_of::<SockAddrIn>()),
+            AddressFamily::Packet => Ok(size_of::<SockAddrLl>()),
+            AddressFamily::Netlink => Ok(size_of::<SockAddrNl>()),
+            AddressFamily::Unix => Err(SysError::EINVAL),
+            _ => Err(SysError::EINVAL),
+        }
+    }
+
     /// Write to user sockaddr
     /// Check mutability for user
     unsafe fn write_to(
         self,
-        proc: &mut Process,
+        vm: &MemorySet,
         addr: *mut SockAddr,
         addr_len: *mut u32,
     ) -> SysResult {
@@ -454,19 +469,13 @@ impl SockAddr {
             return Ok(0);
         }
 
-        let addr_len = unsafe { proc.vm.check_write_ptr(addr_len)? };
+        let addr_len = unsafe { vm.check_write_ptr(addr_len)? };
         let max_addr_len = *addr_len as usize;
-        let full_len = match AddressFamily::from(self.family) {
-            AddressFamily::Internet => size_of::<SockAddrIn>(),
-            AddressFamily::Packet => size_of::<SockAddrLl>(),
-            AddressFamily::Netlink => size_of::<SockAddrNl>(),
-            AddressFamily::Unix => return Err(SysError::EINVAL),
-            _ => return Err(SysError::EINVAL),
-        };
+        let full_len = self.len()?;
 
         let written_len = min(max_addr_len, full_len);
         if written_len > 0 {
-            let target = unsafe { proc.vm.check_write_array(addr as *mut u8, written_len)? };
+            let target = unsafe { vm.check_write_array(addr as *mut u8, written_len)? };
             let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
             target.copy_from_slice(source);
         }

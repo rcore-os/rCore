@@ -10,8 +10,9 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
+use crate::memory::MemorySet;
 use crate::process::*;
-use crate::sync::{Condvar, SpinNoIrq, MutexGuard};
+use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
 
@@ -58,6 +59,11 @@ impl Syscall<'_> {
         self.thread.proc.lock()
     }
 
+    /// Get current virtual memory
+    pub fn vm(&self) -> MutexGuard<'_, MemorySet, SpinNoIrq> {
+        self.thread.vm.lock()
+    }
+
     /// System call dispatcher
     // This #[deny(unreachable_patterns)] checks if each match arm is defined
     // See discussion in https://github.com/oscourse-tsinghua/rcore_plus/commit/17e644e54e494835f1a49b34b80c2c4f15ed0dbe.
@@ -83,7 +89,9 @@ impl Syscall<'_> {
             SYS_OPENAT => self.sys_openat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_CLOSE => self.sys_close(args[0]),
             SYS_FSTAT => self.sys_fstat(args[0], args[1] as *mut Stat),
-            SYS_NEWFSTATAT => self.sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3]),
+            SYS_NEWFSTATAT => {
+                self.sys_fstatat(args[0], args[1] as *const u8, args[2] as *mut Stat, args[3])
+            }
             SYS_LSEEK => self.sys_lseek(args[0], args[1] as i64, args[2] as u8),
             SYS_IOCTL => self.sys_ioctl(args[0], args[1], args[2], args[3], args[4]),
             SYS_PREAD64 => self.sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
@@ -100,7 +108,9 @@ impl Syscall<'_> {
             SYS_GETDENTS64 => self.sys_getdents64(args[0], args[1] as *mut LinuxDirent64, args[2]),
             SYS_GETCWD => self.sys_getcwd(args[0] as *mut u8, args[1]),
             SYS_CHDIR => self.sys_chdir(args[0] as *const u8),
-            SYS_RENAMEAT => self.sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8),
+            SYS_RENAMEAT => {
+                self.sys_renameat(args[0], args[1] as *const u8, args[2], args[3] as *const u8)
+            }
             SYS_MKDIRAT => self.sys_mkdirat(args[0], args[1] as *const u8, args[2]),
             SYS_LINKAT => self.sys_linkat(
                 args[0],
@@ -124,7 +134,9 @@ impl Syscall<'_> {
             SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
 
             // io multiplexing
-            SYS_PPOLL => self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec), // ignore sigmask
+            SYS_PPOLL => {
+                self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
+            } // ignore sigmask
             SYS_EPOLL_CREATE1 => self.unimplemented("epoll_create1", Err(SysError::ENOSYS)),
 
             // file system
@@ -149,7 +161,9 @@ impl Syscall<'_> {
 
             // schedule
             SYS_SCHED_YIELD => self.sys_yield(),
-            SYS_SCHED_GETAFFINITY => self.sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32),
+            SYS_SCHED_GETAFFINITY => {
+                self.sys_sched_getaffinity(args[0], args[1], args[2] as *mut u32)
+            }
 
             // socket
             SYS_SOCKET => self.sys_socket(args[0], args[1], args[2]),
@@ -177,9 +191,15 @@ impl Syscall<'_> {
             SYS_SHUTDOWN => self.sys_shutdown(args[0], args[1]),
             SYS_BIND => self.sys_bind(args[0], args[1] as *const SockAddr, args[2]),
             SYS_LISTEN => self.sys_listen(args[0], args[1]),
-            SYS_GETSOCKNAME => self.sys_getsockname(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
-            SYS_GETPEERNAME => self.sys_getpeername(args[0], args[1] as *mut SockAddr, args[2] as *mut u32),
-            SYS_SETSOCKOPT => self.sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4]),
+            SYS_GETSOCKNAME => {
+                self.sys_getsockname(args[0], args[1] as *mut SockAddr, args[2] as *mut u32)
+            }
+            SYS_GETPEERNAME => {
+                self.sys_getpeername(args[0], args[1] as *mut SockAddr, args[2] as *mut u32)
+            }
+            SYS_SETSOCKOPT => {
+                self.sys_setsockopt(args[0], args[1], args[2], args[3] as *const u8, args[4])
+            }
             SYS_GETSOCKOPT => self.sys_getsockopt(
                 args[0],
                 args[1],
@@ -215,7 +235,9 @@ impl Syscall<'_> {
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
             SYS_SETITIMER => self.unimplemented("setitimer", Ok(0)),
-            SYS_GETTIMEOFDAY => self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8),
+            SYS_GETTIMEOFDAY => {
+                self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8)
+            }
             SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
 
             // system
@@ -256,9 +278,13 @@ impl Syscall<'_> {
 
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),
-            SYS_GET_PADDR => self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2]),
+            SYS_GET_PADDR => {
+                self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
+            }
             //SYS_GETRANDOM => self.unimplemented("getrandom", Err(SysError::EINVAL)),
-            SYS_GETRANDOM => self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32),
+            SYS_GETRANDOM => {
+                self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
+            }
             SYS_TKILL => self.unimplemented("tkill", Ok(0)),
             _ => {
                 let ret = match () {
@@ -306,7 +332,7 @@ impl Syscall<'_> {
     }
 
     #[cfg(target_arch = "mips")]
-    fn mips_syscall(&mut self, id: usize, args: [usize; 6],) -> Option<SysResult> {
+    fn mips_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
         let ret = match id {
             SYS_OPEN => self.sys_open(args[0] as *const u8, args[1], args[2]),
             SYS_POLL => self.sys_poll(args[0] as *mut PollFd, args[1], args[2]),

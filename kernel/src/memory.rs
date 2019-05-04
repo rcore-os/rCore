@@ -132,12 +132,8 @@ impl Drop for KernelStack {
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
 
-    // FIXME: fix racing caused by force_unlock
-    unsafe {
-        let thread = current_thread();
-        thread.proc.force_unlock();
-        thread.proc.lock().vm.handle_page_fault(addr)
-    }
+    let thread = unsafe { current_thread() };
+    thread.vm.lock().handle_page_fault(addr)
 }
 
 pub fn init_heap() {

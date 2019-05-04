@@ -35,16 +35,16 @@ impl Syscall<'_> {
 
         if flags.contains(MmapFlags::FIXED) {
             // we have to map it to addr, so remove the old mapping first
-            proc.vm.pop_with_split(addr, addr + len);
+            self.vm().pop_with_split(addr, addr + len);
         } else {
-            addr = proc.vm.find_free_area(addr, len);
+            addr = self.vm().find_free_area(addr, len);
         }
 
         if flags.contains(MmapFlags::ANONYMOUS) {
             if flags.contains(MmapFlags::SHARED) {
                 return Err(SysError::EINVAL);
             }
-            proc.vm.push(
+            self.vm().push(
                 addr,
                 addr + len,
                 prot.to_attr(),
@@ -54,7 +54,7 @@ impl Syscall<'_> {
             return Ok(addr);
         } else {
             let inode = proc.get_file(fd)?.inode();
-            proc.vm.push(
+            self.vm().push(
                 addr,
                 addr + len,
                 prot.to_attr(),
@@ -83,8 +83,8 @@ impl Syscall<'_> {
 
         // FIXME: properly set the attribute of the area
         //        now some mut ptr check is fault
-        let memory_area = proc
-            .vm
+        let vm = self.vm();
+        let memory_area = vm
             .iter()
             .find(|area| area.is_overlap_with(addr, addr + len));
         if memory_area.is_none() {
@@ -96,7 +96,7 @@ impl Syscall<'_> {
     pub fn sys_munmap(&mut self, addr: usize, len: usize) -> SysResult {
         info!("munmap addr={:#x}, size={:#x}", addr, len);
         let mut proc = self.process();
-        proc.vm.pop_with_split(addr, addr + len);
+        self.vm().pop_with_split(addr, addr + len);
         Ok(0)
     }
 }

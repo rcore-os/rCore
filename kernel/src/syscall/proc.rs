@@ -49,8 +49,8 @@ impl Syscall<'_> {
             );
             //return Err(SysError::ENOSYS);
         }
-        let parent_tid_ref = unsafe { self.process().vm.check_write_ptr(parent_tid)? };
-        let child_tid_ref = unsafe { self.process().vm.check_write_ptr(child_tid)? };
+        let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
+        let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
         let new_thread = self
             .thread
             .clone(self.tf, newsp, newtls, child_tid as usize);
@@ -68,7 +68,7 @@ impl Syscall<'_> {
     pub fn sys_wait4(&mut self, pid: isize, wstatus: *mut i32) -> SysResult {
         //info!("wait4: pid: {}, code: {:?}", pid, wstatus);
         let wstatus = if !wstatus.is_null() {
-            Some(unsafe { self.process().vm.check_write_ptr(wstatus)? })
+            Some(unsafe { self.vm().check_write_ptr(wstatus)? })
         } else {
             None
         };
@@ -150,9 +150,9 @@ impl Syscall<'_> {
             path, argv, envp
         );
         let mut proc = self.process();
-        let path = unsafe { proc.vm.check_and_clone_cstr(path)? };
-        let args = unsafe { proc.vm.check_and_clone_cstr_array(argv)? };
-        let envs = unsafe { proc.vm.check_and_clone_cstr_array(envp)? };
+        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let args = unsafe { self.vm().check_and_clone_cstr_array(argv)? };
+        let envs = unsafe { self.vm().check_and_clone_cstr_array(envp)? };
 
         if args.is_empty() {
             error!("exec: args is null");
@@ -180,9 +180,9 @@ impl Syscall<'_> {
             Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
 
         // Activate new page table
-        core::mem::swap(&mut proc.vm, &mut vm);
+        core::mem::swap(&mut *self.vm(), &mut vm);
         unsafe {
-            proc.vm.activate();
+            self.vm().activate();
         }
 
         // Modify exec path
@@ -289,7 +289,7 @@ impl Syscall<'_> {
         let clear_child_tid = self.thread.clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
-            if let Ok(clear_child_tid_ref) = unsafe { proc.vm.check_write_ptr(clear_child_tid) } {
+            if let Ok(clear_child_tid_ref) = unsafe { self.vm().check_write_ptr(clear_child_tid) } {
                 *clear_child_tid_ref = 0;
                 let queue = proc.get_futex(clear_child_tid as usize);
                 queue.notify_one();
@@ -328,7 +328,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {
-        let time = unsafe { *self.process().vm.check_read_ptr(req)? };
+        let time = unsafe { *self.vm().check_read_ptr(req)? };
         info!("nanosleep: time: {:#?}", time);
         // TODO: handle spurious wakeup
         thread::sleep(time.to_duration());

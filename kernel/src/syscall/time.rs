@@ -13,7 +13,7 @@ impl Syscall<'_> {
         }
 
         let proc = self.process();
-        let tv = unsafe { proc.vm.check_write_ptr(tv)? };
+        let tv = unsafe { self.vm().check_write_ptr(tv)? };
 
         let timeval = TimeVal::get_epoch();
         *tv = timeval;
@@ -24,7 +24,7 @@ impl Syscall<'_> {
         info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
 
         let proc = self.process();
-        let ts = unsafe { proc.vm.check_write_ptr(ts)? };
+        let ts = unsafe { self.vm().check_write_ptr(ts)? };
 
         let timespec = TimeSpec::get_epoch();
         *ts = timespec;
@@ -35,7 +35,7 @@ impl Syscall<'_> {
         let sec = get_epoch_usec() / USEC_PER_SEC;
         if time as usize != 0 {
             let proc = self.process();
-            let time = unsafe { proc.vm.check_write_ptr(time)? };
+            let time = unsafe { self.vm().check_write_ptr(time)? };
             *time = sec as u64;
         }
         Ok(sec as usize)
@@ -44,7 +44,7 @@ impl Syscall<'_> {
     pub fn sys_getrusage(&mut self, who: usize, rusage: *mut RUsage) -> SysResult {
         info!("getrusage: who: {}, rusage: {:?}", who, rusage);
         let proc = self.process();
-        let rusage = unsafe { proc.vm.check_write_ptr(rusage)? };
+        let rusage = unsafe { self.vm().check_write_ptr(rusage)? };
 
         let tick_base = *TICK_BASE;
         let tick = unsafe { crate::trap::TICK as u64 };
@@ -67,7 +67,7 @@ impl Syscall<'_> {
     pub fn sys_times(&mut self, buf: *mut Tms) -> SysResult {
         info!("times: buf: {:?}", buf);
         let proc = self.process();
-        let buf = unsafe { proc.vm.check_write_ptr(buf)? };
+        let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
         let tick_base = *TICK_BASE;
         let tick = unsafe { crate::trap::TICK as u64 };

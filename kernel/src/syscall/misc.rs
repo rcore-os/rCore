@@ -24,7 +24,7 @@ impl Syscall<'_> {
         let offset = 65;
         let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
         let proc = self.process();
-        let buf = unsafe { proc.vm.check_write_array(buf, strings.len() * offset)? };
+        let buf = unsafe { self.vm().check_write_array(buf, strings.len() * offset)? };
 
         for i in 0..strings.len() {
             unsafe {
@@ -40,7 +40,7 @@ impl Syscall<'_> {
             pid, size, mask
         );
         let proc = self.process();
-        let mask = unsafe { proc.vm.check_write_array(mask, size / size_of::<u32>())? };
+        let mask = unsafe { self.vm().check_write_array(mask, size / size_of::<u32>())? };
 
         // we only have 4 cpu at most.
         // so just set it.
@@ -50,14 +50,20 @@ impl Syscall<'_> {
 
     pub fn sys_sysinfo(&mut self, sys_info: *mut SysInfo) -> SysResult {
         let proc = self.process();
-        let sys_info = unsafe { proc.vm.check_write_ptr(sys_info)? };
+        let sys_info = unsafe { self.vm().check_write_ptr(sys_info)? };
 
         let sysinfo = SysInfo::default();
         *sys_info = sysinfo;
         Ok(0)
     }
 
-    pub fn sys_futex(&mut self, uaddr: usize, op: u32, val: i32, timeout: *const TimeSpec) -> SysResult {
+    pub fn sys_futex(
+        &mut self,
+        uaddr: usize,
+        op: u32,
+        val: i32,
+        timeout: *const TimeSpec,
+    ) -> SysResult {
         info!(
             "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
             thread::current().id(),
@@ -73,11 +79,11 @@ impl Syscall<'_> {
         if uaddr % size_of::<u32>() != 0 {
             return Err(SysError::EINVAL);
         }
-        let atomic = unsafe { self.process().vm.check_write_ptr(uaddr as *mut AtomicI32)? };
+        let atomic = unsafe { self.vm().check_write_ptr(uaddr as *mut AtomicI32)? };
         let _timeout = if timeout.is_null() {
             None
         } else {
-            Some(unsafe { *self.process().vm.check_read_ptr(timeout)? })
+            Some(unsafe { *self.vm().check_read_ptr(timeout)? })
         };
 
         const OP_WAIT: u32 = 0;
@@ -132,7 +138,7 @@ impl Syscall<'_> {
         match resource {
             RLIMIT_STACK => {
                 if !old_limit.is_null() {
-                    let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                    let old_limit = unsafe { self.vm().check_write_ptr(old_limit)? };
                     *old_limit = RLimit {
                         cur: USER_STACK_SIZE as u64,
                         max: USER_STACK_SIZE as u64,
@@ -142,7 +148,7 @@ impl Syscall<'_> {
             }
             RLIMIT_NOFILE => {
                 if !old_limit.is_null() {
-                    let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                    let old_limit = unsafe { self.vm().check_write_ptr(old_limit)? };
                     *old_limit = RLimit {
                         cur: 1024,
                         max: 1024,
@@ -152,7 +158,7 @@ impl Syscall<'_> {
             }
             RLIMIT_RSS | RLIMIT_AS => {
                 if !old_limit.is_null() {
-                    let old_limit = unsafe { proc.vm.check_write_ptr(old_limit)? };
+                    let old_limit = unsafe { self.vm().check_write_ptr(old_limit)? };
                     // 1GB
                     *old_limit = RLimit {
                         cur: 1024 * 1024 * 1024,
@@ -168,7 +174,7 @@ impl Syscall<'_> {
     pub fn sys_getrandom(&mut self, buf: *mut u8, len: usize, flag: u32) -> SysResult {
         //info!("getrandom: buf: {:?}, len: {:?}, falg {:?}", buf, len,flag);
         let mut proc = self.process();
-        let slice = unsafe { proc.vm.check_write_array(buf, len)? };
+        let slice = unsafe { self.vm().check_write_array(buf, len)? };
         let mut i = 0;
         for elm in slice {
             unsafe {

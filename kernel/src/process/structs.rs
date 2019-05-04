@@ -23,13 +23,14 @@ use super::abi::{self, ProcInitInfo};
 use core::mem::uninitialized;
 use rcore_fs::vfs::INode;
 
-// TODO: avoid pub
 pub struct Thread {
-    pub context: Context,
-    pub kstack: KernelStack,
+    context: Context,
+    kstack: KernelStack,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
+    // This is same as `proc.vm`
+    pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
 }
 
@@ -57,7 +58,7 @@ impl fmt::Display for Pid {
 
 pub struct Process {
     // resources
-    pub vm: MemorySet,
+    pub vm: Arc<Mutex<MemorySet>>,
     pub files: BTreeMap<usize, FileLike>,
     pub cwd: String,
     pub exec_path: String,
@@ -108,11 +109,14 @@ impl Thread {
     /// Make a new kernel thread starting from `entry` with `arg`
     pub fn new_kernel(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<Thread> {
         let vm = MemorySet::new();
+        let vm_token = vm.token();
+        let vm = Arc::new(Mutex::new(vm));
         let kstack = KernelStack::new();
         Box::new(Thread {
-            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm.token()) },
+            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm_token) },
             kstack,
             clear_child_tid: 0,
+            vm: vm.clone(),
             // TODO: kernel thread should not have a process
             proc: Process {
                 vm,
@@ -243,6 +247,8 @@ impl Thread {
     ) -> Box<Thread> {
         let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();
 
+        let vm_token = vm.token();
+        let vm = Arc::new(Mutex::new(vm));
         let kstack = KernelStack::new();
 
         let mut files = BTreeMap::new();
@@ -285,10 +291,11 @@ impl Thread {
 
         Box::new(Thread {
             context: unsafe {
-                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm.token())
+                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm_token)
             },
             kstack,
             clear_child_tid: 0,
+            vm: vm.clone(),
             proc: Process {
                 vm,
                 files,
@@ -308,12 +315,15 @@ impl Thread {
 
     /// Fork a new process from current one
     pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
-        let mut proc = self.proc.lock();
         let kstack = KernelStack::new();
-        let vm = proc.vm.clone();
-        let context = unsafe { Context::new_fork(tf, kstack.top(), vm.token()) };
+        let vm = self.vm.lock().clone();
+        let vm_token = vm.token();
+        let vm = Arc::new(Mutex::new(vm));
+        let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
+
+        let mut proc = self.proc.lock();
         let new_proc = Process {
-            vm,
+            vm: vm.clone(),
             files: proc.files.clone(),
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
@@ -333,6 +343,7 @@ impl Thread {
             context,
             kstack,
             clear_child_tid: 0,
+            vm,
             proc: new_proc,
         })
     }
@@ -346,11 +357,12 @@ impl Thread {
         clear_child_tid: usize,
     ) -> Box<Thread> {
         let kstack = KernelStack::new();
-        let token = self.proc.lock().vm.token();
+        let vm_token = self.vm.lock().token();
         Box::new(Thread {
-            context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), token, tls) },
+            context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), vm_token, tls) },
             kstack,
             clear_child_tid,
+            vm: self.vm.clone(),
             proc: self.proc.clone(),
         })
     }

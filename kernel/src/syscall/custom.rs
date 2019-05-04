@@ -23,9 +23,9 @@ impl Syscall<'_> {
         let (base, len) = pci::get_bar0_mem(tag).ok_or(SysError::ENOENT)?;
 
         let mut proc = self.process();
-        let virt_addr = proc.vm.find_free_area(0, len);
+        let virt_addr = self.vm().find_free_area(0, len);
         let attr = MemoryAttr::default().user();
-        proc.vm.push(
+        self.vm().push(
             virt_addr,
             virt_addr + len,
             attr,
@@ -42,12 +42,17 @@ impl Syscall<'_> {
 
     /// Get start physical addresses of frames
     /// mapped to a list of virtual addresses.
-    pub fn sys_get_paddr(&mut self, vaddrs: *const u64, paddrs: *mut u64, count: usize) -> SysResult {
+    pub fn sys_get_paddr(
+        &mut self,
+        vaddrs: *const u64,
+        paddrs: *mut u64,
+        count: usize,
+    ) -> SysResult {
         let mut proc = self.process();
-        let vaddrs = unsafe { proc.vm.check_read_array(vaddrs, count)? };
-        let paddrs = unsafe { proc.vm.check_write_array(paddrs, count)? };
+        let vaddrs = unsafe { self.vm().check_read_array(vaddrs, count)? };
+        let paddrs = unsafe { self.vm().check_write_array(paddrs, count)? };
         for i in 0..count {
-            let paddr = proc.vm.translate(vaddrs[i] as usize).unwrap_or(0);
+            let paddr = self.vm().translate(vaddrs[i] as usize).unwrap_or(0);
             paddrs[i] = paddr as u64;
         }
         Ok(0)
