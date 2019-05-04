@@ -36,8 +36,8 @@ matrix:
 
 install:
   - if [ $ARCH = riscv32 ] || [ $ARCH = riscv64 ]; then
-      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.1.0-2019.01.0-x86_64-linux-ubuntu14";
-      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.1.0-2019.01.0-x86_64-apple-darwin";
+      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.02.0-x86_64-linux-ubuntu14";
+      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.02.0-x86_64-apple-darwin";
       wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
       tar xf $FILE.tar.gz;
       export PATH=$PATH:$PWD/$FILE/bin;
@@ -103,7 +103,8 @@ install:
 
 
 before_script:
-  - rustup component add rust-src
+  - rustup component add rust-src llvm-tools-preview
+  - (test -x $HOME/.cargo/bin/cargo-objdump || cargo install cargo-binutils)
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)
   - if [ $ARCH = x86_64 ]; then
       (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage);

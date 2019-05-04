@@ -8,8 +8,6 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use isomorphic_drivers::net::ethernet::intel::ixgbe;
 use log::*;
-use rcore_memory::paging::PageTable;
-use rcore_memory::PAGE_SIZE;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, Checksum, DeviceCapabilities};
 use smoltcp::time::Instant;
@@ -26,7 +24,7 @@ use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS,
 
 #[derive(Clone)]
 struct IXGBEDriver {
-    inner: ixgbe::IXGBEDriver,
+    inner: Arc<Mutex<ixgbe::IXGBE<Provider>>>,
     header: usize,
     size: usize,
     mtu: usize,
@@ -49,7 +47,7 @@ impl Driver for IXGBEInterface {
 
         let handled = {
             let _ = FlagsGuard::no_irq_region();
-            self.driver.inner.try_handle_interrupt()
+            self.driver.inner.lock().try_handle_interrupt()
         };
 
         if handled {
@@ -84,6 +82,11 @@ impl Driver for IXGBEInterface {
         self.ifname.clone()
     }
 
+    // get ip addresses
+    fn get_ip_addresses(&self) -> Vec<IpCidr> {
+        Vec::from(self.iface.lock().ip_addrs())
+    }
+
     fn ipv4_address(&self) -> Option<Ipv4Address> {
         self.iface.lock().ipv4_address()
     }
@@ -100,6 +103,17 @@ impl Driver for IXGBEInterface {
             }
         }
     }
+
+    fn send(&self, data: &[u8]) -> Option<usize> {
+        self.driver.inner.lock().send(&data);
+        Some(data.len())
+    }
+
+    fn get_arp(&self, ip: IpAddress) -> Option<EthernetAddress> {
+        let iface = self.iface.lock();
+        let cache = iface.neighbor_cache();
+        cache.lookup_pure(&ip, Instant::from_millis(0))
+    }
 }
 pub struct IXGBERxToken(Vec<u8>);
 pub struct IXGBETxToken(IXGBEDriver);
@@ -110,8 +124,8 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let _ = FlagsGuard::no_irq_region();
-        if self.inner.can_send() {
-            if let Some(data) = self.inner.recv() {
+        if self.inner.lock().can_send() {
+            if let Some(data) = self.inner.lock().recv() {
                 Some((IXGBERxToken(data), IXGBETxToken(self.clone())))
             } else {
                 None
@@ -123,7 +137,7 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
         let _ = FlagsGuard::no_irq_region();
-        if self.inner.can_send() {
+        if self.inner.lock().can_send() {
             Some(IXGBETxToken(self.clone()))
         } else {
             None
@@ -157,10 +171,10 @@ impl phy::TxToken for IXGBETxToken {
         F: FnOnce(&mut [u8]) -> Result<R>,
     {
         let _ = FlagsGuard::no_irq_region();
-        let mut buffer = [0u8; ixgbe::IXGBEDriver::get_mtu()];
+        let mut buffer = [0u8; ixgbe::IXGBE::<Provider>::get_mtu()];
         let result = f(&mut buffer[..len]);
         if result.is_ok() {
-            (self.0).inner.send(&buffer[..len]);
+            self.0.inner.lock().send(&buffer[..len]);
         }
         result
     }
@@ -171,26 +185,24 @@ pub fn ixgbe_init(
     irq: Option<u32>,
     header: usize,
     size: usize,
+    index: usize,
 ) -> Arc<IXGBEInterface> {
     let _ = FlagsGuard::no_irq_region();
-    let ixgbe = ixgbe::IXGBEDriver::init(Provider::new(), header, size);
+    let mut ixgbe = ixgbe::IXGBE::new(header, size);
     ixgbe.enable_irq();
 
     let ethernet_addr = EthernetAddress::from_bytes(&ixgbe.get_mac().as_bytes());
 
     let net_driver = IXGBEDriver {
-        inner: ixgbe,
+        inner: Arc::new(Mutex::new(ixgbe)),
         header,
         size,
         mtu: 1500,
     };
 
-    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, 0, 2), 24)];
+    let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, index as u8, 2), 24)];
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let mut routes = Routes::new(BTreeMap::new());
-    routes
-        .add_default_ipv4_route(Ipv4Address::new(10, 0, 0, 1))
-        .unwrap();
+    let routes = Routes::new(BTreeMap::new());
     let mut iface = EthernetInterfaceBuilder::new(net_driver.clone())
         .ethernet_addr(ethernet_addr)
         .ip_addrs(ip_addrs)
@@ -198,7 +210,7 @@ pub fn ixgbe_init(
         .routes(routes)
         .finalize();
 
-    info!("ixgbe: interface {} up", &name);
+    info!("ixgbe interface {} up with addr 10.0.{}.2/24", name, index);
 
     let ixgbe_iface = IXGBEInterface {
         iface: Mutex::new(iface),

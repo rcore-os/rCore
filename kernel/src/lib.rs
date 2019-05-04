@@ -6,6 +6,7 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
+#![deny(unused_must_use)]
 #![no_std]
 
 // just keep it ...
@@ -22,6 +23,8 @@ use rcore_thread::std_thread as thread;
 
 #[macro_use] // print!
 mod logging;
+#[macro_use]
+mod util;
 mod backtrace;
 mod consts;
 mod drivers;
@@ -34,7 +37,6 @@ mod shell;
 mod sync;
 mod syscall;
 mod trap;
-mod util;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

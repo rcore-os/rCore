@@ -25,7 +25,7 @@ pub fn init_other() {
 }
 
 fn init_frame_allocator() {
-    use bit_allocator::BitAlloc;
+    use bitmap_allocator::BitAlloc;
     use core::ops::Range;
 
     let mut ba = FRAME_ALLOCATOR.lock();

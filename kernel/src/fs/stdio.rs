@@ -20,8 +20,6 @@ impl Stdin {
         self.pushed.notify_one();
     }
     pub fn pop(&self) -> char {
-        // QEMU v3.0 don't support M-mode external interrupt (bug?)
-        // So we have to use polling.
         loop {
             let ret = self.buf.lock().pop_front();
             match ret {
@@ -43,10 +41,37 @@ lazy_static! {
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
 }
 
+// 32bits total, command in lower 16bits, size of the parameter structure in the lower 14 bits of the upper 16 bits
+// higher 2 bits: 01 = write, 10 = read
+
+#[cfg(not(target_arch = "mips"))]
+const TCGETS: u32 = 0x5401;
+#[cfg(target_arch = "mips")]
+const TCGETS: u32 = 0x540D;
+
+#[cfg(not(target_arch = "mips"))]
+const TIOCGPGRP: u32 = 0x540F;
+// _IOR('t', 119, int)
+#[cfg(target_arch = "mips")]
+const TIOCGPGRP: u32 = 0x4_004_74_77;
+
+#[cfg(not(target_arch = "mips"))]
+const TIOCSPGRP: u32 = 0x5410;
+// _IOW('t', 118, int)
+#[cfg(target_arch = "mips")]
+const TIOCSPGRP: u32 = 0x8_004_74_76;
+
+#[cfg(not(target_arch = "mips"))]
+const TIOCGWINSZ: u32 = 0x5413;
+// _IOR('t', 104, struct winsize)
+#[cfg(target_arch = "mips")]
+const TIOCGWINSZ: u32 = 0x4_008_74_68;
+
 // TODO: better way to provide default impl?
 macro_rules! impl_inode {
     () => {
         fn metadata(&self) -> Result<Metadata> { Err(FsError::NotSupported) }
+        fn set_metadata(&self, _metadata: &Metadata) -> Result<()> { Ok(()) }
         fn sync_all(&self) -> Result<()> { Ok(()) }
         fn sync_data(&self) -> Result<()> { Ok(()) }
         fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
@@ -56,19 +81,42 @@ macro_rules! impl_inode {
         fn move_(&self, _old_name: &str, _target: &Arc<INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
         fn find(&self, _name: &str) -> Result<Arc<INode>> { Err(FsError::NotDir) }
         fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
+        fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+            match cmd {
+                TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+                    // pretend to be tty
+                    Ok(())
+                },
+                TIOCGPGRP => {
+                    // pretend to be have a tty process group
+                    // TODO: verify pointer
+                    unsafe {
+                        *(data as *mut u32) = 0
+                    };
+                    Ok(())
+                }
+                _ => Err(FsError::NotSupported)
+            }
+        }
         fn fs(&self) -> Arc<FileSystem> { unimplemented!() }
         fn as_any_ref(&self) -> &Any { self }
-        fn chmod(&self, _mode: u16) -> Result<()> { Ok(()) }
     };
 }
 
 impl INode for Stdin {
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         buf[0] = self.pop() as u8;
         Ok(1)
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         unimplemented!()
+    }
+    fn poll(&self) -> Result<PollStatus> {
+        Ok(PollStatus {
+            read: self.can_read(),
+            write: false,
+            error: false,
+        })
     }
     impl_inode!();
 }
@@ -83,6 +131,13 @@ impl INode for Stdout {
         let s = unsafe { str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
+    }
+    fn poll(&self) -> Result<PollStatus> {
+        Ok(PollStatus {
+            read: false,
+            write: true,
+            error: false,
+        })
     }
     impl_inode!();
 }

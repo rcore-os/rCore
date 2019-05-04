@@ -19,6 +19,7 @@ authors = [
 ]
 
 [features]
+default = ["sv39"]
 # Page table sv39 or sv48 (for riscv64)
 sv39 = []
 board_u540 = ["sv39", "link_user"]
@@ -31,6 +32,8 @@ board_malta = ["link_user"]
 board_mipssim = ["link_user"]
 # for thinpad
 board_thinpad = ["link_user"]
+# for x86 PC
+board_pc = ["link_user"]
 # Hard link user program
 link_user = []
 # Run cmdline instead of user shell, useful for automatic testing
@@ -49,16 +52,17 @@ bitflags = "1.0"
 bit_field = "0.9"
 volatile = "0.2"
 heapless = "0.4"
+bitvec = { git = "https://github.com/myrrlyn/bitvec.git", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
 buddy_system_allocator = "0.1"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers" }
 lazy_static = { version = "1.3", features = ["spin_no_std"] }
-smoltcp = { version = "0.5.0", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
-bit-allocator = { path = "../crate/bit-allocator" }
+smoltcp = { git = "https://github.com/rcore-os/smoltcp", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
+bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
 rcore-memory = { path = "../crate/memory" }
-rcore-thread = { path = "../crate/thread" }
+rcore-thread = { git = "https://github.com/rcore-os/rcore-thread" }
 rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
@@ -67,7 +71,7 @@ bootloader = { git = "https://github.com/rcore-os/bootloader" }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.5"
 raw-cpuid = "6.0"
-uart_16550 = "0.1"
+uart_16550 = "0.2"
 pc-keyboard = "0.5"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]

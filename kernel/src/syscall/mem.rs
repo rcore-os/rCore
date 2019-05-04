@@ -123,6 +123,21 @@ bitflags! {
     }
 }
 
+#[cfg(target_arch = "mips")]
+bitflags! {
+    pub struct MmapFlags: usize {
+        /// Changes are shared.
+        const SHARED = 1 << 0;
+        /// Changes are private.
+        const PRIVATE = 1 << 1;
+        /// Place the mapping at the exact address
+        const FIXED = 1 << 4;
+        /// The mapping is not backed by any file. (non-POSIX)
+        const ANONYMOUS = 0x800;
+    }
+}
+
+#[cfg(not(target_arch = "mips"))]
 bitflags! {
     pub struct MmapFlags: usize {
         /// Changes are shared.
