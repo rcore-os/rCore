@@ -23,7 +23,6 @@ impl Syscall<'_> {
 
         let offset = 65;
         let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
-        let proc = self.process();
         let buf = unsafe { self.vm().check_write_array(buf, strings.len() * offset)? };
 
         for i in 0..strings.len() {
@@ -39,7 +38,6 @@ impl Syscall<'_> {
             "sched_getaffinity: pid: {}, size: {}, mask: {:?}",
             pid, size, mask
         );
-        let proc = self.process();
         let mask = unsafe { self.vm().check_write_array(mask, size / size_of::<u32>())? };
 
         // we only have 4 cpu at most.
@@ -49,7 +47,6 @@ impl Syscall<'_> {
     }
 
     pub fn sys_sysinfo(&mut self, sys_info: *mut SysInfo) -> SysResult {
-        let proc = self.process();
         let sys_info = unsafe { self.vm().check_write_ptr(sys_info)? };
 
         let sysinfo = SysInfo::default();
@@ -90,7 +87,8 @@ impl Syscall<'_> {
         const OP_WAKE: u32 = 1;
         const OP_PRIVATE: u32 = 128;
 
-        let queue = self.process().get_futex(uaddr);
+        let mut proc = self.process();
+        let queue = proc.get_futex(uaddr);
 
         match op & 0xf {
             OP_WAIT => {
@@ -98,8 +96,7 @@ impl Syscall<'_> {
                     return Err(SysError::EAGAIN);
                 }
                 // FIXME: support timeout
-                // FIXME: fix racing
-                queue._wait();
+                queue.wait(proc);
                 Ok(0)
             }
             OP_WAKE => {
@@ -113,7 +110,7 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_reboot(&mut self, _magic: u32, magic2: u32, cmd: u32, _arg: *const u8) -> SysResult {
+    pub fn sys_reboot(&mut self, _magic: u32, _magic2: u32, cmd: u32, _arg: *const u8) -> SysResult {
         // we will skip verifying magic
         if cmd == LINUX_REBOOT_CMD_HALT {
             unsafe {
@@ -130,7 +127,6 @@ impl Syscall<'_> {
         new_limit: *const RLimit,
         old_limit: *mut RLimit,
     ) -> SysResult {
-        let proc = self.process();
         info!(
             "prlimit64: pid: {}, resource: {}, new_limit: {:x?}, old_limit: {:x?}",
             pid, resource, new_limit, old_limit
@@ -171,9 +167,8 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_getrandom(&mut self, buf: *mut u8, len: usize, flag: u32) -> SysResult {
+    pub fn sys_getrandom(&mut self, buf: *mut u8, len: usize, _flag: u32) -> SysResult {
         //info!("getrandom: buf: {:?}, len: {:?}, falg {:?}", buf, len,flag);
-        let mut proc = self.process();
         let slice = unsafe { self.vm().check_write_array(buf, len)? };
         let mut i = 0;
         for elm in slice {

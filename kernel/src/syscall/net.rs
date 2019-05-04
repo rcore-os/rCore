@@ -8,7 +8,6 @@ use crate::net::{
     Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
     RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
 };
-use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::boxed::Box;
 use core::cmp::min;
 use core::mem::size_of;
@@ -74,7 +73,6 @@ impl Syscall<'_> {
             "getsockopt: fd: {}, level: {}, optname: {} optval: {:?} optlen: {:?}",
             fd, level, optname, optval, optlen
         );
-        let proc = self.process();
         let optlen = unsafe { self.vm().check_write_ptr(optlen)? };
         match level {
             SOL_SOCKET => match optname {
@@ -197,7 +195,7 @@ impl Syscall<'_> {
         info!("sys_bind: fd: {} addr: {:?} len: {}", fd, addr, addr_len);
         let mut proc = self.process();
 
-        let mut endpoint = sockaddr_to_endpoint(&mut self.vm(), addr, addr_len)?;
+        let endpoint = sockaddr_to_endpoint(&mut self.vm(), addr, addr_len)?;
         info!("sys_bind: fd: {} bind to {:?}", fd, endpoint);
 
         let socket = proc.get_socket(fd)?;

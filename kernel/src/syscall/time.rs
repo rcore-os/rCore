@@ -12,7 +12,6 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
 
-        let proc = self.process();
         let tv = unsafe { self.vm().check_write_ptr(tv)? };
 
         let timeval = TimeVal::get_epoch();
@@ -23,7 +22,6 @@ impl Syscall<'_> {
     pub fn sys_clock_gettime(&mut self, clock: usize, ts: *mut TimeSpec) -> SysResult {
         info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
 
-        let proc = self.process();
         let ts = unsafe { self.vm().check_write_ptr(ts)? };
 
         let timespec = TimeSpec::get_epoch();
@@ -34,7 +32,6 @@ impl Syscall<'_> {
     pub fn sys_time(&mut self, time: *mut u64) -> SysResult {
         let sec = get_epoch_usec() / USEC_PER_SEC;
         if time as usize != 0 {
-            let proc = self.process();
             let time = unsafe { self.vm().check_write_ptr(time)? };
             *time = sec as u64;
         }
@@ -43,7 +40,6 @@ impl Syscall<'_> {
 
     pub fn sys_getrusage(&mut self, who: usize, rusage: *mut RUsage) -> SysResult {
         info!("getrusage: who: {}, rusage: {:?}", who, rusage);
-        let proc = self.process();
         let rusage = unsafe { self.vm().check_write_ptr(rusage)? };
 
         let tick_base = *TICK_BASE;
@@ -66,7 +62,6 @@ impl Syscall<'_> {
 
     pub fn sys_times(&mut self, buf: *mut Tms) -> SysResult {
         info!("times: buf: {:?}", buf);
-        let proc = self.process();
         let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
         let tick_base = *TICK_BASE;

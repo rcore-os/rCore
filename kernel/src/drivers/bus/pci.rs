@@ -200,7 +200,7 @@ pub fn detach_driver(loc: &Location) -> bool {
 }
 
 pub fn init() {
-    let mut pci_iter = unsafe { scan_bus(&PortOpsImpl, CSpaceAccessMethod::IO) };
+    let pci_iter = unsafe { scan_bus(&PortOpsImpl, CSpaceAccessMethod::IO) };
     for dev in pci_iter {
         info!(
             "pci: {:02x}:{:02x}.{} {:#x} {:#x} ({} {}) irq: {}:{:?}",
@@ -219,7 +219,7 @@ pub fn init() {
 }
 
 pub fn find_device(vendor: u16, product: u16) -> Option<Location> {
-    let mut pci_iter = unsafe { scan_bus(&PortOpsImpl, CSpaceAccessMethod::IO) };
+    let pci_iter = unsafe { scan_bus(&PortOpsImpl, CSpaceAccessMethod::IO) };
     for dev in pci_iter {
         if dev.id.vendor_id == vendor && dev.id.device_id == product {
             return Some(dev.loc);

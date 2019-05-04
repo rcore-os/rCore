@@ -170,7 +170,7 @@ impl Thread {
             header::Machine::Other(243) => {}
             #[cfg(target_arch = "mips")]
             header::Machine::Mips => {}
-            machine @ _ => return Err("invalid ELF arch"),
+            _ => return Err("invalid ELF arch"),
         }
 
         // Check interpreter (for dynamic link)
@@ -242,7 +242,7 @@ impl Thread {
     pub fn new_user(
         inode: &Arc<INode>,
         exec_path: &str,
-        mut args: Vec<String>,
+        args: Vec<String>,
         envs: Vec<String>,
     ) -> Box<Thread> {
         let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();

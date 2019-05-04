@@ -252,8 +252,6 @@ impl Syscall<'_> {
         let iovs = unsafe { IoVecs::check_and_new(iov_ptr, iov_count, &self.vm(), false)? };
 
         let buf = iovs.read_all_to_vec();
-        let len = buf.len();
-
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(buf.as_slice())?;
         Ok(len)
@@ -298,7 +296,7 @@ impl Syscall<'_> {
             proc.lookup_inode_at(dir_fd, &path, true)?
         };
 
-        let mut file = FileHandle::new(inode, flags.to_options(), String::from(path));
+        let file = FileHandle::new(inode, flags.to_options(), String::from(path));
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -588,7 +586,7 @@ impl Syscall<'_> {
         newdirfd: usize,
         newpath: *const u8,
     ) -> SysResult {
-        let mut proc = self.process();
+        let proc = self.process();
         let oldpath = unsafe { self.vm().check_and_clone_cstr(oldpath)? };
         let newpath = unsafe { self.vm().check_and_clone_cstr(newpath)? };
         info!(
@@ -948,7 +946,6 @@ impl OpenFlags {
     }
 }
 
-#[derive(Debug)]
 #[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
 pub struct LinuxDirent64 {
     /// Inode number

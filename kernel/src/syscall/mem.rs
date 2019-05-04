@@ -77,8 +77,6 @@ impl Syscall<'_> {
             "mprotect: addr={:#x}, size={:#x}, prot={:?}",
             addr, len, prot
         );
-
-        let mut proc = self.process();
         let attr = prot.to_attr();
 
         // FIXME: properly set the attribute of the area
@@ -95,7 +93,6 @@ impl Syscall<'_> {
 
     pub fn sys_munmap(&mut self, addr: usize, len: usize) -> SysResult {
         info!("munmap addr={:#x}, size={:#x}", addr, len);
-        let mut proc = self.process();
         self.vm().pop_with_split(addr, addr + len);
         Ok(0)
     }

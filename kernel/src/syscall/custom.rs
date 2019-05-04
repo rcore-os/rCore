@@ -22,7 +22,6 @@ impl Syscall<'_> {
         // Get BAR0 memory
         let (base, len) = pci::get_bar0_mem(tag).ok_or(SysError::ENOENT)?;
 
-        let mut proc = self.process();
         let virt_addr = self.vm().find_free_area(0, len);
         let attr = MemoryAttr::default().user();
         self.vm().push(
@@ -48,7 +47,6 @@ impl Syscall<'_> {
         paddrs: *mut u64,
         count: usize,
     ) -> SysResult {
-        let mut proc = self.process();
         let vaddrs = unsafe { self.vm().check_read_array(vaddrs, count)? };
         let paddrs = unsafe { self.vm().check_write_array(paddrs, count)? };
         for i in 0..count {

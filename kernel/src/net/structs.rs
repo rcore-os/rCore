@@ -285,7 +285,7 @@ impl Socket for TcpSocketState {
         }
     }
 
-    fn bind(&mut self, mut endpoint: Endpoint) -> SysResult {
+    fn bind(&mut self, endpoint: Endpoint) -> SysResult {
         if let Endpoint::Ip(mut ip) = endpoint {
             if ip.port == 0 {
                 ip.port = get_ephemeral_port();
@@ -936,7 +936,7 @@ impl Socket for NetlinkSocketState {
                 let ifaces = NET_DRIVERS.read();
                 for i in 0..ifaces.len() {
                     let mut msg = Vec::new();
-                    let mut new_header = NetlinkMessageHeader {
+                    let new_header = NetlinkMessageHeader {
                         nlmsg_len: 0, // to be determined later
                         nlmsg_type: NetlinkMessageType::NewLink.into(),
                         nlmsg_flags: NetlinkMessageFlags::MULTI,
@@ -994,7 +994,7 @@ impl Socket for NetlinkSocketState {
                     let ip_addrs = ifaces[i].get_ip_addresses();
                     for j in 0..ip_addrs.len() {
                         let mut msg = Vec::new();
-                        let mut new_header = NetlinkMessageHeader {
+                        let new_header = NetlinkMessageHeader {
                             nlmsg_len: 0, // to be determined later
                             nlmsg_type: NetlinkMessageType::NewAddr.into(),
                             nlmsg_flags: NetlinkMessageFlags::MULTI,
@@ -1040,7 +1040,7 @@ impl Socket for NetlinkSocketState {
             _ => {}
         }
         let mut msg = Vec::new();
-        let mut new_header = NetlinkMessageHeader {
+        let new_header = NetlinkMessageHeader {
             nlmsg_len: 0, // to be determined later
             nlmsg_type: NetlinkMessageType::Done.into(),
             nlmsg_flags: NetlinkMessageFlags::MULTI,
