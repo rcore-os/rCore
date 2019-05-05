@@ -3,6 +3,7 @@
 use alloc::string::String;
 use bcm2837::atags::Atags;
 
+pub mod emmc;
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
 pub mod irq;

@@ -62,7 +62,7 @@ dependencies = [
 [[package]]
 name = "bcm2837"
 version = "0.1.0"
-source = "git+https://github.com/GeminiLab/bcm2837#3409b86ed8ef75fae47b65278332f91361f2b83a"
+source = "git+https://github.com/GeminiLab/bcm2837#a2ce1915112a716e2b699eeceb3c36a0aa1e0dd4"
 dependencies = [
  "aarch64 2.2.2 (git+https://github.com/equation314/aarch64)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
