@@ -2,6 +2,74 @@ use bcm2837::emmc::*;
 use core::time::Duration;
 use crate::thread;
 
+const SD_CMD_TYPE_NORMAL: u32 = 0x0;
+const SD_CMD_TYPE_SUSPEND: u32 = (1 << 22);
+const SD_CMD_TYPE_RESUME: u32 = (2 << 22);
+const SD_CMD_TYPE_ABORT: u32 = (3 << 22);
+const SD_CMD_TYPE_MASK: u32 = (3 << 22);
+const SD_CMD_ISDATA: u32 = (1 << 21);
+const SD_CMD_IXCHK_EN: u32 = (1 << 20);
+const SD_CMD_CRCCHK_EN: u32 = (1 << 19);
+const SD_CMD_RSPNS_TYPE_NONE: u32 = 0; // For no response
+const SD_CMD_RSPNS_TYPE_136: u32 = (1 << 16); // For response R2 (with CRC), R3,4 (no CRC)
+const SD_CMD_RSPNS_TYPE_48: u32 = (2 << 16); // For responses R1, R5, R6, R7 (with CRC)
+const SD_CMD_RSPNS_TYPE_48B: u32 = (3 << 16); // For responses R1b, R5b (with CRC)
+const SD_CMD_RSPNS_TYPE_MASK: u32 = (3 << 16);
+const SD_CMD_MULTI_BLOCK: u32 = (1 << 5);
+const SD_CMD_DAT_DIR_HC: u32 = 0;
+const SD_CMD_DAT_DIR_CH: u32 = (1 << 4);
+const SD_CMD_AUTO_CMD_EN_NONE: u32 = 0;
+const SD_CMD_AUTO_CMD_EN_CMD12: u32 = (1 << 2);
+const SD_CMD_AUTO_CMD_EN_CMD23: u32 = (2 << 2);
+const SD_CMD_BLKCNT_EN: u32 = (1 << 1);
+const SD_CMD_DMA: u32 = 1;
+
+const SD_ERR_CMD_TIMEOUT: u32 = 0;
+const SD_ERR_CMD_CRC: u32 = 1;
+const SD_ERR_CMD_END_BIT: u32 = 2;
+const SD_ERR_CMD_INDEX: u32 = 3;
+const SD_ERR_DATA_TIMEOUT: u32 = 4;
+const SD_ERR_DATA_CRC: u32 = 5;
+const SD_ERR_DATA_END_BIT: u32 = 6;
+const SD_ERR_CURRENT_LIMIT: u32 = 7; // !(not supported)
+const SD_ERR_AUTO_CMD12: u32 = 8;
+const SD_ERR_ADMA: u32 = 9; // !(not supported)
+const SD_ERR_TUNING: u32 = 10; // !(not supported)
+const SD_ERR_RSVD: u32 = 11; // !(not supported)
+
+const SD_ERR_MASK_CMD_TIMEOUT: u32 = (1 << (16 + SD_ERR_CMD_TIMEOUT));
+const SD_ERR_MASK_CMD_CRC: u32 = (1 << (16 + SD_ERR_CMD_CRC));
+const SD_ERR_MASK_CMD_END_BIT: u32 = (1 << (16 + SD_ERR_CMD_END_BIT));
+const SD_ERR_MASK_CMD_INDEX: u32 = (1 << (16 + SD_ERR_CMD_INDEX));
+const SD_ERR_MASK_DATA_TIMEOUT: u32 = (1 << (16 + SD_ERR_CMD_TIMEOUT));
+const SD_ERR_MASK_DATA_CRC: u32 = (1 << (16 + SD_ERR_CMD_CRC));
+const SD_ERR_MASK_DATA_END_BIT: u32 = (1 << (16 + SD_ERR_CMD_END_BIT));
+// const SD_ERR_MASK_CURRENT_LIMIT: u32 = (1 << (16 + SD_ERR_CMD_CURRENT_LIMIT));
+// const SD_ERR_MASK_AUTO_CMD12: u32 = (1 << (16 + SD_ERR_CMD_AUTO_CMD12));
+// const SD_ERR_MASK_ADMA: u32 = (1 << (16 + SD_ERR_CMD_ADMA));
+// const SD_ERR_MASK_TUNING: u32 = (1 << (16 + SD_ERR_CMD_TUNING));
+
+const SD_RESP_NONE: u32 = SD_CMD_RSPNS_TYPE_NONE;
+const SD_RESP_R1: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R1b: u32 = (SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN);
+const SD_RESP_R2: u32 = (SD_CMD_RSPNS_TYPE_136 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R3: u32 = SD_CMD_RSPNS_TYPE_48;
+const SD_RESP_R4: u32 = SD_CMD_RSPNS_TYPE_136;
+const SD_RESP_R5: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R5b: u32 = (SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN);
+const SD_RESP_R6: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R7: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
+
+const SD_DATA_READ: u32 = (SD_CMD_ISDATA | SD_CMD_DAT_DIR_CH);
+const SD_DATA_WRITE: u32 = (SD_CMD_ISDATA | SD_CMD_DAT_DIR_HC);
+
+const SD_VER_UNKNOWN: u32 = 0;
+const SD_VER_1: u32 = 1;
+const SD_VER_1_1: u32 = 2;
+const SD_VER_2: u32 = 3;
+const SD_VER_3: u32 = 4;
+const SD_VER_4: u32 = 5;
+
 #[derive(Debug)]
 pub struct SDScr {
     scr: [u32; 2],
@@ -65,6 +133,8 @@ fn usleep(cnt: u32) {
  * static void sd_issue_command_int(struct emmc_block_dev *dev, uint32_t cmd_reg, uint32_t argument, useconds_t timeout)
  * static void sd_handle_card_interrupt(struct emmc_block_dev *dev)
  * static void sd_handle_interrupts(struct emmc_block_dev *dev)
+ * 
+ * 
  * static void sd_issue_command(struct emmc_block_dev *dev, uint32_t command, uint32_t argument, useconds_t timeout)
  * static int sd_ensure_data_mode(struct emmc_block_dev *edev)
  * -- static int sd_suitable_for_dma(void *buf)
