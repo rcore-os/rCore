@@ -10,6 +10,27 @@ fn usleep(cnt: u32) {
     thread::sleep(Duration::from_micros(cnt.into()));
 }
 
+/*
+ * TODO:
+ * ++ static void sd_power_off()
+ * static uint32_t sd_get_base_clock_hz()
+ * -- static int bcm_2708_power_off()
+ * -- static int bcm_2708_power_on()
+ * -- static int bcm_2708_power_cycle()
+ * ++ static uint32_t sd_get_clock_divider(uint32_t base_clock, uint32_t target_rate)
+ * ++ static int sd_switch_clock_rate(uint32_t base_clock, uint32_t target_rate)
+ * static int sd_reset_cmd()
+ * static int sd_reset_dat()
+ * static void sd_issue_command_int(struct emmc_block_dev *dev, uint32_t cmd_reg, uint32_t argument, useconds_t timeout)
+ * static void sd_handle_card_interrupt(struct emmc_block_dev *dev)
+ * static void sd_handle_interrupts(struct emmc_block_dev *dev)
+ * static void sd_issue_command(struct emmc_block_dev *dev, uint32_t command, uint32_t argument, useconds_t timeout)
+ * static int sd_ensure_data_mode(struct emmc_block_dev *edev)
+ * static int sd_suitable_for_dma(void *buf)
+ * static int sd_do_data_command(struct emmc_block_dev *edev, int is_write, uint8_t *buf, size_t buf_size, uint32_t block_no)
+ * Other Constants
+ */
+
 impl EmmcCtl {
 
     pub fn new() -> EmmcCtl {
