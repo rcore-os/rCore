@@ -49,6 +49,16 @@ const SD_ERR_MASK_DATA_END_BIT: u32 = (1 << (16 + SD_ERR_CMD_END_BIT));
 // const SD_ERR_MASK_ADMA: u32 = (1 << (16 + SD_ERR_CMD_ADMA));
 // const SD_ERR_MASK_TUNING: u32 = (1 << (16 + SD_ERR_CMD_TUNING));
 
+const SD_COMMAND_COMPLETE: u32 = 1;
+const SD_TRANSFER_COMPLETE: u32 = 1 << 1;
+const SD_BLOCK_GAP_EVENT: u32 = 1 << 2;
+const SD_DMA_INTERRUPT: u32 = 1 << 3;
+const SD_BUFFER_WRITE_READY: u32 = 1 << 4;
+const SD_BUFFER_READ_READY: u32 = 1 << 5;
+const SD_CARD_INSERTION: u32 = 1 << 6;
+const SD_CARD_REMOVAL: u32 = 1 << 7;
+const SD_CARD_INTERRUPT: u32 = 1 << 8;
+
 const SD_RESP_NONE: u32 = SD_CMD_RSPNS_TYPE_NONE;
 const SD_RESP_R1: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
 const SD_RESP_R1b: u32 = (SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN);
@@ -209,6 +219,41 @@ const sd_acommands: [u32; 64] = [
     sd_cmd!(RESERVED,63)
 ];
 
+const GO_IDLE_STATE: usize = 0;
+const ALL_SEND_CID: usize = 2;
+const SEND_RELATIVE_ADDR: usize = 3;
+const SET_DSR: usize = 4;
+const IO_SET_OP_COND: usize = 5;
+const SWITCH_FUNC: usize = 6;
+const SELECT_CARD: usize = 7;
+const DESELECT_CARD: usize = 7;
+const SELECT_DESELECT_CARD: usize = 7;
+const SEND_IF_COND: usize = 8;
+const SEND_CSD: usize = 9;
+const SEND_CID: usize = 10;
+const VOLTAGE_SWITCH: usize = 11;
+const STOP_TRANSMISSION: usize = 12;
+const SEND_STATUS: usize = 13;
+const GO_INACTIVE_STATE: usize = 15;
+const SET_BLOCKLEN: usize = 16;
+const READ_SINGLE_BLOCK: usize = 17;
+const READ_MULTIPLE_BLOCK: usize = 18;
+const SEND_TUNING_BLOCK: usize = 19;
+const SPEED_CLASS_CONTROL: usize = 20;
+const SET_BLOCK_COUNT: usize = 23;
+const WRITE_BLOCK: usize = 24;
+const WRITE_MULTIPLE_BLOCK: usize = 25;
+const PROGRAM_CSD: usize = 27;
+const SET_WRITE_PROT: usize = 28;
+const CLR_WRITE_PROT: usize = 29;
+const SEND_WRITE_PROT: usize = 30;
+const ERASE_WR_BLK_START: usize = 32;
+const ERASE_WR_BLK_END: usize = 33;
+const ERASE: usize = 38;
+const LOCK_UNLOCK: usize = 42;
+const APP_CMD: usize = 55;
+const GEN_CMD: usize = 56;
+
 const SD_RESET_CMD: u32 = (1 << 25);
 const SD_RESET_DAT: u32 = (1 << 26);
 const SD_RESET_ALL: u32 = (1 << 24);
@@ -232,8 +277,8 @@ impl SDScr {
 
 pub struct EmmcCtl {
     emmc: Emmc,
-    card_supports_sdhc: u32,
-    card_supports_18v:  u32,
+    card_supports_sdhc: bool,
+    card_supports_18v:  bool,
     card_ocr:           u32,
     card_rca:           u32,
     last_interrupt:     u32,
@@ -244,18 +289,18 @@ pub struct EmmcCtl {
 
     last_cmd_reg:       u32,
     last_cmd:           u32,
-    last_cmd_success:   u32,
+    last_cmd_success:   bool,
     last_r0:            u32,
     last_r1:            u32,
     last_r2:            u32,
     last_r3:            u32,
 
     // void *buf;
-    // int blocks_to_transfer;
+    blocks_to_transfer: u32,
     block_size:         usize,
-    use_sdma:           i32,
-    card_removal:       i32,
-    base_clock:         u32
+    use_sdma:           bool,
+    card_removal:       bool,
+    base_clock:         u32,
 }
 
 fn usleep(cnt: u32) {
@@ -302,6 +347,18 @@ macro_rules! timeout_wait {
             usleep(1000);
         }
         succeeded
+    });
+
+    ($condition:expr, $timeout:expr) => ({
+        let mut succeeded = false;
+        for _ in 0..(($timeout) / 1000) {
+            if $condition {
+                succeeded = true;
+                break;
+            }
+            usleep(1000);
+        }
+        succeeded
     })
 }
 
@@ -310,8 +367,8 @@ impl EmmcCtl {
     pub fn new() -> EmmcCtl { //TODO: improve it!
         EmmcCtl {
             emmc: Emmc::new(),
-            card_supports_sdhc:0,
-            card_supports_18v:0,
+            card_supports_sdhc:false,
+            card_supports_18v:false,
             card_ocr:0,
             card_rca:0,
             last_interrupt:0,
@@ -322,16 +379,17 @@ impl EmmcCtl {
 
             last_cmd_reg:0,
             last_cmd:0,
-            last_cmd_success:0,
+            last_cmd_success:false,
             last_r0:0,
             last_r1:0,
             last_r2:0,
             last_r3:0,
 
+            blocks_to_transfer:0,
             block_size:0,
-            use_sdma:0,
-            card_removal:0,
-            base_clock:0
+            use_sdma:false,
+            card_removal:false,
+            base_clock:0,
         }        
     }
 
@@ -416,16 +474,122 @@ impl EmmcCtl {
         timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0)
     }
 
-    pub fn sd_issue_command_int(&mut self, cmd_reg: u32, argument: u32, timeout: u32) {
+    pub fn sd_issue_command_int(&mut self, cmd_regarg: u32, argument: u32, timeout: u32) {
+        let mut cmd_reg = cmd_regarg;
+        
+        self.last_cmd_reg = cmd_reg;
+        self.last_cmd_success = false;
 
+        // Check Command Inhibit
+        while self.emmc.registers.STATUS.read() & 0x1 != 0 {
+            usleep(1000);
+        }
+
+        // Is the command with busy?
+        if cmd_reg & SD_CMD_RSPNS_TYPE_MASK == SD_CMD_RSPNS_TYPE_48B {
+            // With busy
+            // Is is an abort command?
+            if cmd_reg & SD_CMD_TYPE_MASK != SD_CMD_TYPE_ABORT {
+                // Not an abort command
+                // Wait for the data line to be free
+                while self.emmc.registers.STATUS.read() & 0x2 != 0 {
+                    usleep(1000);
+                }
+            }
+        }
+        
+        // Is this a DMA transfer?
+        let is_sdma = (cmd_reg & SD_CMD_ISDATA != 0) && (self.use_sdma);
+
+        if is_sdma {
+            self.last_cmd_success = false;
+            return;
+            // self.emmc.registers.ARG2.write($bufferaddr);
+        }
+
+        if self.blocks_to_transfer > 0xffff {
+            self.last_cmd_success = false;
+            return;
+        }
+
+        self.emmc.registers.BLKSIZECNT.write(self.block_size as u32 | (self.blocks_to_transfer << 16));
+
+        self.emmc.registers.ARG1.write(argument);
+
+        if is_sdma {
+            cmd_reg |= SD_CMD_DMA;
+        }
+
+        self.emmc.registers.CMDTM.write(cmd_reg);
+        usleep(2000);
+
+        timeout_wait!(self.emmc.registers.INTERRUPT.read() & 0x8001 != 0, timeout);
+        let irpts = self.emmc.registers.INTERRUPT.read();
+        self.emmc.registers.INTERRUPT.write(0xffff0001);
+
+        if (irpts & 0xffff0001 != 0x1) {
+            self.last_error = irpts & 0xffff0000;
+            self.last_interrupt = irpts;
+            return;
+        }
+
+        usleep(2000);
+        
     }
 
     pub fn sd_handle_card_interrupt(&mut self) {
-
+        if self.card_rca != 0 {
+            self.sd_issue_command_int(sd_commands[SEND_STATUS], self.card_rca << 16, 500000);
+        }
     }
 
     pub fn sd_handle_interrupts(&mut self) {
+        let irpts = self.emmc.registers.INTERRUPT.read();
+        let mut reset_mask = 0;
 
+        if irpts & SD_COMMAND_COMPLETE != 0 {
+            reset_mask |= SD_COMMAND_COMPLETE;
+        }
+
+        if irpts & SD_TRANSFER_COMPLETE != 0 {
+            reset_mask |= SD_TRANSFER_COMPLETE;
+        }
+
+        if irpts & SD_BLOCK_GAP_EVENT != 0 {
+            reset_mask |= SD_BLOCK_GAP_EVENT;
+        }
+
+        if irpts & SD_DMA_INTERRUPT != 0 {
+            reset_mask |= SD_DMA_INTERRUPT;
+        }
+
+        if irpts & SD_BUFFER_WRITE_READY != 0 {
+            reset_mask |= SD_BUFFER_WRITE_READY;
+        }
+
+        if irpts & SD_BUFFER_READ_READY != 0 {
+            reset_mask |= SD_BUFFER_READ_READY;
+        }
+
+        if irpts & SD_CARD_INSERTION != 0 {
+            reset_mask |= SD_CARD_INSERTION;
+        }
+
+        if irpts & SD_CARD_REMOVAL != 0 {
+            reset_mask |= SD_CARD_REMOVAL;
+            self.card_removal = true;
+        }
+
+        if irpts & SD_CARD_INTERRUPT != 0 {
+            self.sd_handle_card_interrupt();
+            reset_mask |= SD_CARD_INTERRUPT;
+        }
+
+        if irpts & 0x8000 != 0 {
+            reset_mask |= 0xffff0000;
+        }
+
+        self.emmc.registers.INTERRUPT.write(reset_mask);
     }
 
     pub fn sd_issue_command(&mut self, command: u32, argument: u32, timeout: u32) {
