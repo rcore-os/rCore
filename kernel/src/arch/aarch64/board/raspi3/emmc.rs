@@ -209,6 +209,9 @@ const sd_acommands: [u32; 64] = [
     sd_cmd!(RESERVED,63)
 ];
 
+const SD_RESET_CMD: u32 = (1 << 25);
+const SD_RESET_DAT: u32 = (1 << 26);
+const SD_RESET_ALL: u32 = (1 << 24);
 
 #[derive(Debug)]
 pub struct SDScr {
@@ -284,6 +287,9 @@ fn usleep(cnt: u32) {
  * int sd_write(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
  * Other Constants
  */
+
+const MAX_WAIT_US: u32 = 1000000;
+const MAX_WAIT_TIMES: u32 = MAX_WAIT_US / 1000;
 
 impl EmmcCtl {
 
@@ -383,11 +389,33 @@ impl EmmcCtl {
     }
 
     pub fn sd_reset_cmd(&mut self) -> bool {
-        false
+        let mut control1 = self.emmc.registers.CONTROL1.read();
+        self.emmc.registers.CONTROL1.write(control1 | SD_RESET_CMD);
+
+        let mut succeeded = false;
+        for _ in 0..MAX_WAIT_TIMES {
+            if self.emmc.registers.CONTROL1.read() & SD_RESET_CMD == 0 {
+                succeeded = true;
+                break;
+            }
+        }
+
+        succeeded
     }
 
     pub fn sd_reset_dat(&mut self) -> bool {
-        false
+        let mut control1 = self.emmc.registers.CONTROL1.read();
+        self.emmc.registers.CONTROL1.write(control1 | SD_RESET_DAT);
+
+        let mut succeeded = false;
+        for _ in 0..MAX_WAIT_TIMES {
+            if self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0 {
+                succeeded = true;
+                break;
+            }
+        }
+
+        succeeded
     }
 
     pub fn sd_issue_command_int(&mut self, cmd_reg: u32, argument: u32, timeout: u32) {
