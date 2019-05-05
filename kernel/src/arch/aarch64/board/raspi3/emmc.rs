@@ -291,6 +291,20 @@ fn usleep(cnt: u32) {
 const MAX_WAIT_US: u32 = 1000000;
 const MAX_WAIT_TIMES: u32 = MAX_WAIT_US / 1000;
 
+macro_rules! timeout_wait {
+    ($condition:expr) => ({
+        let mut succeeded = false;
+        for _ in 0..MAX_WAIT_TIMES {
+            if $condition {
+                succeeded = true;
+                break;
+            }
+            usleep(1000);
+        }
+        succeeded
+    })
+}
+
 impl EmmcCtl {
 
     pub fn new() -> EmmcCtl { //TODO: improve it!
@@ -392,30 +406,14 @@ impl EmmcCtl {
         let mut control1 = self.emmc.registers.CONTROL1.read();
         self.emmc.registers.CONTROL1.write(control1 | SD_RESET_CMD);
 
-        let mut succeeded = false;
-        for _ in 0..MAX_WAIT_TIMES {
-            if self.emmc.registers.CONTROL1.read() & SD_RESET_CMD == 0 {
-                succeeded = true;
-                break;
-            }
-        }
-
-        succeeded
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_CMD == 0)
     }
 
     pub fn sd_reset_dat(&mut self) -> bool {
         let mut control1 = self.emmc.registers.CONTROL1.read();
         self.emmc.registers.CONTROL1.write(control1 | SD_RESET_DAT);
 
-        let mut succeeded = false;
-        for _ in 0..MAX_WAIT_TIMES {
-            if self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0 {
-                succeeded = true;
-                break;
-            }
-        }
-
-        succeeded
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0)
     }
 
     pub fn sd_issue_command_int(&mut self, cmd_reg: u32, argument: u32, timeout: u32) {
