@@ -13,4 +13,7 @@ pub fn init() {
     assert_has_not_been_called!("driver::init must be called only once");
     board::init_driver();
     console::init();
+    if let Some(con) = console::CONSOLE.lock().as_mut() {
+        con.clear();
+    }
 }
