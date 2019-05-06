@@ -12,7 +12,7 @@ use rcore_memory::paging::*;
 use crate::consts::{KERNEL_OFFSET, KERNEL_PML4, RECURSIVE_INDEX};
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
-pub struct ActivePageTable(RecursivePageTable<'static>);
+pub struct ActivePageTable(RecursivePageTable);
 
 pub struct PageEntry(PageTableEntry);
 
@@ -34,8 +34,7 @@ impl PageTable for ActivePageTable {
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (_frame, flush) = self.0.unmap(Page::of_addr(addr as u64)).unwrap();
-        flush.flush();
+        self.0.unmap(Page::of_addr(addr as u64)).unwrap().1.flush();
     }
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
@@ -50,16 +49,9 @@ impl PageTableExt for ActivePageTable {
     const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
 }
 
-const ROOT_PAGE_TABLE: *mut Aarch64PageTable = (KERNEL_OFFSET
-    | (RECURSIVE_INDEX << 39)
-    | (RECURSIVE_INDEX << 30)
-    | (RECURSIVE_INDEX << 21)
-    | (RECURSIVE_INDEX << 12))
-    as *mut Aarch64PageTable;
-
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *(ROOT_PAGE_TABLE as *mut _)).unwrap())
+        ActivePageTable(RecursivePageTable::new(RECURSIVE_INDEX as u16))
     }
 }
 
@@ -198,12 +190,6 @@ pub struct InactivePageTable0 {
 impl InactivePageTable for InactivePageTable0 {
     type Active = ActivePageTable;
 
-    fn new() -> Self {
-        // When the new InactivePageTable is created for the user MemorySet, it's use ttbr1 as the
-        // TTBR. And the kernel TTBR ttbr0 will never changed, so we needn't call map_kernel()
-        Self::new_bare()
-    }
-
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(target as u64);
@@ -220,17 +206,8 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn map_kernel(&mut self) {
-        let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e0 = table[KERNEL_PML4].clone();
-        assert!(!e0.is_unused());
-
-        self.edit(|_| {
-            table[KERNEL_PML4].set_frame(
-                Frame::containing_address(e0.addr()),
-                EF::default(),
-                MairNormal::attr_value(),
-            );
-        });
+        // When the new InactivePageTable is created for the user MemorySet, it's use ttbr0 as the
+        // TTBR. And the kernel TTBR ttbr1 will never changed, so we needn't call map_kernel()
     }
 
     fn token(&self) -> usize {
@@ -250,7 +227,11 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let target = ttbr_el1_read(1).start_address().as_u64() as usize;
+        let target = ttbr_el1_read(1);
+        if self.p4_frame == target {
+            return f(&mut active_table());
+        }
+        let target = target.start_address().as_u64() as usize;
         active_table().with_temporary_map(
             target,
             |active_table, p4_table: &mut Aarch64PageTable| {
