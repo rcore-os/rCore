@@ -29,6 +29,9 @@ pub fn init() {
         status.enable_soft_int1();
         // Enable clock interrupt
         status.enable_hard_int5();
+        // Enable serial interrupt
+        #[cfg(feature = "board_thinpad")]
+        status.enable_hard_int0();
 
         cp0::status::write(status);
     }
@@ -208,6 +211,11 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
     let rd = (inst >> 11) & 0b11111;
     let sel = (inst >> 6) & 0b111;
     let format = inst & 0b111111;
+
+    if inst == 0x42000020 {
+        // ignore WAIT
+        return true;
+    }
 
     if opcode == 0b011111 && format == 0b111011 {
         // RDHWR

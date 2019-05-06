@@ -6,7 +6,7 @@ use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-#[cfg(not(feature = "run_cmdline"))]
+#[cfg(not(any(feature = "run_cmdline", feature = "board_thinpad")))]
 pub fn add_user_shell() {
     // the busybox of alpine linux can not transfer env vars into child process
     // Now we use busybox from
@@ -33,6 +33,21 @@ pub fn add_user_shell() {
         processor()
             .manager()
             .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
+    } else {
+        processor().manager().add(Thread::new_kernel(shell, 0));
+    }
+}
+
+#[cfg(feature = "board_thinpad")]
+pub fn run_user_shell() {
+    if let Ok(inode) = ROOT_INODE.lookup("sh") {
+        let data = inode.read_as_vec().unwrap();
+        processor().manager().add(Thread::new_user(
+            data.as_slice(),
+            "sh",
+            vec!["sh".into()],
+            Vec::new(),
+        ));
     } else {
         processor().manager().add(Thread::new_kernel(shell, 0));
     }
