@@ -347,10 +347,10 @@ impl Syscall<'_> {
                 match self.sys_pipe(fd_ptr) {
                     Ok(code) => {
                         unsafe {
-                            tf.v0 = *fd_ptr as usize;
-                            tf.v1 = *(fd_ptr.add(1)) as usize;
+                            self.tf.v0 = *fd_ptr as usize;
+                            self.tf.v1 = *(fd_ptr.add(1)) as usize;
                         }
-                        Ok(tf.v0)
+                        Ok(self.tf.v0)
                     }
                     Err(err) => Err(err),
                 }
