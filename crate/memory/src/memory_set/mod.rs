@@ -174,6 +174,8 @@ impl MemoryAttr {
 
 /// set of memory space with multiple memory area with associated page table and stack space
 /// like `mm_struct` in ucore
+/// NOTE: Don't remove align(64), or you will fail to run MIPS.
+#[repr(align(64))]
 pub struct MemorySet<T: InactivePageTable> {
     areas: Vec<MemoryArea>,
     page_table: T,
