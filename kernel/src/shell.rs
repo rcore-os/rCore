@@ -40,10 +40,10 @@ pub fn add_user_shell() {
 
 #[cfg(feature = "board_thinpad")]
 pub fn add_user_shell() {
+    use crate::fs::INodeExt;
     if let Ok(inode) = ROOT_INODE.lookup("sh") {
-        let data = inode.read_as_vec().unwrap();
         processor().manager().add(Thread::new_user(
-            data.as_slice(),
+            &inode,
             "sh",
             vec!["sh".into()],
             Vec::new(),
