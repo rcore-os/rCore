@@ -39,7 +39,7 @@ pub fn add_user_shell() {
 }
 
 #[cfg(feature = "board_thinpad")]
-pub fn run_user_shell() {
+pub fn add_user_shell() {
     if let Ok(inode) = ROOT_INODE.lookup("sh") {
         let data = inode.read_as_vec().unwrap();
         processor().manager().add(Thread::new_user(
