@@ -60,6 +60,11 @@ pub unsafe fn restore(flags: usize) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn stack_pointer_not_aligned(sp: usize) {
+    panic!("Stack pointer not aligned: sp = 0x{:x?}", sp);
+}
+
 /// Dispatch and handle interrupt.
 ///
 /// This function is called from `trap.asm`.

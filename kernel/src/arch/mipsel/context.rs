@@ -5,8 +5,10 @@ use mips::tlb;
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
-    /// unused 16 bytes
-    pub unused: [usize; 4],
+    /// Non-zero if the kernel stack is not 16-byte-aligned
+    pub unaligned_kstack: usize,
+    /// unused 12 bytes
+    pub unused: [usize; 3],
     /// CP0 status register
     pub status: cp0::status::Status,
     /// CP0 cause register

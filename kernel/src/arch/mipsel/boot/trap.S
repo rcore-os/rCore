@@ -31,7 +31,18 @@ trap_from_kernel:
 	 *  k0 is damaged
 	 *  k1 = old stack pointer
 	 *  sp = kernel stack */
+
+	# align stack pointer
+	andi k0, sp, 0xf
+	beqz k0, sp_aligned
+	nop
+
+	la k0, 0xfffffff0
+	and k0, sp, k0
+	sw sp, -176(k0)
+	move sp, k0
 	
+sp_aligned:
 	# allocate 38 words for trapframe + 6 extra words
 	addiu sp, sp, -176
 
@@ -147,9 +158,12 @@ trap_return:
 	lw fp, 156(sp)
 	lw ra, 160(sp)
 
-	// save kernel stack
-	la k0, _cur_kstack_ptr
+	# save kernel stack
+	lw k0, 0(sp)
 	addiu k1, sp, 176
+	movn k1, k0, k0
+
+	la k0, _cur_kstack_ptr
 	sw k1, 0(k0)
 	nop
 
