@@ -9,7 +9,7 @@ use mips::paging::{
 use mips::tlb::*;
 use rcore_memory::paging::*;
 
-pub struct ActivePageTable(TwoLevelPageTable<'static>, PageEntry);
+pub struct ActivePageTable(usize, PageEntry);
 
 /// PageTableEntry: the contents of this entry.
 /// Page: this entry is the pte of page `Page`.
@@ -21,9 +21,8 @@ impl PageTable for ActivePageTable {
         let flags = EF::VALID | EF::WRITABLE | EF::CACHEABLE;
         let page = Page::of_addr(VirtAddr::new(addr));
         let frame = Frame::of_addr(PhysAddr::new(target));
-        // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
-        self.0
+        self.get_table()
             .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap()
             .flush();
@@ -32,13 +31,13 @@ impl PageTable for ActivePageTable {
 
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
-        let (_, flush) = self.0.unmap(page).unwrap();
+        let (_, flush) = self.get_table().unmap(page).unwrap();
         flush.flush();
     }
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         let page = Page::of_addr(VirtAddr::new(vaddr));
-        if let Ok(e) = self.0.ref_entry(page.clone()) {
+        if let Ok(e) = self.get_table().ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
             self.1 = PageEntry(e, page);
             Some(&mut self.1 as &mut Entry)
@@ -70,14 +69,30 @@ pub fn root_page_table_buffer() -> &'static mut MIPSPageTable {
 
 impl PageTableExt for ActivePageTable {}
 
+static mut __page_table_with_mode: bool = false;
+
 /// The virtual address of root page table
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
         ActivePageTable(
-            TwoLevelPageTable::new(root_page_table_buffer()),
+            get_root_page_table_ptr(),
             ::core::mem::uninitialized(),
         )
+    }
+
+    unsafe fn get_raw_table(&mut self) -> *mut MIPSPageTable {
+        if __page_table_with_mode {
+            get_root_page_table_ptr() as *mut MIPSPageTable
+        } else {
+            self.0 as *mut MIPSPageTable
+        }
+    }
+
+    fn get_table(&mut self) -> TwoLevelPageTable<'static> {
+        unsafe {
+            TwoLevelPageTable::new(&mut *self.get_raw_table())
+        }
     }
 }
 
@@ -189,24 +204,52 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let pt: *mut MIPSPageTable = unsafe { self.token() as *mut MIPSPageTable };
-
         unsafe {
             clear_all_tlb();
         }
 
+        debug!("edit table {:x?} -> {:x?}", Self::active_token(), self.token());
         let mut active = unsafe {
             ActivePageTable(
-                TwoLevelPageTable::new(&mut *pt),
+                self.token(),
                 ::core::mem::uninitialized(),
             )
         };
 
         let ret = f(&mut active);
+        debug!("finish table");
 
         unsafe {
             clear_all_tlb();
         }
+        ret
+    }
+
+    unsafe fn with<T>(&self, f: impl FnOnce() -> T) -> T {
+        let old_token = Self::active_token();
+        let new_token = self.token();
+
+        let old_mode = unsafe { __page_table_with_mode };
+        unsafe { 
+            __page_table_with_mode = true;
+        }
+
+        debug!("switch table {:x?} -> {:x?}", old_token, new_token);
+        if old_token != new_token {
+            Self::set_token(new_token);
+            Self::flush_tlb();
+        }
+        let ret = f();
+        debug!("switch table {:x?} -> {:x?}", new_token, old_token);
+        if old_token != new_token {
+            Self::set_token(old_token);
+            Self::flush_tlb();
+        }
+
+        unsafe {
+            __page_table_with_mode = old_mode;
+        }
+
         ret
     }
 }
