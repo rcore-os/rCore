@@ -92,7 +92,7 @@ fn remap_the_kernel(dtb: usize) {
         Linear::new(offset),
         "bss",
     );
-    // TODO: dtb on rocket chip
+    // dtb on rocket chip is embedded into kernel
     #[cfg(not(feature = "board_rocket_chip"))]
     ms.push(
         dtb,
