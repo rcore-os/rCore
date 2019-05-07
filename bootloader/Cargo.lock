@@ -2,8 +2,8 @@
 # It is not intended for manual editing.
 [[package]]
 name = "aarch64"
-version = "2.2.2"
-source = "git+https://github.com/rcore-os/aarch64#14a08f4d285ae0ff515b03bff9f5e66eb68feaed"
+version = "2.5.0"
+source = "git+https://github.com/rcore-os/aarch64#797c24f07f9d90542eb094530b6f63fe3ea7dded"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -14,8 +14,8 @@ dependencies = [
 
 [[package]]
 name = "bcm2837"
-version = "0.1.0"
-source = "git+https://github.com/rcore-os/bcm2837#446f0ea04deb5216ba5e08f10af36e5c1729e6fd"
+version = "1.0.0"
+source = "git+https://github.com/rcore-os/bcm2837#b29a8db5504b7eaa6f8adf2c3ff916d1ffd15194"
 dependencies = [
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -98,8 +98,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "rcore-bootloader"
 version = "0.1.0"
 dependencies = [
- "aarch64 2.2.2 (git+https://github.com/rcore-os/aarch64)",
- "bcm2837 0.1.0 (git+https://github.com/rcore-os/bcm2837)",
+ "aarch64 2.5.0 (git+https://github.com/rcore-os/aarch64)",
+ "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -205,8 +205,8 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum aarch64 2.2.2 (git+https://github.com/rcore-os/aarch64)" = "<none>"
-"checksum bcm2837 0.1.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
+"checksum aarch64 2.5.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
+"checksum bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)" = "c9ce8bb087aacff865633f0bd5aeaed910fe2fe55b55f4739527f2e023a2e53d"

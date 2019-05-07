@@ -10,11 +10,7 @@ extern crate xmas_elf;
 use core::mem::transmute;
 use core::slice;
 use fixedvec::FixedVec;
-use xmas_elf::{
-    header,
-    program::{ProgramHeader, ProgramHeader32, ProgramHeader64},
-    ElfFile,
-};
+use xmas_elf::{header, program::{self, ProgramHeader}, ElfFile};
 
 #[cfg(target_arch = "aarch64")]
 #[path = "arch/aarch64/mod.rs"]
@@ -46,7 +42,7 @@ pub extern "C" fn boot_main() -> ! {
     let kernel_elf = ElfFile::new(kernel).unwrap();
     header::sanity_check(&kernel_elf).unwrap();
 
-    let mut preallocated_space = alloc_stack!([ProgramHeader64; 32]);
+    let mut preallocated_space = alloc_stack!([program::ProgramHeader64; 32]);
     let mut segments = FixedVec::new(&mut preallocated_space);
 
     for program_header in kernel_elf.program_iter() {
@@ -76,7 +72,7 @@ pub extern "C" fn boot_main() -> ! {
     let kernel_elf = ElfFile::new(kernel).unwrap();
     header::sanity_check(&kernel_elf).unwrap();
 
-    let mut preallocated_space = alloc_stack!([ProgramHeader32; 32]);
+    let mut preallocated_space = alloc_stack!([program::ProgramHeader32; 32]);
     let mut segments = FixedVec::new(&mut preallocated_space);
 
     for program_header in kernel_elf.program_iter() {
