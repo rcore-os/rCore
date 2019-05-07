@@ -156,8 +156,12 @@ impl EscapeParser {
                     }
                     let csi = CSI::new(byte, &self.params);
                     if csi == CSI::SGR {
-                        for &param in self.params.iter() {
-                            self.char_attr.apply_sgr(param);
+                        if self.params.is_empty() {
+                            self.char_attr.apply_sgr(0);
+                        } else {
+                            for &param in self.params.iter() {
+                                self.char_attr.apply_sgr(param);
+                            }
                         }
                     }
                     self.status = ParseStatus::Text;
