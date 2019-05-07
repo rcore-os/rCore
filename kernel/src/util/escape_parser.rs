@@ -9,6 +9,7 @@ use heapless::Vec;
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(align(4))]
 pub struct CharacterAttribute {
     /// foreground color
     pub foreground: ConsoleColor,

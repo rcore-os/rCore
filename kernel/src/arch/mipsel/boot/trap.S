@@ -32,8 +32,8 @@ trap_from_kernel:
 	 *  k1 = old stack pointer
 	 *  sp = kernel stack */
 	
-	# allocate 38 words for trapframe + 4 extra words
-	addiu sp, sp, -168
+	# allocate 38 words for trapframe + 6 extra words
+	addiu sp, sp, -176
 
 	# save general registers
 	sw ra, 160(sp)
@@ -149,7 +149,7 @@ trap_return:
 
 	// save kernel stack
 	la k0, _cur_kstack_ptr
-	addiu k1, sp, 168
+	addiu k1, sp, 176
 	sw k1, 0(k0)
 	nop
 

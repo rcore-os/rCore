@@ -19,6 +19,7 @@ mod color;
 mod fonts;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(align(4))]
 pub struct ConsoleChar {
     ascii_char: u8,
     attr: CharacterAttribute,

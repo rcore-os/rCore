@@ -52,6 +52,7 @@ pub struct TrapFrame {
     pub ra: usize,
     /// Reserved
     pub reserved: usize,
+    pub __padding: [usize; 2],
 }
 
 impl TrapFrame {
@@ -135,6 +136,7 @@ struct ContextData {
     /// s[1] = reserved
     /// s[2..11] = Callee-saved registers
     s: [usize; 12],
+    __padding: [usize; 2],
 }
 
 impl ContextData {
