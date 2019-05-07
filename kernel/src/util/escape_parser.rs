@@ -7,7 +7,7 @@ use super::color::ConsoleColor;
 use heapless::consts::U8;
 use heapless::Vec;
 
-#[repr(C)]
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CharacterAttribute {
     /// foreground color
