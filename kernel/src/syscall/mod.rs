@@ -229,7 +229,7 @@ impl Syscall<'_> {
                 args[0],
                 args[1] as u32,
                 args[2] as i32,
-                // args[3] as *const TimeSpec,
+                args[3] as *const TimeSpec,
             ),
 
             // time
@@ -275,6 +275,14 @@ impl Syscall<'_> {
                 args[1] as u32,
                 args[2] as u32,
                 args[3] as *const u8,
+            ),
+            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
+                args[0],
+                args[1] as *mut usize,
+                args[2],
+                args[3] as *mut usize,
+                args[4],
+                args[5],
             ),
 
             // custom
