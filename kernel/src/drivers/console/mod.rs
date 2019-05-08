@@ -28,7 +28,7 @@ pub struct ConsoleChar {
 impl Default for ConsoleChar {
     fn default() -> Self {
         ConsoleChar {
-            ascii_char: 0,
+            ascii_char: b' ',
             attr: CharacterAttribute::default(),
         }
     }
@@ -152,7 +152,7 @@ impl<F: Font> Console<F> {
 
     fn new_line(&mut self) {
         let attr_blank = ConsoleChar {
-            ascii_char: 0,
+            ascii_char: b' ',
             attr: self.parser.char_attribute(),
         };
         for j in self.col..self.buf.num_col {

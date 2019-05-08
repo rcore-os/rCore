@@ -75,9 +75,12 @@ board := raspi3
 need_bootloader := true
 endif
 
-# currently only mipsel architecture needs DTB linked to the kernel
+# currently only mipsel architecture and rocket-chip need DTB linked to the kernel
 ifeq ($(arch), mipsel)
 dtb := src/arch/$(arch)/board/$(board)/device.dtb
+endif
+ifeq ($(board), rocket_chip)
+dtb := src/arch/riscv32/board/$(board)/device.dtb
 endif
 
 # mipssim does not support SMP
@@ -330,6 +333,8 @@ ifeq ($(arch), x86_64)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
 	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+else ifeq ($(board), rocket_chip)
+	@cp src/arch/riscv32/board/rocket_chip/linker.ld src/arch/riscv32/boot/linker64.ld
 else
 	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
 endif

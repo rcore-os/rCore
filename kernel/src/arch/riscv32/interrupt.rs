@@ -74,7 +74,7 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
 }
 
 fn external() {
-    #[cfg(feature = "board_u540")]
+    #[cfg(any(feature = "board_u540", feature = "board_rocket_chip"))]
     unsafe {
         super::board::handle_external_interrupt();
     }
