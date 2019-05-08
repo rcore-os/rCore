@@ -263,6 +263,7 @@ impl Syscall<'_> {
             SYS_SETGROUPS => self.unimplemented("setgroups", Ok(0)),
             SYS_SETPRIORITY => self.sys_set_priority(args[0]),
             SYS_PRCTL => self.unimplemented("prctl", Ok(0)),
+            SYS_MEMBARRIER => self.unimplemented("membarrier", Ok(0)),
             SYS_PRLIMIT64 => self.sys_prlimit64(
                 args[0],
                 args[1],
