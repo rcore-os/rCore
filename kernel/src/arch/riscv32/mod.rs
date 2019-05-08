@@ -70,7 +70,6 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     crate::drivers::init(device_tree_vaddr);
     #[cfg(not(feature = "board_k210"))]
     unsafe {
-        #[cfg(not(feature = "board_rocket_chip"))]
         board::enable_serial_interrupt();
         board::init_external_interrupt();
     }

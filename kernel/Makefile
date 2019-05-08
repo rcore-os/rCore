@@ -75,7 +75,7 @@ board := raspi3
 need_bootloader := true
 endif
 
-# currently only mipsel architecture and rocket-chip needs DTB linked to the kernel
+# currently only mipsel architecture and rocket-chip need DTB linked to the kernel
 ifeq ($(arch), mipsel)
 dtb := src/arch/$(arch)/board/$(board)/device.dtb
 endif

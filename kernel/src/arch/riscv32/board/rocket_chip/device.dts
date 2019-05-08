@@ -91,16 +91,16 @@
                         
                         serial0: serial@60000000 {
                                 compatible = "xlnx,xps-uartlite-1.00.a";
-                                reg = <0x0 0x6000000 0x1000>;
-                                interrupt-parent = <&L10>;
+                                reg = <0x6000000 0x1000>;
+                                interrupt-parent = <&axi_intc>;
                                 interrupts = <1>;
                         };
 
-                        serial_net: serial@60010000 {
-                                compatible = "xlnx,xps-uartlite-1.00.a";
-                                reg = <0x0 0x60010000 0x1000>;
+                        axi_intc: axi_intc@61200000 {
+                                compatible = "xlnx,xps-intc-1.00.a";
+                                reg = <0x61200000 0x1000>;
                                 interrupt-parent = <&L10>;
-                                interrupts = <2>;
+                                interrupts = <1>;
                         };
                 };
                 L9: rom@10000 {
