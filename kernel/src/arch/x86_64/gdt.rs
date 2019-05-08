@@ -47,30 +47,28 @@ impl Cpu {
         }
     }
 
-    pub fn foreach(mut f: impl FnMut(&mut Cpu)) {
+    pub fn iter() -> impl Iterator<Item = &'static Self> {
         unsafe {
-            CPUS.iter_mut()
-                .filter_map(|x| x.as_mut())
-                .for_each(f);
+            CPUS.iter()
+                .filter_map(|x| x.as_ref())
         }
     }
-    pub fn get_id(&self) -> usize {
+    pub fn id(&self) -> usize {
         self.id
     }
-    pub fn notify_event(&mut self, item: IPIEventItem) {
+    pub fn notify_event(&self, item: IPIEventItem) {
         let mut queue = self.ipi_handler_queue.lock();
         queue.push(item);
     }
     pub fn current() -> &'static mut Cpu {
         unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
     }
-    pub fn ipi_handler(&mut self) {
+    pub fn handle_ipi(&self) {
         let mut queue = self.ipi_handler_queue.lock();
-        let mut current_events: Vec<IPIEventItem> = vec![];
-        ::core::mem::swap(&mut current_events, queue.as_mut());
+        let handlers = core::mem::replace(queue.as_mut(), vec![]);
         drop(queue);
-        for ev in current_events.iter() {
-            ev.call();
+        for handler in handlers {
+            handler();
         }
     }
     pub fn disable_preemption(&self) -> bool {

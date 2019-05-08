@@ -112,7 +112,7 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         IPIFuncCall => {
             let irq = tf.trap_num as u8 - IRQ0;
             super::ack(irq); // must ack before switching
-            super::super::gdt::Cpu::current().ipi_handler();
+            super::super::gdt::Cpu::current().handle_ipi();
         }
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }

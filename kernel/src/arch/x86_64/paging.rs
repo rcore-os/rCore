@@ -1,6 +1,7 @@
 // Depends on kernel
 use crate::consts::KERNEL_OFFSET;
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
+use core::sync::atomic::Ordering;
 use log::*;
 use rcore_memory::paging::*;
 use x86_64::instructions::tlb;
@@ -12,8 +13,7 @@ use x86_64::structures::paging::{
     page_table::{PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator,
 };
-use x86_64::PhysAddr;
-use core::sync::atomic::Ordering;
+use x86_64::{VirtAddr, PhysAddr};
 
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;
@@ -287,5 +287,8 @@ fn flush_tlb_all(vaddr: usize) {
     if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
         return;
     }
-    super::ipi::invoke_on_allcpu(super::ipi::tlb_shootdown, (vaddr, vaddr + 0x1000), false);
+    super::ipi::invoke_on_allcpu(
+        move || tlb::flush(VirtAddr::new(vaddr as u64)),
+        false,
+    );
 }
