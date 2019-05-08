@@ -45,3 +45,6 @@ pub const PIRQE: u8 = 20;
 pub const PIRQF: u8 = 21;
 pub const PIRQG: u8 = 22;
 pub const PIRQH: u8 = 23;
+
+// IPI constants
+pub const IPIFuncCall: u8 = 0xfc;

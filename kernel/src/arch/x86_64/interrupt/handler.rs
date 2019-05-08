@@ -109,6 +109,11 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         Syscall32 => syscall32(tf),
         InvalidOpcode => invalid_opcode(tf),
         DivideError | GeneralProtectionFault => error(tf),
+        IPIFuncCall => {
+            let irq = tf.trap_num as u8 - IRQ0;
+            super::ack(irq); // must ack before switching
+            super::super::gdt::Cpu::current().ipi_handler();
+        }
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 }

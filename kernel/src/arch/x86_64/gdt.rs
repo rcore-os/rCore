@@ -1,11 +1,14 @@
+use super::ipi::IPIEventItem;
 use alloc::boxed::Box;
-
+use alloc::vec::*;
+use core::sync::atomic::{AtomicBool, Ordering};
 use x86_64::registers::model_specific::Msr;
 use x86_64::structures::gdt::*;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::{PrivilegeLevel, VirtAddr};
 
 use crate::consts::MAX_CPU_NUM;
+use crate::sync::{Semaphore, SpinLock as Mutex};
 
 /// Init TSS & GDT.
 pub fn init() {
@@ -20,22 +23,16 @@ static mut CPUS: [Option<Cpu>; MAX_CPU_NUM] = [
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-    None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
-    //    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
 ];
 
 pub struct Cpu {
     gdt: GlobalDescriptorTable,
     tss: TaskStateSegment,
     double_fault_stack: [u8; 0x100],
+    preemption_disabled: AtomicBool, // TODO: check this on timer(). This is currently unavailable since related code is in rcore_thread.
+    ipi_handler_queue: Mutex<Vec<IPIEventItem>>,
+    id: usize,
 }
 
 impl Cpu {
@@ -44,9 +41,47 @@ impl Cpu {
             gdt: GlobalDescriptorTable::new(),
             tss: TaskStateSegment::new(),
             double_fault_stack: [0u8; 0x100],
+            preemption_disabled: AtomicBool::new(false),
+            ipi_handler_queue: Mutex::new(vec![]),
+            id: 0,
         }
     }
 
+    pub fn foreach(mut f: impl FnMut(&mut Cpu)) {
+        unsafe {
+            CPUS.iter_mut()
+                .filter_map(|x| x.as_mut())
+                .for_each(f);
+        }
+    }
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
+    pub fn notify_event(&mut self, item: IPIEventItem) {
+        let mut queue = self.ipi_handler_queue.lock();
+        queue.push(item);
+    }
+    pub fn current() -> &'static mut Cpu {
+        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
+    }
+    pub fn ipi_handler(&mut self) {
+        let mut queue = self.ipi_handler_queue.lock();
+        let mut current_events: Vec<IPIEventItem> = vec![];
+        ::core::mem::swap(&mut current_events, queue.as_mut());
+        drop(queue);
+        for ev in current_events.iter() {
+            ev.call();
+        }
+    }
+    pub fn disable_preemption(&self) -> bool {
+        self.preemption_disabled.swap(true, Ordering::Relaxed)
+    }
+    pub fn restore_preemption(&self, val: bool) {
+        self.preemption_disabled.store(val, Ordering::Relaxed);
+    }
+    pub fn can_preempt(&self) -> bool {
+        self.preemption_disabled.load(Ordering::Relaxed)
+    }
     unsafe fn init(&'static mut self) {
         use x86_64::instructions::segmentation::{load_fs, set_cs};
         use x86_64::instructions::tables::load_tss;
@@ -63,7 +98,7 @@ impl Cpu {
         self.gdt.add_entry(UCODE);
         self.gdt.add_entry(Descriptor::tss_segment(&self.tss));
         self.gdt.load();
-
+        self.id = super::cpu::id();
         // reload code segment register
         set_cs(KCODE_SELECTOR);
         // load TSS
@@ -81,7 +116,7 @@ const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000); // EXECUT
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000); // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000); // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
-                                                                       // Copied from xv6
+// Copied from xv6
 const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 const UDATA32: Descriptor = Descriptor::UserSegment(0x00cff200_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 
