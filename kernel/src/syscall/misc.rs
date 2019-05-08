@@ -59,15 +59,16 @@ impl Syscall<'_> {
         uaddr: usize,
         op: u32,
         val: i32,
-        timeout: *const TimeSpec,
+//        timeout: *const TimeSpec,
     ) -> SysResult {
         info!(
-            "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
+            //"futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
+            "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}. timeout ALWAYS 0",
             thread::current().id(),
             uaddr,
             op,
-            val,
-            timeout
+            val
+//            timeout
         );
         //    if op & OP_PRIVATE == 0 {
         //        unimplemented!("futex only support process-private");
@@ -77,11 +78,13 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
         let atomic = unsafe { self.vm().check_write_ptr(uaddr as *mut AtomicI32)? };
-        let _timeout = if timeout.is_null() {
-            None
-        } else {
-            Some(unsafe { *self.vm().check_read_ptr(timeout)? })
-        };
+        // musl libc 1.1.22 _wake FUN didn't provide timeout, ___futexwait FUN set timeout=0
+        // now rcore just ignored the timeout parameter. TODO
+//        let _timeout = if timeout.is_null() {
+//            None
+//        } else {
+//            Some(unsafe { *self.vm().check_read_ptr(timeout)? })
+//        };
 
         const OP_WAIT: u32 = 0;
         const OP_WAKE: u32 = 1;
