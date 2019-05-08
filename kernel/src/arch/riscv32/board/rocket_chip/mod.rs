@@ -19,7 +19,6 @@ pub unsafe fn init_external_interrupt() {
 
     // enable all interrupts
     AXI_INTC_IER.write_volatile(0xffffffff);
-
 }
 
 /// Claim and complete external interrupt by reading and writing to

@@ -13,19 +13,19 @@
 //! mipssim/malta(MIPS) -- 10MB
 
 use super::HEAP_ALLOCATOR;
-use core::mem;
 pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::process::current_thread;
 use crate::sync::SpinNoIrqLock;
 use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
+use core::mem;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::paging::PageTable;
 use rcore_memory::*;
-use crate::process::current_thread;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
 

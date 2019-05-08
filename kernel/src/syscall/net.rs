@@ -185,7 +185,11 @@ impl Syscall<'_> {
             iovs.write_all_from_slice(&buf[..len]);
             let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
-                sockaddr_in.write_to(&mut self.vm(), hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
+                sockaddr_in.write_to(
+                    &mut self.vm(),
+                    hdr.msg_name,
+                    &mut hdr.msg_namelen as *mut u32,
+                )?;
             }
         }
         result
@@ -427,17 +431,13 @@ fn sockaddr_to_endpoint(
                 Ok(Endpoint::Ip((addr, port).into()))
             }
             AddressFamily::Unix => Err(SysError::EINVAL),
-            AddressFamily::Packet => {
-                Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
-                    addr.addr_ll.sll_ifindex as usize,
-                )))
-            }
-            AddressFamily::Netlink => {
-                Ok(Endpoint::Netlink(NetlinkEndpoint::new(
-                    addr.addr_nl.nl_pid,
-                    addr.addr_nl.nl_groups,
-                )))
-            }
+            AddressFamily::Packet => Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
+                addr.addr_ll.sll_ifindex as usize,
+            ))),
+            AddressFamily::Netlink => Ok(Endpoint::Netlink(NetlinkEndpoint::new(
+                addr.addr_nl.nl_pid,
+                addr.addr_nl.nl_groups,
+            ))),
             _ => Err(SysError::EINVAL),
         }
     }
@@ -456,12 +456,7 @@ impl SockAddr {
 
     /// Write to user sockaddr
     /// Check mutability for user
-    unsafe fn write_to(
-        self,
-        vm: &MemorySet,
-        addr: *mut SockAddr,
-        addr_len: *mut u32,
-    ) -> SysResult {
+    unsafe fn write_to(self, vm: &MemorySet, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
         // Ignore NULL
         if addr.is_null() {
             return Ok(0);
