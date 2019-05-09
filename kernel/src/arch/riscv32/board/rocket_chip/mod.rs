@@ -1,19 +1,22 @@
 use super::consts::KERNEL_OFFSET;
+use crate::memory::active_table;
+use rcore_memory::paging::PageTable;
 
 /// Mask all external interrupt except serial.
 pub unsafe fn init_external_interrupt() {
     const HART0_S_MODE_INTERRUPT_ENABLES: *mut u64 = (KERNEL_OFFSET + 0x0C00_2080) as *mut u64;
+    // enable all external interrupts
     HART0_S_MODE_INTERRUPT_ENABLES.write_volatile(0xf);
 
     // mask interrupts first
-    const AXI_INTC_IER: *mut u32 = (KERNEL_OFFSET + 0x1900_0008) as *mut u32;
+    const AXI_INTC_IER: *mut u32 = (KERNEL_OFFSET + 0x1810_0008) as *mut u32;
     AXI_INTC_IER.write_volatile(0x0);
 
     // acknowledge all interrupts
-    const AXI_INTC_IAR: *mut u32 = (KERNEL_OFFSET + 0x1900_000C) as *mut u32;
+    const AXI_INTC_IAR: *mut u32 = (KERNEL_OFFSET + 0x1810_000C) as *mut u32;
     AXI_INTC_IAR.write_volatile(0xffffffff);
 
-    const AXI_INTC_MER: *mut u32 = (KERNEL_OFFSET + 0x1900_001C) as *mut u32;
+    const AXI_INTC_MER: *mut u32 = (KERNEL_OFFSET + 0x1810_001C) as *mut u32;
     // Hardware Interrupt enable | Enable irq output
     AXI_INTC_MER.write_volatile(0b11);
 
@@ -32,7 +35,7 @@ pub unsafe fn handle_external_interrupt() {
     HART0_S_MODE_INTERRUPT_CLAIM_COMPLETE.write_volatile(source);
 
     // acknowledge all interrupts
-    const AXI_INTC_IAR: *mut u32 = (KERNEL_OFFSET + 0x1900_000C) as *mut u32;
+    const AXI_INTC_IAR: *mut u32 = (KERNEL_OFFSET + 0x1810_000C) as *mut u32;
     AXI_INTC_IAR.write_volatile(0xffffffff);
 }
 
