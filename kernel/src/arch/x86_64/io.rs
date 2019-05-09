@@ -10,18 +10,18 @@ pub fn getchar() -> char {
 }
 
 pub fn putfmt(fmt: Arguments) {
-    #[cfg(feature = "nographic")]
-    {
+    //#[cfg(feature = "nographic")]
+    //{
         unsafe {
             COM1.force_unlock();
         }
         COM1.lock().write_fmt(fmt).unwrap();
-    }
-    #[cfg(not(feature = "nographic"))]
-    {
-        unsafe {
-            VGA_WRITER.force_unlock();
-        }
-        VGA_WRITER.lock().write_fmt(fmt).unwrap();
-    }
+    //}
+    //#[cfg(not(feature = "nographic"))]
+    //{
+        //unsafe {
+            //VGA_WRITER.force_unlock();
+        //}
+        //VGA_WRITER.lock().write_fmt(fmt).unwrap();
+    //}
 }

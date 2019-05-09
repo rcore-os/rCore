@@ -70,7 +70,7 @@ rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = { git = "https://github.com/rcore-os/bootloader" }
+bootloader = { git = "https://github.com/rcore-os/bootloader", branch="vga", features=["vga_320x200"] }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.5"
 raw-cpuid = "6.0"
