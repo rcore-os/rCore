@@ -524,7 +524,7 @@ impl Syscall<'_> {
         arg3: usize,
     ) -> SysResult {
         info!(
-            "ioctl: fd: {}, request: {:x}, args: {} {} {}",
+            "ioctl: fd: {}, request: {:#x}, args: {:#x} {:#x} {:#x}",
             fd, request, arg1, arg2, arg3
         );
         let mut proc = self.process();
