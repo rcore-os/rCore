@@ -75,10 +75,7 @@ static mut __page_table_with_mode: bool = false;
 
 impl ActivePageTable {
     pub unsafe fn new() -> Self {
-        ActivePageTable(
-            get_root_page_table_ptr(),
-            ::core::mem::uninitialized(),
-        )
+        ActivePageTable(get_root_page_table_ptr(), ::core::mem::uninitialized())
     }
 
     unsafe fn get_raw_table(&mut self) -> *mut MIPSPageTable {
@@ -90,9 +87,7 @@ impl ActivePageTable {
     }
 
     fn get_table(&mut self) -> TwoLevelPageTable<'static> {
-        unsafe {
-            TwoLevelPageTable::new(&mut *self.get_raw_table())
-        }
+        unsafe { TwoLevelPageTable::new(&mut *self.get_raw_table()) }
     }
 }
 
@@ -208,13 +203,12 @@ impl InactivePageTable for InactivePageTable0 {
             clear_all_tlb();
         }
 
-        debug!("edit table {:x?} -> {:x?}", Self::active_token(), self.token());
-        let mut active = unsafe {
-            ActivePageTable(
-                self.token(),
-                ::core::mem::uninitialized(),
-            )
-        };
+        debug!(
+            "edit table {:x?} -> {:x?}",
+            Self::active_token(),
+            self.token()
+        );
+        let mut active = unsafe { ActivePageTable(self.token(), ::core::mem::uninitialized()) };
 
         let ret = f(&mut active);
         debug!("finish table");
@@ -230,7 +224,7 @@ impl InactivePageTable for InactivePageTable0 {
         let new_token = self.token();
 
         let old_mode = unsafe { __page_table_with_mode };
-        unsafe { 
+        unsafe {
             __page_table_with_mode = true;
         }
 

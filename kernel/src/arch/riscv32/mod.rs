@@ -30,7 +30,6 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 
     unsafe {
         cpu::set_cpu_id(hartid);
-
     }
 
     #[cfg(feature = "board_rocket_chip")]
