@@ -78,5 +78,10 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
         ))?;
     }
 
-    Ok((info, fb::ColorConfig::BGRA8888, vaddr))
+    let color_config = match info.depth {
+        16 => ColorConfig::RGB565,
+        32 => ColorConfig::BGRA8888,
+        _ => Err(format!("unsupported color depth {}", info.depth))?,
+    };
+    Ok((info, color_config, vaddr))
 }

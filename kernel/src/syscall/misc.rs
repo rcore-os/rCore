@@ -77,11 +77,6 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
         let atomic = unsafe { self.vm().check_write_ptr(uaddr as *mut AtomicI32)? };
-        let _timeout = if timeout.is_null() {
-            None
-        } else {
-            Some(unsafe { *self.vm().check_read_ptr(timeout)? })
-        };
 
         const OP_WAIT: u32 = 0;
         const OP_WAKE: u32 = 1;
@@ -92,6 +87,12 @@ impl Syscall<'_> {
 
         match op & 0xf {
             OP_WAIT => {
+                let _timeout = if timeout.is_null() {
+                    None
+                } else {
+                    Some(unsafe { *self.vm().check_read_ptr(timeout)? })
+                };
+
                 if atomic.load(Ordering::Acquire) != val {
                     return Err(SysError::EAGAIN);
                 }
@@ -110,7 +111,13 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_reboot(&mut self, _magic: u32, _magic2: u32, cmd: u32, _arg: *const u8) -> SysResult {
+    pub fn sys_reboot(
+        &mut self,
+        _magic: u32,
+        _magic2: u32,
+        cmd: u32,
+        _arg: *const u8,
+    ) -> SysResult {
         // we will skip verifying magic
         if cmd == LINUX_REBOOT_CMD_HALT {
             unsafe {

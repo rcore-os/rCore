@@ -737,9 +737,21 @@ impl Syscall<'_> {
         offset_ptr: *mut usize,
         count: usize,
     ) -> SysResult {
+        self.sys_copy_file_range(in_fd, offset_ptr, out_fd, 0 as *mut usize, count, 0)
+    }
+
+    pub fn sys_copy_file_range(
+        &mut self,
+        in_fd: usize,
+        in_offset: *mut usize,
+        out_fd: usize,
+        out_offset: *mut usize,
+        count: usize,
+        flags: usize,
+    ) -> SysResult {
         info!(
-            "sendfile:BEG out: {}, in: {}, offset_ptr: {:?}, count: {}",
-            out_fd, in_fd, offset_ptr, count
+            "copy_file_range:BEG in: {}, out: {}, in_offset: {:?}, out_offset: {:?}, count: {} flags {}",
+            in_fd, out_fd, in_offset, out_offset, count, flags
         );
         let proc = self.process();
         // We know it's save, pacify the borrow checker
@@ -748,10 +760,23 @@ impl Syscall<'_> {
         let out_file = unsafe { (*proc_cell.get()).get_file(out_fd)? };
         let mut buffer = [0u8; 1024];
 
-        let mut read_offset = if !offset_ptr.is_null() {
-            unsafe { *self.vm().check_read_ptr(offset_ptr)? }
+        // for in_offset and out_offset
+        // null means update file offset
+        // non-null means update {in,out}_offset instead
+
+        let mut read_offset = if !in_offset.is_null() {
+            unsafe { *self.vm().check_read_ptr(in_offset)? }
         } else {
             in_file.seek(SeekFrom::Current(0))? as usize
+        };
+
+        let orig_out_file_offset = out_file.seek(SeekFrom::Current(0))?;
+        let write_offset = if !out_offset.is_null() {
+            out_file.seek(SeekFrom::Start(
+                unsafe { *self.vm().check_read_ptr(out_offset)? } as u64,
+            ))? as usize
+        } else {
+            0
         };
 
         // read from specified offset and write new offset back
@@ -772,8 +797,8 @@ impl Syscall<'_> {
                 let write_len = out_file.write(&buffer[bytes_written..(bytes_written + rlen)])?;
                 if write_len == 0 {
                     info!(
-                        "sendfile:END_ERR out: {}, in: {}, offset_ptr: {:?}, count: {} = bytes_read {}, bytes_written {}, write_len {}",
-                        out_fd, in_fd, offset_ptr, count, bytes_read, bytes_written, write_len
+                        "copy_file_range:END_ERR in: {}, out: {}, in_offset: {:?}, out_offset: {:?}, count: {} = bytes_read {}, bytes_written {}, write_len {}",
+                        in_fd, out_fd, in_offset, out_offset, count, bytes_read, bytes_written, write_len
                     );
                     return Err(SysError::EBADF);
                 }
@@ -783,16 +808,23 @@ impl Syscall<'_> {
             total_written += bytes_written;
         }
 
-        if !offset_ptr.is_null() {
+        if !in_offset.is_null() {
             unsafe {
-                offset_ptr.write(read_offset);
+                in_offset.write(read_offset);
             }
         } else {
             in_file.seek(SeekFrom::Current(bytes_read as i64))?;
         }
+
+        if !out_offset.is_null() {
+            unsafe {
+                out_offset.write(write_offset + total_written);
+            }
+            out_file.seek(SeekFrom::Start(orig_out_file_offset))?;
+        }
         info!(
-            "sendfile:END out: {}, in: {}, offset_ptr: {:?}, count: {} = bytes_read {}, total_written {}",
-            out_fd, in_fd, offset_ptr, count, bytes_read, total_written
+            "copy_file_range:END in: {}, out: {}, in_offset: {:?}, out_offset: {:?}, count: {} flags {}",
+            in_fd, out_fd, in_offset, out_offset, count, flags
         );
         return Ok(total_written);
     }

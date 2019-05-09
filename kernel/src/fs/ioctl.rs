@@ -34,3 +34,7 @@ pub const FIONCLEX: usize = 0x6602;
 pub const FIOCLEX: usize = 0x5451;
 #[cfg(target_arch = "mips")]
 pub const FIOCLEX: usize = 0x6601;
+
+// rustc using pipe and ioctl pipe file with this request id
+// for non-blocking/blocking IO control setting
+pub const FIONBIO: usize = 0x5421;

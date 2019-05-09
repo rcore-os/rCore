@@ -350,27 +350,29 @@ impl Syscall<'_> {
 
 bitflags! {
     pub struct CloneFlags: usize {
-        const CSIGNAL = 0x000000ff;
-        const VM = 0x0000100;
-        const FS = 0x0000200;
-        const FILES = 0x0000400;
-        const SIGHAND = 0x0000800;
-        const PTRACE = 0x0002000;
-        const VFORK = 0x0004000;
-        const PARENT = 0x0008000;
-        const SYSVSEM = 0x0008000;
-        const SETTLS = 0x0008000;
-        const PARENT_SETTID = 0x0010000;
-        const CHILD_CLEARTID = 0x0020000;
-        const DETACHED = 0x0040000;
-        const UNTRACED = 0x0080000;
-        const CHILD_SETTID = 0x0100000;
-        const NEWCGROUP = 0x0200000;
-        const NEWUTS = 0x0400000;
-        const NEWIPC = 0x0800000;
-        const NEWUSER = 0x1000000;
-        const NEWPID = 0x2000000;
-        const NEWNET = 0x4000000;
-        const IO = 0x8000000;
+        const CSIGNAL =         0x000000ff;
+        const VM =              0x00000100;
+        const FS =              0x00000200;
+        const FILES =           0x00000400;
+        const SIGHAND =         0x00000800;
+        const PTRACE =          0x00002000;
+        const VFORK =           0x00004000;
+        const PARENT =          0x00008000;
+        const THREAD =          0x00010000;
+        const NEWNS	 =          0x00020000;
+        const SYSVSEM =         0x00040000;
+        const SETTLS =          0x00080000;
+        const PARENT_SETTID =   0x00100000;
+        const CHILD_CLEARTID =  0x00200000;
+        const DETACHED =        0x00400000;
+        const UNTRACED =        0x00800000;
+        const CHILD_SETTID =    0x01000000;
+        const NEWCGROUP =       0x02000000;
+        const NEWUTS =          0x04000000;
+        const NEWIPC =          0x08000000;
+        const NEWUSER =         0x10000000;
+        const NEWPID =          0x20000000;
+        const NEWNET =          0x40000000;
+        const IO =              0x80000000;
     }
 }

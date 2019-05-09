@@ -34,6 +34,7 @@ impl FileLike {
         match request {
             // TODO: place flags & path in FileLike in stead of FileHandle/Socket
             FIOCLEX => Ok(0),
+            FIONBIO => Ok(0),
             _ => {
                 match self {
                     FileLike::File(file) => file.io_control(request as u32, arg1)?,

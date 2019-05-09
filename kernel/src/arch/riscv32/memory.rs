@@ -92,7 +92,7 @@ fn remap_the_kernel(dtb: usize) {
         Linear::new(offset),
         "bss",
     );
-    // TODO: dtb on rocket chip
+    // dtb on rocket chip is embedded into kernel
     #[cfg(not(feature = "board_rocket_chip"))]
     ms.push(
         dtb,
@@ -132,6 +132,33 @@ fn remap_the_kernel(dtb: usize) {
         MemoryAttr::default(),
         Linear::new(offset),
         "uart16550",
+    );
+    // map PLIC for Rocket Chip
+    #[cfg(feature = "board_rocket_chip")]
+    ms.push(
+        KERNEL_OFFSET + 0x0C20_1000,
+        KERNEL_OFFSET + 0x0C20_1000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(offset),
+        "plic2",
+    );
+    // map UART for Rocket Chip
+    #[cfg(feature = "board_rocket_chip")]
+    ms.push(
+        KERNEL_OFFSET + 0x18000000,
+        KERNEL_OFFSET + 0x18000000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(-(KERNEL_OFFSET as isize + 0x18000000 - 0x60000000)),
+        "uartlite",
+    );
+    // map AXI INTC for Rocket Chip
+    #[cfg(feature = "board_rocket_chip")]
+    ms.push(
+        KERNEL_OFFSET + 0x19000000,
+        KERNEL_OFFSET + 0x19000000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(-(KERNEL_OFFSET as isize + 0x19000000 - 0x61200000)),
+        "axi_intc",
     );
     unsafe {
         ms.activate();

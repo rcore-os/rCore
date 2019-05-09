@@ -1,7 +1,10 @@
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 mod board;
-#[cfg(not(feature = "board_u540"))]
+#[cfg(feature = "board_rocket_chip")]
+#[path = "board/rocket_chip/mod.rs"]
+mod board;
+#[cfg(not(any(feature = "board_u540", feature = "board_rocket_chip")))]
 #[path = "board/virt/mod.rs"]
 mod board;
 
@@ -23,10 +26,20 @@ use log::*;
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
-    let device_tree_vaddr = device_tree_paddr - MEMORY_OFFSET + KERNEL_OFFSET;
+    let mut device_tree_vaddr = device_tree_paddr - MEMORY_OFFSET + KERNEL_OFFSET;
 
     unsafe {
         cpu::set_cpu_id(hartid);
+
+    }
+
+    #[cfg(feature = "board_rocket_chip")]
+    {
+        extern "C" {
+            fn _dtb_start();
+            fn _dtb_end();
+        }
+        device_tree_vaddr = _dtb_start as usize;
     }
 
     if hartid != BOOT_HART_ID {
@@ -53,11 +66,10 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     memory::init(device_tree_vaddr);
     timer::init();
     // FIXME: init driver on u540
-    #[cfg(not(any(feature = "board_u540", feature = "board_rocket_chip")))]
+    #[cfg(not(any(feature = "board_u540")))]
     crate::drivers::init(device_tree_vaddr);
     #[cfg(not(feature = "board_k210"))]
     unsafe {
-        #[cfg(not(feature = "board_rocket_chip"))]
         board::enable_serial_interrupt();
         board::init_external_interrupt();
     }
@@ -115,3 +127,5 @@ global_asm!(include_str!("boot/entry64.asm"));
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/entry_k210.asm"));
 global_asm!(include_str!("boot/trap.asm"));
+#[cfg(feature = "board_rocket_chip")]
+global_asm!(include_str!("boot/dtb.gen.s"));

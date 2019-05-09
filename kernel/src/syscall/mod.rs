@@ -263,6 +263,7 @@ impl Syscall<'_> {
             SYS_SETGROUPS => self.unimplemented("setgroups", Ok(0)),
             SYS_SETPRIORITY => self.sys_set_priority(args[0]),
             SYS_PRCTL => self.unimplemented("prctl", Ok(0)),
+            SYS_MEMBARRIER => self.unimplemented("membarrier", Ok(0)),
             SYS_PRLIMIT64 => self.sys_prlimit64(
                 args[0],
                 args[1],
@@ -274,6 +275,14 @@ impl Syscall<'_> {
                 args[1] as u32,
                 args[2] as u32,
                 args[3] as *const u8,
+            ),
+            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
+                args[0],
+                args[1] as *mut usize,
+                args[2],
+                args[3] as *mut usize,
+                args[4],
+                args[5],
             ),
 
             // custom
