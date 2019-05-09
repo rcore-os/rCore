@@ -132,6 +132,14 @@ impl Syscall<'_> {
             SYS_DUP3 => self.sys_dup2(args[0], args[1]), // TODO: handle `flags`
             SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
             SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
+            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
+                args[0],
+                args[1] as *mut usize,
+                args[2],
+                args[3] as *mut usize,
+                args[4],
+                args[5],
+            ),
 
             // io multiplexing
             SYS_PPOLL => {
@@ -231,6 +239,7 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
+            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
 
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
@@ -276,25 +285,15 @@ impl Syscall<'_> {
                 args[2] as u32,
                 args[3] as *const u8,
             ),
-            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
-                args[0],
-                args[1] as *mut usize,
-                args[2],
-                args[3] as *mut usize,
-                args[4],
-                args[5],
-            ),
+            SYS_GETRANDOM => {
+                self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
+            }
 
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
-            //SYS_GETRANDOM => self.unimplemented("getrandom", Err(SysError::EINVAL)),
-            SYS_GETRANDOM => {
-                self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
-            }
-            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]

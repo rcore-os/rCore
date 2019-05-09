@@ -1,6 +1,7 @@
 // Depends on kernel
 use crate::consts::KERNEL_OFFSET;
 use crate::memory::{active_table, alloc_frame, dealloc_frame};
+use core::sync::atomic::Ordering;
 use log::*;
 use rcore_memory::paging::*;
 use x86_64::instructions::tlb;
@@ -12,7 +13,7 @@ use x86_64::structures::paging::{
     page_table::{PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator,
 };
-use x86_64::PhysAddr;
+use x86_64::{VirtAddr, PhysAddr};
 
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;
@@ -57,11 +58,13 @@ impl PageTable for ActivePageTable {
                 .unwrap()
                 .flush();
         }
+        flush_tlb_all(addr);
         unsafe { &mut *(get_entry_ptr(addr, 1)) }
     }
 
     fn unmap(&mut self, addr: usize) {
         self.0.unmap(Page::of_addr(addr)).unwrap().1.flush();
+        flush_tlb_all(addr);
     }
 
     fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
@@ -93,6 +96,7 @@ impl Entry for PageEntry {
         use x86_64::{instructions::tlb::flush, VirtAddr};
         let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
         flush(addr);
+        flush_tlb_all(addr.as_u64() as usize);
     }
     fn accessed(&self) -> bool {
         self.0.flags().contains(EF::ACCESSED)
@@ -276,4 +280,15 @@ impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
     fn deallocate_frame(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_u64() as usize);
     }
+}
+
+/// Flush TLB for `vaddr` on all CPU
+fn flush_tlb_all(vaddr: usize) {
+    if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
+        return;
+    }
+    super::ipi::invoke_on_allcpu(
+        move || tlb::flush(VirtAddr::new(vaddr as u64)),
+        false,
+    );
 }
