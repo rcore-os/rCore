@@ -1,6 +1,4 @@
 use super::consts::KERNEL_OFFSET;
-use crate::memory::active_table;
-use rcore_memory::paging::PageTable;
 
 /// Mask all external interrupt except serial.
 pub unsafe fn init_external_interrupt() {

@@ -7,6 +7,7 @@ pub use self::handler::*;
 pub use self::trapframe::*;
 use crate::consts::KERNEL_OFFSET;
 use apic::*;
+use crate::memory::phys_to_virt;
 
 #[inline(always)]
 pub unsafe fn enable() {
@@ -39,12 +40,12 @@ pub fn no_interrupt(f: impl FnOnce()) {
 
 #[inline(always)]
 pub fn enable_irq(irq: u8) {
-    let mut ioapic = unsafe { IoApic::new(KERNEL_OFFSET + IOAPIC_ADDR as usize) };
+    let mut ioapic = unsafe { IoApic::new(phys_to_virt(IOAPIC_ADDR as usize)) };
     ioapic.enable(irq, 0);
 }
 
 #[inline(always)]
 pub fn ack(_irq: u8) {
-    let mut lapic = unsafe { XApic::new(KERNEL_OFFSET + LAPIC_ADDR) };
+    let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
     lapic.eoi();
 }

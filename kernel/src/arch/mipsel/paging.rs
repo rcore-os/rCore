@@ -1,5 +1,5 @@
 // Depends on kernel
-use crate::memory::{active_table, alloc_frame, dealloc_frame};
+use crate::memory::{alloc_frame, dealloc_frame};
 use log::*;
 use mips::addr::*;
 use mips::paging::{FrameAllocator, FrameDeallocator};

@@ -9,7 +9,6 @@ use bitflags::*;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::time::Instant;
@@ -17,12 +16,12 @@ use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::Result;
 use volatile::{ReadOnly, Volatile};
 
-use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS};
+use crate::memory::phys_to_virt;
 
 pub struct VirtIONet {
     interrupt_parent: u32,
@@ -42,9 +41,6 @@ const VIRTIO_QUEUE_TRANSMIT: usize = 1;
 impl Driver for VirtIONetDriver {
     fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         let driver = self.0.lock();
-
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
 
         let header = unsafe { &mut *(driver.header as *mut VirtIOHeader) };
         let interrupt = header.interrupt_status.read();
@@ -138,10 +134,6 @@ impl phy::RxToken for VirtIONetRxToken {
     {
         let (input, output, _, user_data) = {
             let mut driver = (self.0).0.lock();
-
-            // ensure header page is mapped
-            active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-
             driver.queues[VIRTIO_QUEUE_RECEIVE].get().unwrap()
         };
         let result = f(&input[0][size_of::<VirtIONetHeader>()..]);
@@ -159,10 +151,6 @@ impl phy::TxToken for VirtIONetTxToken {
     {
         let output = {
             let mut driver = (self.0).0.lock();
-
-            // ensure header page is mapped
-            active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-
             if let Some((_, output, _, _)) = driver.queues[VIRTIO_QUEUE_TRANSMIT].get() {
                 unsafe { slice::from_raw_parts_mut(output[0].as_ptr() as *mut u8, output[0].len()) }
             } else {
@@ -252,8 +240,9 @@ struct VirtIONetHeader {
 
 pub fn virtio_net_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
-    let from = reg.as_slice().read_be_u64(0).unwrap();
-    let header = unsafe { &mut *(from as *mut VirtIOHeader) };
+    let paddr = reg.as_slice().read_be_u64(0).unwrap();
+    let vaddr = phys_to_virt(paddr as usize);
+    let header = unsafe { &mut *(vaddr as *mut VirtIOHeader) };
 
     header.status.write(VirtIODeviceStatus::DRIVER.bits());
 
@@ -267,7 +256,7 @@ pub fn virtio_net_init(node: &Node) {
     header.write_driver_features(driver_features);
 
     // read configuration space
-    let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIONetworkConfig) };
+    let config = unsafe { &mut *((vaddr + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIONetworkConfig) };
     let mac = config.mac;
     let status = VirtIONetworkStatus::from_bits_truncate(config.status.read());
     debug!("Got MAC address {:?} and status {:?}", mac, status);
@@ -280,7 +269,7 @@ pub fn virtio_net_init(node: &Node) {
     let mut driver = VirtIONet {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
-        header: from as usize,
+        header: vaddr as usize,
         mac: EthernetAddress(mac),
         queues: [
             VirtIOVirtqueue::new(header, VIRTIO_QUEUE_RECEIVE, queue_num),

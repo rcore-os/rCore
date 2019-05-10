@@ -11,7 +11,7 @@ pub mod cow;
 pub mod memory_set;
 pub mod no_mmu;
 pub mod paging;
-pub mod swap;
+//pub mod swap;
 
 pub use crate::addr::*;
 

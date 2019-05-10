@@ -7,19 +7,18 @@ use bitflags::*;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::arch::cpu;
-use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, DRIVERS};
 use super::test::mandelbrot;
+use crate::memory::phys_to_virt;
 
 const VIRTIO_GPU_EVENT_DISPLAY: u32 = 1 << 0;
 
@@ -198,11 +197,6 @@ impl Driver for VirtIOGpuDriver {
 
         let mut driver = self.0.lock();
 
-        // ensure header page is mapped
-        // TODO: this should be mapped in all page table by default
-        let header_addr = &mut driver.header as *mut _ as usize;
-        active_table().map_if_not_exists(header_addr, header_addr);
-
         let interrupt = driver.header.interrupt_status.read();
         if interrupt != 0 {
             driver.header.interrupt_ack.write(interrupt);
@@ -350,8 +344,9 @@ fn flush_frame_buffer_to_screen(driver: &mut VirtIOGpu) {
 
 pub fn virtio_gpu_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
-    let from = reg.as_slice().read_be_u64(0).unwrap();
-    let header = unsafe { &mut *(from as *mut VirtIOHeader) };
+    let paddr = reg.as_slice().read_be_u64(0).unwrap();
+    let vaddr = phys_to_virt(paddr as usize);
+    let header = unsafe { &mut *(vaddr as *mut VirtIOHeader) };
 
     header.status.write(VirtIODeviceStatus::DRIVER.bits());
 
@@ -365,7 +360,7 @@ pub fn virtio_gpu_init(node: &Node) {
     header.write_driver_features(driver_features);
 
     // read configuration space
-    let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOGpuConfig) };
+    let config = unsafe { &mut *((vaddr + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOGpuConfig) };
     info!("Config: {:?}", config);
 
     // virtio 4.2.4 Legacy interface

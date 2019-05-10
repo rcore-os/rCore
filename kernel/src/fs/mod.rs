@@ -20,7 +20,7 @@ mod pipe;
 mod pseudo;
 mod stdio;
 
-/// Hard link user programs
+// Hard link user programs
 #[cfg(feature = "link_user")]
 global_asm!(concat!(
     r#"

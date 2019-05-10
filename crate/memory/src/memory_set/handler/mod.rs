@@ -18,7 +18,7 @@ pub trait MemoryHandler: Debug + Send + Sync + 'static {
     fn clone_map(
         &self,
         pt: &mut PageTable,
-        with: &Fn(&mut FnMut()),
+        src_pt: &mut PageTable,
         addr: VirtAddr,
         attr: &MemoryAttr,
     );
