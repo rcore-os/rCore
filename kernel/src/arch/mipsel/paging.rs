@@ -23,7 +23,7 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target));
         // we may need frame allocator to alloc frame for new page table(first/second)
         self.get_table()
-            .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
+            .map_to(page, frame, flags, &mut FrameAllocatorForMips)
             .unwrap()
             .flush();
         self.get_entry(addr).expect("fail to get entry")
@@ -254,15 +254,15 @@ impl Drop for InactivePageTable0 {
     }
 }
 
-struct FrameAllocatorForRiscv;
+struct FrameAllocatorForMips;
 
-impl FrameAllocator for FrameAllocatorForRiscv {
+impl FrameAllocator for FrameAllocatorForMips {
     fn alloc(&mut self) -> Option<Frame> {
         alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new(addr)))
     }
 }
 
-impl FrameDeallocator for FrameAllocatorForRiscv {
+impl FrameDeallocator for FrameAllocatorForMips {
     fn dealloc(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_usize());
     }
