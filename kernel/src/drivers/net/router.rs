@@ -22,15 +22,15 @@ use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 
 const AXI_STREAM_FIFO_ISR: *mut u32 = (KERNEL_OFFSET + 0x1820_0000) as *mut u32;
 const AXI_STREAM_FIFO_IER: *mut u32 = (KERNEL_OFFSET + 0x1820_0004) as *mut u32;
+const AXI_STREAM_FIFO_TDFR: *mut u32 = (KERNEL_OFFSET + 0x1820_0008) as *mut u32;
+const AXI_STREAM_FIFO_TDFD: *mut u32 = (KERNEL_OFFSET + 0x1820_0010) as *mut u32;
+const AXI_STREAM_FIFO_TLR: *mut u32 = (KERNEL_OFFSET + 0x1820_0014) as *mut u32;
 const AXI_STREAM_FIFO_RDFR: *mut u32 = (KERNEL_OFFSET + 0x1820_0018) as *mut u32;
 const AXI_STREAM_FIFO_RDFO: *mut u32 = (KERNEL_OFFSET + 0x1820_001C) as *mut u32;
 const AXI_STREAM_FIFO_RDFD: *mut u32 = (KERNEL_OFFSET + 0x1820_0020) as *mut u32;
 const AXI_STREAM_FIFO_RLR: *mut u32 = (KERNEL_OFFSET + 0x1820_0024) as *mut u32;
-const AXI_STREAM_FIFO_RDR: *mut u32 = (KERNEL_OFFSET + 0x1820_0030) as *mut u32;
-
 const AXI_STREAM_FIFO_TDR: *mut u32 = (KERNEL_OFFSET + 0x1820_002C) as *mut u32;
-const AXI_STREAM_FIFO_TDFD: *mut u32 = (KERNEL_OFFSET + 0x1820_0010) as *mut u32;
-const AXI_STREAM_FIFO_TLR: *mut u32 = (KERNEL_OFFSET + 0x1820_0014) as *mut u32;
+const AXI_STREAM_FIFO_RDR: *mut u32 = (KERNEL_OFFSET + 0x1820_0030) as *mut u32;
 
 pub struct Router {
     buffer: Vec<Vec<u8>>,
@@ -108,7 +108,7 @@ impl phy::TxToken for RouterTxToken {
             for byte in buffer {
                 AXI_STREAM_FIFO_TDFD.write_volatile(byte as u32);
             }
-            AXI_STREAM_FIFO_TLR.write(len as u32);
+            AXI_STREAM_FIFO_TLR.write((len * 4) as u32);
         }
         res
     }
@@ -184,6 +184,13 @@ impl Driver for RouterInterface {
 }
 
 pub fn router_init() -> Arc<RouterInterface> {
+    unsafe {
+        // reset tx fifo
+        AXI_STREAM_FIFO_TDFR.write_volatile(0xA5);
+        // reset rx fifo
+        AXI_STREAM_FIFO_RDFR.write_volatile(0xA5);
+    }
+
     let ethernet_addr = EthernetAddress::from_bytes(&[2, 2, 3, 3, 0, 0]);
 
     let net_driver = RouterDriver(Arc::new(Mutex::new(Router { buffer: Vec::new() })));
