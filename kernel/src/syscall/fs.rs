@@ -141,6 +141,9 @@ impl Syscall<'_> {
                 return Ok(0);
             }
 
+            // NOTE: To run rustc, uncomment yield_now and comment Condvar.
+            //       Waking up from pipe is unimplemented now.
+            // thread::yield_now();
             Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
         }
     }
@@ -1416,6 +1419,7 @@ impl IoVecs {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct PollFd {
     fd: u32,
     events: PollEvents,
