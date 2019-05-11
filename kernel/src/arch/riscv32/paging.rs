@@ -13,10 +13,8 @@ use riscv::register::satp;
 
 #[cfg(target_arch = "riscv32")]
 type TopLevelPageTable<'a> = riscv::paging::Rv32PageTable<'a>;
-#[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+#[cfg(target_arch = "riscv64")]
 type TopLevelPageTable<'a> = riscv::paging::Rv39PageTable<'a>;
-#[cfg(all(target_arch = "riscv64", not(feature = "sv39")))]
-type TopLevelPageTable<'a> = riscv::paging::Rv48PageTable<'a>;
 
 pub struct PageTableImpl {
     page_table: TopLevelPageTable<'static>,
@@ -191,20 +189,19 @@ impl PageTableExt for PageTableImpl {
             let frame = Frame::of_addr(PhysAddr::new((i << 22) - PHYSICAL_MEMORY_OFFSET));
             table[i].set(frame, flags);
         }
-        #[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+        #[cfg(target_arch = "riscv64")]
         for i in 509..512 {
             let flags =
                 EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
             let frame = Frame::of_addr(PhysAddr::new((0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET));
             table[i].set(frame, flags);
         }
-        // TODO: sv48
     }
 
     fn token(&self) -> usize {
         #[cfg(target_arch = "riscv32")]
         return self.root_frame.number() | (1 << 31);
-        #[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+        #[cfg(target_arch = "riscv64")]
         return self.root_frame.number() | (8 << 60);
     }
 
