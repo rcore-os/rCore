@@ -1,5 +1,8 @@
 // Linear mapping
+#[cfg(target_arch = "riscv32")]
 pub const PHYSICAL_MEMORY_OFFSET: usize = 0x4000_0000;
+#[cfg(target_arch = "riscv64")]
+pub const PHYSICAL_MEMORY_OFFSET: usize = 0xFFFF_FFFF_4000_0000;
 
 #[cfg(target_arch = "riscv32")]
 pub const KERNEL_OFFSET: usize = 0xC000_0000;

@@ -1,9 +1,4 @@
 use crate::consts::PHYSICAL_MEMORY_OFFSET;
-#[cfg(target_arch = "riscv64")]
-use crate::consts::RECURSIVE_INDEX;
-// Depends on kernel
-#[cfg(target_arch = "riscv64")]
-use crate::consts::KERNEL_P4_INDEX;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use log::*;
 use rcore_memory::paging::*;
@@ -12,12 +7,19 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::paging::{
     Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, PageTableType,
-    RecursivePageTable, TwoLevelPageTable,
+    RecursivePageTable
 };
 use riscv::register::satp;
 
+#[cfg(target_arch = "riscv32")]
+type TopLevelPageTable<'a> = riscv::paging::Rv32PageTable<'a>;
+#[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+type TopLevelPageTable<'a> = riscv::paging::Rv39PageTable<'a>;
+#[cfg(all(target_arch = "riscv64", not(feature = "sv39")))]
+type TopLevelPageTable<'a> = riscv::paging::Rv48PageTable<'a>;
+
 pub struct PageTableImpl {
-    page_table: TwoLevelPageTable<'static>,
+    page_table: TopLevelPageTable<'static>,
     root_frame: Frame,
     entry: PageEntry,
 }
@@ -151,7 +153,7 @@ impl PageTableImpl {
         let frame = Frame::of_ppn(PageTableImpl::active_token() & 0x7fffffff);
         let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET);
         PageTableImpl {
-            page_table: TwoLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
+            page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
             entry: unsafe { core::mem::uninitialized() },
         }
@@ -167,7 +169,7 @@ impl PageTableExt for PageTableImpl {
         table.zero();
 
         PageTableImpl {
-            page_table: TwoLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
+            page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
             entry: unsafe { core::mem::uninitialized() },
         }
@@ -178,16 +180,28 @@ impl PageTableExt for PageTableImpl {
         let table = unsafe {
             &mut *(phys_to_virt(self.root_frame.start_address().as_usize()) as *mut RvPageTable)
         };
+        #[cfg(target_arch = "riscv32")]
         for i in 256..1024 {
             let flags =
                 EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
             let frame = Frame::of_addr(PhysAddr::new((i << 22) - PHYSICAL_MEMORY_OFFSET));
             table[i].set(frame, flags);
         }
+        #[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+        for i in 509..512 {
+            let flags =
+                EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
+            let frame = Frame::of_addr(PhysAddr::new((0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET));
+            table[i].set(frame, flags);
+        }
+        // TODO: sv48
     }
 
     fn token(&self) -> usize {
-        self.root_frame.number() | (1 << 31)
+        #[cfg(target_arch = "riscv32")]
+        return self.root_frame.number() | (1 << 31);
+        #[cfg(all(target_arch = "riscv64", feature = "sv39"))]
+        return self.root_frame.number() | (8 << 60);
     }
 
     unsafe fn set_token(token: usize) {
@@ -203,7 +217,6 @@ impl PageTableExt for PageTableImpl {
     }
 
     fn flush_tlb() {
-        debug!("flushing token {:x}", Self::active_token());
         unsafe {
             sfence_vma_all();
         }
