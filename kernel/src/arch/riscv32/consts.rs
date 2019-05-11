@@ -19,7 +19,7 @@ pub const MEMORY_END: usize = 0x8060_0000;
 pub const MEMORY_END: usize = 0x8800_0000;
 
 // FIXME: rv64 `sh` and `ls` will crash if stack top > 0x80000000 ???
-pub const USER_STACK_OFFSET: usize = 0x80000000 - USER_STACK_SIZE;
+pub const USER_STACK_OFFSET: usize = 0x40000000 - USER_STACK_SIZE;
 pub const USER_STACK_SIZE: usize = 0x10000;
 
 pub const MAX_DTB_SIZE: usize = 0x2000;

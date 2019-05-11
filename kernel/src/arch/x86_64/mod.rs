@@ -9,12 +9,12 @@ pub mod gdt;
 pub mod idt;
 pub mod interrupt;
 pub mod io;
+pub mod ipi;
 pub mod memory;
 pub mod paging;
 pub mod rand;
 pub mod syscall;
 pub mod timer;
-pub mod ipi;
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
@@ -34,7 +34,10 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     // First init log mod, so that we can print log info.
     crate::logging::init();
     info!("{:#x?}", boot_info);
-    assert_eq!(boot_info.physical_memory_offset as usize, consts::PHYSICAL_MEMORY_OFFSET);
+    assert_eq!(
+        boot_info.physical_memory_offset as usize,
+        consts::PHYSICAL_MEMORY_OFFSET
+    );
 
     // Init trap handling.
     idt::init();

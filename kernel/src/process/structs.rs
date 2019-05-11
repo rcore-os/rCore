@@ -20,9 +20,9 @@ use crate::memory::{
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
+use crate::processor;
 use core::mem::uninitialized;
 use rcore_fs::vfs::INode;
-use crate::processor;
 
 pub struct Thread {
     context: Context,

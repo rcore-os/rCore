@@ -16,7 +16,7 @@ use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
-use crate::sync::{SpinNoIrqLock, MutexGuard, SpinNoIrq};
+use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock};
 use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;

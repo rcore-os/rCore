@@ -1,6 +1,5 @@
 /// Interface for inter-processor interrupt.
 /// This module wraps inter-processor interrupt into a broadcast-calling style.
-
 use crate::consts::KERNEL_OFFSET;
 use alloc::boxed::{Box, FnBox};
 use alloc::sync::Arc;

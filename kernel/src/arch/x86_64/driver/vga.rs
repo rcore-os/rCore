@@ -99,9 +99,9 @@ impl VgaBuffer {
 }
 
 lazy_static! {
-    pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
-        VgaWriter::new(unsafe{ &mut *((phys_to_virt(0xb8000)) as *mut VgaBuffer) })
-    );
+    pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter::new(unsafe {
+        &mut *((phys_to_virt(0xb8000)) as *mut VgaBuffer)
+    }));
 }
 
 pub struct VgaWriter {

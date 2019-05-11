@@ -286,8 +286,5 @@ fn flush_tlb_all(vaddr: usize) {
     if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
         return;
     }
-    super::ipi::invoke_on_allcpu(
-        move || tlb::flush(VirtAddr::new(vaddr as u64)),
-        false,
-    );
+    super::ipi::invoke_on_allcpu(move || tlb::flush(VirtAddr::new(vaddr as u64)), false);
 }
