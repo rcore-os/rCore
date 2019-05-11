@@ -11,9 +11,9 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
+use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
 use crate::drivers::BlockDriver;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::arch::consts::LINEAR_OFFSET;
 
 use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
@@ -125,10 +125,6 @@ impl Driver for VirtIOBlkDriver {
 
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
-<<<<<<< HEAD
-=======
-
->>>>>>> [WIP] rv32 linear mapping
         let mut req = VirtIOBlkReadReq::default();
         req.req_type = VIRTIO_BLK_T_IN;
         req.reserved = 0;
@@ -154,10 +150,6 @@ impl Driver for VirtIOBlkDriver {
 
     fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
         let mut driver = self.0.lock();
-<<<<<<< HEAD
-=======
-
->>>>>>> [WIP] rv32 linear mapping
         let mut req: VirtIOBlkWriteReq = unsafe { zeroed() };
         req.req_type = VIRTIO_BLK_T_OUT;
         req.reserved = 0;

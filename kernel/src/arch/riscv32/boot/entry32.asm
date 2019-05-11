@@ -65,8 +65,3 @@ boot_page_table_sv32:
     .word (0x80c00 << 10) | 0xcf # VRWXAD
     .zero 4 * 252
     .zero 4 * 256
-
-    .align 12   # page align
-    .global _root_page_table_ptr
-_root_page_table_ptr:
-    .space 4 # 4bytes

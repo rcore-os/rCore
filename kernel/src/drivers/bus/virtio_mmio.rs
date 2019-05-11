@@ -11,11 +11,7 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-<<<<<<< HEAD
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
-=======
-use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET, LINEAR_OFFSET};
->>>>>>> [WIP] rv32 linear mapping
 use crate::HEAP_ALLOCATOR;
 
 use super::super::block::virtio_blk;
@@ -359,6 +355,7 @@ pub fn virtio_probe(node: &Node) {
     if let Some(reg) = node.prop_raw("reg") {
         let paddr = reg.as_slice().read_be_u64(0).unwrap();
         let vaddr = phys_to_virt(paddr as usize);
+        debug!("walk dt {:x} {:x}", paddr, vaddr);
         let size = reg.as_slice().read_be_u64(8).unwrap();
         // assuming one page
         assert_eq!(size as usize, PAGE_SIZE);
