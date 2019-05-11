@@ -16,7 +16,7 @@ use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::process::current_thread;
-use crate::sync::SpinNoIrqLock;
+use crate::sync::{SpinNoIrqLock, MutexGuard, SpinNoIrq};
 use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
@@ -52,24 +52,19 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
         SpinNoIrqLock::new(FrameAlloc::default());
+    pub static ref ACTIVE_TABLE: SpinNoIrqLock<ActivePageTable> =
+        SpinNoIrqLock::new(unsafe { ActivePageTable::new() });
 }
 
-/// The only way to get active page table
+/// The only way to get current active page table safely
 ///
-/// ## CHANGE LOG
-///
-/// In the past, this function returns a `MutexGuard` of a global
-/// `Mutex<ActiveTable>` object, which means only one CPU core
-/// can access its active table at a time.
-///
-/// But given that a page table is ** process local **, and being active
-/// when and only when a thread of the process is running.
-/// The ownership of this page table is in the `MemorySet` object.
-/// So it's safe to access the active table inside `MemorySet`.
-/// But the shared parts is readonly, e.g. all pages mapped in
-/// `InactivePageTable::map_kernel()`.
-pub fn active_table() -> ActivePageTable {
-    unsafe { ActivePageTable::new() }
+/// NOTE:
+/// Current implementation of recursive page table has a problem that
+/// will cause race condition to the initial page table.
+/// So we have to add a global mutex to avoid the racing.
+/// This will be removed after replacing recursive mapping by linear mapping.
+pub fn active_table() -> MutexGuard<'static, ActivePageTable, SpinNoIrq> {
+    ACTIVE_TABLE.lock()
 }
 
 #[derive(Debug, Clone, Copy)]

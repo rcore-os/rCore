@@ -28,6 +28,7 @@
 
 use super::Condvar;
 use crate::arch::interrupt;
+use crate::processor;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -35,11 +36,12 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
-pub type ThreadLock<T> = Mutex<T, Condvar>;
+pub type SleepLock<T> = Mutex<T, Condvar>;
 
 pub struct Mutex<T: ?Sized, S: MutexSupport> {
     lock: AtomicBool,
     support: S,
+    user: UnsafeCell<(usize, usize)>, // (cid, tid)
     data: UnsafeCell<T>,
 }
 
@@ -78,6 +80,7 @@ impl<T, S: MutexSupport> Mutex<T, S> {
             lock: AtomicBool::new(false),
             data: UnsafeCell::new(user_data),
             support: S::new(),
+            user: UnsafeCell::new((0, 0)),
         }
     }
 
@@ -93,11 +96,23 @@ impl<T, S: MutexSupport> Mutex<T, S> {
 impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
     fn obtain_lock(&self) {
         while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
+            let mut try_count = 0;
             // Wait until the lock looks unlocked before retrying
             while self.lock.load(Ordering::Relaxed) {
                 self.support.cpu_relax();
+                try_count += 1;
+                if try_count == 0x100000 {
+                    let (cid, tid) = unsafe { *self.user.get() };
+                    error!(
+                        "Mutex: deadlock detected! locked by cpu {} thread {} @ {:?}",
+                        cid, tid, self as *const Self
+                    );
+                }
             }
         }
+        let cid = crate::arch::cpu::id();
+        let tid = processor().tid_option().unwrap_or(0);
+        unsafe { self.user.get().write((cid, tid)) };
     }
 
     /// Locks the spinlock and returns a guard.

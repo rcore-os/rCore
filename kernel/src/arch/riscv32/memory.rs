@@ -154,11 +154,20 @@ fn remap_the_kernel(dtb: usize) {
     // map AXI INTC for Rocket Chip
     #[cfg(feature = "board_rocket_chip")]
     ms.push(
-        KERNEL_OFFSET + 0x19000000,
-        KERNEL_OFFSET + 0x19000000 + PAGE_SIZE,
+        KERNEL_OFFSET + 0x18100000,
+        KERNEL_OFFSET + 0x18100000 + PAGE_SIZE,
         MemoryAttr::default(),
-        Linear::new(-(KERNEL_OFFSET as isize + 0x19000000 - 0x61200000)),
+        Linear::new(-(KERNEL_OFFSET as isize + 0x18100000 - 0x61200000)),
         "axi_intc",
+    );
+    // map AXI4-Stream Data FIFO for Rocket Chip
+    #[cfg(feature = "board_rocket_chip")]
+    ms.push(
+        KERNEL_OFFSET + 0x18200000,
+        KERNEL_OFFSET + 0x18200000 + PAGE_SIZE,
+        MemoryAttr::default(),
+        Linear::new(-(KERNEL_OFFSET as isize + 0x18200000 - 0x64A00000)),
+        "router",
     );
     unsafe {
         ms.activate();
