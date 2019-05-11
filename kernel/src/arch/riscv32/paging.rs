@@ -1,3 +1,5 @@
+use crate::consts::LINEAR_OFFSET;
+#[cfg(target_arch = "riscv64")]
 use crate::consts::RECURSIVE_INDEX;
 // Depends on kernel
 #[cfg(target_arch = "riscv32")]
@@ -12,10 +14,14 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::paging::{
     Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, PageTableType,
-    RecursivePageTable,
+    RecursivePageTable, TwoLevelPageTable
 };
 use riscv::register::satp;
 
+#[cfg(target_arch = "riscv32")]
+pub struct ActivePageTable(usize, PageEntry);
+
+#[cfg(target_arch = "riscv64")]
 pub struct ActivePageTable(RecursivePageTable<'static>, PageEntry);
 
 /// PageTableEntry: the contents of this entry.
@@ -31,7 +37,8 @@ impl PageTable for ActivePageTable {
         let frame = Frame::of_addr(PhysAddr::new(target));
         // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
-        self.0
+        info!("map");
+        self.get_table()
             .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
             .unwrap()
             .flush();
@@ -40,13 +47,13 @@ impl PageTable for ActivePageTable {
 
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
-        let (_, flush) = self.0.unmap(page).unwrap();
+        let (_, flush) = self.get_table().unmap(page).unwrap();
         flush.flush();
     }
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         let page = Page::of_addr(VirtAddr::new(vaddr));
-        if let Ok(e) = self.0.ref_entry(page.clone()) {
+        if let Ok(e) = self.get_table().ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
             self.1 = PageEntry(e, page);
             Some(&mut self.1 as &mut Entry)
@@ -56,12 +63,30 @@ impl PageTable for ActivePageTable {
     }
 }
 
+extern "C" {
+    fn _root_page_table_ptr();
+}
+
+pub fn set_root_page_table_ptr(ptr: usize) {
+    unsafe {
+        sfence_vma_all();
+        *(_root_page_table_ptr as *mut usize) = ptr;
+    }
+}
+
+pub fn get_root_page_table_ptr() -> usize {
+    unsafe { *(_root_page_table_ptr as *mut usize) }
+}
+
+pub fn root_page_table_buffer() -> &'static mut RvPageTable {
+    unsafe { &mut *(_root_page_table_ptr as *mut RvPageTable) }
+}
+
 impl PageTableExt for ActivePageTable {}
 
+static mut __page_table_with_mode: bool = false;
+
 /// The virtual address of root page table
-#[cfg(target_arch = "riscv32")]
-const ROOT_PAGE_TABLE: *mut RvPageTable =
-    ((RECURSIVE_INDEX << 12 << 10) | ((RECURSIVE_INDEX + 1) << 12)) as *mut RvPageTable;
 #[cfg(all(target_arch = "riscv64", feature = "sv39"))]
 const ROOT_PAGE_TABLE: *mut RvPageTable = ((0xFFFF_0000_0000_0000)
     | (0o777 << 12 << 9 << 9 << 9)
@@ -79,7 +104,7 @@ impl ActivePageTable {
     #[cfg(target_arch = "riscv32")]
     pub unsafe fn new() -> Self {
         ActivePageTable(
-            RecursivePageTable::new(&mut *ROOT_PAGE_TABLE).unwrap(),
+            get_root_page_table_ptr(),
             ::core::mem::uninitialized(),
         )
     }
@@ -93,6 +118,18 @@ impl ActivePageTable {
             RecursivePageTable::new(&mut *ROOT_PAGE_TABLE, type_).unwrap(),
             ::core::mem::uninitialized(),
         )
+    }
+
+    unsafe fn get_raw_table(&mut self) -> *mut RvPageTable {
+        if __page_table_with_mode {
+            get_root_page_table_ptr() as *mut RvPageTable
+        } else {
+            self.0 as *mut RvPageTable
+        }
+    }
+
+    fn get_table(&mut self) -> TwoLevelPageTable<'static> {
+        unsafe { TwoLevelPageTable::new(&mut *self.get_raw_table(), LINEAR_OFFSET) }
     }
 }
 
@@ -184,6 +221,12 @@ impl InactivePageTable for InactivePageTable0 {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(PhysAddr::new(target));
+        #[cfg(arch = "riscv32")]
+        unsafe {
+            let table = unsafe { &mut *(target as *mut RvPageTable) };
+            table.zero();
+        }
+        #[cfg(arch = "riscv64")]
         active_table().with_temporary_map(target, |_, table: &mut RvPageTable| {
             table.zero();
             table.set_recursive(RECURSIVE_INDEX, frame.clone());
@@ -193,25 +236,13 @@ impl InactivePageTable for InactivePageTable0 {
 
     #[cfg(target_arch = "riscv32")]
     fn map_kernel(&mut self) {
-        let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        extern "C" {
-            fn start();
-            fn end();
+        info!("mapping kernel linear mapping");
+        let table: &mut RvPageTable = unsafe { self.root_frame.as_kernel_mut(LINEAR_OFFSET)};
+        for i in 256..1024 {
+            let flags = EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE;
+            let frame = Frame::of_addr(PhysAddr::new((i - 256) << 22));
+            table[i].set(frame, flags);
         }
-        let mut entrys: [PageTableEntry; 256] = unsafe { core::mem::uninitialized() };
-        let entry_start = start as usize >> 22;
-        let entry_end = (end as usize >> 22) + 1;
-        let entry_count = entry_end - entry_start;
-        for i in 0..entry_count {
-            entrys[i] = table[entry_start + i];
-        }
-
-        self.edit(|_| {
-            // NOTE: 'table' now refers to new page table
-            for i in 0..entry_count {
-                table[entry_start + i] = entrys[i];
-            }
-        });
     }
 
     #[cfg(target_arch = "riscv64")]
@@ -256,27 +287,47 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let target = satp::read().frame().start_address().as_usize();
-        active_table().with_temporary_map(target, |active_table, root_table: &mut RvPageTable| {
-            let backup = root_table[RECURSIVE_INDEX].clone();
+        #[cfg(target_arch = "riscv32")]
+        {
+            debug!(
+                "edit table {:x?} -> {:x?}",
+                Self::active_token(),
+                self.token()
+            );
+            let mut active = unsafe { ActivePageTable(self.token(), ::core::mem::uninitialized()) };
 
-            // overwrite recursive mapping
-            root_table[RECURSIVE_INDEX].set(self.root_frame.clone(), EF::VALID);
-            unsafe {
-                sfence_vma_all();
-            }
+            let ret = f(&mut active);
+            debug!("finish table");
 
-            // execute f in the new context
-            let ret = f(active_table);
-
-            // restore recursive mapping to original p2 table
-            root_table[RECURSIVE_INDEX] = backup;
-            unsafe {
-                sfence_vma_all();
-            }
+            Self::flush_tlb();
 
             ret
-        })
+        }
+        #[cfg(target_arch = "riscv64")]
+        {
+            let target = satp::read().frame().start_address().as_usize();
+            active_table().with_temporary_map(target, |active_table, root_table: &mut RvPageTable| {
+                let backup = root_table[RECURSIVE_INDEX].clone();
+
+                // overwrite recursive mapping
+                root_table[RECURSIVE_INDEX].set(self.root_frame.clone(), EF::VALID);
+                unsafe {
+                    sfence_vma_all();
+                }
+
+                // execute f in the new context
+                let ret = f(active_table);
+
+                // restore recursive mapping to original p2 table
+                root_table[RECURSIVE_INDEX] = backup;
+                unsafe {
+                    sfence_vma_all();
+                }
+
+                ret
+            })
+
+        }
     }
 }
 
@@ -300,6 +351,7 @@ impl FrameDeallocator for FrameAllocatorForRiscv {
     }
 }
 
+#[cfg(target_arch = "riscv64")]
 pub unsafe fn setup_recursive_mapping() {
     let frame = satp::read().frame();
     let root_page_table = unsafe { &mut *(frame.start_address().as_usize() as *mut RvPageTable) };

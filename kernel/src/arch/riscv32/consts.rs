@@ -1,7 +1,5 @@
 // Physical address available on THINPAD:
 // [0x80000000, 0x80800000]
-#[cfg(target_arch = "riscv32")]
-pub const RECURSIVE_INDEX: usize = 0x3fd;
 #[cfg(target_arch = "riscv64")]
 pub const RECURSIVE_INDEX: usize = 0o774;
 // Under riscv64, upon booting, paging is enabled by bbl and
@@ -11,6 +9,9 @@ pub const RECURSIVE_INDEX: usize = 0o774;
 //  root_table[0774] points to root_table itself as page table
 //  root_table[0775] points to root_table itself as leaf page
 //  root_table[0776] points to a temp page table as leaf page
+
+// Linear mapping
+pub const LINEAR_OFFSET: usize = 0x4000_0000;
 
 #[cfg(target_arch = "riscv32")]
 pub const KERNEL_OFFSET: usize = 0xC000_0000;

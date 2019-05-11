@@ -134,6 +134,10 @@ impl phy::RxToken for VirtIONetRxToken {
     {
         let (input, output, _, user_data) = {
             let mut driver = (self.0).0.lock();
+<<<<<<< HEAD
+=======
+
+>>>>>>> [WIP] rv32 linear mapping
             driver.queues[VIRTIO_QUEUE_RECEIVE].get().unwrap()
         };
         let result = f(&input[0][size_of::<VirtIONetHeader>()..]);
@@ -151,6 +155,10 @@ impl phy::TxToken for VirtIONetTxToken {
     {
         let output = {
             let mut driver = (self.0).0.lock();
+<<<<<<< HEAD
+=======
+
+>>>>>>> [WIP] rv32 linear mapping
             if let Some((_, output, _, _)) = driver.queues[VIRTIO_QUEUE_TRANSMIT].get() {
                 unsafe { slice::from_raw_parts_mut(output[0].as_ptr() as *mut u8, output[0].len()) }
             } else {

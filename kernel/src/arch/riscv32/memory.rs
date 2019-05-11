@@ -18,6 +18,7 @@ pub fn init(dtb: usize) {
     init_frame_allocator();
     init_heap();
     // remap the kernel use 4K page
+    #[cfg(target_arch = "riscv64")]
     unsafe {
         super::paging::setup_recursive_mapping();
     }
@@ -54,6 +55,21 @@ fn init_frame_allocator() {
 }
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
+#[cfg(target_arch = "riscv32")]
+fn remap_the_kernel(_dtb: usize) {
+    let mut ms = MemorySet::new();
+    unsafe {
+        ms.activate();
+    }
+    unsafe {
+        SATP = ms.token();
+    }
+    mem::forget(ms);
+    info!("remap kernel end");
+}
+
+/// Remap the kernel memory address with 4K page recorded in p1 page table
+#[cfg(target_arch = "riscv64")]
 fn remap_the_kernel(dtb: usize) {
     let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
     let mut ms = MemorySet::new_bare();

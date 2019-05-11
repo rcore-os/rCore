@@ -11,7 +11,11 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
+<<<<<<< HEAD
 use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+=======
+use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET, LINEAR_OFFSET};
+>>>>>>> [WIP] rv32 linear mapping
 use crate::HEAP_ALLOCATOR;
 
 use super::super::block::virtio_blk;
