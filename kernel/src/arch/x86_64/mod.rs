@@ -15,6 +15,7 @@ pub mod rand;
 pub mod syscall;
 pub mod timer;
 pub mod ipi;
+pub mod board;
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
@@ -52,19 +53,10 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     crate::drivers::init();
     // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
+
     // wake up other CPUs
     AP_CAN_INIT.store(true, Ordering::Relaxed);
-    unsafe{
-        use crate::consts::KERNEL_OFFSET;
-        use core::slice;
-        let frame_buffer_data =
-            unsafe { slice::from_raw_parts_mut((KERNEL_OFFSET + 0xf000_0000) as *mut u8, 64000 as usize) };
-        for x in 0..320 { 
-            for y in 0..200 {
-                frame_buffer_data[x + y * 320] = (x % 16 + ( y % 16) * 16) as u8;
-            }
-        }
-    }
+
     // call the first main function in kernel.
     crate::kmain();
 }
