@@ -7,7 +7,7 @@ use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::paging::{
     Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, PageTableType,
-    RecursivePageTable
+    RecursivePageTable,
 };
 use riscv::register::satp;
 
@@ -149,9 +149,9 @@ impl PageTableImpl {
     /// WARN: You MUST call `core::mem::forget` for it after use!
     pub unsafe fn active() -> Self {
         #[cfg(target_arch = "riscv32")]
-        let mask = 0x7ffffffff;
+        let mask = 0x7fffffff;
         #[cfg(target_arch = "riscv64")]
-        let mask = 0x0ffffffff_ffffffff;
+        let mask = 0x0fffffff_ffffffff;
         let frame = Frame::of_ppn(PageTableImpl::active_token() & mask);
         let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET);
         PageTableImpl {
@@ -193,7 +193,9 @@ impl PageTableExt for PageTableImpl {
         for i in 509..512 {
             let flags =
                 EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
-            let frame = Frame::of_addr(PhysAddr::new((0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET));
+            let frame = Frame::of_addr(PhysAddr::new(
+                (0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET,
+            ));
             table[i].set(frame, flags);
         }
     }
