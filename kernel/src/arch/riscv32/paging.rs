@@ -150,7 +150,11 @@ impl PageTableImpl {
     /// Unsafely get the current active page table.
     /// WARN: You MUST call `core::mem::forget` for it after use!
     pub unsafe fn active() -> Self {
-        let frame = Frame::of_ppn(PageTableImpl::active_token() & 0x7fffffff);
+        #[cfg(target_arch = "riscv32")]
+        let mask = 0x7ffffffff;
+        #[cfg(target_arch = "riscv64")]
+        let mask = 0x0ffffffff_ffffffff;
+        let frame = Frame::of_ppn(PageTableImpl::active_token() & mask);
         let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET);
         PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
