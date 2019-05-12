@@ -8,16 +8,16 @@ use bitflags::*;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
+use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
 use crate::drivers::BlockDriver;
-use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
+use crate::memory::phys_to_virt;
 
 pub struct VirtIOBlk {
     interrupt_parent: u32,
@@ -106,8 +106,6 @@ impl Driver for VirtIOBlkDriver {
     fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
         let driver = self.0.lock();
 
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
         let header = unsafe { &mut *(driver.header as *mut VirtIOHeader) };
         let interrupt = header.interrupt_status.read();
         if interrupt != 0 {
@@ -127,9 +125,6 @@ impl Driver for VirtIOBlkDriver {
 
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-
         let mut req = VirtIOBlkReadReq::default();
         req.req_type = VIRTIO_BLK_T_IN;
         req.reserved = 0;
@@ -155,9 +150,6 @@ impl Driver for VirtIOBlkDriver {
 
     fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
         let mut driver = self.0.lock();
-        // ensure header page is mapped
-        active_table().map_if_not_exists(driver.header as usize, driver.header as usize);
-
         let mut req: VirtIOBlkWriteReq = unsafe { zeroed() };
         req.req_type = VIRTIO_BLK_T_OUT;
         req.reserved = 0;
@@ -184,8 +176,9 @@ impl Driver for VirtIOBlkDriver {
 
 pub fn virtio_blk_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
-    let from = reg.as_slice().read_be_u64(0).unwrap();
-    let header = unsafe { &mut *(from as *mut VirtIOHeader) };
+    let paddr = reg.as_slice().read_be_u64(0).unwrap();
+    let vaddr = phys_to_virt(paddr as usize);
+    let header = unsafe { &mut *(vaddr as *mut VirtIOHeader) };
 
     header.status.write(VirtIODeviceStatus::DRIVER.bits());
 
@@ -199,7 +192,7 @@ pub fn virtio_blk_init(node: &Node) {
     header.write_driver_features(driver_features);
 
     // read configuration space
-    let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOBlkConfig) };
+    let config = unsafe { &mut *((vaddr + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOBlkConfig) };
     info!("Config: {:?}", config);
     info!(
         "Found a block device of size {}KB",
@@ -213,7 +206,7 @@ pub fn virtio_blk_init(node: &Node) {
     let driver = VirtIOBlkDriver(Mutex::new(VirtIOBlk {
         interrupt: node.prop_u32("interrupts").unwrap(),
         interrupt_parent: node.prop_u32("interrupt-parent").unwrap(),
-        header: from as usize,
+        header: vaddr as usize,
         queue: VirtIOVirtqueue::new(header, 0, 16),
         capacity: config.capacity.read() as usize,
     }));

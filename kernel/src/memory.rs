@@ -14,9 +14,9 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
-use crate::sync::{SpinNoIrqLock, MutexGuard, SpinNoIrq};
+use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock};
 use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
@@ -27,7 +27,7 @@ pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::paging::PageTable;
 use rcore_memory::*;
 
-pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
+pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
 // x86_64 support up to 64G memory
 #[cfg(target_arch = "x86_64")]
@@ -52,19 +52,16 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
         SpinNoIrqLock::new(FrameAlloc::default());
-    pub static ref ACTIVE_TABLE: SpinNoIrqLock<ActivePageTable> =
-        SpinNoIrqLock::new(unsafe { ActivePageTable::new() });
 }
 
-/// The only way to get current active page table safely
-///
-/// NOTE:
-/// Current implementation of recursive page table has a problem that
-/// will cause race condition to the initial page table.
-/// So we have to add a global mutex to avoid the racing.
-/// This will be removed after replacing recursive mapping by linear mapping.
-pub fn active_table() -> MutexGuard<'static, ActivePageTable, SpinNoIrq> {
-    ACTIVE_TABLE.lock()
+/// Convert physical address to virtual address
+pub const fn phys_to_virt(paddr: usize) -> usize {
+    PHYSICAL_MEMORY_OFFSET + paddr
+}
+
+/// Convert virtual address to physical address
+pub const fn virt_to_phys(vaddr: usize) -> usize {
+    vaddr - PHYSICAL_MEMORY_OFFSET
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -148,7 +145,7 @@ pub fn init_heap() {
 pub fn enlarge_heap(heap: &mut Heap) {
     info!("Enlarging heap to avoid oom");
 
-    let mut page_table = active_table();
+    let mut page_table = unsafe { PageTableImpl::active() };
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
     #[cfg(target_arch = "x86_64")]
@@ -178,4 +175,5 @@ pub fn enlarge_heap(heap: &mut Heap) {
             heap.init(*addr, *len);
         }
     }
+    core::mem::forget(page_table);
 }

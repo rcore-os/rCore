@@ -2,12 +2,10 @@
 //!
 //! Implemented for every architecture, used by OS.
 
-pub use self::ext::*;
 #[cfg(test)]
 pub use self::mock_page_table::MockPageTable;
 use super::*;
 
-mod ext;
 #[cfg(test)]
 mod mock_page_table;
 
@@ -26,31 +24,18 @@ pub trait PageTable {
     fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Entry>;
 
     /// Get a mutable reference of the content of a page of virtual address `addr`
-    /// Used for testing with mock
-    fn get_page_slice_mut<'a>(&mut self, addr: VirtAddr) -> &'a mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut((addr & !(PAGE_SIZE - 1)) as *mut u8, PAGE_SIZE) }
-    }
+    fn get_page_slice_mut<'a>(&mut self, addr: VirtAddr) -> &'a mut [u8];
+
     /// Read data from virtual address `addr`
     /// Used for testing with mock
-    fn read(&mut self, addr: VirtAddr) -> u8 {
-        unsafe { (addr as *const u8).read() }
+    fn read(&mut self, _addr: VirtAddr) -> u8 {
+        unimplemented!()
     }
 
     /// Write data to virtual address `addr`
     /// Used for testing with mock
-    fn write(&mut self, addr: VirtAddr, data: u8) {
-        unsafe { (addr as *mut u8).write(data) }
-    }
-
-    /// When `vaddr` is not mapped, map it to `paddr`.
-    fn map_if_not_exists(&mut self, vaddr: VirtAddr, paddr: usize) -> bool {
-        if let Some(entry) = self.get_entry(vaddr) {
-            if entry.present() {
-                return false;
-            }
-        }
-        self.map(vaddr, paddr);
-        true
+    fn write(&mut self, _addr: VirtAddr, _data: u8) {
+        unimplemented!()
     }
 }
 
@@ -99,13 +84,8 @@ pub trait Entry {
     fn set_mmio(&mut self, value: u8);
 }
 
-/// An inactive page table
-/// Note: InactivePageTable is not a PageTable
-///       but it can be activated and "become" a PageTable
-pub trait InactivePageTable: Sized {
-    /// the active version of page table
-    type Active: PageTable;
-
+/// Extra methods of `PageTable` for non-trait-object usage
+pub trait PageTableExt: PageTable + Sized {
     /// Create a new page table with kernel memory mapped
     fn new() -> Self {
         let mut pt = Self::new_bare();
@@ -124,10 +104,6 @@ pub trait InactivePageTable: Sized {
     unsafe fn set_token(token: usize);
     fn active_token() -> usize;
     fn flush_tlb();
-
-    /// Make this page table editable
-    /// Set the recursive entry of current active page table to this
-    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T;
 
     /// Activate this page table
     unsafe fn activate(&self) {

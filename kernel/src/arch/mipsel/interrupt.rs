@@ -232,7 +232,7 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
             let tls = unsafe { *(_cur_tls as *const usize) };
 
             set_trapframe_register(rt, tls, tf);
-            info!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
+            debug!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
             return true;
         } else {
             return false;
