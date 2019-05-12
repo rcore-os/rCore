@@ -2,6 +2,8 @@ use bcm2837::emmc::*;
 use core::time::Duration;
 use crate::thread;
 
+pub const BLOCK_SIZE: usize = 512;
+
 const SD_CMD_TYPE_NORMAL: u32 = 0x0;
 const SD_CMD_TYPE_SUSPEND: u32 = (1 << 22);
 const SD_CMD_TYPE_RESUME: u32 = (2 << 22);
@@ -219,40 +221,49 @@ const sd_acommands: [u32; 64] = [
     sd_cmd!(RESERVED,63)
 ];
 
-const GO_IDLE_STATE: usize = 0;
-const ALL_SEND_CID: usize = 2;
-const SEND_RELATIVE_ADDR: usize = 3;
-const SET_DSR: usize = 4;
-const IO_SET_OP_COND: usize = 5;
-const SWITCH_FUNC: usize = 6;
-const SELECT_CARD: usize = 7;
-const DESELECT_CARD: usize = 7;
-const SELECT_DESELECT_CARD: usize = 7;
-const SEND_IF_COND: usize = 8;
-const SEND_CSD: usize = 9;
-const SEND_CID: usize = 10;
-const VOLTAGE_SWITCH: usize = 11;
-const STOP_TRANSMISSION: usize = 12;
-const SEND_STATUS: usize = 13;
-const GO_INACTIVE_STATE: usize = 15;
-const SET_BLOCKLEN: usize = 16;
-const READ_SINGLE_BLOCK: usize = 17;
-const READ_MULTIPLE_BLOCK: usize = 18;
-const SEND_TUNING_BLOCK: usize = 19;
-const SPEED_CLASS_CONTROL: usize = 20;
-const SET_BLOCK_COUNT: usize = 23;
-const WRITE_BLOCK: usize = 24;
-const WRITE_MULTIPLE_BLOCK: usize = 25;
-const PROGRAM_CSD: usize = 27;
-const SET_WRITE_PROT: usize = 28;
-const CLR_WRITE_PROT: usize = 29;
-const SEND_WRITE_PROT: usize = 30;
-const ERASE_WR_BLK_START: usize = 32;
-const ERASE_WR_BLK_END: usize = 33;
-const ERASE: usize = 38;
-const LOCK_UNLOCK: usize = 42;
-const APP_CMD: usize = 55;
-const GEN_CMD: usize = 56;
+const GO_IDLE_STATE: u32 = 0;
+const ALL_SEND_CID: u32 = 2;
+const SEND_RELATIVE_ADDR: u32 = 3;
+const SET_DSR: u32 = 4;
+const IO_SET_OP_COND: u32 = 5;
+const SWITCH_FUNC: u32 = 6;
+const SELECT_CARD: u32 = 7;
+const DESELECT_CARD: u32 = 7;
+const SELECT_DESELECT_CARD: u32 = 7;
+const SEND_IF_COND: u32 = 8;
+const SEND_CSD: u32 = 9;
+const SEND_CID: u32 = 10;
+const VOLTAGE_SWITCH: u32 = 11;
+const STOP_TRANSMISSION: u32 = 12;
+const SEND_STATUS: u32 = 13;
+const GO_INACTIVE_STATE: u32 = 15;
+const SET_BLOCKLEN: u32 = 16;
+const READ_SINGLE_BLOCK: u32 = 17;
+const READ_MULTIPLE_BLOCK: u32 = 18;
+const SEND_TUNING_BLOCK: u32 = 19;
+const SPEED_CLASS_CONTROL: u32 = 20;
+const SET_BLOCK_COUNT: u32 = 23;
+const WRITE_BLOCK: u32 = 24;
+const WRITE_MULTIPLE_BLOCK: u32 = 25;
+const PROGRAM_CSD: u32 = 27;
+const SET_WRITE_PROT: u32 = 28;
+const CLR_WRITE_PROT: u32 = 29;
+const SEND_WRITE_PROT: u32 = 30;
+const ERASE_WR_BLK_START: u32 = 32;
+const ERASE_WR_BLK_END: u32 = 33;
+const ERASE: u32 = 38;
+const LOCK_UNLOCK: u32 = 42;
+const APP_CMD: u32 = 55;
+const GEN_CMD: u32 = 56;
+
+const IS_APP_CMD: u32 = 0x80000000;
+const SET_BUS_WIDTH: u32 = (6 | IS_APP_CMD);
+const SD_STATUS: u32 = (13 | IS_APP_CMD);
+const SEND_NUM_WR_BLOCKS: u32 = (22 | IS_APP_CMD);
+const SET_WR_BLK_ERASE_COUNT: u32 = (23 | IS_APP_CMD);
+const SD_SEND_OP_COND: u32 = (41 | IS_APP_CMD);
+const SET_CLR_CARD_DETECT: u32 = (42 | IS_APP_CMD);
+const SEND_SCR: u32 = (51 | IS_APP_CMD);
 
 const SD_RESET_CMD: u32 = (1 << 25);
 const SD_RESET_DAT: u32 = (1 << 26);
@@ -290,10 +301,7 @@ pub struct EmmcCtl {
     last_cmd_reg:       u32,
     last_cmd:           u32,
     last_cmd_success:   bool,
-    last_r0:            u32,
-    last_r1:            u32,
-    last_r2:            u32,
-    last_r3:            u32,
+    last_r:             [u32; 4],
 
     // void *buf;
     blocks_to_transfer: u32,
@@ -316,20 +324,20 @@ fn usleep(cnt: u32) {
  * -- static int bcm_2708_power_cycle()
  * ++ static uint32_t sd_get_clock_divider(uint32_t base_clock, uint32_t target_rate)
  * ++ static int sd_switch_clock_rate(uint32_t base_clock, uint32_t target_rate)
- * static int sd_reset_cmd()
- * static int sd_reset_dat()
- * static void sd_issue_command_int(struct emmc_block_dev *dev, uint32_t cmd_reg, uint32_t argument, useconds_t timeout)
+ * ++ static int sd_reset_cmd()
+ * ++ static int sd_reset_dat()
+ * ++ static void sd_issue_command_int(struct emmc_block_dev *dev, uint32_t cmd_reg, uint32_t argument, useconds_t timeout)
  * static void sd_handle_card_interrupt(struct emmc_block_dev *dev)
  * static void sd_handle_interrupts(struct emmc_block_dev *dev)
  * 
  * 
- * static void sd_issue_command(struct emmc_block_dev *dev, uint32_t command, uint32_t argument, useconds_t timeout)
- * static int sd_ensure_data_mode(struct emmc_block_dev *edev)
+ * ++ static void sd_issue_command(struct emmc_block_dev *dev, uint32_t command, uint32_t argument, useconds_t timeout)
+ * ++ static int sd_ensure_data_mode(struct emmc_block_dev *edev)
  * -- static int sd_suitable_for_dma(void *buf)
- * static int sd_do_data_command(struct emmc_block_dev *edev, int is_write, uint8_t *buf, size_t buf_size, uint32_t block_no)
+ * -- static int sd_do_data_command(struct emmc_block_dev *edev, int is_write, uint8_t *buf, size_t buf_size, uint32_t block_no)
  * int sd_card_init(struct block_device **dev)
- * int sd_read(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
- * int sd_write(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
+ * ++ int sd_read(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
+ * ++ int sd_write(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
  * Other Constants
  */
 
@@ -380,10 +388,7 @@ impl EmmcCtl {
             last_cmd_reg:0,
             last_cmd:0,
             last_cmd_success:false,
-            last_r0:0,
-            last_r1:0,
-            last_r2:0,
-            last_r3:0,
+            last_r:[0;4],
 
             blocks_to_transfer:0,
             block_size:0,
@@ -474,72 +479,9 @@ impl EmmcCtl {
         timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0)
     }
 
-    pub fn sd_issue_command_int(&mut self, cmd_regarg: u32, argument: u32, timeout: u32) {
-        let mut cmd_reg = cmd_regarg;
-        
-        self.last_cmd_reg = cmd_reg;
-        self.last_cmd_success = false;
-
-        // Check Command Inhibit
-        while self.emmc.registers.STATUS.read() & 0x1 != 0 {
-            usleep(1000);
-        }
-
-        // Is the command with busy?
-        if cmd_reg & SD_CMD_RSPNS_TYPE_MASK == SD_CMD_RSPNS_TYPE_48B {
-            // With busy
-            // Is is an abort command?
-            if cmd_reg & SD_CMD_TYPE_MASK != SD_CMD_TYPE_ABORT {
-                // Not an abort command
-                // Wait for the data line to be free
-                while self.emmc.registers.STATUS.read() & 0x2 != 0 {
-                    usleep(1000);
-                }
-            }
-        }
-        
-        // Is this a DMA transfer?
-        let is_sdma = (cmd_reg & SD_CMD_ISDATA != 0) && (self.use_sdma);
-
-        if is_sdma {
-            self.last_cmd_success = false;
-            return;
-            // self.emmc.registers.ARG2.write($bufferaddr);
-        }
-
-        if self.blocks_to_transfer > 0xffff {
-            self.last_cmd_success = false;
-            return;
-        }
-
-        self.emmc.registers.BLKSIZECNT.write(self.block_size as u32 | (self.blocks_to_transfer << 16));
-
-        self.emmc.registers.ARG1.write(argument);
-
-        if is_sdma {
-            cmd_reg |= SD_CMD_DMA;
-        }
-
-        self.emmc.registers.CMDTM.write(cmd_reg);
-        usleep(2000);
-
-        timeout_wait!(self.emmc.registers.INTERRUPT.read() & 0x8001 != 0, timeout);
-        let irpts = self.emmc.registers.INTERRUPT.read();
-        self.emmc.registers.INTERRUPT.write(0xffff0001);
-
-        if (irpts & 0xffff0001 != 0x1) {
-            self.last_error = irpts & 0xffff0000;
-            self.last_interrupt = irpts;
-            return;
-        }
-
-        usleep(2000);
-        
-    }
-
     pub fn sd_handle_card_interrupt(&mut self) {
         if self.card_rca != 0 {
-            self.sd_issue_command_int(sd_commands[SEND_STATUS], self.card_rca << 16, 500000);
+            self.sd_issue_command_int(sd_commands[SEND_STATUS as usize], self.card_rca << 16, 500000);
         }
     }
 
@@ -592,27 +534,259 @@ impl EmmcCtl {
         self.emmc.registers.INTERRUPT.write(reset_mask);
     }
 
-    pub fn sd_issue_command(&mut self, command: u32, argument: u32, timeout: u32) {
+    pub fn sd_issue_command_int_pre(&mut self, command: u32, argument: u32, timeout: u32) -> bool{
+        self.last_cmd_reg = command;
+        self.last_cmd_success = false;
 
+        while (self.emmc.registers.STATUS.read() & 0x1) != 0 {
+            usleep(1000);
+        }
+
+        if ((command & SD_CMD_RSPNS_TYPE_MASK) == SD_CMD_RSPNS_TYPE_48B) 
+            && ((command & SD_CMD_TYPE_MASK) == SD_CMD_TYPE_ABORT) {
+                while (self.emmc.registers.STATUS.read() & 0x2) != 0 {
+                    usleep(1000);
+                }
+            }
+        
+        if self.blocks_to_transfer > 0xffff {
+            self.last_cmd_success = false;
+            return false;
+        }
+        let blksizecnt = self.block_size as u32 | (self.blocks_to_transfer << 16);
+        self.emmc.registers.BLKSIZECNT.write(blksizecnt);
+        self.emmc.registers.ARG1.write(argument);
+        self.emmc.registers.CMDTM.write(command);
+        usleep(2000);
+
+        timeout_wait!(self.emmc.registers.INTERRUPT.read() & 0x8001 != 0, timeout);
+        
+        let irpts = self.emmc.registers.INTERRUPT.read();
+        self.emmc.registers.INTERRUPT.write(0xffff_0001);
+        if (irpts & 0xffff_0001) != 0x1 {
+            self.last_error = irpts & 0xffff_0000;
+            self.last_interrupt = irpts;
+            return false;
+        }
+        for i in 0..3 {
+            self.last_r[i] = self.emmc.registers.RESP[i].read();
+        }
+        true
+    }
+
+    pub fn sd_issue_command_int_post(&mut self, command: u32, argument: u32, timeout: u32) -> bool{
+        if ((command & SD_CMD_RSPNS_TYPE_MASK) == SD_CMD_RSPNS_TYPE_48B)
+            || (command & SD_CMD_ISDATA) != 0 {
+                if (self.emmc.registers.STATUS.read() & 0x2) == 0 {
+                    self.emmc.registers.INTERRUPT.write(0xffff_0002);
+                } else {
+                    timeout_wait!((self.emmc.registers.INTERRUPT.read() & 0x8002) != 0, timeout);
+                    let mut irpts = self.emmc.registers.INTERRUPT.read();
+                    self.emmc.registers.INTERRUPT.write(0xffff_0002);
+
+                    if (irpts & 0xffff_0002) != 0x2 && (irpts & 0xffff_0002) != 0x10_0002 {
+                        self.last_error = irpts & 0xffff_0000;
+                        self.last_interrupt = irpts;
+                        return false;
+                    }
+
+                    self.emmc.registers.INTERRUPT.write(0xffff_0002);
+                }
+            }
+        self.last_cmd_success = true;
+        true
+    }
+
+    pub fn sd_issue_command_int(&mut self, command: u32, argument: u32, timeout: u32) {
+        if self.sd_issue_command_int_pre(command, argument, timeout) {
+            self.sd_issue_command_int_post(command, argument, timeout);
+        }
+    }
+
+    pub fn sd_issue_command(&mut self, command: u32, argument: u32, timeout: u32) -> bool{
+        self.sd_handle_interrupts();
+        if command & IS_APP_CMD != 0{
+            let cmd = command & 0xff;
+            if sd_acommands[cmd as usize] == sd_cmd!(RESERVED, 0) {
+                self.last_cmd_success = false;
+                return false;
+            }
+            self.last_cmd = APP_CMD;
+
+            let mut rca = 0;
+            if self.card_rca != 0 {
+                rca = self.card_rca << 16;
+            }
+            self.sd_issue_command_int(sd_commands[APP_CMD as usize], rca, timeout);
+            if self.last_cmd_success {
+                self.last_cmd = cmd | IS_APP_CMD;
+                self.sd_issue_command_int(sd_acommands[cmd as usize], argument, timeout);
+            }
+        }
+        else {
+            if sd_commands[command as usize] == sd_cmd!(RESERVED, 0) {
+                self.last_cmd_success = false;
+                return false;
+            }
+            self.last_cmd = command;
+            self.sd_issue_command_int(sd_commands[command as usize], argument, timeout);
+        }
+        true
+    }
+
+    pub fn sd_check_success(&mut self) -> bool {
+        if self.last_cmd_success {
+            return true;
+        }
+        else {
+            self.card_rca = 0;
+            return false;
+        }
     }
 
     pub fn sd_ensure_data_mode(&mut self) -> i32 {
+        if self.card_rca == 0 {
+            let ret = self.init();
+            if ret != 0 {
+                return ret;
+            }
+        }
+
+        self.sd_issue_command(SEND_STATUS, self.card_rca << 16, 500000);
+        if !self.sd_check_success() {
+            return -1;
+        }
+
+        let cur_state = (self.last_r[0] >> 9) & 0xf;
+
+        if cur_state == 3 {
+            self.sd_issue_command(SELECT_CARD, self.card_rca << 16, 500000);
+            if !self.sd_check_success() {
+                return -1;
+            }
+        } else if cur_state == 5 {
+            self.sd_issue_command(STOP_TRANSMISSION, 0, 500000);
+            if !self.sd_check_success() {
+                return -1;
+            }
+            self.sd_reset_dat();
+        } else if cur_state != 4 {
+            let ret = self.init();
+            if ret != 0 {
+                return ret;
+            }
+        }
+
+        if cur_state != 4 {
+            self.sd_issue_command(SEND_STATUS, self.card_rca << 16, 500000);
+            if !self.sd_check_success() {
+                return -1;
+            }
+
+            let cur_state = (self.last_r[0] >> 9) & 0xf;
+            if cur_state != 4 {
+                self.card_rca = 0;
+                return -1;
+            }
+        }
         0
     }
 
-    // sdma not implemented.
-    // pub fn sd_suitable_for_dma()
-
-    pub fn sd_do_data_command(&mut self, is_write: bool, buf: &[u8], block_no: u32) -> i32 {
-        0
+    pub fn read(&mut self, block_no_arg: u32, count: usize, buf: &mut[u32]) ->  Result<(), ()> {
+        let mut block_no = block_no_arg;
+        if self.card_supports_sdhc {
+            block_no *= 512;
+        }
+        //assert_eq!(count * self.block_size, buf.len());
+        self.blocks_to_transfer = count as u32;
+        let mut command = 0;
+        if count > 1 {
+            command = READ_MULTIPLE_BLOCK;
+        } else {
+            command = READ_SINGLE_BLOCK;
+        }
+        for retry in 0..3 {
+            { // send command
+                self.last_cmd = command;
+                if self.sd_issue_command_int_pre(command, block_no, 500000) {
+                    let mut wr_irpt = (1<<5);
+                    let mut finished = true;
+                    for cur_block in 0..count {
+                        timeout_wait!(self.emmc.registers.INTERRUPT.read() & (wr_irpt | 0x8000) != 0, 500000);
+                        let irpts = self.emmc.registers.INTERRUPT.read();
+                        self.emmc.registers.INTERRUPT.write(0xffff_0000 | wr_irpt);
+                        if (irpts & (0xffff_0000 | wr_irpt)) != wr_irpt {
+                            self.last_error = irpts & 0xffff_0000;
+                            self.last_interrupt = irpts;
+                            finished = false;
+                            break;
+                        }
+                        let mut cur_byte_no = 0;
+                        while (cur_byte_no < self.block_size) {
+                            buf[(cur_block as usize)* self.block_size + cur_byte_no] = 
+                                self.emmc.registers.DATA.read();
+                            cur_byte_no += 4;
+                        }
+                    }
+                    if finished {
+                        self.sd_issue_command_int_post(command, block_no, 500000);
+                    }
+                }
+                if self.last_cmd_success {
+                    return Ok(());
+                }
+            }
+        }
+        self.card_rca = 0;
+        Err(())
     }
 
-    pub fn read(&mut self, buf: &[u8], block_no: u32) -> i32 {
-        0
-    }
-
-    pub fn write(&mut self, buf: &[u8], block_no: u32) -> i32 {
-        0
+    pub fn write(&mut self, block_no_arg: u32, count: usize, buf: &[u32]) ->  Result<(), ()> {
+        let mut block_no = block_no_arg;
+        if self.card_supports_sdhc {
+            block_no *= 512;
+        }
+        //assert_eq!(count * self.block_size, buf.len());
+        self.blocks_to_transfer = count as u32;
+        let mut command = 0;
+        if count > 1 {
+            command = READ_MULTIPLE_BLOCK;
+        } else {
+            command = READ_SINGLE_BLOCK;
+        }
+        for retry in 0..3 {
+            { // send command
+                self.last_cmd = command;
+                if self.sd_issue_command_int_pre(command, block_no, 500000) {
+                    let mut wr_irpt = (1<<4);
+                    let mut finished = true;
+                    for cur_block in 0..count {
+                        timeout_wait!(self.emmc.registers.INTERRUPT.read() & (wr_irpt | 0x8000) != 0, 500000);
+                        let irpts = self.emmc.registers.INTERRUPT.read();
+                        self.emmc.registers.INTERRUPT.write(0xffff_0000 | wr_irpt);
+                        if (irpts & (0xffff_0000 | wr_irpt)) != wr_irpt {
+                            self.last_error = irpts & 0xffff_0000;
+                            self.last_interrupt = irpts;
+                            finished = false;
+                            break;
+                        }
+                        let mut cur_byte_no = 0;
+                        while (cur_byte_no < self.block_size) {
+                            self.emmc.registers.DATA.write(buf[(cur_block as usize)* self.block_size + cur_byte_no]);
+                            cur_byte_no += 4;
+                        }
+                    }
+                    if finished {
+                        self.sd_issue_command_int_post(command, block_no, 500000);
+                    }
+                }
+                if self.last_cmd_success {
+                    return Ok(());
+                }
+            }
+        }
+        self.card_rca = 0;
+        Err(())
     }
 
     pub fn init(&mut self) -> i32 {
