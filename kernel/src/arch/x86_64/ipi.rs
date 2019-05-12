@@ -1,3 +1,4 @@
+use crate::memory::phys_to_virt;
 /// Interface for inter-processor interrupt.
 /// This module wraps inter-processor interrupt into a broadcast-calling style.
 use alloc::boxed::{Box, FnBox};
