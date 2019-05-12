@@ -16,11 +16,11 @@ use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
 use crate::arch::cpu;
-use crate::memory::active_table;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::bus::virtio_mmio::*;
 use super::super::{DeviceType, Driver, DRIVERS};
+use crate::memory::phys_to_virt;
 
 struct VirtIOInput {
     interrupt_parent: u32,
@@ -125,11 +125,6 @@ impl VirtIOInput {
             return false;
         }
 
-        // ensure header page is mapped
-        // TODO: this should be mapped in all page table by default
-        let header_addr = self.header as *mut _ as usize;
-        active_table().map_if_not_exists(header_addr, header_addr);
-
         let interrupt = self.header.interrupt_status.read();
         if interrupt != 0 {
             self.header.interrupt_ack.write(interrupt);
@@ -173,8 +168,9 @@ impl Driver for VirtIOInputDriver {
 
 pub fn virtio_input_init(node: &Node) {
     let reg = node.prop_raw("reg").unwrap();
-    let from = reg.as_slice().read_be_u64(0).unwrap();
-    let header = unsafe { &mut *(from as *mut VirtIOHeader) };
+    let paddr = reg.as_slice().read_be_u64(0).unwrap();
+    let vaddr = phys_to_virt(paddr as usize);
+    let header = unsafe { &mut *(vaddr as *mut VirtIOHeader) };
 
     header.status.write(VirtIODeviceStatus::DRIVER.bits());
 
@@ -188,7 +184,7 @@ pub fn virtio_input_init(node: &Node) {
     header.write_driver_features(driver_features);
 
     // read configuration space
-    let config = unsafe { &mut *((from + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOInputConfig) };
+    let config = unsafe { &mut *((vaddr + VIRTIO_CONFIG_SPACE_OFFSET) as *mut VirtIOInputConfig) };
     info!("Config: {:?}", config);
 
     // virtio 4.2.4 Legacy interface

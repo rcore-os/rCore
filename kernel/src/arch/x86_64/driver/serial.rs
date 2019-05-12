@@ -12,6 +12,7 @@ pub fn init() {
     COM2.lock().init();
     enable_irq(consts::COM1);
     enable_irq(consts::COM2);
+    info!("serial: init end");
 }
 
 pub trait SerialRead {

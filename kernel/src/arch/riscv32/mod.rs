@@ -20,13 +20,13 @@ mod sbi;
 pub mod syscall;
 pub mod timer;
 
-use self::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::memory::phys_to_virt;
 use core::sync::atomic::{AtomicBool, Ordering};
 use log::*;
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
-    let mut device_tree_vaddr = device_tree_paddr - MEMORY_OFFSET + KERNEL_OFFSET;
+    let mut device_tree_vaddr = phys_to_virt(device_tree_paddr);
 
     unsafe {
         cpu::set_cpu_id(hartid);

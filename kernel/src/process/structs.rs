@@ -20,9 +20,9 @@ use crate::memory::{
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
+use crate::processor;
 use core::mem::uninitialized;
 use rcore_fs::vfs::INode;
-use crate::processor;
 
 pub struct Thread {
     context: Context,
@@ -76,8 +76,8 @@ pub struct Process {
     pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
 }
 
-/// Records the mapping between pid and Process struct.
 lazy_static! {
+    /// Records the mapping between pid and Process struct.
     pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> =
         RwLock::new(BTreeMap::new());
 }

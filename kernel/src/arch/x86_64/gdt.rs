@@ -48,10 +48,7 @@ impl Cpu {
     }
 
     pub fn iter() -> impl Iterator<Item = &'static Self> {
-        unsafe {
-            CPUS.iter()
-                .filter_map(|x| x.as_ref())
-        }
+        unsafe { CPUS.iter().filter_map(|x| x.as_ref()) }
     }
     pub fn id(&self) -> usize {
         self.id
@@ -114,7 +111,7 @@ const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000); // EXECUT
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000); // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000); // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
-// Copied from xv6
+                                                                       // Copied from xv6
 const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 const UDATA32: Descriptor = Descriptor::UserSegment(0x00cff200_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 

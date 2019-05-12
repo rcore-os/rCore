@@ -39,24 +39,21 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
     fn clone_map(
         &self,
         pt: &mut PageTable,
-        with: &Fn(&mut FnMut()),
+        src_pt: &mut PageTable,
         addr: usize,
         attr: &MemoryAttr,
     ) {
-        let entry = pt.get_entry(addr).expect("failed to get entry");
+        let entry = src_pt.get_entry(addr).expect("failed to get entry");
         if entry.present() && !attr.readonly {
             // eager map and copy data
-            let data = Vec::from(pt.get_page_slice_mut(addr));
-            with(&mut || {
-                let target = self.allocator.alloc().expect("failed to alloc frame");
-                let target_data = pt.get_page_slice_mut(addr);
-                let entry = pt.map(addr, target);
-                target_data.copy_from_slice(&data);
-                attr.apply(entry);
-            });
+            let data = src_pt.get_page_slice_mut(addr);
+            let target = self.allocator.alloc().expect("failed to alloc frame");
+            let entry = pt.map(addr, target);
+            attr.apply(entry);
+            pt.get_page_slice_mut(addr).copy_from_slice(data);
         } else {
             // delay map
-            with(&mut || self.map(pt, addr, attr));
+            self.map(pt, addr, attr);
         }
     }
 
@@ -69,16 +66,9 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
         let frame = self.allocator.alloc().expect("failed to alloc frame");
         entry.set_target(frame);
         entry.set_present(true);
-        let writable = entry.writable();
-        entry.set_writable(true);
         entry.update();
 
         self.fill_data(pt, addr);
-
-        let entry = pt.get_entry(addr).expect("failed to get entry");
-        entry.set_writable(writable);
-        entry.update();
-
         true
     }
 }
