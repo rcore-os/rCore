@@ -1,4 +1,3 @@
-use crate::consts::KERNEL_OFFSET;
 use crate::drivers::block::*;
 use crate::drivers::net::*;
 use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};

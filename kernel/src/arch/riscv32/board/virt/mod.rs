@@ -1,4 +1,3 @@
-use super::consts::KERNEL_OFFSET;
 use crate::memory::phys_to_virt;
 
 /// Mask all external interrupt except serial.

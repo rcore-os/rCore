@@ -59,6 +59,11 @@ pub const fn phys_to_virt(paddr: usize) -> usize {
     PHYSICAL_MEMORY_OFFSET + paddr
 }
 
+/// Convert virtual address to physical address
+pub const fn virt_to_phys(vaddr: usize) -> usize {
+    vaddr - PHYSICAL_MEMORY_OFFSET
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GlobalFrameAlloc;
 

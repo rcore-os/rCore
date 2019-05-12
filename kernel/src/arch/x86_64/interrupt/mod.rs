@@ -5,7 +5,6 @@ mod trapframe;
 
 pub use self::handler::*;
 pub use self::trapframe::*;
-use crate::consts::KERNEL_OFFSET;
 use crate::memory::phys_to_virt;
 use apic::*;
 

@@ -10,8 +10,8 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::arch::cpu;
+use crate::memory::virt_to_phys;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
@@ -279,7 +279,7 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
         header: VirtIOGpuCtrlHdr::with_type(VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING),
         resource_id: VIRTIO_GPU_RESOURCE_ID,
         nr_entries: 1,
-        addr: (frame_buffer - KERNEL_OFFSET + MEMORY_OFFSET) as u64,
+        addr: virt_to_phys(frame_buffer) as u64,
         length: size,
         padding: 0,
     };

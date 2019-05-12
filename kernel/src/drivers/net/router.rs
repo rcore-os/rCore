@@ -18,7 +18,7 @@ use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
-use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::memory::phys_to_virt;
 
 const AXI_STREAM_FIFO_ISR: *mut u32 = (KERNEL_OFFSET + 0x1820_0000) as *mut u32;
 const AXI_STREAM_FIFO_IER: *mut u32 = (KERNEL_OFFSET + 0x1820_0004) as *mut u32;

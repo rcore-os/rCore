@@ -11,14 +11,13 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::HEAP_ALLOCATOR;
 
 use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
 use super::super::input::virtio_input;
 use super::super::net::virtio_net;
-use crate::memory::phys_to_virt;
+use crate::memory::{phys_to_virt, virt_to_phys};
 
 // virtio 4.2.4 Legacy interface
 #[repr(C)]
@@ -95,9 +94,7 @@ impl VirtIOVirtqueue {
 
         header.queue_num.write(queue_num as u32);
         header.queue_align.write(align as u32);
-        header
-            .queue_pfn
-            .write(((address - KERNEL_OFFSET + MEMORY_OFFSET) as u32) >> 12);
+        header.queue_pfn.write((virt_to_phys(address) as u32) >> 12);
 
         // link desc together
         let desc =
@@ -145,7 +142,7 @@ impl VirtIOVirtqueue {
             desc[cur].flags.write(VirtIOVirtqueueFlag::NEXT.bits());
             desc[cur]
                 .addr
-                .write(output[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+                .write(virt_to_phys(output[i].as_ptr() as usize) as u64);
             desc[cur].len.write(output[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
@@ -156,7 +153,7 @@ impl VirtIOVirtqueue {
                 .write((VirtIOVirtqueueFlag::NEXT | VirtIOVirtqueueFlag::WRITE).bits());
             desc[cur]
                 .addr
-                .write(input[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+                .write(virt_to_phys(input[i].as_ptr() as usize) as u64);
             desc[cur].len.write(input[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
@@ -221,7 +218,7 @@ impl VirtIOVirtqueue {
         let mut output = Vec::new();
         loop {
             let flags = VirtIOVirtqueueFlag::from_bits_truncate(desc[cur].flags.read());
-            let addr = desc[cur].addr.read() as u64 - MEMORY_OFFSET as u64 + KERNEL_OFFSET as u64;
+            let addr = phys_to_virt(desc[cur].addr.read() as usize);
             let buffer =
                 unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
             if flags.contains(VirtIOVirtqueueFlag::WRITE) {

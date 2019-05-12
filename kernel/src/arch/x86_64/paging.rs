@@ -1,4 +1,3 @@
-use crate::consts::KERNEL_OFFSET;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use core::sync::atomic::Ordering;
 use log::*;
