@@ -7,7 +7,7 @@
   "target-pointer-width": "32",
   "target-c-int-width": "32",
   "os": "none",
-  "features": "+mips32r2,+soft-float",
+  "features": "+mips32r2,+single-float",
   "max-atomic-width": "32",
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
