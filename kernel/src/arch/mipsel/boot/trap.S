@@ -32,12 +32,6 @@ trap_from_kernel:
 	 *  k1 = old stack pointer
 	 *  sp = kernel stack */
 
-#ifdef board_thinpad
-#define TRAPFRAME_SIZE 304
-#else
-#define TRAPFRAME_SIZE 176
-#endif
-
 	# align stack pointer
 	andi k0, sp, 0xf
 	beqz k0, sp_aligned
@@ -45,11 +39,17 @@ trap_from_kernel:
 
 	la k0, 0xfffffff0
 	and k0, sp, k0
-	sw sp, -TRAPFRAME_SIZE(k0)
+	sw sp, -176(k0)
 	move sp, k0
 	
 sp_aligned:
 	# allocate 38 / 70 words for trapframe + 6 extra words
+
+#ifdef board_thinpad
+#define TRAPFRAME_SIZE 304
+#else
+#define TRAPFRAME_SIZE 176
+#endif
 
 	addiu sp, sp, -TRAPFRAME_SIZE
 
