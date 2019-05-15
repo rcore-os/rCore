@@ -177,3 +177,31 @@ pub fn enlarge_heap(heap: &mut Heap) {
     }
     core::mem::forget(page_table);
 }
+
+pub fn access_ok(from: usize, len: usize) -> bool {
+    from < PHYSICAL_MEMORY_OFFSET && (from + len) < PHYSICAL_MEMORY_OFFSET
+}
+
+#[naked]
+pub unsafe extern "C" fn read_user_fixup() -> usize {
+    return 1;
+}
+
+#[no_mangle]
+pub fn copy_from_user_u8(addr: *const u8) -> Option<u8> {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn read_user_u8(dst: *mut u8, src: *const u8) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, 1) {
+        return None;
+    }
+    let mut dst: u8 = 0;
+    match unsafe { read_user_u8((&mut dst) as *mut u8, addr) } {
+        0 => Some(dst),
+        _ => None,
+    }
+}
