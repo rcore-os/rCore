@@ -10,7 +10,7 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
-use crate::memory::{copy_from_user_u8, MemorySet};
+use crate::memory::{copy_from_user_u8, copy_from_user_usize, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
@@ -572,4 +572,22 @@ pub fn check_and_clone_cstr(user: *const u8) -> Result<String, SysError> {
         }
     }
     return String::from_utf8(buffer).map_err(|_| SysError::EFAULT);
+}
+
+pub fn check_and_clone_cstr_array(user: *const *const u8) -> Result<Vec<String>, SysError> {
+    let mut buffer = Vec::new();
+    for i in 0.. {
+        let addr = unsafe { user.add(i) };
+        if let Some(str_addr) = copy_from_user_usize(addr as *const usize) {
+            if str_addr > 0 {
+                let string = check_and_clone_cstr(str_addr as *const u8)?;
+                buffer.push(string);
+            } else {
+                break;
+            }
+        } else {
+            return Err(SysError::EFAULT);
+        }
+    }
+    return Ok(buffer);
 }

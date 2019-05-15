@@ -21,6 +21,7 @@ use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
+use core::mem::size_of;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
@@ -196,11 +197,30 @@ pub fn copy_from_user_u8(addr: *const u8) -> Option<u8> {
         dst.copy_from_nonoverlapping(src, 1);
         0
     }
-    if !access_ok(addr as usize, 1) {
+    if !access_ok(addr as usize, size_of::<u8>()) {
         return None;
     }
     let mut dst: u8 = 0;
     match unsafe { read_user_u8((&mut dst) as *mut u8, addr) } {
+        0 => Some(dst),
+        _ => None,
+    }
+}
+
+#[no_mangle]
+pub fn copy_from_user_usize(addr: *const usize) -> Option<usize> {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn read_user_usize(dst: *mut usize, src: *const usize) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<usize>()) {
+        return None;
+    }
+    let mut dst: usize = 0;
+    match unsafe { read_user_usize((&mut dst) as *mut usize, addr) } {
         0 => Some(dst),
         _ => None,
     }
