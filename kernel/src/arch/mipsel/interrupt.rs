@@ -266,6 +266,15 @@ fn page_fault(tf: &mut TrapFrame) {
 
             if !tlb_valid {
                 if !crate::memory::handle_page_fault(addr) {
+                    extern "C" {
+                        fn _copy_user_start();
+                        fn _copy_user_end();
+                    }
+                    if tf.epc >= _copy_user_start as usize && tf.epc < _copy_user_end as usize {
+                        debug!("fixup for addr {:x?}", addr);
+                        tf.epc = crate::memory::read_user_fixup as usize;
+                        return;
+                    }
                     crate::trap::error(tf);
                 }
             }

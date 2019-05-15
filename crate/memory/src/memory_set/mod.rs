@@ -128,7 +128,8 @@ impl MemoryAttr {
 
 /// A set of memory space with multiple memory areas with associated page table
 /// NOTE: Don't remove align(64), or you will fail to run MIPS.
-#[repr(align(64))]
+/// Temporary solution for rv64
+#[cfg_attr(not(target_arch = "riscv64"), repr(align(64)))]
 pub struct MemorySet<T: PageTableExt> {
     areas: Vec<MemoryArea>,
     page_table: T,
