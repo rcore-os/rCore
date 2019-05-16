@@ -35,7 +35,8 @@ impl Stdin {
             match buf_lock.pop_front() {
                 Some(c) => return c,
                 None => {
-                    self.pushed.wait(buf_lock);
+                    //self.pushed.wait(buf_lock);
+                    return 0 as char;
                 }
             }
         }

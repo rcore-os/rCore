@@ -31,20 +31,25 @@ impl INode for Vga {
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         info!("the _offset is {} {}", _offset, _buf[0]);
-        let mut result : usize = 0;
-        if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
-            for x in 0..1024 {  // TODO, should not use CONSTS
-                for y in 0..768 {
-                    let blue = _buf[3 * (x * 768 + y)];
-                    let green = _buf[3 * (x * 768 + y) + 1];
-                    let red = _buf[3 * (x * 768 + y) + 2];
-                    let pixel : u32 = ((blue as u32) << 16) | ((green as u32) << 8) | (red as u32);
-                    fb.write(x as u32, y as u32, pixel);
-                    result += 3;
-                }
-            }
-        }
-        return Ok(result);
+        //let mut result : usize = 0;
+        //if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
+            //for x in 0..1024 {  // TODO, should not use CONSTS
+                //for y in 0..768 {
+                    //let blue = _buf[3 * (x * 768 + y)];
+                    //let green = _buf[3 * (x * 768 + y) + 1];
+                    //let red = _buf[3 * (x * 768 + y) + 2];
+                    //let pixel : u32 = ((blue as u32) << 16) | ((green as u32) << 8) | (red as u32);
+                    //fb.write(x as u32, y as u32, pixel);
+                    //result += 3;
+                //}
+            //}
+        //}
+        use crate::consts::KERNEL_OFFSET;
+        use core::slice;
+        let frame_buffer_data =
+            unsafe { slice::from_raw_parts_mut((KERNEL_OFFSET + 0xf000_0000) as *mut u8, ( 1024 * 768 * 3) as usize) };
+        frame_buffer_data.copy_from_slice(&_buf);
+        return Ok(1024 * 768 * 3);
     }
     fn poll(&self) -> Result<PollStatus> {
         Ok(PollStatus { // TOKNOW and TODO
