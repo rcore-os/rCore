@@ -146,13 +146,9 @@ pub fn init_heap() {
 pub fn enlarge_heap(heap: &mut Heap) {
     info!("Enlarging heap to avoid oom");
 
-    let mut page_table = unsafe { PageTableImpl::active() };
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
-    #[cfg(target_arch = "x86_64")]
-    let va_offset = KERNEL_OFFSET + 0xe0000000;
-    #[cfg(not(target_arch = "x86_64"))]
-    let va_offset = KERNEL_OFFSET + 0x00e00000;
+    let va_offset = PHYSICAL_MEMORY_OFFSET;
     for i in 0..16384 {
         let page = alloc_frame().unwrap();
         let va = va_offset + page;
@@ -168,15 +164,11 @@ pub fn enlarge_heap(heap: &mut Heap) {
         addr_len += 1;
     }
     for (addr, len) in addrs[..addr_len].into_iter() {
-        for va in (*addr..(*addr + *len)).step_by(PAGE_SIZE) {
-            page_table.map(va, va - va_offset).update();
-        }
         info!("Adding {:#X} {:#X} to heap", addr, len);
         unsafe {
             heap.init(*addr, *len);
         }
     }
-    core::mem::forget(page_table);
 }
 
 pub fn access_ok(from: usize, len: usize) -> bool {
