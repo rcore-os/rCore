@@ -257,6 +257,9 @@ const APP_CMD: u32 = 55;
 const GEN_CMD: u32 = 56;
 
 const IS_APP_CMD: u32 = 0x80000000;
+macro_rules! ACMD {
+    ($a: expr) => ((($a) | (IS_APP_CMD)));
+}
 const SET_BUS_WIDTH: u32 = (6 | IS_APP_CMD);
 const SD_STATUS: u32 = (13 | IS_APP_CMD);
 const SEND_NUM_WR_BLOCKS: u32 = (22 | IS_APP_CMD);
@@ -273,7 +276,7 @@ const SD_RESET_ALL: u32 = (1 << 24);
 pub struct SDScr {
     scr: [u32; 2],
     sd_bus_widths:  u32,
-    sd_version: i32
+    sd_version: u32
 }
 
 impl SDScr {
@@ -315,6 +318,10 @@ fn usleep(cnt: u32) {
     thread::sleep(Duration::from_micros(cnt.into()));
 }
 
+fn byte_swap(b: u32) -> u32 {
+    (b >> 24) | ((b & 0xFF0000) >> 8) | ((b & 0xFF00) << 8) | ((b & 0xFF) << 24)
+}
+
 /*
  * TODO:
  * ++ static void sd_power_off()
@@ -335,7 +342,7 @@ fn usleep(cnt: u32) {
  * ++ static int sd_ensure_data_mode(struct emmc_block_dev *edev)
  * -- static int sd_suitable_for_dma(void *buf)
  * -- static int sd_do_data_command(struct emmc_block_dev *edev, int is_write, uint8_t *buf, size_t buf_size, uint32_t block_no)
- * int sd_card_init(struct block_device **dev)
+ * ++ int sd_card_init(struct block_device **dev)
  * ++ int sd_read(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
  * ++ int sd_write(struct block_device *dev, uint8_t *buf, size_t buf_size, uint32_t block_no)
  * Other Constants
@@ -401,6 +408,11 @@ impl EmmcCtl {
     pub fn sd_power_off(&mut self) {
         let ctl0 = self.emmc.registers.CONTROL0.read();
         self.emmc.registers.CONTROL0.write(ctl0 & !(1 << 8));
+    }
+
+    pub fn sd_get_base_clock_hz(&mut self) -> u32 {
+        // todo: use mailbox instead
+        0
     }
 
     pub fn sd_get_clock_divider(&mut self, base_clock: u32, target_rate: u32) -> u32 {
@@ -690,6 +702,332 @@ impl EmmcCtl {
             }
         }
         0
+    }
+
+    pub fn sd_card_init(&mut self) -> bool {
+        let ver = self.emmc.registers.SLOTISR_VER.read();
+        let vendor = ver >> 24;
+	    let sdversion = (ver >> 16) & 0xff;
+	    let slot_status = ver & 0xff;
+
+        let mut control0 = self.emmc.registers.CONTROL0.read();
+        let mut control1 = self.emmc.registers.CONTROL1.read();
+        control1 |= (1 << 24);
+        // Disable clock
+        control1 &= !(1 << 2);
+        control1 &= !(1 << 0);
+        self.emmc.registers.CONTROL1.write(control1);
+
+        if !timeout_wait!((self.emmc.registers.CONTROL1.read() & (0x7 << 24)) == 0) {
+            return false;
+        }
+
+	    // Check for a valid card
+        if !timeout_wait!(self.emmc.registers.STATUS.read() & (1 << 16) != 0, 500000) {
+            return false;
+        }
+
+        // Clear control2
+        self.emmc.registers.CONTROL2.write(0);
+
+        let clk = self.sd_get_base_clock_hz();
+        let base_clock = if clk > 0 { clk } else { 100000000 };
+
+	    // Set clock rate to something slow
+        control1 = self.emmc.registers.CONTROL1.read();
+        control1 |= 1;
+
+        let f_id = self.sd_get_clock_divider(base_clock, 400000);
+        control1 |= f_id;
+
+        control1 |= (7 << 16);		// data timeout = TMCLK * 2^10
+
+        self.emmc.registers.CONTROL1.write(control1);
+
+        if !timeout_wait!(self.emmc.registers.CONTROL1.read() & 0x2 != 0) {
+            return false;
+        }
+
+	    // Enable the SD clock
+        usleep(2000);
+        control1 = self.emmc.registers.CONTROL1.read();
+	    control1 |= 4;
+        self.emmc.registers.CONTROL1.write(control1);
+	    usleep(2000);
+
+        // Mask off sending interrupts to the ARM
+        self.emmc.registers.IRPT_EN.write(0);
+        // Reset interrupts
+        self.emmc.registers.INTERRUPT.write(0xffffffff);
+        // Have all interrupts sent to the INTERRUPT register
+        let irpt_mask = 0xffffffff & (!SD_CARD_INTERRUPT);
+        self.emmc.registers.IRPT_MASK.write(0xffffffff);
+
+	    usleep(2000);
+
+        self.block_size = 512;
+        self.base_clock = base_clock;
+
+	    // Send CMD0 to the card (reset to idle state)
+        if !self.sd_issue_command(0 /* GO_IDLE_STATE */, 0, 500000) {
+            return false;
+        }
+
+        // Send CMD8 to the card
+        // Voltage supplied = 0x1 = 2.7-3.6V (standard)
+        // Check pattern = 10101010b (as per PLSS 4.3.13) = 0xAA
+        let v2_later = if !self.sd_issue_command(8 /* SEND_IF_COND */, 0x1aa, 500000) {
+            if self.last_error == 0 {
+                false
+            } else if self.last_error & (1 << 16) != 0 {
+                if !self.sd_reset_cmd() {
+                    return false;
+                }
+
+                self.emmc.registers.INTERRUPT.write(SD_ERR_MASK_CMD_TIMEOUT);
+                false
+            } else {
+                return false;
+            }
+        } else {
+            if self.last_r[0] & 0xfff != 0x1aa {
+                return false;
+            }
+            true
+        };
+
+        // Here we are supposed to check the response to CMD5 (HCSS 3.6)
+        // It only returns if the card is a SDIO card
+        let _t = self.sd_issue_command(5 /* IO_SET_OP_COND */, 0, 10000);
+        if !((!_t) && self.last_error == 0) {
+            if (!_t) && self.last_error & (1 << 16) != 0 {
+                if !self.sd_reset_cmd() {
+                    return false;
+                }
+
+                self.emmc.registers.INTERRUPT.write(SD_ERR_MASK_CMD_TIMEOUT);
+            } else {
+                return false;
+            }
+        }
+
+        if !self.sd_issue_command(ACMD!(41), 0, 500000) {
+            return false;
+        }
+
+        let mut card_is_busy = true;
+
+        while card_is_busy {
+            let v2_flags = if v2_later {
+                (1 << 30) | if self.failed_voltage_switch == 0 {
+                    (1 << 24)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+
+            if !self.sd_issue_command(ACMD!(41), 0x00ff8000 | v2_flags, 500000) {
+                return false;
+            }
+
+            if (self.last_r[0] >> 31) & 0x1 != 0 {
+                self.card_ocr = (self.last_r[0] >> 8) & 0xffff;
+                self.card_supports_sdhc = (self.last_r[0] >> 30) & 0x1 != 0;
+
+                if self.failed_voltage_switch == 0 {
+                    self.card_supports_18v = (self.last_r[0] >> 24) & 0x1 != 0;
+                }
+
+                card_is_busy = false;
+            } else {
+                usleep(500000);
+            }
+        }
+
+        // At this point, we know the card is definitely an SD card, so will definitely
+        //  support SDR12 mode which runs at 25 MHz
+        self.sd_switch_clock_rate(base_clock, 25000000 /* SD_CLOCK_NORMAL */);
+        
+	    // A small wait before the voltage switch
+        usleep(5000);
+
+	    // Switch to 1.8V mode if possible
+        if (self.card_supports_18v) {
+            // As per HCSS 3.6.1
+
+            // Send VOLTAGE_SWITCH
+            if !self.sd_issue_command(11 /* VOLTAGE_SWITCH */, 0, 500000) {
+                self.failed_voltage_switch = 1;
+                self.sd_power_off();
+                return self.sd_card_init();
+            }
+
+	        // Disable SD clock
+            control1 = self.emmc.registers.CONTROL1.read();
+            control1 &= !(1 << 2);
+            self.emmc.registers.CONTROL1.write(control1);
+
+	        // Check DAT[3:0]
+            let status_reg = self.emmc.registers.STATUS.read();
+            if ((status_reg >> 20) & 0xf) != 0 {
+                self.failed_voltage_switch = 1;
+                self.sd_power_off();
+                return self.sd_card_init();
+            }
+
+	        // Set 1.8V signal enable to 1
+            control0 = self.emmc.registers.CONTROL0.read();
+            control0 |= (1 << 8);
+            self.emmc.registers.CONTROL0.write(control0);
+
+            usleep(5000);
+
+	        // Check the 1.8V signal enable is set
+            control0 = self.emmc.registers.CONTROL0.read();
+            if ((control0 >> 8) & 0x1) == 0 {
+                self.failed_voltage_switch = 1;
+                self.sd_power_off();
+                return self.sd_card_init();
+            }
+
+	        // Re-enable SD clock
+            control1 = self.emmc.registers.CONTROL1.read();
+            control1 |= (1 << 2);
+            self.emmc.registers.CONTROL1.write(control1);
+
+            // Wait 1 ms
+            usleep(10000);
+
+	        // Check DAT[3:0]
+            let status_reg = self.emmc.registers.STATUS.read();
+            if ((status_reg >> 20) & 0xf) != 0xf {
+                self.failed_voltage_switch = 1;
+                self.sd_power_off();
+                return self.sd_card_init();
+            }
+        }
+
+        if !self.sd_issue_command(2 /* ALL_SEND_CID */, 0, 500000) {
+            return false;
+        }
+
+        let card_cid = [ self.last_r[0], self.last_r[1], self.last_r[2], self.last_r[3] ];
+
+        if ! self.sd_issue_command(3 /* SEND_RELATIVE_ADDR */, 0, 500000) {
+            return false;
+        }
+
+        let cmd3_resp = self.last_r[0];
+        self.card_rca = (cmd3_resp >> 16) & 0xffff;
+
+        if (cmd3_resp >> 15) & 0x1 != 0 { // CRC error
+            return false;
+        }
+
+        if (cmd3_resp >> 14) & 0x1 != 0 { // illegal command
+            return false;
+        }
+
+        if (cmd3_resp >> 13) & 0x1 != 0 { // generic error
+            return false;
+        }
+
+        if (cmd3_resp >> 8) & 0x1 == 0 { // not ready for data
+            return false;
+        }
+
+        if !self.sd_issue_command(7 /* SELECT_CARD */, self.card_rca << 16 , 500000) {
+            return false;
+        }
+
+	    // Now select the card (toggles it to transfer state)
+        let cmd7_resp = self.last_r[0];
+        let status = (cmd7_resp >> 9) & 0xf;
+
+        if status != 3 && status != 4 {
+            return false;
+        }
+
+	    // If not an SDHC card, ensure BLOCKLEN is 512 bytes
+        if !self.card_supports_sdhc {
+            if !self.sd_issue_command(16 /* SET_BLOCKLEN */, 512, 500000) {
+                return false;
+            }
+        }
+
+        self.block_size = 512;
+        let mut controller_block_size = self.emmc.registers.BLKSIZECNT.read();
+        controller_block_size &= (!0xfff);
+        controller_block_size |= 0x200;
+        self.emmc.registers.BLKSIZECNT.write(controller_block_size);
+
+        self.block_size = 8;
+        self.blocks_to_transfer = 1;
+
+        if !self.sd_issue_command(SEND_SCR, 0, 500000) {
+            self.block_size = 512;
+            return false;
+        }
+
+        self.block_size = 512;
+
+        // Determine card version
+        // Note that the SCR is big-endian
+        let scr0 = byte_swap(self.sd_scr.scr[0]);
+        self.sd_scr.sd_version = SD_VER_UNKNOWN;
+        let sd_spec = (scr0 >> (56 - 32)) & 0xf;
+        let sd_spec3 = (scr0 >> (47 - 32)) & 0x1;
+        let sd_spec4 = (scr0 >> (42 - 32)) & 0x1;
+        self.sd_scr.sd_bus_widths = (scr0 >> (48 - 32)) & 0xf;
+        self.sd_scr.sd_version = if sd_spec == 0 {
+            SD_VER_1
+        } else if sd_spec == 1 {
+            SD_VER_1_1
+        } else if sd_spec == 2 {
+            if sd_spec3 == 0 {
+                SD_VER_2
+            } else if sd_spec3 == 1 {
+                if sd_spec4 == 0 {
+                    SD_VER_3
+                } else if sd_spec4 == 1 {
+                    SD_VER_4
+                } else {
+                    SD_VER_UNKNOWN
+                }
+            } else {
+                SD_VER_UNKNOWN
+            }
+        } else {
+            SD_VER_UNKNOWN
+        };
+
+        if self.sd_scr.sd_bus_widths & 0x4 != 0 {
+            // Set 4-bit transfer mode (ACMD6)
+            // See HCSS 3.4 for the algorithm
+
+            // Disable card interrupt in host
+            let old_irpt_mask = self.emmc.registers.IRPT_MASK.read();
+            let new_irpt_mask = old_irpt_mask & !(1 << 8);
+            self.emmc.registers.IRPT_MASK.write(new_irpt_mask);
+
+            // Send ACMD6 to change the card's bit mode
+            if self.sd_issue_command(SET_BUS_WIDTH, 0x2, 500000) {
+                // Change bit mode for Host
+                control0 = self.emmc.registers.CONTROL0.read();
+                control0 |= 0x2;
+                self.emmc.registers.CONTROL0.write(control0);
+
+                // Re-enable card interrupt in host
+                self.emmc.registers.IRPT_MASK.write(old_irpt_mask);
+            }
+        }
+
+	    // Reset interrupt register
+        self.emmc.registers.INTERRUPT.write(0xffffffff);
+
+        true
     }
 
     pub fn read(&mut self, block_no_arg: u32, count: usize, buf: &mut[u32]) ->  Result<(), ()> {
