@@ -1,4 +1,4 @@
-use rcore_memory::memory_set::handler::{Delay, File};
+use rcore_memory::memory_set::handler::{Delay, File, Linear};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::paging::PageTable;
 use rcore_memory::Page;
@@ -53,21 +53,41 @@ impl Syscall<'_> {
             );
             return Ok(addr);
         } else {
-            let inode = proc.get_file(fd)?.inode();
-            self.vm().push(
-                addr,
-                addr + len,
-                prot.to_attr(),
-                File {
-                    file: INodeForMap(inode),
-                    mem_start: addr,
-                    file_start: offset,
-                    file_end: offset + len,
-                    allocator: GlobalFrameAlloc,
+
+            let file = proc.get_file(fd)?;
+            info!("mmap path is {} ", &*file.path);
+            match &*file.path {
+                "/dev/fb0" => {
+                    self.vm().push(
+                        addr,
+                        addr + len,
+                        prot.to_attr(),
+                        Linear::new(
+                            ( 0xfd00_0000 - addr ) as isize,
+                        ),
+                        "mmap_file",
+                    );
+                    info!("mmap for /dev/fb0");
+                    return Ok(addr);
                 },
-                "mmap_file",
-            );
-            return Ok(addr);
+                _ => {
+                    let inode = file.inode();
+                    self.vm().push(
+                        addr,
+                        addr + len,
+                        prot.to_attr(),
+                        File {
+                            file: INodeForMap(inode),
+                            mem_start: addr,
+                            file_start: offset,
+                            file_end: offset + len,
+                            allocator: GlobalFrameAlloc,
+                        },
+                        "mmap_file",
+                    );
+                    return Ok(addr);
+                },
+            };
         }
     }
 
