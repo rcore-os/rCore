@@ -1,5 +1,7 @@
 use bcm2837::emmc::*;
 use core::time::Duration;
+use core::slice;
+use core::mem;
 use crate::thread;
 
 pub const BLOCK_SIZE: usize = 512;
@@ -272,6 +274,7 @@ const SD_RESET_CMD: u32 = (1 << 25);
 const SD_RESET_DAT: u32 = (1 << 26);
 const SD_RESET_ALL: u32 = (1 << 24);
 
+#[repr(C)]
 #[derive(Debug)]
 pub struct SDScr {
     scr: [u32; 2],
@@ -615,7 +618,7 @@ impl EmmcCtl {
         }
     }
 
-    pub fn sd_issue_command(&mut self, command: u32, argument: u32, timeout: u32) -> bool{
+    pub fn sd_issue_command(&mut self, command: u32, argument: u32, timeout: u32) -> bool {
         self.sd_handle_interrupts();
         if command & IS_APP_CMD != 0{
             let cmd = command & 0xff;
@@ -644,6 +647,55 @@ impl EmmcCtl {
             self.sd_issue_command_int(sd_commands[command as usize], argument, timeout);
         }
         true
+    }
+
+    pub fn sd_issue_command_scr(&mut self, timeout: u32) -> bool {
+        self.sd_handle_interrupts();
+        let command = SEND_SCR;
+        let cmd = command & 0xff;
+        
+        self.last_cmd = APP_CMD;
+
+        let mut rca = 0;
+        let scr_size = mem::size_of::<SDScr>();
+        let count = scr_size / self.block_size;
+        let buf =  unsafe { slice::from_raw_parts_mut(&mut self.sd_scr as *mut _ as *mut u32, scr_size / 4) };
+        if self.card_rca != 0 {
+            rca = self.card_rca << 16;
+            self.sd_issue_command_int(sd_acommands[APP_CMD as usize], rca, timeout);
+            if self.last_cmd_success {
+                self.last_cmd = cmd | IS_APP_CMD;
+                let command = sd_acommands[cmd as usize];
+                if self.sd_issue_command_int_pre(command, 0, timeout) {
+                    let mut wr_irpt = (1<<5);
+                    let mut finished = true;
+                    for cur_block in 0..count {
+                        timeout_wait!(self.emmc.registers.INTERRUPT.read() & (wr_irpt | 0x8000) != 0, timeout);
+                        let irpts = self.emmc.registers.INTERRUPT.read();
+                        self.emmc.registers.INTERRUPT.write(0xffff_0000 | wr_irpt);
+                        if (irpts & (0xffff_0000 | wr_irpt)) != wr_irpt {
+                            self.last_error = irpts & 0xffff_0000;
+                            self.last_interrupt = irpts;
+                            finished = false;
+                            break;
+                        }
+                        let mut cur_byte_no = 0;
+                        while (cur_byte_no < self.block_size) {
+                            buf[(cur_block as usize)* self.block_size + cur_byte_no] = 
+                                self.emmc.registers.DATA.read();
+                            cur_byte_no += 4;
+                        }
+                    }
+                    if finished {
+                        self.sd_issue_command_int_post(command, 0, timeout);
+                    }
+                }
+                if self.last_cmd_success {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn sd_check_success(&mut self) -> bool {
@@ -1046,7 +1098,7 @@ impl EmmcCtl {
         for retry in 0..3 {
             { // send command
                 self.last_cmd = command;
-                if self.sd_issue_command_int_pre(command, block_no, 500000) {
+                if self.sd_issue_command_int_pre(sd_commands[command as usize], block_no, 500000) {
                     let mut wr_irpt = (1<<5);
                     let mut finished = true;
                     for cur_block in 0..count {
@@ -1067,7 +1119,7 @@ impl EmmcCtl {
                         }
                     }
                     if finished {
-                        self.sd_issue_command_int_post(command, block_no, 500000);
+                        self.sd_issue_command_int_post(sd_commands[command as usize], block_no, 500000);
                     }
                 }
                 if self.last_cmd_success {
@@ -1095,7 +1147,7 @@ impl EmmcCtl {
         for retry in 0..3 {
             { // send command
                 self.last_cmd = command;
-                if self.sd_issue_command_int_pre(command, block_no, 500000) {
+                if self.sd_issue_command_int_pre(sd_commands[command as usize], block_no, 500000) {
                     let mut wr_irpt = (1<<4);
                     let mut finished = true;
                     for cur_block in 0..count {
@@ -1115,7 +1167,7 @@ impl EmmcCtl {
                         }
                     }
                     if finished {
-                        self.sd_issue_command_int_post(command, block_no, 500000);
+                        self.sd_issue_command_int_post(sd_commands[command as usize], block_no, 500000);
                     }
                 }
                 if self.last_cmd_success {
