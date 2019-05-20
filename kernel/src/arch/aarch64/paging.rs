@@ -86,8 +86,7 @@ pub enum MMIOType {
 
 impl Entry for PageEntry {
     fn update(&mut self) {
-        let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
-        tlb_invalidate(addr);
+        tlb_invalidate(self.1.start_address());
     }
 
     fn present(&self) -> bool {
