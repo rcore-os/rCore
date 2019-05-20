@@ -703,6 +703,7 @@ impl Syscall<'_> {
                 read: true,
                 write: false,
                 append: false,
+                nonblock: false,
             },
             String::from("pipe_r:[]"),
         )));
@@ -713,6 +714,7 @@ impl Syscall<'_> {
                 read: false,
                 write: true,
                 append: false,
+                nonblock: false,
             },
             String::from("pipe_w:[]"),
         )));
@@ -827,6 +829,16 @@ impl Syscall<'_> {
             in_fd, out_fd, in_offset, out_offset, count, flags
         );
         return Ok(total_written);
+    }
+
+    pub fn sys_fcntl(&mut self, fd : usize, cmd : usize, arg : usize) -> SysResult{
+        info!(
+            "fcntl: fd: {}, cmd: {:x}, arg: {}",
+            fd, cmd, arg
+        );
+        let mut proc = self.process();
+        let file_like = proc.get_file_like(fd)?;
+        file_like.fcntl(cmd, arg)
     }
 }
 
@@ -978,6 +990,7 @@ impl OpenFlags {
             read: self.readable(),
             write: self.writable(),
             append: self.contains(OpenFlags::APPEND),
+            nonblock: false,
         }
     }
 }

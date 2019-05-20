@@ -35,8 +35,7 @@ impl Stdin {
             match buf_lock.pop_front() {
                 Some(c) => return c,
                 None => {
-                    //self.pushed.wait(buf_lock);
-                    return 0 as char;
+                    self.pushed.wait(buf_lock);
                 }
             }
         }
@@ -92,8 +91,12 @@ macro_rules! impl_inode {
 
 impl INode for Stdin {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        buf[0] = self.pop() as u8;
-        Ok(1)
+        if self.can_read() {
+            buf[0] = self.pop() as u8;
+            Ok(1)
+        }else{
+            Ok(0)
+        }
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         unimplemented!()
