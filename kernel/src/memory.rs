@@ -171,8 +171,9 @@ pub fn enlarge_heap(heap: &mut Heap) {
     }
 }
 
-pub fn access_ok(from: usize, len: usize) -> bool {
-    from < PHYSICAL_MEMORY_OFFSET && (from + len) < PHYSICAL_MEMORY_OFFSET
+/// Check whether the address range [addr, addr + len) is not in kernel space
+pub fn access_ok(addr: usize, len: usize) -> bool {
+    addr < PHYSICAL_MEMORY_OFFSET && (addr + len) < PHYSICAL_MEMORY_OFFSET
 }
 
 #[naked]
@@ -180,39 +181,19 @@ pub unsafe extern "C" fn read_user_fixup() -> usize {
     return 1;
 }
 
-#[no_mangle]
-pub fn copy_from_user_u8(addr: *const u8) -> Option<u8> {
+pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
     #[naked]
     #[inline(never)]
     #[link_section = ".text.copy_user"]
-    unsafe extern "C" fn read_user_u8(dst: *mut u8, src: *const u8) -> usize {
+    unsafe extern "C" fn read_user<T>(dst: *mut T, src: *const T) -> usize {
         dst.copy_from_nonoverlapping(src, 1);
         0
     }
-    if !access_ok(addr as usize, size_of::<u8>()) {
+    if !access_ok(addr as usize, size_of::<T>()) {
         return None;
     }
-    let mut dst: u8 = 0;
-    match unsafe { read_user_u8((&mut dst) as *mut u8, addr) } {
-        0 => Some(dst),
-        _ => None,
-    }
-}
-
-#[no_mangle]
-pub fn copy_from_user_usize(addr: *const usize) -> Option<usize> {
-    #[naked]
-    #[inline(never)]
-    #[link_section = ".text.copy_user"]
-    unsafe extern "C" fn read_user_usize(dst: *mut usize, src: *const usize) -> usize {
-        dst.copy_from_nonoverlapping(src, 1);
-        0
-    }
-    if !access_ok(addr as usize, size_of::<usize>()) {
-        return None;
-    }
-    let mut dst: usize = 0;
-    match unsafe { read_user_usize((&mut dst) as *mut usize, addr) } {
+    let mut dst: T = unsafe { core::mem::uninitialized() };
+    match unsafe { read_user(&mut dst, addr) } {
         0 => Some(dst),
         _ => None,
     }
