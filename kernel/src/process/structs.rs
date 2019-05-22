@@ -21,7 +21,7 @@ use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::processor;
-use core::mem::uninitialized;
+use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 
 pub struct Thread {
@@ -103,7 +103,7 @@ impl Thread {
         Box::new(Thread {
             context: Context::null(),
             // safety: other fields will never be used
-            ..core::mem::uninitialized()
+            ..core::mem::MaybeUninit::uninitialized().into_initialized()
         })
     }
 
@@ -146,7 +146,7 @@ impl Thread {
     ) -> Result<(MemorySet, usize, usize), &'static str> {
         // Read ELF header
         // 0x3c0: magic number from ld-musl.so
-        let mut data: [u8; 0x3c0] = unsafe { uninitialized() };
+        let mut data: [u8; 0x3c0] = unsafe { MaybeUninit::uninitialized().into_initialized() };
         inode
             .read_at(0, &mut data)
             .map_err(|_| "failed to read from INode")?;

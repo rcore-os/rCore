@@ -202,7 +202,7 @@ impl PageTableImpl {
         let table = unsafe { &mut *frame_to_page_table(frame) };
         PageTableImpl(
             MappedPageTable::new(table, frame_to_page_table),
-            core::mem::uninitialized(),
+            core::mem::MaybeUninit::uninitialized().into_initialized()(),
             frame,
         )
     }
@@ -217,7 +217,7 @@ impl PageTableExt for PageTableImpl {
         unsafe {
             PageTableImpl(
                 MappedPageTable::new(table, frame_to_page_table),
-                core::mem::uninitialized(),
+                core::mem::MaybeUninit::uninitialized().into_initialized()(),
                 frame,
             )
         }
