@@ -1,12 +1,13 @@
+use aarch64::{asm, regs::*};
+
 pub fn halt() {
-    unsafe { asm!("wfi" :::: "volatile") }
+    asm::wfi();
 }
 
 pub fn id() -> usize {
-    // TODO: cpu id
-    0
+    (MPIDR_EL1.get() & 3) as usize
 }
 
-pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
+pub unsafe fn exit_in_qemu(_error_code: u8) -> ! {
     unimplemented!()
 }

@@ -21,6 +21,7 @@ use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
+use core::mem::size_of;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
@@ -145,13 +146,9 @@ pub fn init_heap() {
 pub fn enlarge_heap(heap: &mut Heap) {
     info!("Enlarging heap to avoid oom");
 
-    let mut page_table = unsafe { PageTableImpl::active() };
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
-    #[cfg(target_arch = "x86_64")]
-    let va_offset = KERNEL_OFFSET + 0xe0000000;
-    #[cfg(not(target_arch = "x86_64"))]
-    let va_offset = KERNEL_OFFSET + 0x00e00000;
+    let va_offset = PHYSICAL_MEMORY_OFFSET;
     for i in 0..16384 {
         let page = alloc_frame().unwrap();
         let va = va_offset + page;
@@ -167,13 +164,56 @@ pub fn enlarge_heap(heap: &mut Heap) {
         addr_len += 1;
     }
     for (addr, len) in addrs[..addr_len].into_iter() {
-        for va in (*addr..(*addr + *len)).step_by(PAGE_SIZE) {
-            page_table.map(va, va - va_offset).update();
-        }
         info!("Adding {:#X} {:#X} to heap", addr, len);
         unsafe {
             heap.init(*addr, *len);
         }
     }
-    core::mem::forget(page_table);
+}
+
+pub fn access_ok(from: usize, len: usize) -> bool {
+    from < PHYSICAL_MEMORY_OFFSET && (from + len) < PHYSICAL_MEMORY_OFFSET
+}
+
+#[naked]
+pub unsafe extern "C" fn read_user_fixup() -> usize {
+    return 1;
+}
+
+#[no_mangle]
+pub fn copy_from_user_u8(addr: *const u8) -> Option<u8> {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn read_user_u8(dst: *mut u8, src: *const u8) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<u8>()) {
+        return None;
+    }
+    let mut dst: u8 = 0;
+    match unsafe { read_user_u8((&mut dst) as *mut u8, addr) } {
+        0 => Some(dst),
+        _ => None,
+    }
+}
+
+#[no_mangle]
+pub fn copy_from_user_usize(addr: *const usize) -> Option<usize> {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn read_user_usize(dst: *mut usize, src: *const usize) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<usize>()) {
+        return None;
+    }
+    let mut dst: usize = 0;
+    match unsafe { read_user_usize((&mut dst) as *mut usize, addr) } {
+        0 => Some(dst),
+        _ => None,
+    }
 }

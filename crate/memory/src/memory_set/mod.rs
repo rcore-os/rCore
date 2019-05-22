@@ -49,20 +49,6 @@ impl MemoryArea {
             self.check_read_array(ptr, count)
         }
     }
-    /// Check the null-end C string is within the readable memory, and is valid.
-    /// If so, clone it to a String.
-    ///
-    /// Unsafe: the page table must be active.
-    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> Option<String> {
-        if ptr as usize >= self.end_addr {
-            return None;
-        }
-        let max_len = self.end_addr - ptr as usize;
-        (0..max_len)
-            .find(|&i| ptr.offset(i as isize).read() == 0)
-            .and_then(|len| core::str::from_utf8(core::slice::from_raw_parts(ptr, len)).ok())
-            .map(|s| String::from(s))
-    }
     /// Test whether this area is (page) overlap with area [`start_addr`, `end_addr`]
     pub fn is_overlap_with(&self, start_addr: VirtAddr, end_addr: VirtAddr) -> bool {
         let p0 = Page::of_addr(self.start_addr);
@@ -128,7 +114,8 @@ impl MemoryAttr {
 
 /// A set of memory space with multiple memory areas with associated page table
 /// NOTE: Don't remove align(64), or you will fail to run MIPS.
-#[repr(align(64))]
+/// Temporary solution for rv64
+#[cfg_attr(not(target_arch = "riscv64"), repr(align(64)))]
 pub struct MemorySet<T: PageTableExt> {
     areas: Vec<MemoryArea>,
     page_table: T,
@@ -186,35 +173,6 @@ impl<T: PageTableExt> MemorySet<T> {
             }
         }
         Err(VMError::InvalidPtr)
-    }
-    /// Check the null-end C string pointer array
-    /// Used for getting argv & envp
-    pub unsafe fn check_and_clone_cstr_array(
-        &self,
-        mut argv: *const *const u8,
-    ) -> VMResult<Vec<String>> {
-        let mut args = Vec::new();
-        loop {
-            let cstr = *self.check_read_ptr(argv)?;
-            if cstr.is_null() {
-                break;
-            }
-            let arg = self.check_and_clone_cstr(cstr)?;
-            args.push(arg);
-            argv = argv.add(1);
-        }
-        Ok(args)
-    }
-    /// Check the null-end C string is within the readable memory, and is valid.
-    /// If so, clone it to a String.
-    ///
-    /// Unsafe: the page table must be active.
-    pub unsafe fn check_and_clone_cstr(&self, ptr: *const u8) -> VMResult<String> {
-        self.areas
-            .iter()
-            .filter_map(|area| area.check_and_clone_cstr(ptr))
-            .next()
-            .ok_or(VMError::InvalidPtr)
     }
     /// Find a free area with hint address `addr_hint` and length `len`.
     /// Return the start address of found free area.

@@ -153,9 +153,9 @@ impl Syscall<'_> {
             path, argv, envp
         );
         let mut proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
-        let args = unsafe { self.vm().check_and_clone_cstr_array(argv)? };
-        let envs = unsafe { self.vm().check_and_clone_cstr_array(envp)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
+        let args = unsafe { check_and_clone_cstr_array(argv)? };
+        let envs = unsafe { check_and_clone_cstr_array(envp)? };
 
         if args.is_empty() {
             error!("exec: args is null");

@@ -2,11 +2,12 @@
 # It is not intended for manual editing.
 [[package]]
 name = "aarch64"
-version = "2.5.0"
-source = "git+https://github.com/rcore-os/aarch64#797c24f07f9d90542eb094530b6f63fe3ea7dded"
+version = "2.6.1"
+source = "git+https://github.com/rcore-os/aarch64#65d1453f11f3cc113247352dffa02d8dcdd34769"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "usize_conversions 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ux 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -43,7 +44,7 @@ name = "bcm2837"
 version = "1.0.0"
 source = "git+https://github.com/rcore-os/bcm2837#b29a8db5504b7eaa6f8adf2c3ff916d1ffd15194"
 dependencies = [
- "aarch64 2.5.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -352,7 +353,7 @@ dependencies = [
 name = "rcore"
 version = "0.2.0"
 dependencies = [
- "aarch64 2.5.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -658,7 +659,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum aarch64 2.5.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
+"checksum aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)" = "<none>"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"

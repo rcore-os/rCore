@@ -17,6 +17,9 @@ SECTIONS
     .text : {
         stext = .;
         *(.text.entry)
+        _copy_user_start = .;
+        *(.text.copy_user)
+        _copy_user_end = .;
         *(.text .text.*)
         . = ALIGN(4K);
         etext = .;

@@ -184,6 +184,12 @@ impl<F: Font> Console<F> {
                     self.buf.delete(self.row, self.col);
                 }
             }
+            b'\t' => {
+                self.write_byte(b' ');
+                while self.col % 8 != 0 {
+                    self.write_byte(b' ');
+                }
+            }
             b'\n' => self.new_line(),
             b'\r' => self.col = 0,
             b'\x1b' => self.parser.start_parse(),
