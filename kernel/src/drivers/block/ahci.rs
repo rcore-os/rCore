@@ -8,7 +8,6 @@ use alloc::sync::Arc;
 use isomorphic_drivers::block::ahci::{AHCI, BLOCK_SIZE};
 
 use crate::drivers::provider::Provider;
-use crate::drivers::BlockDriver;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};

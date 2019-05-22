@@ -11,8 +11,6 @@ use log::*;
 use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 
-use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
-use crate::drivers::BlockDriver;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::bus::virtio_mmio::*;
