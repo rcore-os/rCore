@@ -157,7 +157,7 @@ impl PageTableImpl {
         PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: unsafe { core::mem::uninitialized() },
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
         }
     }
 }
@@ -173,7 +173,7 @@ impl PageTableExt for PageTableImpl {
         PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: unsafe { core::mem::uninitialized() },
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
         }
     }
 
@@ -191,6 +191,10 @@ impl PageTableExt for PageTableImpl {
         }
         #[cfg(target_arch = "riscv64")]
         for i in 509..512 {
+            if (i == 510) {
+                // MMIO range 0x60000000 - 0x7FFFFFFF does not work as a large page, dunno why
+                continue;
+            }
             let flags =
                 EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
             let frame = Frame::of_addr(PhysAddr::new(
@@ -198,6 +202,42 @@ impl PageTableExt for PageTableImpl {
             ));
             table[i].set(frame, flags);
         }
+
+        // MMIO range 0x60000000 - 0x7FFFFFFF does not work as a large page, dunno why
+        let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
+        // map Uartlite for Rocket Chip
+        #[cfg(feature = "board_rocket_chip")]
+        self.page_table
+            .map_to(
+                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6000_0000)),
+                Frame::of_addr(PhysAddr::new(0x6000_0000)),
+                flags,
+                &mut FrameAllocatorForRiscv,
+            )
+            .unwrap()
+            .flush();
+        // map AXI INTC for Rocket Chip
+        #[cfg(feature = "board_rocket_chip")]
+        self.page_table
+            .map_to(
+                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6120_0000)),
+                Frame::of_addr(PhysAddr::new(0x6120_0000)),
+                flags,
+                &mut FrameAllocatorForRiscv,
+            )
+            .unwrap()
+            .flush();
+        // map AXI4-Stream Data FIFO for Rocket Chip
+        #[cfg(feature = "board_rocket_chip")]
+        self.page_table
+            .map_to(
+                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x64A0_0000)),
+                Frame::of_addr(PhysAddr::new(0x64A0_0000)),
+                flags,
+                &mut FrameAllocatorForRiscv,
+            )
+            .unwrap()
+            .flush();
     }
 
     fn token(&self) -> usize {

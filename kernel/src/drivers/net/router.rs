@@ -20,17 +20,17 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::memory::phys_to_virt;
 
-const AXI_STREAM_FIFO_ISR: *mut u32 = phys_to_virt(0x1820_0000) as *mut u32;
-const AXI_STREAM_FIFO_IER: *mut u32 = phys_to_virt(0x1820_0004) as *mut u32;
-const AXI_STREAM_FIFO_TDFR: *mut u32 = phys_to_virt(0x1820_0008) as *mut u32;
-const AXI_STREAM_FIFO_TDFD: *mut u32 = phys_to_virt(0x1820_0010) as *mut u32;
-const AXI_STREAM_FIFO_TLR: *mut u32 = phys_to_virt(0x1820_0014) as *mut u32;
-const AXI_STREAM_FIFO_RDFR: *mut u32 = phys_to_virt(0x1820_0018) as *mut u32;
-const AXI_STREAM_FIFO_RDFO: *mut u32 = phys_to_virt(0x1820_001C) as *mut u32;
-const AXI_STREAM_FIFO_RDFD: *mut u32 = phys_to_virt(0x1820_0020) as *mut u32;
-const AXI_STREAM_FIFO_RLR: *mut u32 = phys_to_virt(0x1820_0024) as *mut u32;
-const AXI_STREAM_FIFO_TDR: *mut u32 = phys_to_virt(0x1820_002C) as *mut u32;
-const AXI_STREAM_FIFO_RDR: *mut u32 = phys_to_virt(0x1820_0030) as *mut u32;
+const AXI_STREAM_FIFO_ISR: *mut u32 = phys_to_virt(0x64A0_0000) as *mut u32;
+const AXI_STREAM_FIFO_IER: *mut u32 = phys_to_virt(0x64A0_0004) as *mut u32;
+const AXI_STREAM_FIFO_TDFR: *mut u32 = phys_to_virt(0x64A0_0008) as *mut u32;
+const AXI_STREAM_FIFO_TDFD: *mut u32 = phys_to_virt(0x64A0_0010) as *mut u32;
+const AXI_STREAM_FIFO_TLR: *mut u32 = phys_to_virt(0x64A0_0014) as *mut u32;
+const AXI_STREAM_FIFO_RDFR: *mut u32 = phys_to_virt(0x64A0_0018) as *mut u32;
+const AXI_STREAM_FIFO_RDFO: *mut u32 = phys_to_virt(0x64A0_001C) as *mut u32;
+const AXI_STREAM_FIFO_RDFD: *mut u32 = phys_to_virt(0x64A0_0020) as *mut u32;
+const AXI_STREAM_FIFO_RLR: *mut u32 = phys_to_virt(0x64A0_0024) as *mut u32;
+const AXI_STREAM_FIFO_TDR: *mut u32 = phys_to_virt(0x64A0_002C) as *mut u32;
+const AXI_STREAM_FIFO_RDR: *mut u32 = phys_to_virt(0x64A0_0030) as *mut u32;
 
 pub struct Router {
     buffer: Vec<Vec<u8>>,
