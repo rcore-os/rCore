@@ -61,9 +61,6 @@ impl Cpu {
         let mut queue = self.ipi_handler_queue.lock();
         queue.push(item);
     }
-    pub fn current() -> &'static mut Cpu {
-        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
-    }
     pub fn handle_ipi(&self) {
         let mut queue = self.ipi_handler_queue.lock();
         let handlers = core::mem::replace(queue.as_mut(), vec![]);

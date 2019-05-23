@@ -417,7 +417,7 @@ dependencies = [
 [[package]]
 name = "rcore-thread"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-thread#77e8e0778154734ee59525e043caab6339e14d75"
+source = "git+https://github.com/rcore-os/rcore-thread#56021ab440fab8c7b819fed6a42649fb8bbaec07"
 dependencies = [
  "deque 0.3.2 (git+https://github.com/rcore-os/deque.git?branch=no_std)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",

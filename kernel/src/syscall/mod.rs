@@ -549,12 +549,7 @@ pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Optio
             return result;
         }
     }
-    loop {
-        if let Some(result) = action() {
-            return result;
-        }
-        Condvar::wait_any(&condvars);
-    }
+    Condvar::wait_events(&condvars, action)
 }
 
 pub fn check_and_clone_cstr(user: *const u8) -> Result<String, SysError> {

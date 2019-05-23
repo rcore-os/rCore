@@ -119,7 +119,7 @@ impl phy::TxToken for RouterTxToken {
     {
         let mut buffer = vec![0; len];
         let res = f(&mut buffer);
-        debug!("out buf {}", len);
+        debug!("out buf {} data {:x?} port {}", len, &buffer[..20], (self.0).1);
 
         unsafe {
             AXI_STREAM_FIFO_TDR.write_volatile(2);
@@ -157,7 +157,7 @@ impl Driver for RouterInterface {
                     for i in 1..rdfo {
                         buffer.push(AXI_STREAM_FIFO_RDFD.read_volatile() as u8);
                     }
-                    debug!("got packet of length {} port {}", rdfo, port);
+                    debug!("got packet of length {} port {} data {:x?}", rdfo, port, &buffer[..20]);
                     driver.buffer[port as usize].push(buffer);
                 }
                 drop(driver);
