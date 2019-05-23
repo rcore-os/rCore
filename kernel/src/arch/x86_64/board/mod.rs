@@ -19,7 +19,7 @@ pub fn probe_fb_info(width : u32, height : u32, depth : u32) -> FramebufferResul
         yoffset: 0,
         depth: 24,
         pitch: 1024, // TOKNOW
-        bus_addr: 0xf000_0000,
+        bus_addr: 0xfd00_0000,
         screen_size: 1024 * 768 * 3,
     };
     Ok((fb_info, fb::ColorConfig::BGRA8888, KERNEL_OFFSET + 0xf000_0000))

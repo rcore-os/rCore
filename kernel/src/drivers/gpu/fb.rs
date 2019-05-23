@@ -172,6 +172,11 @@ impl Framebuffer {
         unsafe { self.buf.base_addr }
     }
 
+    #[inline]
+    pub fn bus_addr(&self) -> usize {
+        self.fb_info.bus_addr as usize
+    }
+
     /// Read pixel at `(x, y)`.
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {

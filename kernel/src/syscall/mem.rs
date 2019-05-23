@@ -58,16 +58,19 @@ impl Syscall<'_> {
             info!("mmap path is {} ", &*file.path);
             match &*file.path {
                 "/dev/fb0" => {
-                    self.vm().push(
-                        addr,
-                        addr + len,
-                        prot.to_attr(),
-                        Linear::new(
-                            ( 0xfd00_0000 - addr ) as isize,
-                        ),
-                        "mmap_file",
-                    );
-                    info!("mmap for /dev/fb0");
+                    use crate::arch::board::fb::FRAME_BUFFER;
+                    if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
+                        self.vm().push(
+                            addr,
+                            addr + len,
+                            prot.to_attr(),
+                            Linear::new(
+                                ( fb.bus_addr() - addr ) as isize,
+                            ),
+                            "mmap_file",
+                        );
+                        info!("mmap for /dev/fb0");
+                    }
                     return Ok(addr);
                 },
                 _ => {
