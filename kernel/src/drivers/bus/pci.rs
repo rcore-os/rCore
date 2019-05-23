@@ -157,8 +157,10 @@ pub fn init_driver(dev: &PCIDevice) {
                 );
             }
         }
-        (0x8086, 0x2922) => {
+        (0x8086, 0x2922) | (0x8086, 0xa282) | (0x8086, 0x8d02) => {
             // 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]
+            // 200 Series PCH SATA controller [AHCI mode]
+            // C610/X99 series chipset 6-Port SATA Controller [AHCI mode]
             if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[5] {
                 let irq = unsafe { enable(dev.loc) };
                 assert!(len as usize <= PAGE_SIZE);

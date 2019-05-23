@@ -73,13 +73,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitvec"
-version = "0.11.0"
-source = "git+https://github.com/myrrlyn/bitvec.git#8ab20a3e33fe068fc3a4a05eda1211d5fcc1237b"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bootloader"
 version = "0.4.0"
-source = "git+https://github.com/rcore-os/bootloader?branch=linear#cc33d7d2d2d33f5adcbd0f596964ba99127b51af"
+source = "git+https://github.com/rcore-os/bootloader?branch=linear#a535573bf83d5b916b5424a6b64e85e9197db40b"
 dependencies = [
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -359,7 +359,7 @@ dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
- "bitvec 0.11.0 (git+https://github.com/myrrlyn/bitvec.git)",
+ "bitvec 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bootloader 0.4.0 (git+https://github.com/rcore-os/bootloader?branch=linear)",
  "buddy_system_allocator 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -667,7 +667,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)" = "<none>"
-"checksum bitvec 0.11.0 (git+https://github.com/myrrlyn/bitvec.git)" = "<none>"
+"checksum bitvec 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c28d4291b516ccfbb897d45de3c468c135e6af7c4f1f1aacfaae0a5bc2e6ea2c"
 "checksum bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cfadef5c4e2c2e64067b9ecc061179f12ac7ec65ba613b1f60f3972bbada1f5b"
 "checksum bootloader 0.4.0 (git+https://github.com/rcore-os/bootloader?branch=linear)" = "<none>"
 "checksum buddy_system_allocator 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "59da15ef556589ee78370281d75b67f2d69ed26465ec0e0f3961e2021502426f"

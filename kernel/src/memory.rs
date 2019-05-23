@@ -30,9 +30,9 @@ use rcore_memory::*;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
-// x86_64 support up to 64G memory
+// x86_64 support up to 1T memory
 #[cfg(target_arch = "x86_64")]
-pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
+pub type FrameAlloc = bitmap_allocator::BitAlloc256M;
 
 // RISCV, ARM, MIPS has 1G memory
 #[cfg(all(
