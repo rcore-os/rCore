@@ -16,7 +16,7 @@ pub mod rand;
 pub mod syscall;
 pub mod timer;
 
-static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
+static AP_CAN_INIT: AtomicBool = ATOMIC_BOOL_INIT;
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
