@@ -6,7 +6,7 @@ use spin::Mutex;
 use volatile::Volatile;
 use x86_64::instructions::port::Port;
 
-use crate::consts::KERNEL_OFFSET;
+use crate::memory::phys_to_virt;
 use crate::util::color::ConsoleColor;
 use crate::util::escape_parser::{EscapeParser, CSI};
 
@@ -99,10 +99,9 @@ impl VgaBuffer {
 }
 
 lazy_static! {
-    pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(
-        // VGA virtual address is specified at bootloader
-        VgaWriter::new(unsafe{ &mut *((KERNEL_OFFSET + 0xf0000000) as *mut VgaBuffer) })
-    );
+    pub static ref VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter::new(unsafe {
+        &mut *((phys_to_virt(0xb8000)) as *mut VgaBuffer)
+    }));
 }
 
 pub struct VgaWriter {

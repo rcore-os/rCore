@@ -45,12 +45,24 @@ impl Pipe {
         )
     }
 
-    pub fn can_read(&self) -> bool {
+    fn can_read(&self) -> bool {
         if let PipeEnd::Read = self.direction {
-            self.data.lock().buf.len() > 0
+            self.data.lock().buf.len() > 0 || self.is_broken()
         } else {
             false
         }
+    }
+
+    fn can_write(&self) -> bool {
+        if let PipeEnd::Write = self.direction {
+            !self.is_broken()
+        } else {
+            false
+        }
+    }
+
+    fn is_broken(&self) -> bool {
+        Arc::strong_count(&self.data) < 2
     }
 }
 
@@ -105,39 +117,11 @@ impl INode for Pipe {
     }
 
     fn poll(&self) -> Result<PollStatus> {
-        let data = self.data.lock();
-        match self.direction {
-            PipeEnd::Read => {
-                if data.buf.len() > 0 {
-                    Ok(PollStatus {
-                        read: true,
-                        write: false,
-                        error: false,
-                    })
-                } else {
-                    Ok(PollStatus {
-                        read: false,
-                        write: false,
-                        error: false,
-                    })
-                }
-            }
-            PipeEnd::Write => {
-                if data.buf.len() > 0 {
-                    Ok(PollStatus {
-                        read: false,
-                        write: true,
-                        error: false,
-                    })
-                } else {
-                    Ok(PollStatus {
-                        read: false,
-                        write: false,
-                        error: false,
-                    })
-                }
-            }
-        }
+        Ok(PollStatus {
+            read: self.can_read(),
+            write: self.can_write(),
+            error: false,
+        })
     }
     impl_inode!();
 }

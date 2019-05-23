@@ -1,3 +1,4 @@
+use crate::memory::phys_to_virt;
 use apic::{LocalApic, XApic};
 use raw_cpuid::CpuId;
 use x86_64::registers::control::{Cr0, Cr0Flags};
@@ -21,12 +22,12 @@ pub fn id() -> usize {
 }
 
 pub fn send_ipi(cpu_id: usize) {
-    let mut lapic = unsafe { XApic::new(0xffffff00_fee00000) };
+    let mut lapic = unsafe { XApic::new(phys_to_virt(0xfee00000)) };
     lapic.send_ipi(cpu_id as u8, 0x30); // TODO: Find a IPI trap num
 }
 
 pub fn init() {
-    let mut lapic = unsafe { XApic::new(0xffffff00_fee00000) };
+    let mut lapic = unsafe { XApic::new(phys_to_virt(0xfee00000)) };
     lapic.cpu_init();
 
     // enable FPU, the manual Volume 3 Chapter 13

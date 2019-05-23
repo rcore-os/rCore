@@ -147,6 +147,17 @@ fn page_fault(tf: &mut TrapFrame) {
     if crate::memory::handle_page_fault(addr) {
         return;
     }
+
+    extern "C" {
+        fn _copy_user_start();
+        fn _copy_user_end();
+    }
+    if tf.rip >= _copy_user_start as usize && tf.rip < _copy_user_end as usize {
+        debug!("fixup for addr {:x?}", addr);
+        tf.rip = crate::memory::read_user_fixup as usize;
+        return;
+    }
+
     error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:?}", addr, code);
     error(tf);
 }

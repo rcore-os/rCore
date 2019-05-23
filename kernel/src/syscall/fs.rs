@@ -141,6 +141,9 @@ impl Syscall<'_> {
                 return Ok(0);
             }
 
+            // NOTE: To run rustc, uncomment yield_now and comment Condvar.
+            //       Waking up from pipe is unimplemented now.
+            // thread::yield_now();
             Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
         }
     }
@@ -269,7 +272,7 @@ impl Syscall<'_> {
         mode: usize,
     ) -> SysResult {
         let mut proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         let flags = OpenFlags::from_bits_truncate(flags);
         info!(
             "openat: dir_fd: {}, path: {:?}, flags: {:?}, mode: {:#o}",
@@ -333,7 +336,7 @@ impl Syscall<'_> {
     ) -> SysResult {
         // TODO: check permissions based on uid/gid
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         let flags = AtFlags::from_bits_truncate(flags);
         if !proc.pid.is_init() {
             // we trust pid 0 process
@@ -383,7 +386,7 @@ impl Syscall<'_> {
         flags: usize,
     ) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         let stat_ref = unsafe { self.vm().check_write_ptr(stat_ptr)? };
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
@@ -414,7 +417,7 @@ impl Syscall<'_> {
         len: usize,
     ) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         info!(
             "readlinkat: dirfd: {}, path: {:?}, base: {:?}, len: {}",
@@ -460,7 +463,7 @@ impl Syscall<'_> {
 
     pub fn sys_truncate(&mut self, path: *const u8, len: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         info!("truncate: path: {:?}, len: {}", path, len);
         proc.lookup_inode(&path)?.resize(len)?;
         Ok(0)
@@ -524,7 +527,7 @@ impl Syscall<'_> {
         arg3: usize,
     ) -> SysResult {
         info!(
-            "ioctl: fd: {}, request: {:x}, args: {} {} {}",
+            "ioctl: fd: {}, request: {:#x}, args: {:#x} {:#x} {:#x}",
             fd, request, arg1, arg2, arg3
         );
         let mut proc = self.process();
@@ -534,7 +537,7 @@ impl Syscall<'_> {
 
     pub fn sys_chdir(&mut self, path: *const u8) -> SysResult {
         let mut proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         if !proc.pid.is_init() {
             // we trust pid 0 process
             info!("chdir: path: {:?}", path);
@@ -587,8 +590,8 @@ impl Syscall<'_> {
         newpath: *const u8,
     ) -> SysResult {
         let proc = self.process();
-        let oldpath = unsafe { self.vm().check_and_clone_cstr(oldpath)? };
-        let newpath = unsafe { self.vm().check_and_clone_cstr(newpath)? };
+        let oldpath = unsafe { check_and_clone_cstr(oldpath)? };
+        let newpath = unsafe { check_and_clone_cstr(newpath)? };
         info!(
             "renameat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}",
             olddirfd as isize, oldpath, newdirfd as isize, newpath
@@ -608,7 +611,7 @@ impl Syscall<'_> {
 
     pub fn sys_mkdirat(&mut self, dirfd: usize, path: *const u8, mode: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         // TODO: check pathname
         info!(
             "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
@@ -626,7 +629,7 @@ impl Syscall<'_> {
 
     pub fn sys_rmdir(&mut self, path: *const u8) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         info!("rmdir: path: {:?}", path);
 
         let (dir_path, file_name) = split_path(&path);
@@ -652,8 +655,8 @@ impl Syscall<'_> {
         flags: usize,
     ) -> SysResult {
         let proc = self.process();
-        let oldpath = unsafe { self.vm().check_and_clone_cstr(oldpath)? };
-        let newpath = unsafe { self.vm().check_and_clone_cstr(newpath)? };
+        let oldpath = unsafe { check_and_clone_cstr(oldpath)? };
+        let newpath = unsafe { check_and_clone_cstr(newpath)? };
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
@@ -673,7 +676,7 @@ impl Syscall<'_> {
 
     pub fn sys_unlinkat(&mut self, dirfd: usize, path: *const u8, flags: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
+        let path = unsafe { check_and_clone_cstr(path)? };
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
@@ -1433,6 +1436,7 @@ impl IoVecs {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct PollFd {
     fd: u32,
     events: PollEvents,
