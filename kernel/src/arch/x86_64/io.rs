@@ -1,5 +1,4 @@
 use super::driver::serial::*;
-use super::driver::vga::VGA_WRITER;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {
@@ -19,6 +18,7 @@ pub fn putfmt(fmt: Arguments) {
     }
     #[cfg(not(feature = "nographic"))]
     {
+        use super::driver::vga::VGA_WRITER;
         unsafe {
             VGA_WRITER.force_unlock();
         }

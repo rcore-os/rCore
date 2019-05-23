@@ -1,7 +1,5 @@
 use rcore_memory::memory_set::handler::{Delay, File};
 use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::paging::PageTable;
-use rcore_memory::Page;
 use rcore_memory::PAGE_SIZE;
 
 use crate::memory::GlobalFrameAlloc;

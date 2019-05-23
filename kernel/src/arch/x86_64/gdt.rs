@@ -1,5 +1,4 @@
 use super::ipi::IPIEventItem;
-use alloc::boxed::Box;
 use alloc::vec::*;
 use core::sync::atomic::{AtomicBool, Ordering};
 use x86_64::registers::model_specific::Msr;
@@ -8,7 +7,7 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::{PrivilegeLevel, VirtAddr};
 
 use crate::consts::MAX_CPU_NUM;
-use crate::sync::{Semaphore, SpinLock as Mutex};
+use crate::sync::SpinLock as Mutex;
 
 /// Init TSS & GDT.
 pub fn init() {
@@ -79,7 +78,7 @@ impl Cpu {
         self.preemption_disabled.load(Ordering::Relaxed)
     }
     unsafe fn init(&'static mut self) {
-        use x86_64::instructions::segmentation::{load_fs, set_cs};
+        use x86_64::instructions::segmentation::set_cs;
         use x86_64::instructions::tables::load_tss;
 
         // Set the stack when DoubleFault occurs

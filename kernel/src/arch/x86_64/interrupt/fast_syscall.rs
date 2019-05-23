@@ -1,5 +1,4 @@
 use super::super::gdt;
-use super::TrapFrame;
 use core::mem::transmute;
 /// `syscall` instruction
 use x86_64::registers::model_specific::*;

@@ -16,13 +16,13 @@ use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
 
-use self::custom::*;
-use self::fs::*;
-use self::mem::*;
-use self::misc::*;
+pub use self::custom::*;
+pub use self::fs::*;
+pub use self::mem::*;
+pub use self::misc::*;
 pub use self::net::*;
-use self::proc::*;
-use self::time::*;
+pub use self::proc::*;
+pub use self::time::*;
 
 mod custom;
 mod fs;
@@ -32,7 +32,9 @@ mod net;
 mod proc;
 mod time;
 
+#[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
+#[cfg(feature = "profile")]
 use spin::Mutex;
 
 #[cfg(feature = "profile")]

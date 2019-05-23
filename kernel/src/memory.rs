@@ -14,10 +14,9 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
+use crate::consts::{MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
-use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock};
-use alloc::boxed::Box;
+use crate::sync::SpinNoIrqLock;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
@@ -132,13 +131,13 @@ pub fn handle_page_fault(addr: usize) -> bool {
 
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
-    const machine_align: usize = mem::size_of::<usize>();
-    const heap_block: usize = KERNEL_HEAP_SIZE / machine_align;
-    static mut HEAP: [usize; heap_block] = [0; heap_block];
+    const MACHINE_ALIGN: usize = mem::size_of::<usize>();
+    const HEAP_BLOCK: usize = KERNEL_HEAP_SIZE / MACHINE_ALIGN;
+    static mut HEAP: [usize; HEAP_BLOCK] = [0; HEAP_BLOCK];
     unsafe {
         HEAP_ALLOCATOR
             .lock()
-            .init(HEAP.as_ptr() as usize, heap_block * machine_align);
+            .init(HEAP.as_ptr() as usize, HEAP_BLOCK * MACHINE_ALIGN);
     }
     info!("heap init end");
 }

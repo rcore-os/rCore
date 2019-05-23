@@ -5,12 +5,12 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use bitflags::*;
 use smoltcp::iface::*;
 use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::time::Instant;
 use smoltcp::wire::*;
 use smoltcp::Result;
-use bitflags::*;
 
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
@@ -119,7 +119,12 @@ impl phy::TxToken for RouterTxToken {
     {
         let mut buffer = vec![0; len];
         let res = f(&mut buffer);
-        debug!("out buf {} data {:x?} port {}", len, &buffer[..20], (self.0).1);
+        debug!(
+            "out buf {} data {:x?} port {}",
+            len,
+            &buffer[..20],
+            (self.0).1
+        );
 
         unsafe {
             AXI_STREAM_FIFO_TDR.write_volatile(2);
@@ -145,7 +150,10 @@ impl Driver for RouterInterface {
         let isr = unsafe { AXI_STREAM_FIFO_ISR.read_volatile() };
 
         if isr > 0 {
-            debug!("handle router interrupt {:?}", AXIStreamFifoInterrupt::from_bits_truncate(isr));
+            debug!(
+                "handle router interrupt {:?}",
+                AXIStreamFifoInterrupt::from_bits_truncate(isr)
+            );
             unsafe {
                 AXI_STREAM_FIFO_ISR.write(isr);
                 let rdfo = AXI_STREAM_FIFO_RDFO.read_volatile();
@@ -157,7 +165,12 @@ impl Driver for RouterInterface {
                     for i in 1..rdfo {
                         buffer.push(AXI_STREAM_FIFO_RDFD.read_volatile() as u8);
                     }
-                    debug!("got packet of length {} port {} data {:x?}", rdfo, port, &buffer[..20]);
+                    debug!(
+                        "got packet of length {} port {} data {:x?}",
+                        rdfo,
+                        port,
+                        &buffer[..20]
+                    );
                     driver.buffer[port as usize].push(buffer);
                 }
                 drop(driver);
@@ -214,11 +227,14 @@ pub fn router_init() {
     for i in 0..ENABLED_PORTS {
         let ethernet_addr = EthernetAddress::from_bytes(&[2, 2, 3, 3, 0, i]);
 
-        let net_driver = RouterDriver(Arc::new(Mutex::new(Router { buffer: [Vec::new(), Vec::new()] })), i);
+        let net_driver = RouterDriver(
+            Arc::new(Mutex::new(Router {
+                buffer: [Vec::new(), Vec::new()],
+            })),
+            i,
+        );
 
-        let ip_addrs = [
-            IpCidr::new(IpAddress::v4(10, 0, i, 1), 24),
-        ];
+        let ip_addrs = [IpCidr::new(IpAddress::v4(10, 0, i, 1), 24)];
         let neighbor_cache = NeighborCache::new(BTreeMap::new());
         let routes = Routes::new(BTreeMap::new());
         let iface = EthernetInterfaceBuilder::new(net_driver.clone())

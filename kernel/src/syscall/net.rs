@@ -6,7 +6,7 @@ use crate::fs::FileLike;
 use crate::memory::MemorySet;
 use crate::net::{
     Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
-    RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
+    RawSocketState, Socket, TcpSocketState, UdpSocketState,
 };
 use alloc::boxed::Box;
 use core::cmp::min;
@@ -462,13 +462,13 @@ impl SockAddr {
             return Ok(0);
         }
 
-        let addr_len = unsafe { vm.check_write_ptr(addr_len)? };
+        let addr_len = vm.check_write_ptr(addr_len)?;
         let max_addr_len = *addr_len as usize;
         let full_len = self.len()?;
 
         let written_len = min(max_addr_len, full_len);
         if written_len > 0 {
-            let target = unsafe { vm.check_write_array(addr as *mut u8, written_len)? };
+            let target = vm.check_write_array(addr as *mut u8, written_len)?;
             let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
             target.copy_from_slice(source);
         }

@@ -1,5 +1,4 @@
 use super::*;
-use crate::arch::cpu;
 use crate::process::processor;
 use crate::thread;
 use alloc::collections::VecDeque;
@@ -105,7 +104,7 @@ impl Condvar {
         let mut count = 0;
         let queue = self.wait_queue.lock();
         for t in queue.iter() {
-            if (count >= n) {
+            if count >= n {
                 break;
             }
             t.unpark();
