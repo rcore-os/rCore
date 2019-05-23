@@ -19,6 +19,7 @@ pub struct OpenOptions {
     pub write: bool,
     /// Before each write, the file offset is positioned at the end of the file.
     pub append: bool,
+    pub nonblock: bool,
 }
 
 #[derive(Debug)]
@@ -48,7 +49,17 @@ impl FileHandle {
         if !self.options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        let len = self.inode.read_at(offset, buf)?;
+        let mut len : usize = 0;
+        if !self.options.nonblock {   // block
+            loop {
+                len = self.inode.read_at(offset, buf)?;
+                if len > 0 {
+                    break;
+                }
+            }
+        }else{
+            len = self.inode.read_at(offset, buf)?;
+        }
         Ok(len)
     }
 
@@ -122,6 +133,13 @@ impl FileHandle {
 
     pub fn inode(&self) -> Arc<INode> {
         self.inode.clone()
+    }
+
+    pub fn fcntl(&mut self, cmd: usize, arg: usize) -> Result<()> {
+        if arg == 2048 && cmd == 4 {
+            self.options.nonblock = true;
+        }
+        Ok(())
     }
 }
 

@@ -56,6 +56,16 @@ impl FileLike {
         };
         Ok(status)
     }
+
+    pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {
+        match self {
+            FileLike::File(file) => file.fcntl(cmd, arg)?,
+            FileLike::Socket(socket) => {
+                //TODO
+            }
+        }
+        Ok(0)
+    }
 }
 
 impl fmt::Debug for FileLike {
