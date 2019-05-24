@@ -25,6 +25,7 @@ board_k210 = ["link_user"]
 board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
+consolegraphic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 # for qemu machine
@@ -68,7 +69,7 @@ rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = { git = "https://github.com/rcore-os/bootloader", branch = "linear" }
+bootloader = { git = "https://github.com/rcore-os/bootloader", branch = "vga" }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.6"
 raw-cpuid = "6.0"

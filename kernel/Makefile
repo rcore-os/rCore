@@ -21,7 +21,7 @@
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = <sfsimg>            SFS image path of user programs
 #   smp     = 1 | 2 | ...        SMP core number
-#   graphic = on | off           Enable/disable qemu graphical output
+#   graphic = on | off | console Enable/disable qemu graphical output, or print console to graphic output
 #   board   = none               Running on QEMU
 #         | pc                   Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
@@ -202,8 +202,12 @@ qemu_opts += -nographic
 endif
 
 ### build args ###
-ifneq ($(graphic), on)
+ifeq ($(graphic), off)
 features += nographic
+endif
+
+ifeq ($(graphic), console)
+features += consolegraphic
 endif
 
 ifneq ($(init), )

@@ -50,6 +50,7 @@ impl FileHandle {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let mut len: usize = 0;
+        /*
         if !self.options.nonblock {
             // block
             loop {
@@ -61,6 +62,9 @@ impl FileHandle {
         } else {
             len = self.inode.read_at(offset, buf)?;
         }
+        */
+        // TODO: handle block/nonblock correctly
+        len = self.inode.read_at(offset, buf)?;
         Ok(len)
     }
 
