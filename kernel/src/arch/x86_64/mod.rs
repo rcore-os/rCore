@@ -2,6 +2,7 @@ use bootloader::bootinfo::{BootInfo, MemoryRegionType};
 use core::sync::atomic::*;
 use log::*;
 
+pub mod board;
 pub mod consts;
 pub mod cpu;
 pub mod driver;
@@ -15,8 +16,6 @@ pub mod paging;
 pub mod rand;
 pub mod syscall;
 pub mod timer;
-pub mod ipi;
-pub mod board;
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 

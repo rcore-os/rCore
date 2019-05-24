@@ -98,6 +98,7 @@ export DTB = $(dtb)
 qemu_opts := \
 	-smp cores=$(smp)
 qemu_net_opts :=
+qemu_ui_opts := 
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -120,6 +121,8 @@ qemu_opts += \
 	-machine accel=kvm
 qemu_net_opts += \
 	-device vfio-pci,host=$(pci_passthru)
+qemu_ui_opts += \
+	-vga std
 endif
 ifeq ($(extra_nic), on)
 qemu_net_opts += \
@@ -138,6 +141,9 @@ qemu_opts += \
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
+qemu_ui_opts += \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 
 else ifeq ($(arch), riscv64)
 ifeq ($(board), u540)
@@ -158,6 +164,9 @@ endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
+qemu_ui_opts += \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 
 else ifeq ($(arch), aarch64)
 qemu_opts += \
@@ -271,9 +280,7 @@ justrunnet: build
 	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
 
 justrunui: build
-	@qemu-system-$(arch) $(qemu_opts) \
-		-device virtio-gpu-device \
-		-device virtio-mouse-device
+	@qemu-system-$(arch) $(qemu_opts) $(qemu_ui_opts)
 
 justruntest: build
 	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null

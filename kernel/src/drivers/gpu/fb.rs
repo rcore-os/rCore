@@ -153,7 +153,7 @@ impl Framebuffer {
                     8 => ColorDepth8,
                     16 => ColorDepth16,
                     32 => ColorDepth32,
-                    24=> ColorDepth24,
+                    24 => ColorDepth24,
                     _ => Err(format!("unsupported color depth {}", info.depth))?,
                 };
                 Ok(Framebuffer {

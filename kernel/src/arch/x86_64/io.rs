@@ -1,6 +1,6 @@
+use super::driver::console::CONSOLE;
 use super::driver::serial::*;
 use core::fmt::{Arguments, Write};
-use super::driver::console::CONSOLE;
 
 pub fn getchar() -> char {
     unsafe {
@@ -26,7 +26,7 @@ pub fn putfmt(fmt: Arguments) {
         COM1.lock().write_fmt(fmt).unwrap();
         //unsafe { CONSOLE.force_unlock() }
         //if let Some(console) = CONSOLE.lock().as_mut() {
-            //console.write_fmt(fmt).unwrap();
+        //console.write_fmt(fmt).unwrap();
         //}
     }
 }

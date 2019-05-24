@@ -1,15 +1,16 @@
 #[path = "../../../drivers/gpu/fb.rs"]
 pub mod fb;
 
-use fb::{ColorConfig, FramebufferInfo, FramebufferResult, FRAME_BUFFER};
 use crate::consts::KERNEL_OFFSET;
+use crate::memory::phys_to_virt;
+use fb::{ColorConfig, FramebufferInfo, FramebufferResult, FRAME_BUFFER};
 
 pub fn init_driver() {
     #[cfg(not(feature = "nographic"))]
     fb::init();
 }
 
-pub fn probe_fb_info(width : u32, height : u32, depth : u32) -> FramebufferResult {
+pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
     let fb_info = FramebufferInfo {
         xres: 1024,
         yres: 768,
@@ -22,5 +23,9 @@ pub fn probe_fb_info(width : u32, height : u32, depth : u32) -> FramebufferResul
         bus_addr: 0xfd00_0000,
         screen_size: 1024 * 768 * 3,
     };
-    Ok((fb_info, fb::ColorConfig::BGRA8888, KERNEL_OFFSET + 0xf000_0000))
+    Ok((
+        fb_info,
+        fb::ColorConfig::BGRA8888,
+        phys_to_virt(0xfd00_0000),
+    ))
 }

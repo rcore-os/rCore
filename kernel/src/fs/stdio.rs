@@ -94,7 +94,7 @@ impl INode for Stdin {
         if self.can_read() {
             buf[0] = self.pop() as u8;
             Ok(1)
-        }else{
+        } else {
             Ok(0)
         }
     }

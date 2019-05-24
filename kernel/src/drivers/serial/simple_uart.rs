@@ -64,11 +64,11 @@ impl Write for SerialPort {
                     self.putchar(8);
                     self.putchar(b' ');
                     self.putchar(8);
-                },
+                }
                 b'\n' => {
                     self.putchar(b'\r');
                     self.putchar(b'\n');
-                },
+                }
                 c => {
                     self.putchar(c);
                 }
