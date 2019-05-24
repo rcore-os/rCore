@@ -64,6 +64,7 @@ impl INode for Vga {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
