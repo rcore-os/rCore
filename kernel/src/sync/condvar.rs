@@ -33,10 +33,12 @@ impl Condvar {
         return lock;
     }
 
+    /// Wait for condvar until condition() returns Some
     pub fn wait_event<T>(condvar: &Condvar, mut condition: impl FnMut() -> Option<T>) -> T {
         Self::wait_events(&[condvar], condition)
     }
 
+    /// Wait for condvars until condition() returns Some
     pub fn wait_events<T>(condvars: &[&Condvar], mut condition: impl FnMut() -> Option<T>) -> T {
         let thread = thread::current();
         let tid = thread.id();
