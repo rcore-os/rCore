@@ -174,9 +174,11 @@ pub fn init_driver(dev: &PCIDevice) {
                 let irq = unsafe { enable(dev.loc) };
                 assert!(len as usize <= PAGE_SIZE);
                 let vaddr = phys_to_virt(addr as usize);
-                PCI_DRIVERS
-                    .lock()
-                    .insert(dev.loc, ahci::init(irq, vaddr, len as usize));
+                if let Some(driver) = ahci::init(irq, vaddr, len as usize) {
+                    PCI_DRIVERS
+                        .lock()
+                        .insert(dev.loc, driver);
+                }
             }
         }
         _ => {}

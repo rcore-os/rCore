@@ -43,10 +43,13 @@ impl Driver for AHCIDriver {
     }
 }
 
-pub fn init(_irq: Option<u32>, header: usize, size: usize) -> Arc<AHCIDriver> {
-    let ahci = AHCI::new(header, size);
-    let driver = Arc::new(AHCIDriver(Mutex::new(ahci)));
-    DRIVERS.write().push(driver.clone());
-    BLK_DRIVERS.write().push(driver.clone());
-    driver
+pub fn init(_irq: Option<u32>, header: usize, size: usize) -> Option<Arc<AHCIDriver>> {
+    if let Some(ahci) = AHCI::new(header, size) {
+        let driver = Arc::new(AHCIDriver(Mutex::new(ahci)));
+        DRIVERS.write().push(driver.clone());
+        BLK_DRIVERS.write().push(driver.clone());
+        Some(driver)
+    } else {
+        None
+    }
 }
