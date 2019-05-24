@@ -2,6 +2,7 @@
 
 use alloc::{string::String, sync::Arc};
 use core::fmt;
+use crate::thread;
 
 use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 
@@ -58,7 +59,9 @@ impl FileHandle {
                         len = read_len;
                         break;
                     }
-                    Err(FsError::Again) => {}
+                    Err(FsError::Again) => {
+                        thread::yield_now();
+                    }
                     Err(err) => {
                         return Err(err);
                     }
