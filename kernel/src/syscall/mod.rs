@@ -289,7 +289,8 @@ impl Syscall<'_> {
             ),
             SYS_GETRANDOM => {
                 self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
-            }
+            },
+            SYS_RT_SIGQUEUEINFO => self.unimplemented("rt_sigqueueinfo", Ok(0)),
 
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),

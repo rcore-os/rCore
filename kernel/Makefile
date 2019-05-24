@@ -346,8 +346,9 @@ else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
-	    $(hostcc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
+	    $(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
+	$(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/linker.ld.S -o src/arch/$(arch)/boot/linker.ld
 	@cargo xbuild $(build_args)
 endif
 
