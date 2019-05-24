@@ -212,7 +212,7 @@ impl PageTableImpl {
         PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
-            entry: core::mem::uninitialized(),
+            entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
         }
     }
 }
@@ -227,7 +227,7 @@ impl PageTableExt for PageTableImpl {
             PageTableImpl {
                 page_table: MappedPageTable::new(table, frame_to_page_table),
                 root_frame: frame,
-                entry: core::mem::uninitialized(),
+                entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
             }
         }
     }

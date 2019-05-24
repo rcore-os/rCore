@@ -21,7 +21,7 @@ pub trait PageExt {
 impl PageExt for Page {
     fn of_addr(address: usize) -> Self {
         use x86_64;
-        Page::containing_address(x86_64::VirtAddr::new(address as u64))
+        Page::containing_address(VirtAddr::new(address as u64))
     }
     fn range_of(begin: usize, end: usize) -> PageRange {
         Page::range(Page::of_addr(begin), Page::of_addr(end - 1) + 1)
@@ -101,7 +101,7 @@ fn frame_to_page_table(frame: Frame) -> *mut x86PageTable {
 
 impl Entry for PageEntry {
     fn update(&mut self) {
-        use x86_64::{instructions::tlb::flush, VirtAddr};
+        use x86_64::instructions::tlb::flush;
         let addr = self.1.start_address();
         flush(addr);
         flush_tlb_all(addr.as_u64() as usize);
@@ -199,10 +199,10 @@ impl PageTableImpl {
     /// WARN: You MUST call `core::mem::forget` for it after use!
     pub unsafe fn active() -> Self {
         let frame = Cr3::read().0;
-        let table = unsafe { &mut *frame_to_page_table(frame) };
+        let table = &mut *frame_to_page_table(frame);
         PageTableImpl(
             MappedPageTable::new(table, frame_to_page_table),
-            core::mem::uninitialized(),
+            core::mem::MaybeUninit::uninitialized().into_initialized(),
             frame,
         )
     }
@@ -217,7 +217,7 @@ impl PageTableExt for PageTableImpl {
         unsafe {
             PageTableImpl(
                 MappedPageTable::new(table, frame_to_page_table),
-                core::mem::uninitialized(),
+                core::mem::MaybeUninit::uninitialized().into_initialized(),
                 frame,
             )
         }

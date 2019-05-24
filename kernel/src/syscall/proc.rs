@@ -1,7 +1,6 @@
 //! Syscalls for process
 
 use super::*;
-use crate::fs::INodeExt;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -153,9 +152,9 @@ impl Syscall<'_> {
             path, argv, envp
         );
         let mut proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
-        let args = unsafe { check_and_clone_cstr_array(argv)? };
-        let envs = unsafe { check_and_clone_cstr_array(envp)? };
+        let path = check_and_clone_cstr(path)?;
+        let args = check_and_clone_cstr_array(argv)?;
+        let envs = check_and_clone_cstr_array(envp)?;
 
         if args.is_empty() {
             error!("exec: args is null");

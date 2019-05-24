@@ -1,12 +1,12 @@
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
-mod board;
+pub mod board;
 #[cfg(feature = "board_rocket_chip")]
 #[path = "board/rocket_chip/mod.rs"]
-mod board;
+pub mod board;
 #[cfg(not(any(feature = "board_u540", feature = "board_rocket_chip")))]
 #[path = "board/virt/mod.rs"]
-mod board;
+pub mod board;
 
 pub mod compiler_rt;
 pub mod consts;

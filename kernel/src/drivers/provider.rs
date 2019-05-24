@@ -1,10 +1,6 @@
-use alloc::alloc::{alloc_zeroed, dealloc, Layout};
-
 pub use crate::arch::paging::PageTableImpl;
-use crate::consts::PHYSICAL_MEMORY_OFFSET;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt, virt_to_phys};
 use isomorphic_drivers::provider;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 
 pub struct Provider;

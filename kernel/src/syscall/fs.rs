@@ -105,14 +105,17 @@ impl Syscall<'_> {
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-        loop {
+        Condvar::wait_events(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)], move || {
             use PollEvents as PE;
             let proc = self.process();
             let mut events = 0;
             for poll in polls.iter_mut() {
                 poll.revents = PE::empty();
                 if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
-                    let status = file_like.poll()?;
+                    let status = match file_like.poll() {
+                        Ok(ret) => ret,
+                        Err(err) => return Some(Err(err)),
+                    };
                     if status.error {
                         poll.revents |= PE::HUP;
                         events += 1;
@@ -133,19 +136,15 @@ impl Syscall<'_> {
             drop(proc);
 
             if events > 0 {
-                return Ok(events);
+                return Some(Ok(events));
             }
 
             let current_time_ms = crate::trap::uptime_msec();
             if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
-                return Ok(0);
+                return Some(Ok(0));
             }
-
-            // NOTE: To run rustc, uncomment yield_now and comment Condvar.
-            //       Waking up from pipe is unimplemented now.
-            // thread::yield_now();
-            Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
-        }
+            return None;
+        })
     }
 
     pub fn sys_select(
@@ -180,7 +179,7 @@ impl Syscall<'_> {
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-        loop {
+        Condvar::wait_events(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)], move || {
             let proc = self.process();
             let mut events = 0;
             for (&fd, file_like) in proc.files.iter() {
@@ -190,7 +189,10 @@ impl Syscall<'_> {
                 if !err_fds.contains(fd) && !read_fds.contains(fd) && !write_fds.contains(fd) {
                     continue;
                 }
-                let status = file_like.poll()?;
+                let status = match file_like.poll() {
+                    Ok(ret) => ret,
+                    Err(err) => return Some(Err(err)),
+                };
                 if status.error && err_fds.contains(fd) {
                     err_fds.set(fd);
                     events += 1;
@@ -207,23 +209,23 @@ impl Syscall<'_> {
             drop(proc);
 
             if events > 0 {
-                return Ok(events);
+                return Some(Ok(events));
             }
 
             if timeout_msecs == 0 {
                 // no timeout, return now;
-                return Ok(0);
+                return Some(Ok(0));
             }
 
             let current_time_ms = crate::trap::uptime_msec();
             // infinity check
             if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs as usize
             {
-                return Ok(0);
+                return Some(Ok(0));
             }
 
-            Condvar::wait_any(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)]);
-        }
+            return None;
+        })
     }
 
     pub fn sys_readv(&mut self, fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
@@ -386,7 +388,7 @@ impl Syscall<'_> {
         flags: usize,
     ) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         let stat_ref = unsafe { self.vm().check_write_ptr(stat_ptr)? };
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
@@ -537,7 +539,7 @@ impl Syscall<'_> {
 
     pub fn sys_chdir(&mut self, path: *const u8) -> SysResult {
         let mut proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         if !proc.pid.is_init() {
             // we trust pid 0 process
             info!("chdir: path: {:?}", path);
@@ -590,8 +592,8 @@ impl Syscall<'_> {
         newpath: *const u8,
     ) -> SysResult {
         let proc = self.process();
-        let oldpath = unsafe { check_and_clone_cstr(oldpath)? };
-        let newpath = unsafe { check_and_clone_cstr(newpath)? };
+        let oldpath = check_and_clone_cstr(oldpath)?;
+        let newpath = check_and_clone_cstr(newpath)?;
         info!(
             "renameat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}",
             olddirfd as isize, oldpath, newdirfd as isize, newpath
@@ -611,7 +613,7 @@ impl Syscall<'_> {
 
     pub fn sys_mkdirat(&mut self, dirfd: usize, path: *const u8, mode: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         // TODO: check pathname
         info!(
             "mkdirat: dirfd: {}, path: {:?}, mode: {:#o}",
@@ -629,7 +631,7 @@ impl Syscall<'_> {
 
     pub fn sys_rmdir(&mut self, path: *const u8) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         info!("rmdir: path: {:?}", path);
 
         let (dir_path, file_name) = split_path(&path);
@@ -655,8 +657,8 @@ impl Syscall<'_> {
         flags: usize,
     ) -> SysResult {
         let proc = self.process();
-        let oldpath = unsafe { check_and_clone_cstr(oldpath)? };
-        let newpath = unsafe { check_and_clone_cstr(newpath)? };
+        let oldpath = check_and_clone_cstr(oldpath)?;
+        let newpath = check_and_clone_cstr(newpath)?;
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "linkat: olddirfd: {}, oldpath: {:?}, newdirfd: {}, newpath: {:?}, flags: {:?}",
@@ -834,11 +836,8 @@ impl Syscall<'_> {
         return Ok(total_written);
     }
 
-    pub fn sys_fcntl(&mut self, fd : usize, cmd : usize, arg : usize) -> SysResult{
-        info!(
-            "fcntl: fd: {}, cmd: {:x}, arg: {}",
-            fd, cmd, arg
-        );
+    pub fn sys_fcntl(&mut self, fd: usize, cmd: usize, arg: usize) -> SysResult {
+        info!("fcntl: fd: {}, cmd: {:x}, arg: {}", fd, cmd, arg);
         let mut proc = self.process();
         let file_like = proc.get_file_like(fd)?;
         file_like.fcntl(cmd, arg)
@@ -886,11 +885,11 @@ impl Process {
         match path {
             "/proc/self/exe" => {
                 return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
-            },
+            }
             "/dev/fb0" => {
                 info!("/dev/fb0 will be opened");
                 return Ok(Arc::new(Vga::default()));
-            },
+            }
             _ => {}
         }
         let (fd_dir_path, fd_name) = split_path(&path);

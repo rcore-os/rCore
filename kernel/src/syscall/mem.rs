@@ -1,7 +1,5 @@
 use rcore_memory::memory_set::handler::{Delay, File, Linear};
 use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::paging::PageTable;
-use rcore_memory::Page;
 use rcore_memory::PAGE_SIZE;
 
 use crate::memory::GlobalFrameAlloc;
@@ -53,7 +51,6 @@ impl Syscall<'_> {
             );
             return Ok(addr);
         } else {
-
             let file = proc.get_file(fd)?;
             info!("mmap path is {} ", &*file.path);
             match &*file.path {
@@ -64,15 +61,15 @@ impl Syscall<'_> {
                             addr,
                             addr + len,
                             prot.to_attr(),
-                            Linear::new(
-                                ( fb.bus_addr() - addr ) as isize,
-                            ),
+                            Linear::new((fb.bus_addr() - addr) as isize),
                             "mmap_file",
                         );
                         info!("mmap for /dev/fb0");
+                        return Ok(addr);
+                    } else {
+                        return Err(SysError::ENOENT);
                     }
-                    return Ok(addr);
-                },
+                }
                 _ => {
                     let inode = file.inode();
                     self.vm().push(
@@ -89,7 +86,7 @@ impl Syscall<'_> {
                         "mmap_file",
                     );
                     return Ok(addr);
-                },
+                }
             };
         }
     }

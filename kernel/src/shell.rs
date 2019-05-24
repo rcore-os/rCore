@@ -1,6 +1,5 @@
 //! Kernel shell
 
-use crate::arch::io;
 use crate::fs::ROOT_INODE;
 use crate::process::*;
 use alloc::string::String;

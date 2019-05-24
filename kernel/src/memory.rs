@@ -14,10 +14,9 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
+use crate::consts::{MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
-use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock};
-use alloc::boxed::Box;
+use crate::sync::SpinNoIrqLock;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
@@ -30,9 +29,9 @@ use rcore_memory::*;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
-// x86_64 support up to 64G memory
+// x86_64 support up to 1T memory
 #[cfg(target_arch = "x86_64")]
-pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
+pub type FrameAlloc = bitmap_allocator::BitAlloc256M;
 
 // RISCV, ARM, MIPS has 1G memory
 #[cfg(all(
@@ -132,13 +131,13 @@ pub fn handle_page_fault(addr: usize) -> bool {
 
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
-    const machine_align: usize = mem::size_of::<usize>();
-    const heap_block: usize = KERNEL_HEAP_SIZE / machine_align;
-    static mut HEAP: [usize; heap_block] = [0; heap_block];
+    const MACHINE_ALIGN: usize = mem::size_of::<usize>();
+    const HEAP_BLOCK: usize = KERNEL_HEAP_SIZE / MACHINE_ALIGN;
+    static mut HEAP: [usize; HEAP_BLOCK] = [0; HEAP_BLOCK];
     unsafe {
         HEAP_ALLOCATOR
             .lock()
-            .init(HEAP.as_ptr() as usize, heap_block * machine_align);
+            .init(HEAP.as_ptr() as usize, HEAP_BLOCK * MACHINE_ALIGN);
     }
     info!("heap init end");
 }
@@ -171,8 +170,9 @@ pub fn enlarge_heap(heap: &mut Heap) {
     }
 }
 
-pub fn access_ok(from: usize, len: usize) -> bool {
-    from < PHYSICAL_MEMORY_OFFSET && (from + len) < PHYSICAL_MEMORY_OFFSET
+/// Check whether the address range [addr, addr + len) is not in kernel space
+pub fn access_ok(addr: usize, len: usize) -> bool {
+    addr < PHYSICAL_MEMORY_OFFSET && (addr + len) < PHYSICAL_MEMORY_OFFSET
 }
 
 #[naked]
@@ -180,39 +180,19 @@ pub unsafe extern "C" fn read_user_fixup() -> usize {
     return 1;
 }
 
-#[no_mangle]
-pub fn copy_from_user_u8(addr: *const u8) -> Option<u8> {
+pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
     #[naked]
     #[inline(never)]
     #[link_section = ".text.copy_user"]
-    unsafe extern "C" fn read_user_u8(dst: *mut u8, src: *const u8) -> usize {
+    unsafe extern "C" fn read_user<T>(dst: *mut T, src: *const T) -> usize {
         dst.copy_from_nonoverlapping(src, 1);
         0
     }
-    if !access_ok(addr as usize, size_of::<u8>()) {
+    if !access_ok(addr as usize, size_of::<T>()) {
         return None;
     }
-    let mut dst: u8 = 0;
-    match unsafe { read_user_u8((&mut dst) as *mut u8, addr) } {
-        0 => Some(dst),
-        _ => None,
-    }
-}
-
-#[no_mangle]
-pub fn copy_from_user_usize(addr: *const usize) -> Option<usize> {
-    #[naked]
-    #[inline(never)]
-    #[link_section = ".text.copy_user"]
-    unsafe extern "C" fn read_user_usize(dst: *mut usize, src: *const usize) -> usize {
-        dst.copy_from_nonoverlapping(src, 1);
-        0
-    }
-    if !access_ok(addr as usize, size_of::<usize>()) {
-        return None;
-    }
-    let mut dst: usize = 0;
-    match unsafe { read_user_usize((&mut dst) as *mut usize, addr) } {
+    let mut dst: T = unsafe { core::mem::uninitialized() };
+    match unsafe { read_user(&mut dst, addr) } {
         0 => Some(dst),
         _ => None,
     }

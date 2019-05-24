@@ -11,7 +11,6 @@ use bitflags::*;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use volatile::Volatile;
 

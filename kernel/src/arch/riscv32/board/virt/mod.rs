@@ -1,3 +1,6 @@
+#[path = "../../../../drivers/gpu/fb.rs"]
+pub mod fb;
+
 use crate::memory::phys_to_virt;
 
 /// Mask all external interrupt except serial.
@@ -15,4 +18,8 @@ pub unsafe fn enable_serial_interrupt() {
     const UART16550: *mut u8 = phys_to_virt(0x10000000) as *mut u8;
     UART16550.add(4).write_volatile(0x0B);
     UART16550.add(1).write_volatile(0x01);
+}
+
+pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
+    unimplemented!()
 }

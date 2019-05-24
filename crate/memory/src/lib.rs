@@ -1,6 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(alloc)]
 #![feature(nll)]
+#![feature(maybe_uninit)]
 
 // import macros from log
 use log::*;

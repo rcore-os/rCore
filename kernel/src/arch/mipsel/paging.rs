@@ -155,7 +155,7 @@ impl PageTableImpl {
         PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
-            entry: unsafe { core::mem::uninitialized() },
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
         }
     }
 }
@@ -171,7 +171,7 @@ impl PageTableExt for PageTableImpl {
         PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
-            entry: unsafe { core::mem::uninitialized() },
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
         }
     }
 
