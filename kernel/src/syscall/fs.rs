@@ -708,6 +708,7 @@ impl Syscall<'_> {
                 read: true,
                 write: false,
                 append: false,
+                nonblock: false,
             },
             String::from("pipe_r:[]"),
         )));
@@ -718,6 +719,7 @@ impl Syscall<'_> {
                 read: false,
                 write: true,
                 append: false,
+                nonblock: false,
             },
             String::from("pipe_w:[]"),
         )));
@@ -833,6 +835,16 @@ impl Syscall<'_> {
         );
         return Ok(total_written);
     }
+
+    pub fn sys_fcntl(&mut self, fd : usize, cmd : usize, arg : usize) -> SysResult{
+        info!(
+            "fcntl: fd: {}, cmd: {:x}, arg: {}",
+            fd, cmd, arg
+        );
+        let mut proc = self.process();
+        let file_like = proc.get_file_like(fd)?;
+        file_like.fcntl(cmd, arg)
+    }
 }
 
 impl Process {
@@ -876,7 +888,11 @@ impl Process {
         match path {
             "/proc/self/exe" => {
                 return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
-            }
+            },
+            "/dev/fb0" => {
+                info!("/dev/fb0 will be opened");
+                return Ok(Arc::new(Vga::default()));
+            },
             _ => {}
         }
         let (fd_dir_path, fd_name) = split_path(&path);
@@ -979,6 +995,7 @@ impl OpenFlags {
             read: self.readable(),
             write: self.writable(),
             append: self.contains(OpenFlags::APPEND),
+            nonblock: false,
         }
     }
 }

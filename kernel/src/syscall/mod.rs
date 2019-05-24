@@ -101,7 +101,10 @@ impl Syscall<'_> {
             SYS_READV => self.sys_readv(args[0], args[1] as *const IoVec, args[2]),
             SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
             SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
-            SYS_FCNTL => self.unimplemented("fcntl", Ok(0)),
+            SYS_FCNTL => {
+                info!("SYS_FCNTL : {} {} {} {}", args[0], args[1], args[2], args[3]);
+                self.sys_fcntl(args[0], args[1], args[2])
+            },
             SYS_FLOCK => self.unimplemented("flock", Ok(0)),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
