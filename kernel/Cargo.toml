@@ -59,7 +59,7 @@ console-traits = "0.3"
 buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
-isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers" }
+isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
 lazy_static = { version = "1.3", features = ["spin_no_std"] }
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
