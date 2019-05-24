@@ -15,7 +15,6 @@ pub mod paging;
 pub mod rand;
 pub mod syscall;
 pub mod timer;
-pub mod ipi;
 pub mod board;
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);

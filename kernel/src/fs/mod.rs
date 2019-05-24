@@ -20,7 +20,7 @@ mod ioctl;
 mod pipe;
 mod pseudo;
 mod stdio;
-mod vga;
+pub mod vga;
 
 // Hard link user programs
 #[cfg(feature = "link_user")]
