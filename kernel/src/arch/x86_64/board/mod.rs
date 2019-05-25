@@ -46,7 +46,7 @@ pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> FramebufferResul
         depth: depth,
         pitch: pitch, // TOKNOW
         bus_addr: framebuffer as u32,
-        screen_size: width * height * 3,
+        screen_size: width * height * (depth / 8),
     };
     // assume BGRA8888 for now
     Ok((
