@@ -18,10 +18,10 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
         yres_virtual: 768,
         xoffset: 0,
         yoffset: 0,
-        depth: 24,
+        depth: 32,
         pitch: 1024, // TOKNOW
-        bus_addr: 0xfd00_0000,
-        screen_size: 1024 * 768 * 3,
+        bus_addr: 0xf100_0000,
+        screen_size: 1024 * 768 * 4,
     };
     Ok((
         fb_info,

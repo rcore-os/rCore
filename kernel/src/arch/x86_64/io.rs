@@ -24,9 +24,9 @@ pub fn putfmt(fmt: Arguments) {
             COM1.force_unlock();
         }
         COM1.lock().write_fmt(fmt).unwrap();
-        //unsafe { CONSOLE.force_unlock() }
-        //if let Some(console) = CONSOLE.lock().as_mut() {
-        //console.write_fmt(fmt).unwrap();
-        //}
+        unsafe { CONSOLE.force_unlock() }
+        if let Some(console) = CONSOLE.lock().as_mut() {
+            console.write_fmt(fmt).unwrap();
+        }
     }
 }

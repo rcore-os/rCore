@@ -5,7 +5,7 @@ use core::fmt;
 use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
-use crate::fs::vga::{fb_var_screeninfo, fb_bitfield};
+use crate::fs::vga::{fb_var_screeninfo, fb_bitfield, fb_fix_screeninfo};
 
 /// Framebuffer information
 #[repr(C)]
@@ -247,6 +247,10 @@ impl Framebuffer {
         var_info.xoffset = self.fb_info.xoffset;
         var_info.yoffset = self.fb_info.yoffset;
         var_info.bits_per_pixel = self.fb_info.depth;
+    }
+
+    pub fn fill_fix_screeninfo(&self, fix_info : &mut fb_fix_screeninfo) {
+        fix_info.line_length = self.fb_info.pitch;
     }
 }
 

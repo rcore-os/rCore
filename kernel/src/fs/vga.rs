@@ -71,7 +71,9 @@ impl INode for Vga {
         match cmd {
             FBIOGET_FSCREENINFO => {
                 let fb_fix_info = unsafe{ &mut *(data as *mut fb_fix_screeninfo) };
-                fb_fix_info.line_length = 100;
+                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                    fb.fill_fix_screeninfo(fb_fix_info);
+                }
                 Ok(())
             },
             FBIOGET_VSCREENINFO => {
@@ -96,7 +98,7 @@ const FBIOGET_FSCREENINFO : u32 = 0x4602;
 const FBIOGET_VSCREENINFO : u32 = 0x4600;
 
 #[repr(C)]
-struct fb_fix_screeninfo {
+pub struct fb_fix_screeninfo {
     pub id : [u8;16],			/* identification string eg "TT Builtin" */
     pub smem_start : u64,	/* Start of frame buffer mem */
                                     /* (physical address) */
