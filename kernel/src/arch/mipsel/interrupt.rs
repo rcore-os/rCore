@@ -154,7 +154,14 @@ fn timer() {
 fn syscall(tf: &mut TrapFrame) {
     tf.epc += 4; // Must before syscall, because of fork.
     let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
-    trace!("MIPS syscall {} invoked with {:?}", tf.v0, arguments);
+    trace!("MIPS syscall {} invoked with {:x?}, epc = {:x?}", tf.v0, arguments, tf.epc);
+
+
+    // temporary solution for ThinPad
+    if(tf.v0 == 0) {
+        warn!("Syscall ID = 0");
+        tf.v0 = unsafe { *((tf.sp + 28) as *const usize) };
+    }
 
     let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
     // comply with mips n32 abi, always return a positive value
