@@ -1187,6 +1187,6 @@ impl EmmcCtl {
     }
 
     pub fn init(&mut self) -> i32 {
-        0
+        if self.sd_card_init() { 0 } else { -1 }
     }
 }
