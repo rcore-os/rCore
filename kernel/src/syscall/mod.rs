@@ -10,19 +10,19 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
-use crate::memory::MemorySet;
+use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
 
-use self::custom::*;
-use self::fs::*;
-use self::mem::*;
-use self::misc::*;
+pub use self::custom::*;
+pub use self::fs::*;
+pub use self::mem::*;
+pub use self::misc::*;
 pub use self::net::*;
-use self::proc::*;
-use self::time::*;
+pub use self::proc::*;
+pub use self::time::*;
 
 mod custom;
 mod fs;
@@ -32,7 +32,9 @@ mod net;
 mod proc;
 mod time;
 
+#[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
+#[cfg(feature = "profile")]
 use spin::Mutex;
 
 #[cfg(feature = "profile")]
@@ -99,7 +101,13 @@ impl Syscall<'_> {
             SYS_READV => self.sys_readv(args[0], args[1] as *const IoVec, args[2]),
             SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
             SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
-            SYS_FCNTL => self.unimplemented("fcntl", Ok(0)),
+            SYS_FCNTL => {
+                info!(
+                    "SYS_FCNTL : {} {} {} {}",
+                    args[0], args[1], args[2], args[3]
+                );
+                self.sys_fcntl(args[0], args[1], args[2])
+            }
             SYS_FLOCK => self.unimplemented("flock", Ok(0)),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
@@ -288,6 +296,7 @@ impl Syscall<'_> {
             SYS_GETRANDOM => {
                 self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
             }
+            SYS_RT_SIGQUEUEINFO => self.unimplemented("rt_sigqueueinfo", Ok(0)),
 
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),
@@ -549,10 +558,32 @@ pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Optio
             return result;
         }
     }
-    loop {
-        if let Some(result) = action() {
-            return result;
+    Condvar::wait_events(&condvars, action)
+}
+
+pub fn check_and_clone_cstr(user: *const u8) -> Result<String, SysError> {
+    let mut buffer = Vec::new();
+    for i in 0.. {
+        let addr = unsafe { user.add(i) };
+        let data = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+        if data == 0 {
+            break;
         }
-        Condvar::wait_any(&condvars);
+        buffer.push(data);
     }
+    String::from_utf8(buffer).map_err(|_| SysError::EFAULT)
+}
+
+pub fn check_and_clone_cstr_array(user: *const *const u8) -> Result<Vec<String>, SysError> {
+    let mut buffer = Vec::new();
+    for i in 0.. {
+        let addr = unsafe { user.add(i) };
+        let str_ptr = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+        if str_ptr.is_null() {
+            break;
+        }
+        let string = check_and_clone_cstr(str_ptr)?;
+        buffer.push(string);
+    }
+    Ok(buffer)
 }

@@ -3,7 +3,7 @@
 //! The code is borrowed from [RustDoc - Dining Philosophers](https://doc.rust-lang.org/1.6.0/book/dining-philosophers.html)
 
 use crate::sync::Condvar;
-use crate::sync::ThreadLock as Mutex;
+use crate::sync::SleepLock as Mutex;
 use crate::thread;
 use alloc::vec;
 use alloc::{sync::Arc, vec::Vec};

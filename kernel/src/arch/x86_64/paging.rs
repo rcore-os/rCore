@@ -1,6 +1,4 @@
-// Depends on kernel
-use crate::consts::KERNEL_OFFSET;
-use crate::memory::{active_table, alloc_frame, dealloc_frame};
+use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use core::sync::atomic::Ordering;
 use log::*;
 use rcore_memory::paging::*;
@@ -8,12 +6,12 @@ use x86_64::instructions::tlb;
 use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::{
     frame::PhysFrame as Frame,
-    mapper::{Mapper, RecursivePageTable},
+    mapper::{MappedPageTable, Mapper},
     page::{Page, PageRange, Size4KiB},
     page_table::{PageTable as x86PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator,
 };
-use x86_64::{VirtAddr, PhysAddr};
+use x86_64::{PhysAddr, VirtAddr};
 
 pub trait PageExt {
     fn of_addr(address: usize) -> Self;
@@ -23,7 +21,7 @@ pub trait PageExt {
 impl PageExt for Page {
     fn of_addr(address: usize) -> Self {
         use x86_64;
-        Page::containing_address(x86_64::VirtAddr::new(address as u64))
+        Page::containing_address(VirtAddr::new(address as u64))
     }
     fn range_of(begin: usize, end: usize) -> PageRange {
         Page::range(Page::of_addr(begin), Page::of_addr(end - 1) + 1)
@@ -40,11 +38,15 @@ impl FrameExt for Frame {
     }
 }
 
-pub struct ActivePageTable(RecursivePageTable<'static>);
+pub struct PageTableImpl(
+    MappedPageTable<'static, fn(Frame) -> *mut x86PageTable>,
+    PageEntry,
+    Frame,
+);
 
-pub struct PageEntry(PageTableEntry);
+pub struct PageEntry(&'static mut PageTableEntry, Page, Frame);
 
-impl PageTable for ActivePageTable {
+impl PageTable for PageTableImpl {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         unsafe {
@@ -59,7 +61,7 @@ impl PageTable for ActivePageTable {
                 .flush();
         }
         flush_tlb_all(addr);
-        unsafe { &mut *(get_entry_ptr(addr, 1)) }
+        self.get_entry(addr).unwrap()
     }
 
     fn unmap(&mut self, addr: usize) {
@@ -68,33 +70,39 @@ impl PageTable for ActivePageTable {
     }
 
     fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
-        for level in 0..3 {
-            let entry = get_entry_ptr(addr, 4 - level);
-            if unsafe { !(*entry).present() } {
+        let mut page_table = frame_to_page_table(self.2);
+        for level in 0..4 {
+            let index = (addr >> (12 + (3 - level) * 9)) & 0o777;
+            let entry = unsafe { &mut (&mut *page_table)[index] };
+            if level == 3 {
+                let page = Page::of_addr(addr);
+                self.1 = PageEntry(entry, page, self.2);
+                return Some(&mut self.1 as &mut Entry);
+            }
+            if !entry.flags().contains(EF::PRESENT) {
                 return None;
             }
+            page_table = frame_to_page_table(entry.frame().unwrap());
         }
-        unsafe { Some(&mut *(get_entry_ptr(addr, 1))) }
+        unreachable!();
+    }
+
+    fn get_page_slice_mut<'a>(&mut self, addr: usize) -> &'a mut [u8] {
+        let frame = self.0.translate_page(Page::of_addr(addr)).unwrap();
+        let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
+        unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
 }
 
-impl PageTableExt for ActivePageTable {
-    // FIXME: the default value 0xcafebe000 is so low that allocation might overwrite it sometimes.
-    // However, putting it to KERNEL_OFFSET | 0xcafeb000 has unintended effects.
-    // Someone needs to reconsider this and use an ultimate solution.
-    // const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
-}
-
-impl ActivePageTable {
-    pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *(0xffffffff_fffff000 as *mut _)).unwrap())
-    }
+fn frame_to_page_table(frame: Frame) -> *mut x86PageTable {
+    let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
+    vaddr as *mut x86PageTable
 }
 
 impl Entry for PageEntry {
     fn update(&mut self) {
-        use x86_64::{instructions::tlb::flush, VirtAddr};
-        let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
+        use x86_64::instructions::tlb::flush;
+        let addr = self.1.start_address();
         flush(addr);
         flush_tlb_all(addr.as_u64() as usize);
     }
@@ -153,14 +161,18 @@ impl Entry for PageEntry {
         self.0.flags().contains(EF::USER_ACCESSIBLE)
     }
     fn set_user(&mut self, value: bool) {
-        self.as_flags().set(EF::USER_ACCESSIBLE, value);
+        // x86_64 page table struct do not implement setting USER bit
         if value {
-            let mut addr = self as *const _ as usize;
-            for _ in 0..3 {
-                // Upper level entry
-                addr = ((addr >> 9) & 0o777_777_777_7770) | 0xffffff80_00000000;
-                // set USER_ACCESSIBLE
-                unsafe { (*(addr as *mut EF)).insert(EF::USER_ACCESSIBLE) };
+            let mut page_table = frame_to_page_table(self.2);
+            for level in 0..4 {
+                let index =
+                    (self.1.start_address().as_u64() as usize >> (12 + (3 - level) * 9)) & 0o777;
+                let entry = unsafe { &mut (&mut *page_table)[index] };
+                entry.set_flags(entry.flags() | EF::USER_ACCESSIBLE);
+                if level == 3 {
+                    return;
+                }
+                page_table = frame_to_page_table(entry.frame().unwrap());
             }
         }
     }
@@ -176,51 +188,57 @@ impl Entry for PageEntry {
     fn set_mmio(&mut self, _value: u8) {}
 }
 
-fn get_entry_ptr(addr: usize, level: u8) -> *mut PageEntry {
-    debug_assert!(level <= 4);
-    let entry_addr = ((addr >> (level * 9)) & !0x7) | !((1 << (48 - level * 9)) - 1);
-    entry_addr as *mut PageEntry
-}
-
 impl PageEntry {
     fn as_flags(&mut self) -> &mut EF {
-        unsafe { &mut *(self as *mut _ as *mut EF) }
+        unsafe { &mut *(self.0 as *mut _ as *mut EF) }
     }
 }
 
-#[derive(Debug)]
-pub struct InactivePageTable0 {
-    p4_frame: Frame,
+impl PageTableImpl {
+    /// Unsafely get the current active page table.
+    /// WARN: You MUST call `core::mem::forget` for it after use!
+    pub unsafe fn active() -> Self {
+        let frame = Cr3::read().0;
+        let table = &mut *frame_to_page_table(frame);
+        PageTableImpl(
+            MappedPageTable::new(table, frame_to_page_table),
+            core::mem::MaybeUninit::uninitialized().into_initialized(),
+            frame,
+        )
+    }
 }
 
-impl InactivePageTable for InactivePageTable0 {
-    type Active = ActivePageTable;
-
+impl PageTableExt for PageTableImpl {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(target);
-        active_table().with_temporary_map(target, |_, table: &mut x86PageTable| {
-            table.zero();
-            // set up recursive mapping for the table
-            table[511].set_frame(frame.clone(), EF::PRESENT | EF::WRITABLE);
-        });
-        InactivePageTable0 { p4_frame: frame }
+        let table = unsafe { &mut *frame_to_page_table(frame) };
+        table.zero();
+        unsafe {
+            PageTableImpl(
+                MappedPageTable::new(table, frame_to_page_table),
+                core::mem::MaybeUninit::uninitialized().into_initialized(),
+                frame,
+            )
+        }
     }
 
     fn map_kernel(&mut self) {
-        let table = unsafe { &mut *(0xffffffff_fffff000 as *mut x86PageTable) };
+        let table = unsafe { &mut *frame_to_page_table(Cr3::read().0) };
         // Kernel at 0xffff_ff00_0000_0000
         // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
-        let e510 = table[510].clone();
+        let ekernel = table[510].clone();
+        let ephysical = table[0x1f8].clone();
         let estack = table[175].clone();
-        self.edit(|_| {
-            table[510].set_addr(e510.addr(), e510.flags() | EF::GLOBAL);
-            table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
-        });
+
+        let table = unsafe { &mut *frame_to_page_table(self.2) };
+        table[510].set_addr(ekernel.addr(), ekernel.flags() | EF::GLOBAL);
+        table[0x1f8].set_addr(ephysical.addr(), ephysical.flags() | EF::GLOBAL);
+        table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
     }
 
     fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as CR3
+        self.2.start_address().as_u64() as usize // as CR3
     }
 
     unsafe fn set_token(token: usize) {
@@ -237,40 +255,18 @@ impl InactivePageTable for InactivePageTable0 {
     fn flush_tlb() {
         tlb::flush_all();
     }
-
-    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let target = Cr3::read().0.start_address().as_u64() as usize;
-        if self.p4_frame == Cr3::read().0 {
-            return f(&mut active_table());
-        }
-        active_table().with_temporary_map(target, |active_table, p4_table: &mut x86PageTable| {
-            let backup = p4_table[0o777].clone();
-
-            // overwrite recursive mapping
-            p4_table[0o777].set_frame(self.p4_frame.clone(), EF::PRESENT | EF::WRITABLE);
-            tlb::flush_all();
-
-            // execute f in the new context
-            let ret = f(active_table);
-
-            // restore recursive mapping to original p4 table
-            p4_table[0o777] = backup;
-            tlb::flush_all();
-            ret
-        })
-    }
 }
 
-impl Drop for InactivePageTable0 {
+impl Drop for PageTableImpl {
     fn drop(&mut self) {
-        info!("PageTable dropping: {:?}", self);
-        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        info!("PageTable dropping: {:?}", self.2);
+        dealloc_frame(self.2.start_address().as_u64() as usize);
     }
 }
 
 struct FrameAllocatorForX86;
 
-impl FrameAllocator<Size4KiB> for FrameAllocatorForX86 {
+unsafe impl FrameAllocator<Size4KiB> for FrameAllocatorForX86 {
     fn allocate_frame(&mut self) -> Option<Frame> {
         alloc_frame().map(|addr| Frame::of_addr(addr))
     }
@@ -284,11 +280,10 @@ impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
 
 /// Flush TLB for `vaddr` on all CPU
 fn flush_tlb_all(vaddr: usize) {
+    // FIXME: too slow, disable now.
+    return;
     if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
         return;
     }
-    super::ipi::invoke_on_allcpu(
-        move || tlb::flush(VirtAddr::new(vaddr as u64)),
-        false,
-    );
+    super::ipi::invoke_on_allcpu(move || tlb::flush(VirtAddr::new(vaddr as u64)), false);
 }

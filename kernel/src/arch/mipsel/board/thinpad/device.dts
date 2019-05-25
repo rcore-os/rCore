@@ -9,7 +9,7 @@
 
 	chosen {
 		stdio = &uart;
-        bootargs = "";
+        bootargs = "sh";
 	};
 
     aliases { };

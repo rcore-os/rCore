@@ -21,7 +21,7 @@
 #   LOG  = off | error | warn | info | debug | trace
 #   SFSIMG = <sfsimg>            SFS image path of user programs
 #   smp     = 1 | 2 | ...        SMP core number
-#   graphic = on | off           Enable/disable qemu graphical output
+#   graphic = on | off | console Enable/disable qemu graphical output, or print console to graphic output
 #   board   = none               Running on QEMU
 #         | pc                   Only available on x86_64, run on real pc
 #         | u540                 Only available on riscv64, run on HiFive U540, use Sv39
@@ -98,6 +98,7 @@ export DTB = $(dtb)
 qemu_opts := \
 	-smp cores=$(smp)
 qemu_net_opts :=
+qemu_ui_opts := 
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -120,6 +121,8 @@ qemu_opts += \
 	-machine accel=kvm
 qemu_net_opts += \
 	-device vfio-pci,host=$(pci_passthru)
+qemu_ui_opts += \
+	-vga std
 endif
 ifeq ($(extra_nic), on)
 qemu_net_opts += \
@@ -138,6 +141,9 @@ qemu_opts += \
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
+qemu_ui_opts += \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 
 else ifeq ($(arch), riscv64)
 ifeq ($(board), u540)
@@ -158,6 +164,9 @@ endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
+qemu_ui_opts += \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 
 else ifeq ($(arch), aarch64)
 qemu_opts += \
@@ -193,8 +202,12 @@ qemu_opts += -nographic
 endif
 
 ### build args ###
-ifneq ($(graphic), on)
+ifeq ($(graphic), off)
 features += nographic
+endif
+
+ifeq ($(graphic), console)
+features += consolegraphic
 endif
 
 ifneq ($(init), )
@@ -271,9 +284,7 @@ justrunnet: build
 	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
 
 justrunui: build
-	@qemu-system-$(arch) $(qemu_opts) \
-		-device virtio-gpu-device \
-		-device virtio-mouse-device
+	@qemu-system-$(arch) $(qemu_opts) $(qemu_ui_opts)
 
 justruntest: build
 	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
@@ -346,8 +357,9 @@ else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
-	    $(hostcc) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
+	    $(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
+	$(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/linker.ld.S -o src/arch/$(arch)/boot/linker.ld
 	@cargo xbuild $(build_args)
 endif
 

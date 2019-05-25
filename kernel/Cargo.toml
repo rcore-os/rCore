@@ -19,14 +19,13 @@ authors = [
 ]
 
 [features]
-default = ["sv39"]
-# Page table sv39 or sv48 (for riscv64)
-sv39 = []
-board_u540 = ["sv39", "link_user"]
-board_k210 = ["sv39", "link_user"]
-board_rocket_chip = ["sv39", "link_user"]
+default = []
+board_u540 = ["link_user"]
+board_k210 = ["link_user"]
+board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
+consolegraphic = []
 board_raspi3 = ["bcm2837", "link_user"]
 raspi3_use_generic_timer = ["bcm2837/use_generic_timer"]
 # for qemu machine
@@ -55,12 +54,12 @@ bitflags = "1.0"
 bit_field = "0.9"
 volatile = "0.2"
 heapless = "0.4"
-bitvec = { git = "https://github.com/myrrlyn/bitvec.git", default-features = false, features = ["alloc"] }
+bitvec = { version = "0.11", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
 buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
-isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers" }
+isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
 lazy_static = { version = "1.3", features = ["spin_no_std"] }
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
@@ -70,9 +69,9 @@ rcore-fs = { git = "https://github.com/rcore-os/rcore-fs" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = { git = "https://github.com/rcore-os/bootloader" }
+bootloader = { git = "https://github.com/rcore-os/bootloader", branch = "vga" }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
-x86_64 = "0.5"
+x86_64 = "0.6"
 raw-cpuid = "6.0"
 uart_16550 = "0.2"
 pc-keyboard = "0.5"
@@ -81,7 +80,7 @@ pc-keyboard = "0.5"
 riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "2.5.0" }
+aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "2.6.1" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "1.0.0", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]

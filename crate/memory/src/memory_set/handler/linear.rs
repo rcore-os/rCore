@@ -23,11 +23,11 @@ impl MemoryHandler for Linear {
     fn clone_map(
         &self,
         pt: &mut PageTable,
-        with: &Fn(&mut FnMut()),
+        _src_pt: &mut PageTable,
         addr: VirtAddr,
         attr: &MemoryAttr,
     ) {
-        with(&mut || self.map(pt, addr, attr));
+        self.map(pt, addr, attr);
     }
 
     fn handle_page_fault(&self, _pt: &mut PageTable, _addr: VirtAddr) -> bool {

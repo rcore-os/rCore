@@ -72,6 +72,7 @@ impl INode for Pseudo {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
     impl_inode!();

@@ -5,20 +5,17 @@ pub trait MemoryHandler: Debug + Send + Sync + 'static {
     fn box_clone(&self) -> Box<MemoryHandler>;
 
     /// Map `addr` in the page table
-    /// Should set page flags here instead of in page_fault_handler
+    /// Should set page flags here instead of in `page_fault_handler`
     fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr);
 
     /// Unmap `addr` in the page table
     fn unmap(&self, pt: &mut PageTable, addr: VirtAddr);
 
-    /// Clone map `addr` from one page table to another.
-    /// `pt` is the current active page table.
-    /// `with` is the `InactivePageTable::with` function.
-    /// Call `with` then use `pt` as target page table inside.
+    /// Clone map `addr` from page table `src_pt` to `pt`.
     fn clone_map(
         &self,
         pt: &mut PageTable,
-        with: &Fn(&mut FnMut()),
+        src_pt: &mut PageTable,
         addr: VirtAddr,
         attr: &MemoryAttr,
     );

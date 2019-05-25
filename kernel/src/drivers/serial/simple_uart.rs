@@ -59,12 +59,19 @@ impl SerialPort {
 impl Write for SerialPort {
     fn write_str(&mut self, s: &str) -> Result {
         for c in s.bytes() {
-            if c == 127 {
-                self.putchar(8);
-                self.putchar(b' ');
-                self.putchar(8);
-            } else {
-                self.putchar(c);
+            match c {
+                127 => {
+                    self.putchar(8);
+                    self.putchar(b' ');
+                    self.putchar(8);
+                }
+                b'\n' => {
+                    self.putchar(b'\r');
+                    self.putchar(b'\n');
+                }
+                c => {
+                    self.putchar(c);
+                }
             }
         }
         Ok(())

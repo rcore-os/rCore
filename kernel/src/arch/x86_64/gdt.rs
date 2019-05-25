@@ -1,5 +1,4 @@
 use super::ipi::IPIEventItem;
-use alloc::boxed::Box;
 use alloc::vec::*;
 use core::sync::atomic::{AtomicBool, Ordering};
 use x86_64::registers::model_specific::Msr;
@@ -8,7 +7,7 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::{PrivilegeLevel, VirtAddr};
 
 use crate::consts::MAX_CPU_NUM;
-use crate::sync::{Semaphore, SpinLock as Mutex};
+use crate::sync::SpinLock as Mutex;
 
 /// Init TSS & GDT.
 pub fn init() {
@@ -36,6 +35,10 @@ pub struct Cpu {
 }
 
 impl Cpu {
+    pub fn current() -> &'static mut Self {
+        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
+    }
+
     fn new() -> Self {
         Cpu {
             gdt: GlobalDescriptorTable::new(),
@@ -48,10 +51,7 @@ impl Cpu {
     }
 
     pub fn iter() -> impl Iterator<Item = &'static Self> {
-        unsafe {
-            CPUS.iter()
-                .filter_map(|x| x.as_ref())
-        }
+        unsafe { CPUS.iter().filter_map(|x| x.as_ref()) }
     }
     pub fn id(&self) -> usize {
         self.id
@@ -59,9 +59,6 @@ impl Cpu {
     pub fn notify_event(&self, item: IPIEventItem) {
         let mut queue = self.ipi_handler_queue.lock();
         queue.push(item);
-    }
-    pub fn current() -> &'static mut Cpu {
-        unsafe { CPUS[super::cpu::id()].as_mut().unwrap() }
     }
     pub fn handle_ipi(&self) {
         let mut queue = self.ipi_handler_queue.lock();
@@ -81,7 +78,7 @@ impl Cpu {
         self.preemption_disabled.load(Ordering::Relaxed)
     }
     unsafe fn init(&'static mut self) {
-        use x86_64::instructions::segmentation::{load_fs, set_cs};
+        use x86_64::instructions::segmentation::set_cs;
         use x86_64::instructions::tables::load_tss;
 
         // Set the stack when DoubleFault occurs
@@ -101,9 +98,18 @@ impl Cpu {
         set_cs(KCODE_SELECTOR);
         // load TSS
         load_tss(TSS_SELECTOR);
-        // store address of TSS to GSBase
-        let mut gsbase = Msr::new(0xC0000101);
-        gsbase.write(&self.tss as *const _ as u64);
+        // for fast syscall:
+        // store address of TSS to kernel_gsbase
+        let mut kernel_gsbase = Msr::new(0xC0000102);
+        kernel_gsbase.write(&self.tss as *const _ as u64);
+    }
+
+    /// 设置从Ring3跳到Ring0时，自动切换栈的地址
+    ///
+    /// 每次进入用户态前，都要调用此函数，才能保证正确返回内核态
+    pub fn set_ring0_rsp(&mut self, rsp: usize) {
+        trace!("gdt.set_ring0_rsp: {:#x}", rsp);
+        self.tss.privilege_stack_table[0] = VirtAddr::new(rsp as u64);
     }
 }
 
@@ -114,7 +120,7 @@ const KCODE: Descriptor = Descriptor::UserSegment(0x0020980000000000); // EXECUT
 const UCODE: Descriptor = Descriptor::UserSegment(0x0020F80000000000); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT | LONG_MODE
 const KDATA: Descriptor = Descriptor::UserSegment(0x0000920000000000); // DATA_WRITABLE | USER_SEGMENT | PRESENT
 const UDATA: Descriptor = Descriptor::UserSegment(0x0000F20000000000); // DATA_WRITABLE | USER_SEGMENT | USER_MODE | PRESENT
-// Copied from xv6
+                                                                       // Copied from xv6
 const UCODE32: Descriptor = Descriptor::UserSegment(0x00cffa00_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 const UDATA32: Descriptor = Descriptor::UserSegment(0x00cff200_0000ffff); // EXECUTABLE | USER_SEGMENT | USER_MODE | PRESENT
 
