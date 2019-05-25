@@ -55,7 +55,7 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     //get local apic id of cpu
     cpu::init();
     // Use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
-    driver::init();
+    driver::init(boot_info);
     // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
     crate::drivers::init();
     // init cpu scheduler and process manager, and add user shell app in process manager

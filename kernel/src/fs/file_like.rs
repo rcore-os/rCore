@@ -32,7 +32,7 @@ impl FileLike {
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
         match request {
-            // TODO: place flags & path in FileLike in stead of FileHandle/Socket
+            // TODO: place flags & path in FileLike instead of FileHandle/Socket
             FIOCLEX => Ok(0),
             FIONBIO => Ok(0),
             _ => {

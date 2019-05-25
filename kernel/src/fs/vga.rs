@@ -31,15 +31,20 @@ impl INode for Vga {
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         info!("the _offset is {} {}", _offset, _buf[0]);
-        use core::slice;
-        let frame_buffer_data = unsafe {
-            slice::from_raw_parts_mut(
-                phys_to_virt(0xfd00_0000) as *mut u8,
-                (1024 * 768 * 3) as usize,
-            )
-        };
-        frame_buffer_data.copy_from_slice(&_buf);
-        return Ok(1024 * 768 * 3);
+        let lock = FRAME_BUFFER.lock();
+        if let Some(ref frame_buffer) = *lock {
+            use core::slice;
+            let frame_buffer_data = unsafe {
+                slice::from_raw_parts_mut(
+                    frame_buffer.base_addr() as *mut u8,
+                    frame_buffer.framebuffer_size(),
+                )
+            };
+            frame_buffer_data.copy_from_slice(&_buf);
+            Ok(frame_buffer.framebuffer_size())
+        } else {
+            Err(FsError::EntryNotFound)
+        }
     }
     fn poll(&self) -> Result<PollStatus> {
         Ok(PollStatus {
@@ -64,9 +69,10 @@ impl INode for Vga {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
-    fn io_control(&self, cmd: u32, data: usize) -> Result<()> { 
+    fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
         info!("cmd {:#x} , data {:#x} vga not support ioctl !", cmd, data);
         match cmd {
             FBIOGET_FSCREENINFO => {
@@ -75,17 +81,17 @@ impl INode for Vga {
                     fb.fill_fix_screeninfo(fb_fix_info);
                 }
                 Ok(())
-            },
+            }
             FBIOGET_VSCREENINFO => {
-                let fb_var_info = unsafe{ &mut *(data as *mut fb_var_screeninfo) };
+                let fb_var_info = unsafe { &mut *(data as *mut fb_var_screeninfo) };
                 if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
                     fb.fill_var_screeninfo(fb_var_info);
                 }
                 Ok(())
-            },
+            }
             _ => {
                 warn!("use never support ioctl !");
-                Err(FsError::NotSupported) 
+                Err(FsError::NotSupported)
             }
         }
         //let fb_fix_info = unsafe{ &mut *(data as *mut fb_fix_screeninfo) };
@@ -94,8 +100,8 @@ impl INode for Vga {
     impl_inode!();
 }
 
-const FBIOGET_FSCREENINFO : u32 = 0x4602;
-const FBIOGET_VSCREENINFO : u32 = 0x4600;
+const FBIOGET_FSCREENINFO: u32 = 0x4602;
+const FBIOGET_VSCREENINFO: u32 = 0x4600;
 
 #[repr(C)]
 pub struct fb_fix_screeninfo {
@@ -121,49 +127,49 @@ pub struct fb_fix_screeninfo {
 
 #[repr(C)]
 pub struct fb_var_screeninfo {
-    pub xres : u32,			/* visible resolution		*/
-    pub yres : u32,
-    pub xres_virtual : u32,		/* virtual resolution		*/
-    pub yres_virtual : u32,
-    pub xoffset : u32,			/* offset from virtual to visible */
-    pub yoffset : u32,			/* resolution			*/
+    pub xres: u32, /* visible resolution		*/
+    pub yres: u32,
+    pub xres_virtual: u32, /* virtual resolution		*/
+    pub yres_virtual: u32,
+    pub xoffset: u32, /* offset from virtual to visible */
+    pub yoffset: u32, /* resolution			*/
 
-    pub bits_per_pixel : u32,		/* guess what			*/
-    pub grayscale : u32,		/* 0 = color, 1 = grayscale,	*/
-                                    /* >1 = FOURCC			*/
-    pub red : fb_bitfield ,		/* bitfield in fb mem if true color, */
-    pub green : fb_bitfield ,	/* else only length is significant */
-    pub blue : fb_bitfield ,
-    pub transp : fb_bitfield ,	/* transparency			*/	
+    pub bits_per_pixel: u32, /* guess what			*/
+    pub grayscale: u32,      /* 0 = color, 1 = grayscale,	*/
+    /* >1 = FOURCC			*/
+    pub red: fb_bitfield,   /* bitfield in fb mem if true color, */
+    pub green: fb_bitfield, /* else only length is significant */
+    pub blue: fb_bitfield,
+    pub transp: fb_bitfield, /* transparency			*/
 
-    pub nonstd : u32,			/* != 0 Non standard pixel format */
+    pub nonstd: u32, /* != 0 Non standard pixel format */
 
-    pub activate : u32,			/* see FB_ACTIVATE_*		*/
+    pub activate: u32, /* see FB_ACTIVATE_*		*/
 
-    pub height : u32,			/* height of picture in mm    */
-    pub width : u32,			/* width of picture in mm     */
+    pub height: u32, /* height of picture in mm    */
+    pub width: u32,  /* width of picture in mm     */
 
-    pub accel_flags : u32,		/* (OBSOLETE) see fb_info.flags */
+    pub accel_flags: u32, /* (OBSOLETE) see fb_info.flags */
 
     /* Timing: All values in pixclocks, except pixclock (of course) */
-    pub pixclock : u32,			/* pixel clock in ps (pico seconds) */
-    pub left_margin : u32,		/* time from sync to picture	*/
-    pub right_margin : u32,		/* time from picture to sync	*/
-    pub upper_margin : u32,		/* time from sync to picture	*/
-    pub lower_margin : u32,
-    pub hsync_len : u32,		/* length of horizontal sync	*/
-    pub vsync_len : u32,		/* length of vertical sync	*/
-    pub sync : u32,			/* see FB_SYNC_*		*/
-    pub vmode : u32,			/* see FB_VMODE_*		*/
-    pub rotate : u32,			/* angle we rotate counter clockwise */
-    pub colorspace : u32,		/* colorspace for FOURCC-based modes */
-    pub reserved : [u32;4],		/* Reserved for future compatibility */
+    pub pixclock: u32,     /* pixel clock in ps (pico seconds) */
+    pub left_margin: u32,  /* time from sync to picture	*/
+    pub right_margin: u32, /* time from picture to sync	*/
+    pub upper_margin: u32, /* time from sync to picture	*/
+    pub lower_margin: u32,
+    pub hsync_len: u32,     /* length of horizontal sync	*/
+    pub vsync_len: u32,     /* length of vertical sync	*/
+    pub sync: u32,          /* see FB_SYNC_*		*/
+    pub vmode: u32,         /* see FB_VMODE_*		*/
+    pub rotate: u32,        /* angle we rotate counter clockwise */
+    pub colorspace: u32,    /* colorspace for FOURCC-based modes */
+    pub reserved: [u32; 4], /* Reserved for future compatibility */
 }
 
 #[repr(C)]
 pub struct fb_bitfield {
-    pub offset : u32,			/* beginning of bitfield	*/
-    pub length : u32,			/* length of bitfield		*/
-    pub msb_right : u32,		/* != 0 : Most significant bit is */ 
-                                    /* right */ 
+    pub offset: u32, /* beginning of bitfield	*/
+    pub length: u32, /* length of bitfield		*/
+    pub msb_right: u32, /* != 0 : Most significant bit is */
+                     /* right */
 }

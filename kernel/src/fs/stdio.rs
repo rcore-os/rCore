@@ -95,7 +95,7 @@ impl INode for Stdin {
             buf[0] = self.pop() as u8;
             Ok(1)
         } else {
-            Ok(0)
+            Err(FsError::Again)
         }
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {

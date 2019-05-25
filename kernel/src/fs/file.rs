@@ -1,5 +1,6 @@
 //! File handle for process
 
+use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
@@ -53,9 +54,17 @@ impl FileHandle {
         if !self.options.nonblock {
             // block
             loop {
-                len = self.inode.read_at(offset, buf)?;
-                if len > 0 {
-                    break;
+                match self.inode.read_at(offset, buf) {
+                    Ok(read_len) => {
+                        len = read_len;
+                        break;
+                    }
+                    Err(FsError::Again) => {
+                        thread::yield_now();
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
                 }
             }
         } else {
