@@ -1018,7 +1018,14 @@ impl EmmcCtl {
         self.block_size = 8;
         self.blocks_to_transfer = 1;
 
+        /*
         if !self.sd_issue_command(SEND_SCR, 0, 500000) {
+            self.block_size = 512;
+            return false;
+        }
+        */
+
+        if !self.sd_issue_command_scr(500000) {
             self.block_size = 512;
             return false;
         }
