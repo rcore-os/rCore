@@ -174,6 +174,11 @@ impl Framebuffer {
     }
 
     #[inline]
+    pub fn framebuffer_size(&self) -> usize {
+        self.fb_info.screen_size as usize
+    }
+
+    #[inline]
     pub fn bus_addr(&self) -> usize {
         self.fb_info.bus_addr as usize
     }

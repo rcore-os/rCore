@@ -1,8 +1,8 @@
 //! File handle for process
 
+use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
-use crate::thread;
 
 use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 

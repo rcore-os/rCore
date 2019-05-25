@@ -31,15 +31,20 @@ impl INode for Vga {
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         info!("the _offset is {} {}", _offset, _buf[0]);
-        use core::slice;
-        let frame_buffer_data = unsafe {
-            slice::from_raw_parts_mut(
-                phys_to_virt(0xfd00_0000) as *mut u8,
-                (1024 * 768 * 3) as usize,
-            )
-        };
-        frame_buffer_data.copy_from_slice(&_buf);
-        return Ok(1024 * 768 * 3);
+        let lock = FRAME_BUFFER.lock();
+        if let Some(ref frame_buffer) = *lock {
+            use core::slice;
+            let frame_buffer_data = unsafe {
+                slice::from_raw_parts_mut(
+                    frame_buffer.base_addr() as *mut u8,
+                    frame_buffer.framebuffer_size(),
+                )
+            };
+            frame_buffer_data.copy_from_slice(&_buf);
+            Ok(frame_buffer.framebuffer_size())
+        } else {
+            Err(FsError::EntryNotFound)
+        }
     }
     fn poll(&self) -> Result<PollStatus> {
         Ok(PollStatus {
