@@ -562,28 +562,36 @@ pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Optio
 }
 
 pub fn check_and_clone_cstr(user: *const u8) -> Result<String, SysError> {
-    let mut buffer = Vec::new();
-    for i in 0.. {
-        let addr = unsafe { user.add(i) };
-        let data = copy_from_user(addr).ok_or(SysError::EFAULT)?;
-        if data == 0 {
-            break;
+    if user.is_null() {
+        Ok(String::new())
+    } else {
+        let mut buffer = Vec::new();
+        for i in 0.. {
+            let addr = unsafe { user.add(i) };
+            let data = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+            if data == 0 {
+                break;
+            }
+            buffer.push(data);
         }
-        buffer.push(data);
+        String::from_utf8(buffer).map_err(|_| SysError::EFAULT)
     }
-    String::from_utf8(buffer).map_err(|_| SysError::EFAULT)
 }
 
 pub fn check_and_clone_cstr_array(user: *const *const u8) -> Result<Vec<String>, SysError> {
-    let mut buffer = Vec::new();
-    for i in 0.. {
-        let addr = unsafe { user.add(i) };
-        let str_ptr = copy_from_user(addr).ok_or(SysError::EFAULT)?;
-        if str_ptr.is_null() {
-            break;
+    if user.is_null() {
+        Ok(Vec::new())
+    } else {
+        let mut buffer = Vec::new();
+        for i in 0.. {
+            let addr = unsafe { user.add(i) };
+            let str_ptr = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+            if str_ptr.is_null() {
+                break;
+            }
+            let string = check_and_clone_cstr(str_ptr)?;
+            buffer.push(string);
         }
-        let string = check_and_clone_cstr(str_ptr)?;
-        buffer.push(string);
+        Ok(buffer)
     }
-    Ok(buffer)
 }

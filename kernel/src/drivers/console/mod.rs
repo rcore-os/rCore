@@ -174,7 +174,7 @@ impl<F: Font> Console<F> {
             return;
         }
         match byte {
-            b'\x7f' => {
+            b'\x7f' | b'\x08' => {
                 if self.col > 0 {
                     self.col -= 1;
                     self.buf.delete(self.row, self.col);
