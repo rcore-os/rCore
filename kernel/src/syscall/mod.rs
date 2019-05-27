@@ -10,19 +10,19 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
-use crate::memory::MemorySet;
+use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
 
-use self::custom::*;
-use self::fs::*;
-use self::mem::*;
-use self::misc::*;
+pub use self::custom::*;
+pub use self::fs::*;
+pub use self::mem::*;
+pub use self::misc::*;
 pub use self::net::*;
-use self::proc::*;
-use self::time::*;
+pub use self::proc::*;
+pub use self::time::*;
 
 mod custom;
 mod fs;
@@ -32,7 +32,9 @@ mod net;
 mod proc;
 mod time;
 
+#[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
+#[cfg(feature = "profile")]
 use spin::Mutex;
 
 #[cfg(feature = "profile")]
@@ -99,7 +101,13 @@ impl Syscall<'_> {
             SYS_READV => self.sys_readv(args[0], args[1] as *const IoVec, args[2]),
             SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
             SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
-            SYS_FCNTL => self.unimplemented("fcntl", Ok(0)),
+            SYS_FCNTL => {
+                info!(
+                    "SYS_FCNTL : {} {} {} {}",
+                    args[0], args[1], args[2], args[3]
+                );
+                self.sys_fcntl(args[0], args[1], args[2])
+            }
             SYS_FLOCK => self.unimplemented("flock", Ok(0)),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
@@ -132,6 +140,14 @@ impl Syscall<'_> {
             SYS_DUP3 => self.sys_dup2(args[0], args[1]), // TODO: handle `flags`
             SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
             SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
+            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
+                args[0],
+                args[1] as *mut usize,
+                args[2],
+                args[3] as *mut usize,
+                args[4],
+                args[5],
+            ),
 
             // io multiplexing
             SYS_PPOLL => {
@@ -231,6 +247,7 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
+            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
 
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
@@ -263,6 +280,7 @@ impl Syscall<'_> {
             SYS_SETGROUPS => self.unimplemented("setgroups", Ok(0)),
             SYS_SETPRIORITY => self.sys_set_priority(args[0]),
             SYS_PRCTL => self.unimplemented("prctl", Ok(0)),
+            SYS_MEMBARRIER => self.unimplemented("membarrier", Ok(0)),
             SYS_PRLIMIT64 => self.sys_prlimit64(
                 args[0],
                 args[1],
@@ -275,17 +293,16 @@ impl Syscall<'_> {
                 args[2] as u32,
                 args[3] as *const u8,
             ),
+            SYS_GETRANDOM => {
+                self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
+            }
+            SYS_RT_SIGQUEUEINFO => self.unimplemented("rt_sigqueueinfo", Ok(0)),
 
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
-            //SYS_GETRANDOM => self.unimplemented("getrandom", Err(SysError::EINVAL)),
-            SYS_GETRANDOM => {
-                self.sys_getrandom(args[0] as *mut u8, args[1] as usize, args[2] as u32)
-            }
-            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]
@@ -347,10 +364,10 @@ impl Syscall<'_> {
                 match self.sys_pipe(fd_ptr) {
                     Ok(code) => {
                         unsafe {
-                            tf.v0 = *fd_ptr as usize;
-                            tf.v1 = *(fd_ptr.add(1)) as usize;
+                            self.tf.v0 = *fd_ptr as usize;
+                            self.tf.v1 = *(fd_ptr.add(1)) as usize;
                         }
-                        Ok(tf.v0)
+                        Ok(self.tf.v0)
                     }
                     Err(err) => Err(err),
                 }
@@ -541,10 +558,40 @@ pub fn spin_and_wait<T>(condvars: &[&Condvar], mut action: impl FnMut() -> Optio
             return result;
         }
     }
-    loop {
-        if let Some(result) = action() {
-            return result;
+    Condvar::wait_events(&condvars, action)
+}
+
+pub fn check_and_clone_cstr(user: *const u8) -> Result<String, SysError> {
+    if user.is_null() {
+        Ok(String::new())
+    } else {
+        let mut buffer = Vec::new();
+        for i in 0.. {
+            let addr = unsafe { user.add(i) };
+            let data = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+            if data == 0 {
+                break;
+            }
+            buffer.push(data);
         }
-        Condvar::wait_any(&condvars);
+        String::from_utf8(buffer).map_err(|_| SysError::EFAULT)
+    }
+}
+
+pub fn check_and_clone_cstr_array(user: *const *const u8) -> Result<Vec<String>, SysError> {
+    if user.is_null() {
+        Ok(Vec::new())
+    } else {
+        let mut buffer = Vec::new();
+        for i in 0.. {
+            let addr = unsafe { user.add(i) };
+            let str_ptr = copy_from_user(addr).ok_or(SysError::EFAULT)?;
+            if str_ptr.is_null() {
+                break;
+            }
+            let string = check_and_clone_cstr(str_ptr)?;
+            buffer.push(string);
+        }
+        Ok(buffer)
     }
 }

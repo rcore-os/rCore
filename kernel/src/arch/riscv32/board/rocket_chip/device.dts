@@ -1,0 +1,119 @@
+/dts-v1/;
+
+/ {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        compatible = "freechips,rocketchip-unknown-dev";
+        model = "freechips,rocketchip-unknown";
+        L14: cpus {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                L5: cpu@0 {
+                        clock-frequency = <0>;
+                        compatible = "sifive,rocket0", "riscv";
+                        d-cache-block-size = <64>;
+                        d-cache-sets = <64>;
+                        d-cache-size = <16384>;
+                        d-tlb-sets = <1>;
+                        d-tlb-size = <32>;
+                        device_type = "cpu";
+                        i-cache-block-size = <64>;
+                        i-cache-sets = <64>;
+                        i-cache-size = <16384>;
+                        i-tlb-sets = <1>;
+                        i-tlb-size = <32>;
+                        mmu-type = "riscv,sv39";
+                        next-level-cache = <&L6>;
+                        reg = <0>;
+                        riscv,isa = "rv64imafdc";
+                        status = "okay";
+                        timebase-frequency = <1000000>;
+                        tlb-split;
+                        L3: interrupt-controller {
+                                #interrupt-cells = <1>;
+                                compatible = "riscv,cpu-intc";
+                                interrupt-controller;
+                        };
+                };
+        };
+        L6: memory@80000000 {
+                device_type = "memory";
+                reg = <0x80000000 0x10000000>;
+        };
+        L13: soc {
+                #address-cells = <1>;
+                #size-cells = <1>;
+                compatible = "freechips,rocketchip-unknown-soc", "simple-bus";
+                ranges;
+                L11: blkdev-controller@10015000 {
+                        compatible = "ucbbar,blkdev";
+                        interrupt-parent = <&L0>;
+                        interrupts = <3>;
+                        reg = <0x10015000 0x1000>;
+                        reg-names = "control";
+                };
+                L1: clint@2000000 {
+                        compatible = "riscv,clint0";
+                        interrupts-extended = <&L3 3 &L3 7>;
+                        reg = <0x2000000 0x10000>;
+                        reg-names = "control";
+                };
+                L2: debug-controller@0 {
+                        compatible = "sifive,debug-013", "riscv,debug-013";
+                        interrupts-extended = <&L3 65535>;
+                        reg = <0x0 0x1000>;
+                        reg-names = "control";
+                };
+                L8: error-device@3000 {
+                        compatible = "sifive,error0";
+                        reg = <0x3000 0x1000>;
+                        reg-names = "mem";
+                };
+                L10: external-interrupts {
+                        interrupt-parent = <&L0>;
+                        interrupts = <1 2>;
+                };
+                L0: interrupt-controller@c000000 {
+                        #interrupt-cells = <1>;
+                        compatible = "riscv,plic0";
+                        interrupt-controller;
+                        interrupts-extended = <&L3 11 &L3 9>;
+                        reg = <0xc000000 0x4000000>;
+                        reg-names = "control";
+                        riscv,max-priority = <7>;
+                        riscv,ndev = <3>;
+                };
+                L7: mmio-port-axi4@60000000 {
+                        #address-cells = <1>;
+                        #size-cells = <1>;
+                        compatible = "simple-bus";
+                        ranges = <0x60000000 0x60000000 0x20000000>;
+                        
+                        serial0: serial@60000000 {
+                                compatible = "xlnx,xps-uartlite-1.00.a";
+                                reg = <0x6000000 0x1000>;
+                                interrupt-parent = <&axi_intc>;
+                                interrupts = <1>;
+                        };
+
+                        axi_intc: axi_intc@61200000 {
+                                compatible = "xlnx,xps-intc-1.00.a";
+                                reg = <0x61200000 0x1000>;
+                                interrupt-parent = <&L10>;
+                                interrupts = <0>;
+                        };
+
+                        router: router@64A00000 {
+                                compatible = "rcore,router";
+                                reg = <0x64A00000 0x1000>;
+                                interrupt-parent = <&L10>;
+                                interrupts = <1>;
+                        };
+                };
+                L9: rom@10000 {
+                        compatible = "sifive,rom0";
+                        reg = <0x10000 0x10000>;
+                        reg-names = "mem";
+                };
+        };
+};

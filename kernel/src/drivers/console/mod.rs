@@ -18,8 +18,8 @@ use self::fonts::{Font, Font8x16};
 mod color;
 mod fonts;
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(align(4))]
 pub struct ConsoleChar {
     ascii_char: u8,
     attr: CharacterAttribute,
@@ -28,7 +28,7 @@ pub struct ConsoleChar {
 impl Default for ConsoleChar {
     fn default() -> Self {
         ConsoleChar {
-            ascii_char: 0,
+            ascii_char: b' ',
             attr: CharacterAttribute::default(),
         }
     }
@@ -67,7 +67,9 @@ impl<F: Font> ConsoleBuffer<F> {
                 ch.attr.background.pack32(fb.color_config),
             );
             if ch.attr.reverse {
-                core::mem::swap(&mut foreground, &mut background);
+                let temp = background;
+                background = foreground;
+                foreground = temp;
             }
             let underline_y = if ch.attr.underline {
                 F::UNDERLINE
@@ -152,7 +154,7 @@ impl<F: Font> Console<F> {
 
     fn new_line(&mut self) {
         let attr_blank = ConsoleChar {
-            ascii_char: 0,
+            ascii_char: b' ',
             attr: self.parser.char_attribute(),
         };
         for j in self.col..self.buf.num_col {
@@ -172,7 +174,7 @@ impl<F: Font> Console<F> {
             return;
         }
         match byte {
-            b'\x7f' => {
+            b'\x7f' | b'\x08' => {
                 if self.col > 0 {
                     self.col -= 1;
                     self.buf.delete(self.row, self.col);
@@ -180,6 +182,12 @@ impl<F: Font> Console<F> {
                     self.row -= 1;
                     self.col = self.buf.num_col - 1;
                     self.buf.delete(self.row, self.col);
+                }
+            }
+            b'\t' => {
+                self.write_byte(b' ');
+                while self.col % 8 != 0 {
+                    self.write_byte(b' ');
                 }
             }
             b'\n' => self.new_line(),

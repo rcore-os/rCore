@@ -1,4 +1,4 @@
-use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET};
+use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use core::mem;
 use log::*;
@@ -17,10 +17,6 @@ pub fn init(dtb: usize) {
     // initialize heap and Frame allocator
     init_frame_allocator();
     init_heap();
-    // remap the kernel use 4K page
-    unsafe {
-        super::paging::setup_recursive_mapping();
-    }
     remap_the_kernel(dtb);
 }
 
@@ -54,85 +50,8 @@ fn init_frame_allocator() {
 }
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
-fn remap_the_kernel(dtb: usize) {
-    let offset = -(KERNEL_OFFSET as isize - MEMORY_OFFSET as isize);
-    let mut ms = MemorySet::new_bare();
-    ms.push(
-        stext as usize,
-        etext as usize,
-        MemoryAttr::default().execute().readonly(),
-        Linear::new(offset),
-        "text",
-    );
-    ms.push(
-        sdata as usize,
-        edata as usize,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "data",
-    );
-    ms.push(
-        srodata as usize,
-        erodata as usize,
-        MemoryAttr::default().readonly(),
-        Linear::new(offset),
-        "rodata",
-    );
-    ms.push(
-        bootstack as usize,
-        bootstacktop as usize,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "stack",
-    );
-    ms.push(
-        sbss as usize,
-        ebss as usize,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "bss",
-    );
-    // TODO: dtb on rocket chip
-    #[cfg(not(feature = "board_rocket_chip"))]
-    ms.push(
-        dtb,
-        dtb + super::consts::MAX_DTB_SIZE,
-        MemoryAttr::default().readonly(),
-        Linear::new(offset),
-        "dts",
-    );
-    // map PLIC for HiFiveU & VirtIO
-    let offset = -(KERNEL_OFFSET as isize);
-    ms.push(
-        KERNEL_OFFSET + 0x0C00_2000,
-        KERNEL_OFFSET + 0x0C00_2000 + PAGE_SIZE,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "plic0",
-    );
-    ms.push(
-        KERNEL_OFFSET + 0x0C20_2000,
-        KERNEL_OFFSET + 0x0C20_2000 + PAGE_SIZE,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "plic1",
-    );
-    // map UART for HiFiveU
-    ms.push(
-        KERNEL_OFFSET + 0x10010000,
-        KERNEL_OFFSET + 0x10010000 + PAGE_SIZE,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "uart",
-    );
-    // map UART for VirtIO
-    ms.push(
-        KERNEL_OFFSET + 0x10000000,
-        KERNEL_OFFSET + 0x10000000 + PAGE_SIZE,
-        MemoryAttr::default(),
-        Linear::new(offset),
-        "uart16550",
-    );
+fn remap_the_kernel(_dtb: usize) {
+    let mut ms = MemorySet::new();
     unsafe {
         ms.activate();
     }

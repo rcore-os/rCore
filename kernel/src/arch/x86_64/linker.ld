@@ -14,6 +14,9 @@ SECTIONS {
   .text ALIGN(4K):
   {
     stext = .;
+    _copy_user_start = .;
+    *(.text.copy_user)
+    _copy_user_end = .;
     *(.text .text.*)
     etext = .;
   }

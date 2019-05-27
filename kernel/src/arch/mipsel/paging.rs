@@ -1,30 +1,32 @@
 // Depends on kernel
-use crate::memory::{active_table, alloc_frame, dealloc_frame};
-use log::*;
+use crate::memory::{alloc_frame, dealloc_frame};
 use mips::addr::*;
-use mips::paging::{FrameAllocator, FrameDeallocator};
 use mips::paging::{
-    Mapper, PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable,
+    FrameAllocator, FrameDeallocator, Mapper, PageTable as MIPSPageTable, PageTableEntry,
+    PageTableFlags as EF, TwoLevelPageTable,
 };
-use mips::tlb::*;
+use mips::tlb::TLBEntry;
 use rcore_memory::paging::*;
 
-pub struct ActivePageTable(TwoLevelPageTable<'static>, PageEntry);
+pub struct PageTableImpl {
+    page_table: TwoLevelPageTable<'static>,
+    root_frame: Frame,
+    entry: PageEntry,
+}
 
 /// PageTableEntry: the contents of this entry.
 /// Page: this entry is the pte of page `Page`.
 pub struct PageEntry(&'static mut PageTableEntry, Page);
 
-impl PageTable for ActivePageTable {
+impl PageTable for PageTableImpl {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         // map the 4K `page` to the 4K `frame` with `flags`
         let flags = EF::VALID | EF::WRITABLE | EF::CACHEABLE;
         let page = Page::of_addr(VirtAddr::new(addr));
         let frame = Frame::of_addr(PhysAddr::new(target));
-        // map the page to the frame using FrameAllocatorForRiscv
         // we may need frame allocator to alloc frame for new page table(first/second)
-        self.0
-            .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
+        self.page_table
+            .map_to(page, frame, flags, &mut FrameAllocatorForMips)
             .unwrap()
             .flush();
         self.get_entry(addr).expect("fail to get entry")
@@ -32,19 +34,28 @@ impl PageTable for ActivePageTable {
 
     fn unmap(&mut self, addr: usize) {
         let page = Page::of_addr(VirtAddr::new(addr));
-        let (_, flush) = self.0.unmap(page).unwrap();
+        let (_, flush) = self.page_table.unmap(page).unwrap();
         flush.flush();
     }
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
         let page = Page::of_addr(VirtAddr::new(vaddr));
-        if let Ok(e) = self.0.ref_entry(page.clone()) {
+        if let Ok(e) = self.page_table.ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
-            self.1 = PageEntry(e, page);
-            Some(&mut self.1 as &mut Entry)
+            self.entry = PageEntry(e, page);
+            Some(&mut self.entry as &mut Entry)
         } else {
             None
         }
+    }
+
+    fn get_page_slice_mut<'a>(&mut self, addr: usize) -> &'a mut [u8] {
+        let frame = self
+            .page_table
+            .translate_page(Page::of_addr(VirtAddr::new(addr)))
+            .unwrap();
+        let vaddr = frame.to_kernel_unmapped().as_usize();
+        unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
 }
 
@@ -55,7 +66,7 @@ extern "C" {
 
 pub fn set_root_page_table_ptr(ptr: usize) {
     unsafe {
-        clear_all_tlb();
+        TLBEntry::clear_all();
         *(_root_page_table_ptr as *mut usize) = ptr;
     }
 }
@@ -68,24 +79,11 @@ pub fn root_page_table_buffer() -> &'static mut MIPSPageTable {
     unsafe { &mut *(_root_page_table_ptr as *mut MIPSPageTable) }
 }
 
-impl PageTableExt for ActivePageTable {}
-
-/// The virtual address of root page table
-
-impl ActivePageTable {
-    pub unsafe fn new() -> Self {
-        ActivePageTable(
-            TwoLevelPageTable::new(root_page_table_buffer()),
-            ::core::mem::uninitialized(),
-        )
-    }
-}
-
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
         unsafe {
-            clear_all_tlb();
+            TLBEntry::clear_all();
         }
     }
     fn accessed(&self) -> bool {
@@ -148,22 +146,33 @@ impl Entry for PageEntry {
     fn set_mmio(&mut self, _value: u8) {}
 }
 
-#[derive(Debug)]
-pub struct InactivePageTable0 {
-    root_frame: Frame,
+impl PageTableImpl {
+    /// Unsafely get the current active page table.
+    /// WARN: You MUST call `core::mem::forget` for it after use!
+    pub unsafe fn active() -> Self {
+        let frame = Frame::of_addr(PhysAddr::new(get_root_page_table_ptr() & 0x7fffffff));
+        let table = root_page_table_buffer();
+        PageTableImpl {
+            page_table: TwoLevelPageTable::new(table),
+            root_frame: frame,
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
+        }
+    }
 }
 
-impl InactivePageTable for InactivePageTable0 {
-    type Active = ActivePageTable;
-
+impl PageTableExt for PageTableImpl {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(PhysAddr::new(target));
 
         let table = unsafe { &mut *(target as *mut MIPSPageTable) };
-
         table.zero();
-        InactivePageTable0 { root_frame: frame }
+
+        PageTableImpl {
+            page_table: TwoLevelPageTable::new(table),
+            root_frame: frame,
+            entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
+        }
     }
 
     fn map_kernel(&mut self) {
@@ -184,48 +193,26 @@ impl InactivePageTable for InactivePageTable0 {
 
     fn flush_tlb() {
         unsafe {
-            clear_all_tlb();
+            TLBEntry::clear_all();
         }
-    }
-
-    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let pt: *mut MIPSPageTable = unsafe { self.token() as *mut MIPSPageTable };
-
-        unsafe {
-            clear_all_tlb();
-        }
-
-        let mut active = unsafe {
-            ActivePageTable(
-                TwoLevelPageTable::new(&mut *pt),
-                ::core::mem::uninitialized(),
-            )
-        };
-
-        let ret = f(&mut active);
-
-        unsafe {
-            clear_all_tlb();
-        }
-        ret
     }
 }
 
-impl Drop for InactivePageTable0 {
+impl Drop for PageTableImpl {
     fn drop(&mut self) {
         dealloc_frame(self.root_frame.start_address().as_usize());
     }
 }
 
-struct FrameAllocatorForRiscv;
+struct FrameAllocatorForMips;
 
-impl FrameAllocator for FrameAllocatorForRiscv {
+impl FrameAllocator for FrameAllocatorForMips {
     fn alloc(&mut self) -> Option<Frame> {
         alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new(addr)))
     }
 }
 
-impl FrameDeallocator for FrameAllocatorForRiscv {
+impl FrameDeallocator for FrameAllocatorForMips {
     fn dealloc(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_usize());
     }

@@ -6,7 +6,7 @@ use crate::fs::FileLike;
 use crate::memory::MemorySet;
 use crate::net::{
     Endpoint, LinkLevelEndpoint, NetlinkEndpoint, NetlinkSocketState, PacketSocketState,
-    RawSocketState, Socket, TcpSocketState, UdpSocketState, SOCKETS,
+    RawSocketState, Socket, TcpSocketState, UdpSocketState,
 };
 use alloc::boxed::Box;
 use core::cmp::min;
@@ -185,7 +185,11 @@ impl Syscall<'_> {
             iovs.write_all_from_slice(&buf[..len]);
             let sockaddr_in = SockAddr::from(endpoint);
             unsafe {
-                sockaddr_in.write_to(&mut self.vm(), hdr.msg_name, &mut hdr.msg_namelen as *mut u32)?;
+                sockaddr_in.write_to(
+                    &mut self.vm(),
+                    hdr.msg_name,
+                    &mut hdr.msg_namelen as *mut u32,
+                )?;
             }
         }
         result
@@ -427,17 +431,13 @@ fn sockaddr_to_endpoint(
                 Ok(Endpoint::Ip((addr, port).into()))
             }
             AddressFamily::Unix => Err(SysError::EINVAL),
-            AddressFamily::Packet => {
-                Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
-                    addr.addr_ll.sll_ifindex as usize,
-                )))
-            }
-            AddressFamily::Netlink => {
-                Ok(Endpoint::Netlink(NetlinkEndpoint::new(
-                    addr.addr_nl.nl_pid,
-                    addr.addr_nl.nl_groups,
-                )))
-            }
+            AddressFamily::Packet => Ok(Endpoint::LinkLevel(LinkLevelEndpoint::new(
+                addr.addr_ll.sll_ifindex as usize,
+            ))),
+            AddressFamily::Netlink => Ok(Endpoint::Netlink(NetlinkEndpoint::new(
+                addr.addr_nl.nl_pid,
+                addr.addr_nl.nl_groups,
+            ))),
             _ => Err(SysError::EINVAL),
         }
     }
@@ -456,24 +456,19 @@ impl SockAddr {
 
     /// Write to user sockaddr
     /// Check mutability for user
-    unsafe fn write_to(
-        self,
-        vm: &MemorySet,
-        addr: *mut SockAddr,
-        addr_len: *mut u32,
-    ) -> SysResult {
+    unsafe fn write_to(self, vm: &MemorySet, addr: *mut SockAddr, addr_len: *mut u32) -> SysResult {
         // Ignore NULL
         if addr.is_null() {
             return Ok(0);
         }
 
-        let addr_len = unsafe { vm.check_write_ptr(addr_len)? };
+        let addr_len = vm.check_write_ptr(addr_len)?;
         let max_addr_len = *addr_len as usize;
         let full_len = self.len()?;
 
         let written_len = min(max_addr_len, full_len);
         if written_len > 0 {
-            let target = unsafe { vm.check_write_array(addr as *mut u8, written_len)? };
+            let target = vm.check_write_array(addr as *mut u8, written_len)?;
             let source = slice::from_raw_parts(&self as *const SockAddr as *const u8, written_len);
             target.copy_from_slice(source);
         }

@@ -16,7 +16,11 @@ fn main() {
             gen_vector_asm().unwrap();
         }
         "riscv32" => {}
-        "riscv64" => {}
+        "riscv64" => {
+            if board == "rocket_chip" {
+                gen_dtb_asm(&String::from("riscv32"), &board).unwrap();
+            }
+        }
         "mipsel" => {
             gen_dtb_asm(&arch, &board).unwrap();
         }

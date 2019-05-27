@@ -11,7 +11,7 @@
 
 switch_context:
 	// save from's registers
-	addi  sp, sp, (-4*14)
+	addi  sp, sp, (-4*16)
 	sw sp, 0(a0)
 	sw ra, 0(sp)
 	sw s0, 4*4(sp)
@@ -60,7 +60,7 @@ switch_context:
 	lw s7, 11*4(sp)
 	lw s8, 12*4(sp)
 	lw gp, 13*4(sp)
-	addi sp, sp, (4*14)
+	addi sp, sp, (4*16)
 
 	sw zero, 0(a1)
 	jr ra

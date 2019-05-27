@@ -5,8 +5,10 @@ use mips::tlb;
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
-    /// unused 16 bytes
-    pub unused: [usize; 4],
+    /// Non-zero if the kernel stack is not 16-byte-aligned
+    pub unaligned_kstack: usize,
+    /// unused 12 bytes
+    pub unused: [usize; 3],
     /// CP0 status register
     pub status: cp0::status::Status,
     /// CP0 cause register
@@ -50,8 +52,42 @@ pub struct TrapFrame {
     pub sp: usize,
     pub fp: usize,
     pub ra: usize,
+    /// Floating-point registers (contains garbage if no FP support present)
+    pub f0: usize,
+    pub f1: usize,
+    pub f2: usize,
+    pub f3: usize,
+    pub f4: usize,
+    pub f5: usize,
+    pub f6: usize,
+    pub f7: usize,
+    pub f8: usize,
+    pub f9: usize,
+    pub f10: usize,
+    pub f11: usize,
+    pub f12: usize,
+    pub f13: usize,
+    pub f14: usize,
+    pub f15: usize,
+    pub f16: usize,
+    pub f17: usize,
+    pub f18: usize,
+    pub f19: usize,
+    pub f20: usize,
+    pub f21: usize,
+    pub f22: usize,
+    pub f23: usize,
+    pub f24: usize,
+    pub f25: usize,
+    pub f26: usize,
+    pub f27: usize,
+    pub f28: usize,
+    pub f29: usize,
+    pub f30: usize,
+    pub f31: usize,
     /// Reserved
     pub reserved: usize,
+    pub __padding: [usize; 2],
 }
 
 impl TrapFrame {
@@ -135,6 +171,7 @@ struct ContextData {
     /// s[1] = reserved
     /// s[2..11] = Callee-saved registers
     s: [usize; 12],
+    __padding: [usize; 2],
 }
 
 impl ContextData {

@@ -1,66 +1,79 @@
 //! Page table implementations for aarch64.
+
+use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
-use aarch64::paging::memory_attribute::*;
-use aarch64::paging::{FrameAllocator, FrameDeallocator, Page, PhysFrame as Frame, Size4KiB};
 use aarch64::paging::{
-    Mapper, PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF, RecursivePageTable,
+    frame::PhysFrame as Frame,
+    mapper::{MappedPageTable, Mapper},
+    memory_attribute::*,
+    page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
+    FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size4KiB,
 };
 use aarch64::{PhysAddr, VirtAddr};
 use log::*;
 use rcore_memory::paging::*;
-// Depends on kernel
-use crate::consts::{KERNEL_OFFSET, KERNEL_PML4, RECURSIVE_INDEX};
-use crate::memory::{active_table, alloc_frame, dealloc_frame};
 
-pub struct ActivePageTable(RecursivePageTable<'static>);
+type Page = PageAllSizes<Size4KiB>;
 
-pub struct PageEntry(PageTableEntry);
+pub struct PageTableImpl {
+    page_table: MappedPageTable<'static, fn(Frame) -> *mut Aarch64PageTable>,
+    root_frame: Frame,
+    entry: PageEntry,
+}
 
-impl PageTable for ActivePageTable {
+pub struct PageEntry(&'static mut PageTableEntry, Page);
+
+impl PageTable for PageTableImpl {
     fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
-        self.0
-            .map_to(
-                Page::of_addr(addr as u64),
-                Frame::of_addr(target as u64),
-                flags,
-                attr,
-                &mut FrameAllocatorForAarch64,
-            )
-            .unwrap()
-            .flush();
+        unsafe {
+            self.page_table
+                .map_to(
+                    Page::of_addr(addr as u64),
+                    Frame::of_addr(target as u64),
+                    flags,
+                    attr,
+                    &mut FrameAllocatorForAarch64,
+                )
+                .unwrap()
+                .flush();
+        }
         self.get_entry(addr).expect("fail to get entry")
     }
 
     fn unmap(&mut self, addr: usize) {
-        let (_frame, flush) = self.0.unmap(Page::of_addr(addr as u64)).unwrap();
-        flush.flush();
+        self.page_table
+            .unmap(Page::of_addr(addr as u64))
+            .unwrap()
+            .1
+            .flush();
     }
 
     fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
-        // get p1 entry
-        let entry_addr =
-            ((vaddr >> 9) & 0o777_777_777_7770) | (RECURSIVE_INDEX << 39) | (vaddr & KERNEL_OFFSET);
-        Some(unsafe { &mut *(entry_addr as *mut PageEntry) })
+        let page = Page::of_addr(vaddr as u64);
+        if let Ok(e) = self.page_table.get_entry_mut(page) {
+            let e = unsafe { &mut *(e as *mut PageTableEntry) };
+            self.entry = PageEntry(e, page);
+            Some(&mut self.entry as &mut Entry)
+        } else {
+            None
+        }
+    }
+
+    fn get_page_slice_mut<'a>(&mut self, addr: usize) -> &'a mut [u8] {
+        let frame = self
+            .page_table
+            .translate_page(Page::of_addr(addr as u64))
+            .unwrap();
+        let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
+        unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
 }
 
-impl PageTableExt for ActivePageTable {
-    const TEMP_PAGE_ADDR: usize = KERNEL_OFFSET | 0xcafeb000;
-}
-
-const ROOT_PAGE_TABLE: *mut Aarch64PageTable = (KERNEL_OFFSET
-    | (RECURSIVE_INDEX << 39)
-    | (RECURSIVE_INDEX << 30)
-    | (RECURSIVE_INDEX << 21)
-    | (RECURSIVE_INDEX << 12))
-    as *mut Aarch64PageTable;
-
-impl ActivePageTable {
-    pub unsafe fn new() -> Self {
-        ActivePageTable(RecursivePageTable::new(&mut *(ROOT_PAGE_TABLE as *mut _)).unwrap())
-    }
+fn frame_to_page_table(frame: Frame) -> *mut Aarch64PageTable {
+    let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
+    vaddr as *mut Aarch64PageTable
 }
 
 #[repr(u8)]
@@ -73,8 +86,7 @@ pub enum MMIOType {
 
 impl Entry for PageEntry {
     fn update(&mut self) {
-        let addr = VirtAddr::new_unchecked((self as *const _ as u64) << 9);
-        tlb_invalidate(addr);
+        tlb_invalidate(self.1.start_address());
     }
 
     fn present(&self) -> bool {
@@ -108,7 +120,8 @@ impl Entry for PageEntry {
         self.0.addr().as_u64() as usize
     }
     fn set_target(&mut self, target: usize) {
-        self.0.modify_addr(PhysAddr::new(target as u64));
+        self.0
+            .set_addr(PhysAddr::new(target as u64), self.0.flags(), self.0.attr());
     }
     fn writable_shared(&self) -> bool {
         self.0.flags().contains(EF::WRITABLE_SHARED)
@@ -171,7 +184,7 @@ impl Entry for PageEntry {
             2 => MairNormalNonCacheable::attr_value(),
             _ => return,
         };
-        self.0.modify_attr(attr);
+        self.0.set_attr(attr);
     }
 }
 
@@ -186,55 +199,45 @@ impl PageEntry {
         self.0.flags().contains(EF::DIRTY)
     }
     fn as_flags(&mut self) -> &mut EF {
-        unsafe { &mut *(self as *mut _ as *mut EF) }
+        unsafe { &mut *(self.0 as *mut _ as *mut EF) }
     }
 }
 
-#[derive(Debug)]
-pub struct InactivePageTable0 {
-    p4_frame: Frame,
+impl PageTableImpl {
+    /// Unsafely get the current active page table.
+    /// WARN: You MUST call `core::mem::forget` for it after use!
+    pub unsafe fn active() -> Self {
+        let frame = Frame::of_addr(PageTableImpl::active_token() as u64);
+        let table = &mut *frame_to_page_table(frame);
+        PageTableImpl {
+            page_table: MappedPageTable::new(table, frame_to_page_table),
+            root_frame: frame,
+            entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+        }
+    }
 }
 
-impl InactivePageTable for InactivePageTable0 {
-    type Active = ActivePageTable;
-
-    fn new() -> Self {
-        // When the new InactivePageTable is created for the user MemorySet, it's use ttbr1 as the
-        // TTBR. And the kernel TTBR ttbr0 will never changed, so we needn't call map_kernel()
-        Self::new_bare()
-    }
-
+impl PageTableExt for PageTableImpl {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
         let frame = Frame::of_addr(target as u64);
-        active_table().with_temporary_map(target, |_, table: &mut Aarch64PageTable| {
-            table.zero();
-            // set up recursive mapping for the table
-            table[RECURSIVE_INDEX].set_frame(
-                frame.clone(),
-                EF::default(),
-                MairNormal::attr_value(),
-            );
-        });
-        InactivePageTable0 { p4_frame: frame }
+        let table = unsafe { &mut *frame_to_page_table(frame) };
+        table.zero();
+        unsafe {
+            PageTableImpl {
+                page_table: MappedPageTable::new(table, frame_to_page_table),
+                root_frame: frame,
+                entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+            }
+        }
     }
 
     fn map_kernel(&mut self) {
-        let table = unsafe { &mut *ROOT_PAGE_TABLE };
-        let e0 = table[KERNEL_PML4].clone();
-        assert!(!e0.is_unused());
-
-        self.edit(|_| {
-            table[KERNEL_PML4].set_frame(
-                Frame::containing_address(e0.addr()),
-                EF::default(),
-                MairNormal::attr_value(),
-            );
-        });
+        // kernel page table is based on TTBR1_EL1 and will nerver change.
     }
 
     fn token(&self) -> usize {
-        self.p4_frame.start_address().as_u64() as usize // as TTBRx_EL1
+        self.root_frame.start_address().as_u64() as usize // as TTBR0_EL1
     }
 
     unsafe fn set_token(token: usize) {
@@ -248,69 +251,25 @@ impl InactivePageTable for InactivePageTable0 {
     fn flush_tlb() {
         tlb_invalidate_all();
     }
-
-    fn edit<T>(&mut self, f: impl FnOnce(&mut Self::Active) -> T) -> T {
-        let target = ttbr_el1_read(1).start_address().as_u64() as usize;
-        active_table().with_temporary_map(
-            target,
-            |active_table, p4_table: &mut Aarch64PageTable| {
-                let backup = p4_table[RECURSIVE_INDEX].clone();
-                let old_frame = ttbr_el1_read(0);
-
-                // overwrite recursive mapping
-                p4_table[RECURSIVE_INDEX].set_frame(
-                    self.p4_frame.clone(),
-                    EF::default(),
-                    MairNormal::attr_value(),
-                );
-                ttbr_el1_write(0, self.p4_frame.clone());
-                tlb_invalidate_all();
-
-                // execute f in the new context
-                let ret = f(active_table);
-
-                // restore recursive mapping to original p4 table
-                p4_table[RECURSIVE_INDEX] = backup;
-                ttbr_el1_write(0, old_frame);
-                tlb_invalidate_all();
-                ret
-            },
-        )
-    }
 }
 
-impl InactivePageTable0 {
-    /// Activate as kernel page table (TTBR0).
-    /// Used in `arch::memory::remap_the_kernel()`.
-    pub unsafe fn activate_as_kernel(&self) {
-        let old_frame = ttbr_el1_read(1);
-        let new_frame = self.p4_frame.clone();
-        debug!("switch TTBR1 {:?} -> {:?}", old_frame, new_frame);
-        if old_frame != new_frame {
-            ttbr_el1_write(0, Frame::of_addr(0));
-            ttbr_el1_write(1, new_frame);
-            tlb_invalidate_all();
-        }
-    }
-}
-
-impl Drop for InactivePageTable0 {
+impl Drop for PageTableImpl {
     fn drop(&mut self) {
-        info!("PageTable dropping: {:?}", self);
-        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        info!("PageTable dropping: {:?}", self.root_frame);
+        dealloc_frame(self.root_frame.start_address().as_u64() as usize);
     }
 }
 
 struct FrameAllocatorForAarch64;
 
-impl FrameAllocator<Size4KiB> for FrameAllocatorForAarch64 {
-    fn alloc(&mut self) -> Option<Frame> {
+unsafe impl FrameAllocator<Size4KiB> for FrameAllocatorForAarch64 {
+    fn allocate_frame(&mut self) -> Option<Frame> {
         alloc_frame().map(|addr| Frame::of_addr(addr as u64))
     }
 }
 
 impl FrameDeallocator<Size4KiB> for FrameAllocatorForAarch64 {
-    fn dealloc(&mut self, frame: Frame) {
+    fn deallocate_frame(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_u64() as usize);
     }
 }

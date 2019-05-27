@@ -1,7 +1,6 @@
 pub use self::structs::*;
 use crate::arch::cpu;
 use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
-use crate::sync::{MutexGuard, SpinNoIrq};
 use alloc::{boxed::Box, sync::Arc};
 use log::*;
 pub use rcore_thread::*;

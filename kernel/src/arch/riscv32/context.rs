@@ -1,6 +1,9 @@
 use riscv::register::{scause::Scause, sstatus, sstatus::Sstatus};
 
 /// Saved registers on a trap.
+///
+/// WARN: sp needs to be 128-bit (16 Bytes) aligned
+///       but we found it actually needs 32 Bytes aligned ???
 #[derive(Clone)]
 #[repr(C)]
 pub struct TrapFrame {
@@ -14,8 +17,6 @@ pub struct TrapFrame {
     pub stval: usize,
     /// Supervisor Cause
     pub scause: Scause,
-    /// Reserve space for hartid
-    pub _hartid: usize,
 }
 
 impl TrapFrame {
