@@ -26,6 +26,7 @@ pub fn init_driver() {
     #[cfg(not(feature = "nographic"))]
     fb::init();
     timer::init();
+    emmc::init();
 }
 
 /// Returns the (start address, end address) of the physical memory on this
