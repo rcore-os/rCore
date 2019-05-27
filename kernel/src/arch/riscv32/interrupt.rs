@@ -74,7 +74,7 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
 }
 
 fn external() {
-    #[cfg(feature = "board_u540")]
+    #[cfg(any(feature = "board_u540", feature = "board_rocket_chip"))]
     unsafe {
         super::board::handle_external_interrupt();
     }
@@ -132,6 +132,15 @@ fn page_fault(tf: &mut TrapFrame) {
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     if !crate::memory::handle_page_fault(addr) {
+        extern "C" {
+            fn _copy_user_start();
+            fn _copy_user_end();
+        }
+        if tf.sepc >= _copy_user_start as usize && tf.sepc < _copy_user_end as usize {
+            debug!("fixup for addr {:x?}", addr);
+            tf.sepc = crate::memory::read_user_fixup as usize;
+            return;
+        }
         crate::trap::error(tf);
     }
 }

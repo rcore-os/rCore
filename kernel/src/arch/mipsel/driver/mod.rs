@@ -11,4 +11,7 @@ pub mod console;
 pub fn init() {
     board::init_driver();
     console::init();
+    if let Some(con) = console::CONSOLE.lock().as_mut() {
+        con.clear();
+    }
 }

@@ -6,6 +6,8 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
+#![feature(fnbox)]
+#![feature(maybe_uninit)]
 #![deny(unused_must_use)]
 #![no_std]
 

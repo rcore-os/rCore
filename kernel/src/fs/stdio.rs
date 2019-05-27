@@ -29,14 +29,7 @@ impl Stdin {
                 return c;
             }
         }
-        #[cfg(feature = "board_rocket_chip")]
-        loop {
-            let c = crate::arch::io::getchar();
-            if c != '\0' && c as u8 != 254 {
-                return c;
-            }
-        }
-        #[cfg(not(any(feature = "board_k210", feature = "board_rocket_chip")))]
+        #[cfg(not(feature = "board_k210"))]
         loop {
             let mut buf_lock = self.buf.lock();
             match buf_lock.pop_front() {
@@ -48,11 +41,6 @@ impl Stdin {
         }
     }
     pub fn can_read(&self) -> bool {
-        // Currently, rocket-chip implementation rely on htif interface, the serial interrupt DO
-        // NOT work, so return true always
-        #[cfg(feature = "board_rocket_chip")]
-        return true;
-        #[cfg(not(feature = "board_rocket_chip"))]
         return self.buf.lock().len() > 0;
     }
 }
@@ -103,8 +91,12 @@ macro_rules! impl_inode {
 
 impl INode for Stdin {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        buf[0] = self.pop() as u8;
-        Ok(1)
+        if self.can_read() {
+            buf[0] = self.pop() as u8;
+            Ok(1)
+        } else {
+            Err(FsError::Again)
+        }
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         unimplemented!()

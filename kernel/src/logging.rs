@@ -3,6 +3,7 @@ use core::fmt;
 use lazy_static::lazy_static;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
+use crate::processor;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::util::color::ConsoleColor;
 
@@ -63,12 +64,17 @@ impl Log for SimpleLogger {
         true
     }
     fn log(&self, record: &Record) {
-        static DISABLED_TARGET: &[&str] = &[];
-        if self.enabled(record.metadata()) && !DISABLED_TARGET.contains(&record.target()) {
-            //            let target = record.target();
-            //            let begin = target.as_bytes().iter().rposition(|&c| c == b':').map(|i| i + 1).unwrap_or(0);
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        if let Some(tid) = processor().tid_option() {
             print_in_color(
-                format_args!("[{:>5}] {}\n", record.level(), record.args()),
+                format_args!("[{:>5}][{}] {}\n", record.level(), tid, record.args()),
+                ConsoleColor::from(record.level()),
+            );
+        } else {
+            print_in_color(
+                format_args!("[{:>5}][-] {}\n", record.level(), record.args()),
                 ConsoleColor::from(record.level()),
             );
         }

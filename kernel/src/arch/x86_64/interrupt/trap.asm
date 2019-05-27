@@ -49,10 +49,8 @@ __alltraps:
 .global trap_ret
 trap_ret:
 
-    # store kernel rsp -> TSS.sp0
     mov rdi, rsp
-    add rdi, 720
-    mov gs:[4], rdi
+    call set_return_rsp
 
     # pop fp state offset
     pop rcx
@@ -106,6 +104,8 @@ syscall_entry:
     # - store rip -> rcx
     # - load rip
 
+    # swap in kernel gs
+    swapgs
     # store user rsp -> scratch at TSS.sp1
     mov gs:[12], rsp
     # load kernel rsp <- TSS.sp0
@@ -119,8 +119,11 @@ syscall_entry:
     push 0          # error_code (dummy)
     push 0          # trap_num (dummy)
 
+    # swap out kernel gs
+    swapgs
+
     # enable interrupt
-    sti
+    # sti
 
     push rax
     push rcx
@@ -170,10 +173,8 @@ syscall_return:
     # disable interrupt
     cli
 
-    # store kernel rsp -> TSS.sp0
     mov rdi, rsp
-    add rdi, 720
-    mov gs:[4], rdi
+    call set_return_rsp
 
     # pop fp state offset
     pop rcx

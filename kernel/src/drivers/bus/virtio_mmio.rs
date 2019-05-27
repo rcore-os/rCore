@@ -8,18 +8,16 @@ use bitflags::*;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
-use rcore_memory::paging::PageTable;
 use rcore_memory::PAGE_SIZE;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-use crate::arch::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
-use crate::memory::active_table;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
 use super::super::input::virtio_input;
 use super::super::net::virtio_net;
+use crate::memory::{phys_to_virt, virt_to_phys};
 
 // virtio 4.2.4 Legacy interface
 #[repr(C)]
@@ -85,10 +83,10 @@ impl VirtIOVirtqueue {
         assert_eq!(header.queue_pfn.read(), 0); // not in use
         let queue_num_max = header.queue_num_max.read();
         assert!(queue_num_max >= queue_num as u32); // queue available
-        assert!(queue_num & (queue_num - 1) == 0); // power of two
+        assert_eq!(queue_num & (queue_num - 1), 0); // power of two
         let align = PAGE_SIZE;
         let size = virtqueue_size(queue_num, align);
-        assert!(size % align == 0);
+        assert_eq!(size % align, 0);
         // alloc continuous pages
         let address =
             unsafe { HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size, align).unwrap()) }
@@ -96,9 +94,7 @@ impl VirtIOVirtqueue {
 
         header.queue_num.write(queue_num as u32);
         header.queue_align.write(align as u32);
-        header
-            .queue_pfn
-            .write(((address - KERNEL_OFFSET + MEMORY_OFFSET) as u32) >> 12);
+        header.queue_pfn.write((virt_to_phys(address) as u32) >> 12);
 
         // link desc together
         let desc =
@@ -146,7 +142,7 @@ impl VirtIOVirtqueue {
             desc[cur].flags.write(VirtIOVirtqueueFlag::NEXT.bits());
             desc[cur]
                 .addr
-                .write(output[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+                .write(virt_to_phys(output[i].as_ptr() as usize) as u64);
             desc[cur].len.write(output[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
@@ -157,7 +153,7 @@ impl VirtIOVirtqueue {
                 .write((VirtIOVirtqueueFlag::NEXT | VirtIOVirtqueueFlag::WRITE).bits());
             desc[cur]
                 .addr
-                .write(input[i].as_ptr() as u64 - KERNEL_OFFSET as u64 + MEMORY_OFFSET as u64);
+                .write(virt_to_phys(input[i].as_ptr() as usize) as u64);
             desc[cur].len.write(input[i].len() as u32);
             prev = cur;
             cur = desc[cur].next.read() as usize;
@@ -222,7 +218,7 @@ impl VirtIOVirtqueue {
         let mut output = Vec::new();
         loop {
             let flags = VirtIOVirtqueueFlag::from_bits_truncate(desc[cur].flags.read());
-            let addr = desc[cur].addr.read() as u64 - MEMORY_OFFSET as u64 + KERNEL_OFFSET as u64;
+            let addr = phys_to_virt(desc[cur].addr.read() as usize);
             let buffer =
                 unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
             if flags.contains(VirtIOVirtqueueFlag::WRITE) {
@@ -265,7 +261,7 @@ impl VirtIOVirtqueue {
     }
 }
 
-pub const VIRTIO_CONFIG_SPACE_OFFSET: u64 = 0x100;
+pub const VIRTIO_CONFIG_SPACE_OFFSET: usize = 0x100;
 
 impl VirtIOHeader {
     pub fn read_device_features(&mut self) -> u64 {
@@ -354,12 +350,13 @@ pub fn virtqueue_used_elem_offset(num: usize, align: usize) -> usize {
 
 pub fn virtio_probe(node: &Node) {
     if let Some(reg) = node.prop_raw("reg") {
-        let from = reg.as_slice().read_be_u64(0).unwrap();
+        let paddr = reg.as_slice().read_be_u64(0).unwrap();
+        let vaddr = phys_to_virt(paddr as usize);
+        debug!("walk dt {:x} {:x}", paddr, vaddr);
         let size = reg.as_slice().read_be_u64(8).unwrap();
         // assuming one page
         assert_eq!(size as usize, PAGE_SIZE);
-        active_table().map(from as usize, from as usize);
-        let header = unsafe { &mut *(from as *mut VirtIOHeader) };
+        let header = unsafe { &mut *(vaddr as *mut VirtIOHeader) };
         let magic = header.magic.read();
         let version = header.version.read();
         let device_id = header.device_id.read();
@@ -374,23 +371,13 @@ pub fn virtio_probe(node: &Node) {
             // virtio 3.1.1 Device Initialization
             header.status.write(0);
             header.status.write(VirtIODeviceStatus::ACKNOWLEDGE.bits());
-            if device_id == 1 {
-                // net device
-                virtio_net::virtio_net_init(node);
-            } else if device_id == 2 {
-                // blk device
-                virtio_blk::virtio_blk_init(node);
-            } else if device_id == 16 {
-                // gpu device
-                virtio_gpu::virtio_gpu_init(node);
-            } else if device_id == 18 {
-                // input device
-                virtio_input::virtio_input_init(node);
-            } else {
-                println!("Unrecognized virtio device {}", device_id);
+            match device_id {
+                1 => virtio_net::virtio_net_init(node),
+                2 => virtio_blk::virtio_blk_init(node),
+                16 => virtio_gpu::virtio_gpu_init(node),
+                18 => virtio_input::virtio_input_init(node),
+                _ => warn!("Unrecognized virtio device {}", device_id),
             }
-        } else {
-            active_table().unmap(from as usize);
         }
     }
 }

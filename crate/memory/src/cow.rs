@@ -109,8 +109,8 @@ impl<T: PageTable> CowExt<T> {
             self.rc_map.write_decrease(&frame);
             return true;
         }
-        use core::mem::uninitialized;
-        let mut temp_data: [u8; PAGE_SIZE] = unsafe { uninitialized() };
+        use core::mem::MaybeUninit;
+        let mut temp_data: [u8; PAGE_SIZE] = unsafe { MaybeUninit::uninitialized().into_initialized() };
         temp_data[..].copy_from_slice(self.get_page_slice_mut(addr));
 
         self.unmap_shared(addr);

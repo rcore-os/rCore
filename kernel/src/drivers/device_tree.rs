@@ -4,6 +4,7 @@ use core::slice;
 use device_tree::{DeviceTree, Node};
 
 use super::bus::virtio_mmio::virtio_probe;
+use super::net::router::router_init;
 use super::CMDLINE;
 
 const DEVICE_TREE_MAGIC: u32 = 0xd00dfeed;
@@ -13,6 +14,9 @@ fn walk_dt_node(dt: &Node) {
         // TODO: query this from table
         if compatible == "virtio,mmio" {
             virtio_probe(dt);
+        }
+        if compatible == "rcore,router" {
+            router_init();
         }
         // TODO: initial other devices (16650, etc.)
     }

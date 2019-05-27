@@ -1,5 +1,6 @@
 //! Framebuffer
 
+use crate::fs::vga::{fb_bitfield, fb_var_screeninfo};
 use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -40,6 +41,7 @@ pub struct FramebufferInfo {
 pub enum ColorDepth {
     ColorDepth8 = 8,
     ColorDepth16 = 16,
+    ColorDepth24 = 24,
     ColorDepth32 = 32,
 }
 use self::ColorDepth::*;
@@ -74,6 +76,9 @@ impl ColorBuffer {
                 ColorDepth16 => ColorBuffer {
                     buf16: core::slice::from_raw_parts_mut(base_addr as *mut u16, size / 2),
                 },
+                ColorDepth24 => ColorBuffer {
+                    buf8: core::slice::from_raw_parts_mut(base_addr as *mut u8, size),
+                },
                 ColorDepth32 => ColorBuffer {
                     buf32: core::slice::from_raw_parts_mut(base_addr as *mut u32, size / 4),
                 },
@@ -104,6 +109,14 @@ impl ColorBuffer {
     #[inline]
     fn write16(&mut self, index: u32, pixel: u16) {
         unsafe { self.buf16[index as usize] = pixel }
+    }
+
+    #[inline]
+    fn write24(&mut self, index: u32, pixel: u32) {
+        let index = index * 3;
+        unsafe { self.buf8[2 + index as usize] = (pixel >> 16) as u8 }
+        unsafe { self.buf8[1 + index as usize] = (pixel >> 8) as u8 }
+        unsafe { self.buf8[index as usize] = pixel as u8 }
     }
 
     #[inline]
@@ -141,6 +154,7 @@ impl Framebuffer {
                     8 => ColorDepth8,
                     16 => ColorDepth16,
                     32 => ColorDepth32,
+                    24 => ColorDepth24,
                     _ => Err(format!("unsupported color depth {}", info.depth))?,
                 };
                 Ok(Framebuffer {
@@ -159,12 +173,23 @@ impl Framebuffer {
         unsafe { self.buf.base_addr }
     }
 
+    #[inline]
+    pub fn framebuffer_size(&self) -> usize {
+        self.fb_info.screen_size as usize
+    }
+
+    #[inline]
+    pub fn bus_addr(&self) -> usize {
+        self.fb_info.bus_addr as usize
+    }
+
     /// Read pixel at `(x, y)`.
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {
         match self.color_depth {
             ColorDepth8 => self.buf.read8(y * self.fb_info.xres + x) as u32,
             ColorDepth16 => self.buf.read16(y * self.fb_info.xres + x) as u32,
+            ColorDepth24 => self.buf.read16(y * self.fb_info.xres + x) as u32, // TODO
             ColorDepth32 => self.buf.read32(y * self.fb_info.xres + x),
         }
     }
@@ -175,6 +200,7 @@ impl Framebuffer {
         match self.color_depth {
             ColorDepth8 => self.buf.write8(y * self.fb_info.xres + x, pixel as u8),
             ColorDepth16 => self.buf.write16(y * self.fb_info.xres + x, pixel as u16),
+            ColorDepth24 => self.buf.write24(y * self.fb_info.xres + x, pixel),
             ColorDepth32 => self.buf.write32(y * self.fb_info.xres + x, pixel),
         }
     }
@@ -216,6 +242,16 @@ impl Framebuffer {
     /// Fill the entire buffer with `0`.
     pub fn clear(&mut self) {
         self.fill(0, self.fb_info.screen_size as usize, 0);
+    }
+
+    pub fn fill_var_screeninfo(&self, var_info: &mut fb_var_screeninfo) {
+        var_info.xres = self.fb_info.xres;
+        var_info.yres = self.fb_info.yres;
+        var_info.xres_virtual = self.fb_info.xres_virtual;
+        var_info.yres_virtual = self.fb_info.yres_virtual;
+        var_info.xoffset = self.fb_info.xoffset;
+        var_info.yoffset = self.fb_info.yoffset;
+        var_info.bits_per_pixel = self.fb_info.depth;
     }
 }
 

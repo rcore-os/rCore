@@ -11,30 +11,19 @@ pub struct Page {
 }
 
 impl Page {
-    /*
-     **  @brief  get the virtual address of beginning of the page
-     **  @retval VirtAddr             the virtual address of beginning of the page
-     */
+    /// Returns the start address of the page.
     pub fn start_address(&self) -> VirtAddr {
         self.number * PAGE_SIZE
     }
-    /*
-     **  @brief  get the page of a given virtual address
-     **  @param  addr: VirtAddr       the given virtual address
-     **  @retval Page                 the page of the given virtual address
-     */
+
+    /// Returns the page that contains the given virtual address.
     pub fn of_addr(addr: VirtAddr) -> Self {
         Page {
             number: addr / PAGE_SIZE,
         }
     }
 
-    /*
-     **  @brief  get a pageRange between two virtual address
-     **  @param  begin: VirtAddr      the virtual address of the beginning
-     **  @param  end: VirtAddr        the virtual address of the end
-     **  @retval PageRange            the page of the given virtual address
-     */
+    /// Returns a range of pages between address `begin` and `end`
     pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange {
         PageRange {
             start: Page::of_addr(begin),
@@ -79,45 +68,3 @@ impl Iterator for PageRange {
         }
     }
 }
-
-/// frame for the swapmanager
-#[derive(Debug, Copy, Clone, PartialOrd, Ord)]
-#[repr(C)]
-pub struct Frame {
-    /// the raw pointer for the frame's memory set's inactive page table
-    page_table: usize,
-    /// the virtual addr for the frame
-    virtaddr: VirtAddr,
-    /// the token for frame
-    token: usize,
-}
-
-impl Frame {
-    pub fn get_page_table(&self) -> usize {
-        self.page_table
-    }
-
-    pub fn get_virtaddr(&self) -> VirtAddr {
-        self.virtaddr
-    }
-
-    pub fn get_token(&self) -> usize {
-        self.token
-    }
-
-    pub fn new(pt: usize, addr: VirtAddr, pttoken: usize) -> Self {
-        Frame {
-            page_table: pt,
-            virtaddr: addr,
-            token: pttoken,
-        }
-    }
-}
-
-impl PartialEq for Frame {
-    fn eq(&self, other: &Frame) -> bool {
-        self.token == other.token && self.virtaddr == other.virtaddr
-    }
-}
-
-impl Eq for Frame {}

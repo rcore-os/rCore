@@ -14,23 +14,24 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
+use crate::consts::{MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
+use crate::process::current_thread;
 use crate::sync::SpinNoIrqLock;
-use alloc::boxed::Box;
 use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
+use core::mem;
+use core::mem::size_of;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::paging::PageTable;
 use rcore_memory::*;
-use crate::process::current_thread;
 
-pub type MemorySet = rcore_memory::memory_set::MemorySet<InactivePageTable0>;
+pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
-// x86_64 support up to 64G memory
+// x86_64 support up to 1T memory
 #[cfg(target_arch = "x86_64")]
-pub type FrameAlloc = bitmap_allocator::BitAlloc16M;
+pub type FrameAlloc = bitmap_allocator::BitAlloc256M;
 
 // RISCV, ARM, MIPS has 1G memory
 #[cfg(all(
@@ -53,22 +54,14 @@ lazy_static! {
         SpinNoIrqLock::new(FrameAlloc::default());
 }
 
-/// The only way to get active page table
-///
-/// ## CHANGE LOG
-///
-/// In the past, this function returns a `MutexGuard` of a global
-/// `Mutex<ActiveTable>` object, which means only one CPU core
-/// can access its active table at a time.
-///
-/// But given that a page table is ** process local **, and being active
-/// when and only when a thread of the process is running.
-/// The ownership of this page table is in the `MemorySet` object.
-/// So it's safe to access the active table inside `MemorySet`.
-/// But the shared parts is readonly, e.g. all pages mapped in
-/// `InactivePageTable::map_kernel()`.
-pub fn active_table() -> ActivePageTable {
-    unsafe { ActivePageTable::new() }
+/// Convert physical address to virtual address
+pub const fn phys_to_virt(paddr: usize) -> usize {
+    PHYSICAL_MEMORY_OFFSET + paddr
+}
+
+/// Convert virtual address to physical address
+pub const fn virt_to_phys(vaddr: usize) -> usize {
+    vaddr - PHYSICAL_MEMORY_OFFSET
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -138,11 +131,13 @@ pub fn handle_page_fault(addr: usize) -> bool {
 
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
-    static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+    const MACHINE_ALIGN: usize = mem::size_of::<usize>();
+    const HEAP_BLOCK: usize = KERNEL_HEAP_SIZE / MACHINE_ALIGN;
+    static mut HEAP: [usize; HEAP_BLOCK] = [0; HEAP_BLOCK];
     unsafe {
         HEAP_ALLOCATOR
             .lock()
-            .init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE);
+            .init(HEAP.as_ptr() as usize, HEAP_BLOCK * MACHINE_ALIGN);
     }
     info!("heap init end");
 }
@@ -150,13 +145,9 @@ pub fn init_heap() {
 pub fn enlarge_heap(heap: &mut Heap) {
     info!("Enlarging heap to avoid oom");
 
-    let mut page_table = active_table();
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
-    #[cfg(target_arch = "x86_64")]
-    let va_offset = KERNEL_OFFSET + 0xe0000000;
-    #[cfg(not(target_arch = "x86_64"))]
-    let va_offset = KERNEL_OFFSET + 0x00e00000;
+    let va_offset = PHYSICAL_MEMORY_OFFSET;
     for i in 0..16384 {
         let page = alloc_frame().unwrap();
         let va = va_offset + page;
@@ -172,12 +163,37 @@ pub fn enlarge_heap(heap: &mut Heap) {
         addr_len += 1;
     }
     for (addr, len) in addrs[..addr_len].into_iter() {
-        for va in (*addr..(*addr + *len)).step_by(PAGE_SIZE) {
-            page_table.map(va, va - va_offset).update();
-        }
         info!("Adding {:#X} {:#X} to heap", addr, len);
         unsafe {
             heap.init(*addr, *len);
         }
+    }
+}
+
+/// Check whether the address range [addr, addr + len) is not in kernel space
+pub fn access_ok(addr: usize, len: usize) -> bool {
+    addr < PHYSICAL_MEMORY_OFFSET && (addr + len) < PHYSICAL_MEMORY_OFFSET
+}
+
+#[naked]
+pub unsafe extern "C" fn read_user_fixup() -> usize {
+    return 1;
+}
+
+pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn read_user<T>(dst: *mut T, src: *const T) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<T>()) {
+        return None;
+    }
+    let mut dst: T = unsafe { core::mem::uninitialized() };
+    match unsafe { read_user(&mut dst, addr) } {
+        0 => Some(dst),
+        _ => None,
     }
 }

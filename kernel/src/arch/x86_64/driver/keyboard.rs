@@ -7,6 +7,7 @@ pub fn init() {
     use crate::arch::interrupt::consts;
     use crate::arch::interrupt::enable_irq;
     enable_irq(consts::Keyboard);
+    info!("keyboard: init end");
 }
 
 /// Receive character from keyboard

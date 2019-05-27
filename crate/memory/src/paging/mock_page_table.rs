@@ -144,10 +144,10 @@ impl MockPageTable {
      **  @retval MockPageTable        the mock page table created
      */
     pub fn new() -> Self {
-        use core::mem::uninitialized;
+        use core::mem::MaybeUninit;
         MockPageTable {
             entries: [MockEntry::default(); PAGE_COUNT],
-            data: unsafe { uninitialized() },
+            data: unsafe { MaybeUninit::uninitialized().into_initialized() },
             page_fault_handler: None,
         }
     }

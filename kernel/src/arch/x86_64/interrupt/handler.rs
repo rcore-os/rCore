@@ -109,6 +109,11 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         Syscall32 => syscall32(tf),
         InvalidOpcode => invalid_opcode(tf),
         DivideError | GeneralProtectionFault => error(tf),
+        IPIFuncCall => {
+            let irq = tf.trap_num as u8 - IRQ0;
+            super::ack(irq); // must ack before switching
+            super::super::gdt::Cpu::current().handle_ipi();
+        }
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
 }
@@ -142,6 +147,17 @@ fn page_fault(tf: &mut TrapFrame) {
     if crate::memory::handle_page_fault(addr) {
         return;
     }
+
+    extern "C" {
+        fn _copy_user_start();
+        fn _copy_user_end();
+    }
+    if tf.rip >= _copy_user_start as usize && tf.rip < _copy_user_end as usize {
+        debug!("fixup for addr {:x?}", addr);
+        tf.rip = crate::memory::read_user_fixup as usize;
+        return;
+    }
+
     error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:?}", addr, code);
     error(tf);
 }
@@ -212,4 +228,10 @@ fn invalid_opcode(tf: &mut TrapFrame) {
 
 fn error(tf: &TrapFrame) {
     crate::trap::error(tf);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_return_rsp(tf: *const TrapFrame) {
+    use crate::arch::gdt::Cpu;
+    Cpu::current().set_ring0_rsp(tf.add(1) as usize);
 }

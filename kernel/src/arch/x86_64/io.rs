@@ -1,5 +1,5 @@
+use super::driver::console::CONSOLE;
 use super::driver::serial::*;
-use super::driver::vga::VGA_WRITER;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {
@@ -10,18 +10,19 @@ pub fn getchar() -> char {
 }
 
 pub fn putfmt(fmt: Arguments) {
-    #[cfg(feature = "nographic")]
-    {
-        unsafe {
-            COM1.force_unlock();
-        }
-        COM1.lock().write_fmt(fmt).unwrap();
+    // print to console
+    unsafe {
+        COM1.force_unlock();
     }
-    #[cfg(not(feature = "nographic"))]
+    COM1.lock().write_fmt(fmt).unwrap();
+
+    // print to graphic
+    #[cfg(feature = "consolegraphic")]
     {
-        unsafe {
-            VGA_WRITER.force_unlock();
+        use super::driver::vga::VGA_WRITER;
+        unsafe { CONSOLE.force_unlock() }
+        if let Some(console) = CONSOLE.lock().as_mut() {
+            console.write_fmt(fmt).unwrap();
         }
-        VGA_WRITER.lock().write_fmt(fmt).unwrap();
     }
 }

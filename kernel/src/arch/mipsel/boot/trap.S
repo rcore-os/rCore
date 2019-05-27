@@ -31,9 +31,27 @@ trap_from_kernel:
 	 *  k0 is damaged
 	 *  k1 = old stack pointer
 	 *  sp = kernel stack */
+
+#ifdef board_thinpad
+#define TRAPFRAME_SIZE 304
+#else
+#define TRAPFRAME_SIZE 176
+#endif
+
+	# align stack pointer
+	andi k0, sp, 0xf
+	beqz k0, sp_aligned
+	nop
+
+	la k0, 0xfffffff0
+	and k0, sp, k0
+	sw sp, -TRAPFRAME_SIZE(k0)
+	move sp, k0
 	
-	# allocate 38 words for trapframe + 4 extra words
-	addiu sp, sp, -168
+sp_aligned:
+	# allocate 38 / 70 words for trapframe + 6 extra words
+
+	addiu sp, sp, -TRAPFRAME_SIZE
 
 	# save general registers
 	sw ra, 160(sp)
@@ -68,6 +86,42 @@ trap_from_kernel:
 	sw v0, 44(sp)
 	sw AT, 40(sp)
 	nop	
+
+#ifdef board_thinpad
+	# save floating point registers
+	swc1 $f0, 164(sp)
+	swc1 $f1, 168(sp)
+	swc1 $f2, 172(sp)
+	swc1 $f3, 176(sp)
+	swc1 $f4, 180(sp)
+	swc1 $f5, 184(sp)
+	swc1 $f6, 188(sp)
+	swc1 $f7, 192(sp)
+	swc1 $f8, 196(sp)
+	swc1 $f9, 200(sp)
+	swc1 $f10, 204(sp)
+	swc1 $f11, 208(sp)
+	swc1 $f12, 212(sp)
+	swc1 $f13, 216(sp)
+	swc1 $f14, 220(sp)
+	swc1 $f15, 224(sp)
+	swc1 $f16, 228(sp)
+	swc1 $f17, 232(sp)
+	swc1 $f18, 236(sp)
+	swc1 $f19, 240(sp)
+	swc1 $f20, 244(sp)
+	swc1 $f21, 248(sp)
+	swc1 $f22, 252(sp)
+	swc1 $f23, 256(sp)
+	swc1 $f24, 260(sp)
+	swc1 $f25, 264(sp)
+	swc1 $f26, 268(sp)
+	swc1 $f27, 272(sp)
+	swc1 $f28, 276(sp)
+	swc1 $f29, 280(sp)
+	swc1 $f30, 284(sp)
+	swc1 $f31, 288(sp)
+#endif
 
 	# save hi/lo
 	mflo t1
@@ -147,9 +201,48 @@ trap_return:
 	lw fp, 156(sp)
 	lw ra, 160(sp)
 
-	// save kernel stack
+#ifdef board_thinpad
+	# restore floating point registers
+	lwc1 $f0, 164(sp)
+	lwc1 $f1, 168(sp)
+	lwc1 $f2, 172(sp)
+	lwc1 $f3, 176(sp)
+	lwc1 $f4, 180(sp)
+	lwc1 $f5, 184(sp)
+	lwc1 $f6, 188(sp)
+	lwc1 $f7, 192(sp)
+	lwc1 $f8, 196(sp)
+	lwc1 $f9, 200(sp)
+	lwc1 $f10, 204(sp)
+	lwc1 $f11, 208(sp)
+	lwc1 $f12, 212(sp)
+	lwc1 $f13, 216(sp)
+	lwc1 $f14, 220(sp)
+	lwc1 $f15, 224(sp)
+	lwc1 $f16, 228(sp)
+	lwc1 $f17, 232(sp)
+	lwc1 $f18, 236(sp)
+	lwc1 $f19, 240(sp)
+	lwc1 $f20, 244(sp)
+	lwc1 $f21, 248(sp)
+	lwc1 $f22, 252(sp)
+	lwc1 $f23, 256(sp)
+	lwc1 $f24, 260(sp)
+	lwc1 $f25, 264(sp)
+	lwc1 $f26, 268(sp)
+	lwc1 $f27, 272(sp)
+	lwc1 $f28, 276(sp)
+	lwc1 $f29, 280(sp)
+	lwc1 $f30, 284(sp)
+	lwc1 $f31, 288(sp)
+#endif
+
+	# save kernel stack
+	lw k0, 0(sp)
+	addiu k1, sp, TRAPFRAME_SIZE
+	movn k1, k0, k0
+
 	la k0, _cur_kstack_ptr
-	addiu k1, sp, 168
 	sw k1, 0(k0)
 	nop
 

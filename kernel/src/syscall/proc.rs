@@ -1,7 +1,6 @@
 //! Syscalls for process
 
 use super::*;
-use crate::fs::INodeExt;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -54,7 +53,6 @@ impl Syscall<'_> {
         let new_thread = self
             .thread
             .clone(self.tf, newsp, newtls, child_tid as usize);
-        // FIXME: parent pid
         let tid = processor().manager().add(new_thread);
         processor().manager().detach(tid);
         info!("clone: {} -> {}", thread::current().id(), tid);
@@ -66,7 +64,7 @@ impl Syscall<'_> {
     /// Wait for the process exit.
     /// Return the PID. Store exit code to `wstatus` if it's not null.
     pub fn sys_wait4(&mut self, pid: isize, wstatus: *mut i32) -> SysResult {
-        //info!("wait4: pid: {}, code: {:?}", pid, wstatus);
+        info!("wait4: pid: {}, code: {:?}", pid, wstatus);
         let wstatus = if !wstatus.is_null() {
             Some(unsafe { self.vm().check_write_ptr(wstatus)? })
         } else {
@@ -75,10 +73,12 @@ impl Syscall<'_> {
         #[derive(Debug)]
         enum WaitFor {
             AnyChild,
+            AnyChildInGroup,
             Pid(usize),
         }
         let target = match pid {
-            -1 | 0 => WaitFor::AnyChild,
+            -1 => WaitFor::AnyChild,
+            0 => WaitFor::AnyChildInGroup,
             p if p > 0 => WaitFor::Pid(p as usize),
             _ => unimplemented!(),
         };
@@ -86,7 +86,7 @@ impl Syscall<'_> {
             let mut proc = self.process();
             // check child_exit_code
             let find = match target {
-                WaitFor::AnyChild => proc
+                WaitFor::AnyChild | WaitFor::AnyChildInGroup => proc
                     .child_exit_code
                     .iter()
                     .next()
@@ -102,17 +102,19 @@ impl Syscall<'_> {
                 return Ok(pid);
             }
             // if not, check pid
-            let children: Vec<_> = proc
-                .children
-                .iter()
-                .filter_map(|weak| weak.upgrade())
-                .collect();
-            let invalid = match target {
-                WaitFor::AnyChild => children.len() == 0,
-                WaitFor::Pid(pid) => children
+            let invalid = {
+                let children: Vec<_> = proc
+                    .children
                     .iter()
-                    .find(|p| p.lock().pid.get() == pid)
-                    .is_none(),
+                    .filter_map(|weak| weak.upgrade())
+                    .collect();
+                match target {
+                    WaitFor::AnyChild | WaitFor::AnyChildInGroup => children.len() == 0,
+                    WaitFor::Pid(pid) => children
+                        .iter()
+                        .find(|p| p.lock().pid.get() == pid)
+                        .is_none(),
+                }
             };
             if invalid {
                 return Err(SysError::ECHILD);
@@ -150,9 +152,9 @@ impl Syscall<'_> {
             path, argv, envp
         );
         let mut proc = self.process();
-        let path = unsafe { self.vm().check_and_clone_cstr(path)? };
-        let args = unsafe { self.vm().check_and_clone_cstr_array(argv)? };
-        let envs = unsafe { self.vm().check_and_clone_cstr_array(envp)? };
+        let path = check_and_clone_cstr(path)?;
+        let args = check_and_clone_cstr_array(argv)?;
+        let envs = check_and_clone_cstr_array(envp)?;
 
         if args.is_empty() {
             error!("exec: args is null");
@@ -204,7 +206,7 @@ impl Syscall<'_> {
     /// Kill the process
     pub fn sys_kill(&mut self, pid: usize, sig: usize) -> SysResult {
         info!(
-            "kill: {} killed: {} with sig {}",
+            "kill: thread {} kill process {} with signal {}",
             thread::current().id(),
             pid,
             sig
@@ -215,21 +217,8 @@ impl Syscall<'_> {
             self.sys_exit_group(sig);
         } else {
             if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
-                let proc = proc_arc.lock();
-                // quit all threads
-                for tid in proc.threads.iter() {
-                    processor().manager().exit(*tid, sig);
-                }
-                // notify parent and fill exit code
-                // avoid deadlock
-                let proc_parent = proc.parent.clone();
-                let pid = proc.pid.get();
-                drop(proc);
-                if let Some(parent) = proc_parent {
-                    let mut parent = parent.lock();
-                    parent.child_exit_code.insert(pid, sig);
-                    parent.child_exit.notify_one();
-                }
+                let mut proc = proc_arc.lock();
+                proc.exit(sig);
                 Ok(0)
             } else {
                 Err(SysError::EINVAL)
@@ -252,7 +241,7 @@ impl Syscall<'_> {
 
     /// Get the parent process id
     pub fn sys_getppid(&mut self) -> SysResult {
-        if let Some(parent) = self.process().parent.as_ref() {
+        if let Some(parent) = self.process().parent.upgrade() {
             Ok(parent.lock().pid.get())
         } else {
             Ok(0)
@@ -266,26 +255,15 @@ impl Syscall<'_> {
         let mut proc = self.process();
         proc.threads.retain(|&id| id != tid);
 
-        // for last thread,
-        // notify parent and fill exit code
-        // avoid deadlock
-        let exit = proc.threads.len() == 0;
-        let proc_parent = proc.parent.clone();
-        let pid = proc.pid.get();
-        drop(proc);
-        if exit {
-            if let Some(parent) = proc_parent {
-                let mut parent = parent.lock();
-                parent.child_exit_code.insert(pid, exit_code);
-                parent.child_exit.notify_one();
-            }
+        // for last thread, exit the process
+        if proc.threads.len() == 0 {
+            proc.exit(exit_code);
         }
 
         // perform futex wake 1
         // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
         // FIXME: do it in all possible ways a thread can exit
         //        it has memory access so we can't move it to Thread::drop?
-        let mut proc = self.process();
         let clear_child_tid = self.thread.clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
@@ -304,24 +282,10 @@ impl Syscall<'_> {
 
     /// Exit the current thread group (i.e. process)
     pub fn sys_exit_group(&mut self, exit_code: usize) -> ! {
-        let proc = self.process();
+        let mut proc = self.process();
         info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
-        // quit all threads
-        for tid in proc.threads.iter() {
-            processor().manager().exit(*tid, exit_code);
-        }
-
-        // notify parent and fill exit code
-        // avoid deadlock
-        let proc_parent = proc.parent.clone();
-        let pid = proc.pid.get();
-        drop(proc);
-        if let Some(parent) = proc_parent {
-            let mut parent = parent.lock();
-            parent.child_exit_code.insert(pid, exit_code);
-            parent.child_exit.notify_one();
-        }
+        proc.exit(exit_code);
 
         processor().yield_now();
         unreachable!();
@@ -350,27 +314,29 @@ impl Syscall<'_> {
 
 bitflags! {
     pub struct CloneFlags: usize {
-        const CSIGNAL = 0x000000ff;
-        const VM = 0x0000100;
-        const FS = 0x0000200;
-        const FILES = 0x0000400;
-        const SIGHAND = 0x0000800;
-        const PTRACE = 0x0002000;
-        const VFORK = 0x0004000;
-        const PARENT = 0x0008000;
-        const SYSVSEM = 0x0008000;
-        const SETTLS = 0x0008000;
-        const PARENT_SETTID = 0x0010000;
-        const CHILD_CLEARTID = 0x0020000;
-        const DETACHED = 0x0040000;
-        const UNTRACED = 0x0080000;
-        const CHILD_SETTID = 0x0100000;
-        const NEWCGROUP = 0x0200000;
-        const NEWUTS = 0x0400000;
-        const NEWIPC = 0x0800000;
-        const NEWUSER = 0x1000000;
-        const NEWPID = 0x2000000;
-        const NEWNET = 0x4000000;
-        const IO = 0x8000000;
+        const CSIGNAL =         0x000000ff;
+        const VM =              0x00000100;
+        const FS =              0x00000200;
+        const FILES =           0x00000400;
+        const SIGHAND =         0x00000800;
+        const PTRACE =          0x00002000;
+        const VFORK =           0x00004000;
+        const PARENT =          0x00008000;
+        const THREAD =          0x00010000;
+        const NEWNS	 =          0x00020000;
+        const SYSVSEM =         0x00040000;
+        const SETTLS =          0x00080000;
+        const PARENT_SETTID =   0x00100000;
+        const CHILD_CLEARTID =  0x00200000;
+        const DETACHED =        0x00400000;
+        const UNTRACED =        0x00800000;
+        const CHILD_SETTID =    0x01000000;
+        const NEWCGROUP =       0x02000000;
+        const NEWUTS =          0x04000000;
+        const NEWIPC =          0x08000000;
+        const NEWUSER =         0x10000000;
+        const NEWPID =          0x20000000;
+        const NEWNET =          0x40000000;
+        const IO =              0x80000000;
     }
 }

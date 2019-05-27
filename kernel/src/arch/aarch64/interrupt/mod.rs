@@ -11,12 +11,10 @@ pub use self::handler::*;
 
 /// Set the exception vector address
 pub fn init() {
-    unsafe {
-        asm!(
-            "adr x0, __vectors;
-             msr vbar_el1, x0"
-        );
+    extern "C" {
+        fn __vectors();
     }
+    VBAR_EL1.set(__vectors as u64);
 }
 
 /// Enable the interrupt (only IRQ).

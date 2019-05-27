@@ -12,11 +12,11 @@
     bnez sp, trap_from_user
 trap_from_kernel:
     csrr sp, sscratch
-    STORE gp, -1
+    STORE gp, -36
     # sscratch = previous-sp, sp = kernel-sp
 trap_from_user:
     # provide room for trap frame
-    addi sp, sp, -37 * XLENB
+    addi sp, sp, -36 * XLENB
     # save x registers except x2 (sp)
     STORE x1, 1
     STORE x3, 3
@@ -49,8 +49,8 @@ trap_from_user:
     STORE x30, 30
     STORE x31, 31
 
-    # load hartid to gp from sp[36]
-    LOAD gp, 36
+    # load hartid to gp from sp[0]
+    LOAD gp, 0
 
     # get sp, sstatus, sepc, stval, scause
     # set sscratch = 0
@@ -73,9 +73,9 @@ trap_from_user:
     andi s0, s1, 1 << 8     # sstatus.SPP = 1
     bnez s0, _to_kernel     # s0 = back to kernel?
 _to_user:
-    addi s0, sp, 37*XLENB
-    csrw sscratch, s0     # sscratch = kernel-sp
-    STORE gp, 36            # store hartid from gp to sp[36]
+    addi s0, sp, 36*XLENB
+    csrw sscratch, s0       # sscratch = kernel-sp
+    STORE gp, 0             # store hartid from gp to sp[0]
 _to_kernel:
     # restore sstatus, sepc
     csrw sstatus, s1

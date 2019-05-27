@@ -8,7 +8,7 @@ Going to be the next generation teaching operating system.
 
 Supported architectures: x86_64, RISCV32/64, AArch64, MIPS32
 
-Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kendryte K210 and FPGA running Rocket Chip
+Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kendryte K210 and FPGA running Rocket Chip / [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 
@@ -50,9 +50,9 @@ $ make run arch=x86_64 mode=release pci_passthru=0000:00:00.1 # for ixgbe real n
 | Module | Maintainer            |
 |--------|-----------------------|
 | x86_64 | @wangrunji0408        |
-| RISCV  | @jiegec               |
+| RISC-V  | @jiegec               |
 | ARM (Raspi3) | @equation314    |
-| MIPS   | @HarryChen @miskcoo   |
+| MIPS   | @Harry_Chen @miskcoo   |
 | Memory, Process, File System | @wangrunji0408          |
 | Network with drivers | @jiegec |
 | GUI    | @equation314          |

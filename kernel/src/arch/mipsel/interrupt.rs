@@ -29,6 +29,9 @@ pub fn init() {
         status.enable_soft_int1();
         // Enable clock interrupt
         status.enable_hard_int5();
+        // Enable serial interrupt
+        #[cfg(feature = "board_thinpad")]
+        status.enable_hard_int0();
 
         cp0::status::write(status);
     }
@@ -55,6 +58,11 @@ pub unsafe fn restore(flags: usize) {
     if flags != 0 {
         enable();
     }
+}
+
+#[no_mangle]
+pub extern "C" fn stack_pointer_not_aligned(sp: usize) {
+    panic!("Stack pointer not aligned: sp = 0x{:x?}", sp);
 }
 
 /// Dispatch and handle interrupt.
@@ -209,6 +217,11 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
     let sel = (inst >> 6) & 0b111;
     let format = inst & 0b111111;
 
+    if inst == 0x42000020 {
+        // ignore WAIT
+        return true;
+    }
+
     if opcode == 0b011111 && format == 0b111011 {
         // RDHWR
         if rd == 29 && sel == 0 {
@@ -219,7 +232,7 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
             let tls = unsafe { *(_cur_tls as *const usize) };
 
             set_trapframe_register(rt, tls, tf);
-            info!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
+            debug!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
             return true;
         } else {
             return false;
@@ -253,6 +266,15 @@ fn page_fault(tf: &mut TrapFrame) {
 
             if !tlb_valid {
                 if !crate::memory::handle_page_fault(addr) {
+                    extern "C" {
+                        fn _copy_user_start();
+                        fn _copy_user_end();
+                    }
+                    if tf.epc >= _copy_user_start as usize && tf.epc < _copy_user_end as usize {
+                        debug!("fixup for addr {:x?}", addr);
+                        tf.epc = crate::memory::read_user_fixup as usize;
+                        return;
+                    }
                     crate::trap::error(tf);
                 }
             }
@@ -261,6 +283,15 @@ fn page_fault(tf: &mut TrapFrame) {
         }
         Err(()) => {
             if !crate::memory::handle_page_fault(addr) {
+                extern "C" {
+                    fn _copy_user_start();
+                    fn _copy_user_end();
+                }
+                if tf.epc >= _copy_user_start as usize && tf.epc < _copy_user_end as usize {
+                    debug!("fixup for addr {:x?}", addr);
+                    tf.epc = crate::memory::read_user_fixup as usize;
+                    return;
+                }
                 crate::trap::error(tf);
             }
         }
