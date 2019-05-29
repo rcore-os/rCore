@@ -462,7 +462,6 @@ impl EmmcCtl {
     }
 
     pub fn sd_get_base_clock_hz(&mut self) -> u32 {
-        // todo: use mailbox instead
         let buf = mailbox::get_clock_rate(0x1);
         if buf.is_ok() {
             let base_clock = buf.unwrap();
@@ -540,14 +539,25 @@ impl EmmcCtl {
         let mut control1 = self.emmc.registers.CONTROL1.read();
         self.emmc.registers.CONTROL1.write(control1 | SD_RESET_CMD);
 
-        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_CMD == 0)
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_CMD == 0);
+        if self.emmc.registers.CONTROL1.read() & SD_RESET_CMD != 0 {
+            warn!("EmmcCtl: CMD line did not reset properly.");
+            return false;
+        }
+        true
     }
 
     pub fn sd_reset_dat(&mut self) -> bool {
         let mut control1 = self.emmc.registers.CONTROL1.read();
         self.emmc.registers.CONTROL1.write(control1 | SD_RESET_DAT);
 
-        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0)
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & SD_RESET_DAT == 0);
+        if self.emmc.registers.CONTROL1.read() & SD_RESET_DAT != 0 {
+            warn!("EmmcCtl: DAT line did not reset properly.");
+            return false;
+        }
+        true
+
     }
 
     pub fn sd_handle_card_interrupt(&mut self) {
@@ -578,10 +588,12 @@ impl EmmcCtl {
 
         if irpts & SD_BUFFER_WRITE_READY != 0 {
             reset_mask |= SD_BUFFER_WRITE_READY;
+            self.sd_reset_dat();
         }
 
         if irpts & SD_BUFFER_READ_READY != 0 {
             reset_mask |= SD_BUFFER_READ_READY;
+            self.sd_reset_dat();
         }
 
         if irpts & SD_CARD_INSERTION != 0 {
@@ -722,8 +734,7 @@ impl EmmcCtl {
         let mut rca = 0;
         let count = 1;
         let blocks_size_u32 = self.block_size / 4;
-        let mut buf =  self.sd_scr.scr;
-
+       
         self.last_cmd = APP_CMD;
         if self.card_rca != 0 {
             rca = self.card_rca << 16;
@@ -737,6 +748,7 @@ impl EmmcCtl {
             info!("EmmcCtl: issue SEND_SCR");
             info!("EmmcCtl: block_size = {}, blocks_to_transfer = {}.", self.block_size, self.blocks_to_transfer);
             if self.sd_issue_command_int_pre(command, 0, timeout) {
+                let mut buf = &mut self.sd_scr.scr;
                 let mut wr_irpt = (1<<5);
                 let mut finished = true;
                 for cur_block in 0..count {
@@ -752,8 +764,10 @@ impl EmmcCtl {
                     }
                     let mut cur_word_no = 0;
                     while (cur_word_no < blocks_size_u32) {
-                        buf[(cur_block as usize) * blocks_size_u32  + cur_word_no] = 
-                            self.emmc.registers.DATA.read();
+                        let word = self.emmc.registers.DATA.read();
+                        info!("EmmcCtl: block#{}, word#{} = 0x{:08X}, pos = {}", cur_block, cur_word_no, word, (cur_block as usize) * blocks_size_u32  + cur_word_no);
+                        buf[(cur_block as usize) * blocks_size_u32  + cur_word_no] = word;
+                            //self.emmc.registers.DATA.read();
                         cur_word_no += 1;
                     }
                 }
@@ -1330,10 +1344,29 @@ lazy_static! {
     pub static ref EMMC_CTL: Mutex<EmmcCtl> = Mutex::new(EmmcCtl::new());
 }
 
+fn demo() {
+    // print out the first section of the sd_card.
+
+    let section: [u8; 512] = [0; 512];
+    let buf = unsafe { slice::from_raw_parts_mut(section.as_ptr() as *mut u32, 512 / 4) };
+    println!("Trying to fetch the first section of the SD card.");
+    if !EMMC_CTL.lock().read(0, 1, buf).is_ok() {
+        error!("Failed in fetching.");
+        return;
+    }
+    for i in 0..32 {
+        for j in 0..16{
+            print!("{:02X} ", section[i*16+j]);
+        }
+        println!("");
+    }
+
+}
 pub fn init() {
     println!("Initializing EmmcCtl...");
     if EMMC_CTL.lock().init() == 0 {
         println!("EmmcCtl successfully initialized.");
+        demo();
     } else {
         println!("OHHHHHHHHHHHHHH SHIT!");
     }
