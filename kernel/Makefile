@@ -172,11 +172,8 @@ else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
-	-kernel $(kernel_img)
-ifneq ($(u_boot), )
-qemu_opts += \
-	-sd $(bootloader)
-endif
+	-kernel $(kernel_img) \
+	-sd $(kernel_img)
 
 else ifeq ($(arch), mipsel)
 ifeq ($(board), malta)

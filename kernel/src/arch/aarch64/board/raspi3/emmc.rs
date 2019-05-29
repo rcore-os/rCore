@@ -881,7 +881,7 @@ impl EmmcCtl {
 
         self.emmc.registers.CONTROL1.write(control1);
 
-        timeout_wait!(self.emmc.registers.CONTROL1.read() & 0x2 != 0, 0x1000000)
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & 0x2 != 0, 0x1000000);
         if self.emmc.registers.CONTROL1.read() & 0x2 == 0{
             warn!("EmmcCtl: controller's clock did not stabilize within 1 second.");
             return false;
