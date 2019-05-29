@@ -3,6 +3,7 @@ use core::time::Duration;
 use core::slice;
 use core::mem;
 use crate::thread;
+use super::mailbox;
 
 pub const BLOCK_SIZE: usize = 512;
 
@@ -28,6 +29,7 @@ const SD_CMD_AUTO_CMD_EN_CMD23: u32 = (2 << 2);
 const SD_CMD_BLKCNT_EN: u32 = (1 << 1);
 const SD_CMD_DMA: u32 = 1;
 
+const SD_ERR_BASE:u32 = 16;
 const SD_ERR_CMD_TIMEOUT: u32 = 0;
 const SD_ERR_CMD_CRC: u32 = 1;
 const SD_ERR_CMD_END_BIT: u32 = 2;
@@ -411,6 +413,49 @@ impl EmmcCtl {
         }
     }
 
+
+    fn succeeded(&self) -> bool {
+        return self.last_cmd_success;
+    }
+    fn failed(&self) -> bool {
+        return !self.last_cmd_success;
+    }
+    fn timeout(&self) -> bool {
+        return self.failed() && self.last_error==0;
+    }
+    fn cmd_timeout(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_CMD_TIMEOUT))!=0;
+    }
+    fn cmd_crc(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_CMD_CRC))!=0;
+    }
+    fn cmd_end_bit(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_CMD_END_BIT))!=0;
+    }
+    fn cmd_index(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_CMD_INDEX))!=0;
+    }
+    fn data_timeout(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_DATA_TIMEOUT))!=0;
+    }
+    fn data_crc(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_DATA_CRC))!=0;
+    }
+    fn data_end_bit(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_DATA_END_BIT))!=0;
+    }
+    fn current_limit(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_CURRENT_LIMIT))!=0;
+    }
+    fn acmd12_error(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_AUTO_CMD12))!=0;
+    }
+    fn adma_error(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_ADMA))!=0;
+    }
+    fn tuning_error(&self) -> bool {
+        return self.failed() && (self.last_error & (1<<SD_ERR_BASE+SD_ERR_TUNING))!=0;
+    }
     pub fn sd_power_off(&mut self) {
         let ctl0 = self.emmc.registers.CONTROL0.read();
         self.emmc.registers.CONTROL0.write(ctl0 & !(1 << 8));
@@ -418,7 +463,15 @@ impl EmmcCtl {
 
     pub fn sd_get_base_clock_hz(&mut self) -> u32 {
         // todo: use mailbox instead
-        0
+        let buf = mailbox::get_clock_rate(0x1);
+        if buf.is_ok() {
+            let base_clock = buf.unwrap();
+            info!("EmmcCtl: base clock rate is {}Hz.", base_clock);
+            return base_clock;
+        } else {
+            warn!("EmmcCtl: property mailbox did not return a valid clock id.");
+            return 0;
+        }
     }
 
     pub fn sd_get_clock_divider(&mut self, base_clock: u32, target_rate: u32) -> u32 {
@@ -586,8 +639,15 @@ impl EmmcCtl {
             self.last_interrupt = irpts;
             return false;
         }
-        for i in 0..3 {
-            self.last_r[i] = self.emmc.registers.RESP[i].read();
+        usleep(2000);
+        if command & SD_CMD_RSPNS_TYPE_MASK == SD_CMD_RSPNS_TYPE_48
+            || command & SD_CMD_RSPNS_TYPE_MASK == SD_CMD_RSPNS_TYPE_48B {
+                self.last_r[0] = self.emmc.registers.RESP[0].read();
+            }
+        else {
+            for i in 0..3 {
+                self.last_r[i] = self.emmc.registers.RESP[i].read();
+            }
         }
         true
     }
@@ -603,6 +663,7 @@ impl EmmcCtl {
                     self.emmc.registers.INTERRUPT.write(0xffff_0002);
 
                     if (irpts & 0xffff_0002) != 0x2 && (irpts & 0xffff_0002) != 0x10_0002 {
+                        warn!("EmmcCtl: error occurred while waiting for transfer complete interrupt.");
                         self.last_error = irpts & 0xffff_0000;
                         self.last_interrupt = irpts;
                         return false;
@@ -649,56 +710,62 @@ impl EmmcCtl {
             self.last_cmd = command;
             self.sd_issue_command_int(sd_commands[command as usize], argument, timeout);
         }
-        true
+        self.last_cmd_success
     }
 
     pub fn sd_issue_command_scr(&mut self, timeout: u32) -> bool {
+        info!("EmmcCtl::sd_issue_command_scr()");
         self.sd_handle_interrupts();
         let command = SEND_SCR;
         let cmd = command & 0xff;
-        
-        self.last_cmd = APP_CMD;
 
         let mut rca = 0;
-        let scr_size = mem::size_of::<SDScr>();
-        let count = scr_size / self.block_size;
-        let buf =  unsafe { slice::from_raw_parts_mut(&mut self.sd_scr as *mut _ as *mut u32, scr_size / 4) };
+        let count = 1;
+        let blocks_size_u32 = self.block_size / 4;
+        let mut buf =  self.sd_scr.scr;
+
+        self.last_cmd = APP_CMD;
         if self.card_rca != 0 {
             rca = self.card_rca << 16;
-            self.sd_issue_command_int(sd_acommands[APP_CMD as usize], rca, timeout);
-            if self.last_cmd_success {
-                self.last_cmd = cmd | IS_APP_CMD;
-                let command = sd_acommands[cmd as usize];
-                if self.sd_issue_command_int_pre(command, 0, timeout) {
-                    let mut wr_irpt = (1<<5);
-                    let mut finished = true;
-                    for cur_block in 0..count {
-                        timeout_wait!(self.emmc.registers.INTERRUPT.read() & (wr_irpt | 0x8000) != 0, timeout);
-                        let irpts = self.emmc.registers.INTERRUPT.read();
-                        self.emmc.registers.INTERRUPT.write(0xffff_0000 | wr_irpt);
-                        if (irpts & (0xffff_0000 | wr_irpt)) != wr_irpt {
-                            self.last_error = irpts & 0xffff_0000;
-                            self.last_interrupt = irpts;
-                            finished = false;
-                            break;
-                        }
-                        let mut cur_byte_no = 0;
-                        while (cur_byte_no < self.block_size) {
-                            buf[(cur_block as usize)* self.block_size + cur_byte_no] = 
-                                self.emmc.registers.DATA.read();
-                            cur_byte_no += 4;
-                        }
+        }
+        info!("EmmcCtl: issue APP_CMD");
+        self.sd_issue_command_int(sd_commands[APP_CMD as usize], rca, timeout);
+
+        if self.last_cmd_success {
+            self.last_cmd = command;
+            let command = sd_acommands[cmd as usize];
+            info!("EmmcCtl: issue SEND_SCR");
+            info!("EmmcCtl: block_size = {}, blocks_to_transfer = {}.", self.block_size, self.blocks_to_transfer);
+            if self.sd_issue_command_int_pre(command, 0, timeout) {
+                let mut wr_irpt = (1<<5);
+                let mut finished = true;
+                for cur_block in 0..count {
+                    timeout_wait!(self.emmc.registers.INTERRUPT.read() & (wr_irpt | 0x8000) != 0, timeout);
+                    let irpts = self.emmc.registers.INTERRUPT.read();
+                    self.emmc.registers.INTERRUPT.write(0xffff_0000 | wr_irpt);
+                    if (irpts & (0xffff_0000 | wr_irpt)) != wr_irpt {
+                        warn!("EmmcCtl: error occurred while waiting for data block #{} ready interrupt.", count);
+                        self.last_error = irpts & 0xffff_0000;
+                        self.last_interrupt = irpts;
+                        finished = false;
+                        break;
                     }
-                    if finished {
-                        self.sd_issue_command_int_post(command, 0, timeout);
+                    let mut cur_word_no = 0;
+                    while (cur_word_no < blocks_size_u32) {
+                        buf[(cur_block as usize) * blocks_size_u32  + cur_word_no] = 
+                            self.emmc.registers.DATA.read();
+                        cur_word_no += 1;
                     }
                 }
-                if self.last_cmd_success {
-                    return true;
+                if finished {
+                    self.sd_issue_command_int_post(command, 0, timeout);
                 }
             }
+            if self.last_cmd_success {
+                return true;
+            }
         }
-        false
+        self.last_cmd_success
     }
 
     pub fn sd_check_success(&mut self) -> bool {
@@ -761,13 +828,14 @@ impl EmmcCtl {
 
     pub fn sd_card_init(&mut self) -> bool {
         info!("EmmcCtl::sd_card_init()");
-        info!("EmmcCtl: emmc.SLOTISR_VER = 0x{:X}", &self.emmc.registers.SLOTISR_VER as *const _ as usize);
         let ver = self.emmc.registers.SLOTISR_VER.read();
-        info!("EmmcCtl: ver = 0x{:X}", ver);
         let vendor = ver >> 24;
 	    let sdversion = (ver >> 16) & 0xff;
 	    let slot_status = ver & 0xff;
-        
+        info!("EmmcCtl: vendor version number: {}", vendor);
+        info!("EmmcCtl: host controller version number: {}", sdversion);
+        info!("EmmcCtl: slot status: 0b{:b}", slot_status);
+
         info!("EmmcCtl: ctl0");
         let mut control0 = self.emmc.registers.CONTROL0.read();
         info!("EmmcCtl: ctl0 = 0x{:X}", control0);
@@ -813,7 +881,9 @@ impl EmmcCtl {
 
         self.emmc.registers.CONTROL1.write(control1);
 
-        if !timeout_wait!(self.emmc.registers.CONTROL1.read() & 0x2 != 0) {
+        timeout_wait!(self.emmc.registers.CONTROL1.read() & 0x2 != 0, 0x1000000)
+        if self.emmc.registers.CONTROL1.read() & 0x2 == 0{
+            warn!("EmmcCtl: controller's clock did not stabilize within 1 second.");
             return false;
         }
         
@@ -843,7 +913,8 @@ impl EmmcCtl {
 
 	    // Send CMD0 to the card (reset to idle state)
         info!("EmmcCtl: Send CMD0 to the card (reset to idle state).");
-        if !self.sd_issue_command(0 /* GO_IDLE_STATE */, 0, 500000) {
+        if !self.sd_issue_command(GO_IDLE_STATE, 0, 500000) {
+            warn!("EmmcCtl: no CMD0 response.");
             return false;
         }
 
@@ -851,21 +922,21 @@ impl EmmcCtl {
         // Voltage supplied = 0x1 = 2.7-3.6V (standard)
         // Check pattern = 10101010b (as per PLSS 4.3.13) = 0xAA
         info!("EmmcCtl: Send CMD8 to the card.");
-        let v2_later = if !self.sd_issue_command(8 /* SEND_IF_COND */, 0x1aa, 500000) {
-            if self.last_error == 0 {
-                false
-            } else if self.last_error & (1 << 16) != 0 {
-                if !self.sd_reset_cmd() {
-                    return false;
-                }
-
-                self.emmc.registers.INTERRUPT.write(SD_ERR_MASK_CMD_TIMEOUT);
-                false
-            } else {
+        self.sd_issue_command(SEND_IF_COND, 0x1aa, 500000);
+        let v2_later = if self.timeout() {
+            false
+        } else if self.cmd_timeout() {
+            if !self.sd_reset_cmd(){
                 return false;
             }
+            self.emmc.registers.INTERRUPT.write(SD_ERR_MASK_CMD_TIMEOUT);
+            false
+        } else if self.failed() {
+            warn!("EmmcCtl: failure sending CMD8 (0x{:08X}).", self.last_interrupt);
+            return false;
         } else {
             if self.last_r[0] & 0xfff != 0x1aa {
+                warn!("EmmcCtl: unusable card.");
                 return false;
             }
             true
@@ -874,23 +945,23 @@ impl EmmcCtl {
         // Here we are supposed to check the response to CMD5 (HCSS 3.6)
         // It only returns if the card is a SDIO card
         info!("EmmcCtl: Check the response to CMD5.");
-        let _t = self.sd_issue_command(5 /* IO_SET_OP_COND */, 0, 10000);
+        self.sd_issue_command(IO_SET_OP_COND, 0, 10000);
         info!("EmmcCtl: IO_SET_OP_COND sent.");
-        info!("last_error = 0x{:08X}, _t = {}", self.last_error, _t);
-        if !((!_t) && self.last_error == 0) {
-            if (!_t) && self.last_error & (1 << 16) != 0 {
-                info!("imhere!");
+        if !self.timeout(){
+            if self.cmd_timeout() {
                 if !self.sd_reset_cmd() {
                     return false;
                 }
-
                 self.emmc.registers.INTERRUPT.write(SD_ERR_MASK_CMD_TIMEOUT);
             } else {
+                warn!("EmmcCtl: SDIO card detected - not currently supported.");
                 return false;
             }
         }
 
+        info!("EmmcCtl: Sending inquiry ACMD41.");
         if !self.sd_issue_command(ACMD!(41), 0, 500000) {
+            warn!("EmmcCtl: inquiry ACMD41 failed.");
             return false;
         }
 
@@ -906,8 +977,8 @@ impl EmmcCtl {
             } else {
                 0
             };
-
             if !self.sd_issue_command(ACMD!(41), 0x00ff8000 | v2_flags, 500000) {
+                warn!("EmmcCtl: error issuing ACMD41.");
                 return false;
             }
 
@@ -939,7 +1010,7 @@ impl EmmcCtl {
             // As per HCSS 3.6.1
             info!("EmmcCtl: Switch to 1.8v mode.");
             // Send VOLTAGE_SWITCH
-            if !self.sd_issue_command(11 /* VOLTAGE_SWITCH */, 0, 500000) {
+            if !self.sd_issue_command(VOLTAGE_SWITCH, 0, 500000) {
                 self.failed_voltage_switch = 1;
                 self.sd_power_off();
                 return self.sd_card_init();
@@ -990,13 +1061,16 @@ impl EmmcCtl {
             }
         }
 
-        if !self.sd_issue_command(2 /* ALL_SEND_CID */, 0, 500000) {
+        if !self.sd_issue_command(ALL_SEND_CID, 0, 500000) {
             return false;
         }
 
+        info!("EmmcCtl: card CID: {:08X}{:08X}{:08X}{:08X}",
+                 self.last_r[0], self.last_r[1], self.last_r[2], self.last_r[3]);
+
         let card_cid = [ self.last_r[0], self.last_r[1], self.last_r[2], self.last_r[3] ];
 
-        if ! self.sd_issue_command(3 /* SEND_RELATIVE_ADDR */, 0, 500000) {
+        if ! self.sd_issue_command(SEND_RELATIVE_ADDR, 0, 500000) {
             return false;
         }
 
@@ -1004,37 +1078,44 @@ impl EmmcCtl {
         self.card_rca = (cmd3_resp >> 16) & 0xffff;
 
         if (cmd3_resp >> 15) & 0x1 != 0 { // CRC error
+            warn!("EmmcCtl: CRC error.");
             return false;
         }
 
         if (cmd3_resp >> 14) & 0x1 != 0 { // illegal command
+            warn!("EmmcCtl: Illegal command.");
             return false;
         }
 
         if (cmd3_resp >> 13) & 0x1 != 0 { // generic error
+            warn!("EmmcCtl: Generic error.");
             return false;
         }
 
         if (cmd3_resp >> 8) & 0x1 == 0 { // not ready for data
+            warn!("EmmcCtl: Not ready for data.");
             return false;
         }
 
-        if !self.sd_issue_command(7 /* SELECT_CARD */, self.card_rca << 16 , 500000) {
-            return false;
-        }
-
-	    // Now select the card (toggles it to transfer state)
+        // Now select the card (toggles it to transfer state)
         info!("EmmcCtl: Toggle the card to transfer state.");
+        if !self.sd_issue_command(SELECT_CARD, self.card_rca << 16 , 500000) {
+            warn!("EmmcCtl: Error sending SELECT_CARD.");
+            return false;
+        }
+
         let cmd7_resp = self.last_r[0];
         let status = (cmd7_resp >> 9) & 0xf;
 
         if status != 3 && status != 4 {
+            warn!("EmmcCtl: Invalid status ({}).", status);
             return false;
         }
 
 	    // If not an SDHC card, ensure BLOCKLEN is 512 bytes
+        info!("EmmcCtl: card_supports_sdhc = {}.", self.card_supports_sdhc);
         if !self.card_supports_sdhc {
-            if !self.sd_issue_command(16 /* SET_BLOCKLEN */, 512, 500000) {
+            if !self.sd_issue_command(SET_BLOCKLEN, 512, 500000) {
                 return false;
             }
         }
@@ -1056,6 +1137,7 @@ impl EmmcCtl {
         */
 
         if !self.sd_issue_command_scr(500000) {
+            warn!("EmmcCtl: Error sending SEND_SCR.");
             self.block_size = 512;
             return false;
         }
@@ -1093,6 +1175,23 @@ impl EmmcCtl {
             SD_VER_UNKNOWN
         };
 
+        fn sd_version(version: u32) -> &'static str {
+            match version {
+                SD_VER_UNKNOWN => "unknown",
+                SD_VER_1 => "1.0 and 1.01",
+                SD_VER_1_1 => "1.10",
+                SD_VER_2 => "2.00",
+                SD_VER_3 => "3.0x",
+                SD_VER_4 => "4.0x",
+                _ => "unknown"
+            }
+        }
+
+        info!("EmmcCtl: scr0 = 0x{:08X}, scr1 = 0x{:08X}", self.sd_scr.scr[0], self.sd_scr.scr[1]);
+        info!("EmmcCtl: SCR: 0x{:08X}{:08X}", byte_swap(self.sd_scr.scr[0]), byte_swap(self.sd_scr.scr[1]));
+        info!("EmmcCtl: SCR: version {}, bus_widths 0x{:X}", sd_version(self.sd_scr.sd_version),
+            self.sd_scr.sd_bus_widths);
+        
         if self.sd_scr.sd_bus_widths & 0x4 != 0 {
             // Set 4-bit transfer mode (ACMD6)
             // See HCSS 3.4 for the algorithm
@@ -1129,6 +1228,7 @@ impl EmmcCtl {
         //assert_eq!(count * self.block_size, buf.len());
         self.blocks_to_transfer = count as u32;
         let mut command = 0;
+        let blocks_size_u32 = self.block_size / 4;
         if count > 1 {
             command = READ_MULTIPLE_BLOCK;
         } else {
@@ -1150,11 +1250,11 @@ impl EmmcCtl {
                             finished = false;
                             break;
                         }
-                        let mut cur_byte_no = 0;
-                        while (cur_byte_no < self.block_size) {
-                            buf[(cur_block as usize)* self.block_size + cur_byte_no] = 
+                        let mut cur_word_no = 0;
+                        while (cur_word_no < blocks_size_u32) {
+                            buf[(cur_block as usize) * blocks_size_u32  + cur_word_no] = 
                                 self.emmc.registers.DATA.read();
-                            cur_byte_no += 4;
+                            cur_word_no += 1;
                         }
                     }
                     if finished {
@@ -1178,6 +1278,7 @@ impl EmmcCtl {
         //assert_eq!(count * self.block_size, buf.len());
         self.blocks_to_transfer = count as u32;
         let mut command = 0;
+        let blocks_size_u32 = self.block_size / 4;
         if count > 1 {
             command = READ_MULTIPLE_BLOCK;
         } else {
@@ -1199,10 +1300,10 @@ impl EmmcCtl {
                             finished = false;
                             break;
                         }
-                        let mut cur_byte_no = 0;
-                        while (cur_byte_no < self.block_size) {
-                            self.emmc.registers.DATA.write(buf[(cur_block as usize)* self.block_size + cur_byte_no]);
-                            cur_byte_no += 4;
+                        let mut cur_word_no = 0;
+                        while (cur_word_no < blocks_size_u32) {
+                            self.emmc.registers.DATA.write(buf[(cur_block as usize) * blocks_size_u32  + cur_word_no]);
+                            cur_word_no += 1;
                         }
                     }
                     if finished {
