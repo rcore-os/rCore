@@ -1294,9 +1294,9 @@ impl EmmcCtl {
         let mut command = 0;
         let blocks_size_u32 = self.block_size / 4;
         if count > 1 {
-            command = READ_MULTIPLE_BLOCK;
+            command = WRITE_MULTIPLE_BLOCK;
         } else {
-            command = READ_SINGLE_BLOCK;
+            command = WRITE_BLOCK;
         }
         for retry in 0..3 {
             { // send command
@@ -1361,7 +1361,12 @@ fn demo() {
         println!("");
     }
     println!("");
-
+    if section[510] != 0x55 || section[511] != 0xAA {
+        println!("The first section is not an MBR section!");
+        println!("Maybe you are working on qemu using raw image.");
+        println!("Change the -sd argument to raspibian.img.");
+        return;
+    }
     let mut start_pos = 446; // start position of the partion table
     for entry in 0..4 {
         print!("Partion entry #{}: ", entry);
@@ -1391,11 +1396,70 @@ fn demo() {
         start_pos += 16;
     }
 }
+
+fn demo_write() {
+    let section: [u8; 512] = [0; 512];
+    let mut deadbeef: [u8; 512] = [0; 512];
+    println!("Trying to fetch the second section of the SD card.");
+    if !EMMC_CTL.lock().read(1, 1, unsafe { slice::from_raw_parts_mut(section.as_ptr() as *mut u32, 512 / 4) }).is_ok() {
+        error!("Failed in fetching.");
+        return;
+    }
+    println!("Content:");
+    for i in 0..32 {
+        for j in 0..16{
+            print!("{:02X} ", section[i*16+j]);
+        }
+        println!("");
+    }
+    println!("");
+
+    for i in 0..512/4 {
+        deadbeef[i*4+0] = 0xDE;
+        deadbeef[i*4+1] = 0xAD;
+        deadbeef[i*4+2] = 0xBE;
+        deadbeef[i*4+3] = 0xEF;
+    }
+
+    if !EMMC_CTL.lock().write(1, 1, unsafe { slice::from_raw_parts(deadbeef.as_ptr() as *mut u32, 512 / 4) }).is_ok() {
+        error!("Failed in writing.");
+        return;
+    }
+    if !EMMC_CTL.lock().read(1, 1, unsafe { slice::from_raw_parts_mut(deadbeef.as_ptr() as *mut u32, 512/4)}).is_ok() {
+        error!("Failed in checking.");
+        return;
+    }
+    println!("Re-fetched content:");
+    for i in 0..32 {
+        for j in 0..16{
+            print!("{:02X} ", deadbeef[i*16+j]);
+        }
+        println!("");
+    }
+    println!("");
+    if !EMMC_CTL.lock().write(1, 1, unsafe { slice::from_raw_parts(section.as_ptr() as *mut u32, 512 / 4) }).is_ok() {
+        error!("Failed in writing back.");
+        return;
+    }
+    for i in 0..512/4 {
+        if   deadbeef[i*4+0] != 0xDE
+          || deadbeef[i*4+1] != 0xAD
+          || deadbeef[i*4+2] != 0xBE
+          || deadbeef[i*4+3] != 0xEF {
+              error!("Re-fetched content is wrong!");
+              return;
+          }
+    }
+    println!("Passed write() check.");
+}
+
 pub fn init() {
     println!("Initializing EmmcCtl...");
     if EMMC_CTL.lock().init() == 0 {
         println!("EmmcCtl successfully initialized.");
         demo();
+        demo_write();
+        info!("emmc: init end");
     } else {
         println!("OHHHHHHHHHHHHHH SHIT!");
     }
