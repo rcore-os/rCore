@@ -1236,7 +1236,7 @@ impl EmmcCtl {
 
     pub fn read(&mut self, block_no_arg: u32, count: usize, buf: &mut[u32]) ->  Result<(), ()> {
         let mut block_no = block_no_arg;
-        if self.card_supports_sdhc {
+        if !self.card_supports_sdhc {
             block_no *= 512;
         }
         //assert_eq!(count * self.block_size, buf.len());
@@ -1286,7 +1286,7 @@ impl EmmcCtl {
 
     pub fn write(&mut self, block_no_arg: u32, count: usize, buf: &[u32]) ->  Result<(), ()> {
         let mut block_no = block_no_arg;
-        if self.card_supports_sdhc {
+        if !self.card_supports_sdhc {
             block_no *= 512;
         }
         //assert_eq!(count * self.block_size, buf.len());
@@ -1346,7 +1346,6 @@ lazy_static! {
 
 fn demo() {
     // print out the first section of the sd_card.
-
     let section: [u8; 512] = [0; 512];
     let buf = unsafe { slice::from_raw_parts_mut(section.as_ptr() as *mut u32, 512 / 4) };
     println!("Trying to fetch the first section of the SD card.");
@@ -1354,13 +1353,43 @@ fn demo() {
         error!("Failed in fetching.");
         return;
     }
+    println!("Content:");
     for i in 0..32 {
         for j in 0..16{
             print!("{:02X} ", section[i*16+j]);
         }
         println!("");
     }
+    println!("");
 
+    let mut start_pos = 446; // start position of the partion table
+    for entry in 0..4 {
+        print!("Partion entry #{}: ", entry);
+        let partion_type = section[start_pos + 0x4];
+        fn partion_type_map(partion_type : u8) -> &'static str {
+            match partion_type {
+                0x00 => "Empty",
+                0x0c => "FAT32",
+                0x83 => "Linux",
+                0x82 => "Swap",
+                _ => "Not supported"
+            }
+        }
+        print!("{:^14}", partion_type_map(partion_type));
+        if partion_type != 0x00 {
+            let start_section: u32 = (section[start_pos + 0x8] as u32)
+                                    | (section[start_pos + 0x9] as u32) << 8
+                                    | (section[start_pos + 0xa] as u32) << 16
+                                    | (section[start_pos + 0xb] as u32) << 24;
+            let total_section: u32= (section[start_pos + 0xc] as u32)
+                                    | (section[start_pos + 0xd] as u32) << 8
+                                    | (section[start_pos + 0xe] as u32) << 16
+                                    | (section[start_pos + 0xf] as u32) << 24;
+            print!(" start section no. = {}, a total of {} sections in use.", start_section, total_section);
+        }
+        println!("");
+        start_pos += 16;
+    }
 }
 pub fn init() {
     println!("Initializing EmmcCtl...");
