@@ -253,6 +253,10 @@ impl Framebuffer {
         var_info.yoffset = self.fb_info.yoffset;
         var_info.bits_per_pixel = self.fb_info.depth;
     }
+
+    pub fn fill_fix_screeninfo(&self, fix_info : &mut fb_fix_screeninfo) {
+        fix_info.line_length = self.fb_info.pitch;
+    }
 }
 
 lazy_static! {

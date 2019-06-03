@@ -76,8 +76,10 @@ impl INode for Vga {
         info!("cmd {:#x} , data {:#x} vga not support ioctl !", cmd, data);
         match cmd {
             FBIOGET_FSCREENINFO => {
-                let fb_fix_info = unsafe { &mut *(data as *mut fb_fix_screeninfo) };
-                fb_fix_info.line_length = 100;
+                let fb_fix_info = unsafe{ &mut *(data as *mut fb_fix_screeninfo) };
+                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                    fb.fill_fix_screeninfo(fb_fix_info);
+                }
                 Ok(())
             }
             FBIOGET_VSCREENINFO => {
@@ -102,25 +104,25 @@ const FBIOGET_FSCREENINFO: u32 = 0x4602;
 const FBIOGET_VSCREENINFO: u32 = 0x4600;
 
 #[repr(C)]
-struct fb_fix_screeninfo {
-    pub id: [u8; 16],    /* identification string eg "TT Builtin" */
-    pub smem_start: u64, /* Start of frame buffer mem */
-    /* (physical address) */
-    pub smem_len: u32,    /* Length of frame buffer mem */
-    pub _type: u32,       /* see FB_TYPE_*		*/
-    pub type_aux: u32,    /* Interleave for interleaved Planes */
-    pub visual: u32,      /* see FB_VISUAL_*		*/
-    pub xpanstep: u16,    /* zero if no hardware panning  */
-    pub ypanstep: u16,    /* zero if no hardware panning  */
-    pub ywrapstep: u16,   /* zero if no hardware ywrap    */
-    pub line_length: u32, /* length of a line in bytes    */
-    pub mmio_start: u64,  /* Start of Memory Mapped I/O   */
-    /* (physical address) */
-    pub mmio_len: u32, /* Length of Memory Mapped I/O  */
-    pub accel: u32,    /* Indicate to driver which	*/
-    /*  specific chip/card we have	*/
-    pub capabilities: u16,  /* see FB_CAP_*			*/
-    pub reserved: [u16; 2], /* Reserved for future compatibility */
+pub struct fb_fix_screeninfo {
+    pub id : [u8;16],			/* identification string eg "TT Builtin" */
+    pub smem_start : u64,	/* Start of frame buffer mem */
+                                    /* (physical address) */
+    pub smem_len : u32,			/* Length of frame buffer mem */
+    pub _type : u32,			/* see FB_TYPE_*		*/
+    pub type_aux : u32,			/* Interleave for interleaved Planes */
+    pub visual : u32,			/* see FB_VISUAL_*		*/ 
+    pub xpanstep : u16,			/* zero if no hardware panning  */
+    pub ypanstep : u16,			/* zero if no hardware panning  */
+    pub ywrapstep : u16,		/* zero if no hardware ywrap    */
+    pub line_length : u32,		/* length of a line in bytes    */
+    pub mmio_start : u64,	/* Start of Memory Mapped I/O   */
+                                    /* (physical address) */
+    pub mmio_len : u32,			/* Length of Memory Mapped I/O  */
+    pub accel : u32,			/* Indicate to driver which	*/
+                                    /*  specific chip/card we have	*/
+    pub capabilities : u16,		/* see FB_CAP_*			*/
+    pub reserved : [u16;2],		/* Reserved for future compatibility */
 }
 
 #[repr(C)]
