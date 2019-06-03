@@ -358,3 +358,12 @@ pub fn framebuffer_alloc(
         screen_size: ret.allocate.buf[1],
     })
 }
+
+pub fn get_clock_rate(clock_id: u32) -> PropertyMailboxResult<u32> {
+    let ret = send_one_tag!(RPI_FIRMWARE_GET_CLOCK_RATE, [clock_id, 0])?;
+    if ret[0] == clock_id {
+        return Ok(ret[1]);
+    } else {
+        return Err(PropertyMailboxError(1));
+    }
+}

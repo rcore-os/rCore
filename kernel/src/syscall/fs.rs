@@ -1487,7 +1487,7 @@ impl FdSet {
             debug!("bitset {:?}", bitset);
 
             // save the fdset, and clear it
-            use alloc::prelude::ToOwned;
+            use alloc::borrow::ToOwned;
             let origin = bitset.to_owned();
             bitset.set_all(false);
             Ok(FdSet { bitset, origin })

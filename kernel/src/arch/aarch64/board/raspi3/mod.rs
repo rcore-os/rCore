@@ -2,6 +2,7 @@
 
 use bcm2837::atags::Atags;
 
+pub mod emmc;
 #[path = "../../../../drivers/gpu/fb.rs"]
 pub mod fb;
 pub mod irq;
@@ -25,6 +26,7 @@ pub fn init_driver() {
     #[cfg(not(feature = "nographic"))]
     fb::init();
     timer::init();
+    emmc::init();
 }
 
 /// Returns the (start address, end address) of the physical memory on this
