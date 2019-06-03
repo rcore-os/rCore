@@ -72,7 +72,8 @@ impl BlockDevice for EmmcDriver {
     fn read_at(&self, block_id: usize, buf: &mut [u8]) -> Result<()> {
         use core::slice;
         assert!(buf.len() >= emmc::BLOCK_SIZE);
-        let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, emmc::BLOCK_SIZE / 4) };
+        let buf =
+            unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, emmc::BLOCK_SIZE / 4) };
         let mut ctrl = self.0.lock();
         ctrl.read(block_id as u32, 1, buf).map_err(|_| DevError)?;
         Ok(())

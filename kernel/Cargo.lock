@@ -51,7 +51,7 @@ dependencies = [
 [[package]]
 name = "bcm2837"
 version = "1.0.0"
-source = "git+https://github.com/GeminiLab/bcm2837#bf1e4ec63c52827bc199399f214f39a4fdcbe228"
+source = "git+https://github.com/rcore-os/bcm2837#bf1e4ec63c52827bc199399f214f39a4fdcbe228"
 dependencies = [
  "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -374,7 +374,7 @@ version = "0.2.0"
 dependencies = [
  "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
- "bcm2837 1.0.0 (git+https://github.com/GeminiLab/bcm2837)",
+ "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
@@ -688,7 +688,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum as-slice 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "293dac66b274fab06f95e7efb05ec439a6b70136081ea522d270bc351ae5bb27"
 "checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
-"checksum bcm2837 1.0.0 (git+https://github.com/GeminiLab/bcm2837)" = "<none>"
+"checksum bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)" = "<none>"
