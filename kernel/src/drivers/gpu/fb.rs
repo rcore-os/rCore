@@ -1,6 +1,6 @@
 //! Framebuffer
 
-use crate::fs::vga::{fb_bitfield, fb_var_screeninfo};
+use crate::fs::vga::{fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo};
 use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -254,7 +254,7 @@ impl Framebuffer {
         var_info.bits_per_pixel = self.fb_info.depth;
     }
 
-    pub fn fill_fix_screeninfo(&self, fix_info : &mut fb_fix_screeninfo) {
+    pub fn fill_fix_screeninfo(&self, fix_info: &mut fb_fix_screeninfo) {
         fix_info.line_length = self.fb_info.pitch;
     }
 }
