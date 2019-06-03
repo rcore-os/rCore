@@ -31,7 +31,6 @@
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
 #   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
-#   u_boot = /path/to/u-boot.bin Only available on aarch64, use u-boot to boot rcore
 # . extra_features = profile | ... Add additional features
 
 arch ?= riscv64
@@ -323,11 +322,7 @@ $(kernel_img): kernel $(bootloader)
 ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
-ifneq ($(u_boot), )
-	@cp $(u_boot) $@
-else
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
-endif
 else ifeq ($(arch), mipsel)
 # qemu-system-mipsel accepts ELF file only, so objcopy is not needed
 	@$(strip) $(kernel) -o $@
