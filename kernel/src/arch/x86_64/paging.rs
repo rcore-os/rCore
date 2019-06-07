@@ -1,4 +1,5 @@
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
+use core::mem::ManuallyDrop;
 use core::sync::atomic::Ordering;
 use log::*;
 use rcore_memory::paging::*;
@@ -196,15 +197,20 @@ impl PageEntry {
 
 impl PageTableImpl {
     /// Unsafely get the current active page table.
-    /// WARN: You MUST call `core::mem::forget` for it after use!
-    pub unsafe fn active() -> Self {
+    /// Using ManuallyDrop to wrap the page table: this is how `core::mem::forget` is implemented now.
+    pub unsafe fn active() -> ManuallyDrop<Self> {
         let frame = Cr3::read().0;
         let table = &mut *frame_to_page_table(frame);
-        PageTableImpl(
+        ManuallyDrop::new(PageTableImpl(
             MappedPageTable::new(table, frame_to_page_table),
             core::mem::MaybeUninit::uninitialized().into_initialized(),
             frame,
-        )
+        ))
+    }
+    /// The method for getting the kernel page table.
+    /// In x86_64 case kernel page table and user page table are the same table. However you have to do the initialization.
+    pub unsafe fn kernel_table() -> ManuallyDrop<Self> {
+        Self::active()
     }
 }
 
@@ -227,14 +233,16 @@ impl PageTableExt for PageTableImpl {
         let table = unsafe { &mut *frame_to_page_table(Cr3::read().0) };
         // Kernel at 0xffff_ff00_0000_0000
         // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
+        // Kseg2 at 0xffff_fe80_0000_0000
         let ekernel = table[510].clone();
         let ephysical = table[0x1f8].clone();
         let estack = table[175].clone();
-
+        let ekseg2 = table[509].clone();
         let table = unsafe { &mut *frame_to_page_table(self.2) };
         table[510].set_addr(ekernel.addr(), ekernel.flags() | EF::GLOBAL);
         table[0x1f8].set_addr(ephysical.addr(), ephysical.flags() | EF::GLOBAL);
         table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
+        table[509].set_addr(ekseg2.addr(), ekseg2.flags() | EF::GLOBAL);
     }
 
     fn token(&self) -> usize {
