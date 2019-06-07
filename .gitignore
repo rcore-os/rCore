@@ -23,3 +23,9 @@ Cargo.lock
 
 # for idea
 .idea
+
+# for kernel module building
+# C & Rust
+modules/*/objs
+# Rust
+modules/*/target

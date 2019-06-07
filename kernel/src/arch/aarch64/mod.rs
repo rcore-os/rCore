@@ -25,6 +25,7 @@ pub extern "C" fn rust_main() -> ! {
     crate::logging::init();
     interrupt::init();
     memory::init();
+    crate::lkm::manager::ModuleManager::init();
     driver::init();
     println!("{}", LOGO);
 

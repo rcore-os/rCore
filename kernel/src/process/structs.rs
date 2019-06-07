@@ -180,10 +180,10 @@ impl Thread {
             let inode = crate::fs::ROOT_INODE
                 .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
                 .map_err(|_| "interpreter not found")?;
-            // modify args for loader
+            // modify args for const_reloc
             args[0] = exec_path.into();
             args.insert(0, loader_path.into());
-            // Elf loader should not have INTERP
+            // Elf const_reloc should not have INTERP
             // No infinite loop
             return Thread::new_user_vm(&inode, exec_path, args, envs);
         }

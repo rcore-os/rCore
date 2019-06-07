@@ -18,6 +18,7 @@ use crate::util;
 
 pub use self::custom::*;
 pub use self::fs::*;
+pub use self::lkm::*;
 pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
@@ -26,6 +27,7 @@ pub use self::time::*;
 
 mod custom;
 mod fs;
+mod lkm;
 mod mem;
 mod misc;
 mod net;
@@ -298,11 +300,22 @@ impl Syscall<'_> {
             }
             SYS_RT_SIGQUEUEINFO => self.unimplemented("rt_sigqueueinfo", Ok(0)),
 
+            // kernel module
+            SYS_INIT_MODULE => {
+                self.sys_init_module(args[0] as *const u8, args[1] as usize, args[2] as *const u8)
+            }
+            SYS_FINIT_MODULE => {
+                debug!("[LKM] sys_finit_module is unimplemented");
+                Err(SysError::ENOSYS)
+            }
+            SYS_DELETE_MODULE => self.sys_delete_module(args[0] as *const u8, args[1] as u32),
+
             // custom
             SYS_MAP_PCI_DEVICE => self.sys_map_pci_device(args[0], args[1]),
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
+
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]

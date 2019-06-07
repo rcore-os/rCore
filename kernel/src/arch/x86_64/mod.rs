@@ -56,6 +56,8 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     memory::init_kernel_kseg2_map();
     //get local apic id of cpu
     cpu::init();
+    // now we can start LKM.
+    crate::lkm::manager::ModuleManager::init();
     // Use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
     driver::init(boot_info);
     // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...

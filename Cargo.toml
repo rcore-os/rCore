@@ -3,4 +3,4 @@ members = [
     "crate/memory",
     "crate/sync",
 ]
-exclude = ["kernel", "bootloader", "user/rust"]
+exclude = ["kernel", "bootloader", "user/rust", "modules"]
