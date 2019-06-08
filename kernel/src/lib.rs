@@ -20,25 +20,26 @@ extern crate log;
 extern crate lazy_static;
 
 pub use crate::process::{new_kernel_context, processor};
-use buddy_system_allocator::LockedHeapWithRescue;
-use rcore_thread::std_thread as thread;
+pub use buddy_system_allocator::LockedHeapWithRescue;
+pub use rcore_thread::std_thread as thread;
 
 #[macro_use] // print!
-mod logging;
+pub mod logging;
 #[macro_use]
-mod util;
-mod backtrace;
-mod consts;
-mod drivers;
-mod fs;
-mod lang;
-mod memory;
-mod net;
-mod process;
-mod shell;
-mod sync;
-mod syscall;
-mod trap;
+pub mod util;
+pub mod backtrace;
+pub mod consts;
+pub mod drivers;
+pub mod fs;
+pub mod lang;
+pub mod lkm;
+pub mod memory;
+pub mod net;
+pub mod process;
+pub mod shell;
+pub mod sync;
+pub mod syscall;
+pub mod trap;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

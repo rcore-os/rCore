@@ -8,10 +8,12 @@
   "arch": "x86_64",
   "os": "none",
   "executables": true,
+  "dynamic-linking": true,
   "linker": "rust-lld",
   "pre-link-args": {
     "ld.lld": [
-      "-Tsrc/arch/x86_64/linker.ld"
+      "-Tsrc/arch/x86_64/linker.ld",
+      "-export-dynamic"
     ]
   },
   "disable-redzone": true,
