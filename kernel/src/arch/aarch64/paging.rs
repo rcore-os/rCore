@@ -10,6 +10,7 @@ use aarch64::paging::{
     FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size4KiB,
 };
 use aarch64::{PhysAddr, VirtAddr};
+use core::mem::ManuallyDrop;
 use log::*;
 use rcore_memory::paging::*;
 
@@ -205,15 +206,26 @@ impl PageEntry {
 
 impl PageTableImpl {
     /// Unsafely get the current active page table.
-    /// WARN: You MUST call `core::mem::forget` for it after use!
-    pub unsafe fn active() -> Self {
+    /// Using ManuallyDrop to wrap the page table: this is how `core::mem::forget` is implemented now.
+    pub unsafe fn active() -> ManuallyDrop<Self> {
         let frame = Frame::of_addr(PageTableImpl::active_token() as u64);
         let table = &mut *frame_to_page_table(frame);
-        PageTableImpl {
+        ManuallyDrop::new(PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
             entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
-        }
+        })
+    }
+    /// The method for getting the kernel page table.
+    /// In aarch64 case kernel page table and user page table are two different tables.
+    pub unsafe fn kernel_table() -> ManuallyDrop<Self> {
+        let frame = Frame::of_addr(ttbr_el1_read(1).start_address().as_u64());
+        let table = &mut *frame_to_page_table(frame);
+        ManuallyDrop::new(PageTableImpl {
+            page_table: MappedPageTable::new(table, frame_to_page_table),
+            root_frame: frame,
+            entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+        })
     }
 }
 

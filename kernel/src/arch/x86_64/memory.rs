@@ -1,8 +1,8 @@
+use super::paging::PageTableImpl;
 use super::{BootInfo, MemoryRegionType};
 use crate::memory::{init_heap, FRAME_ALLOCATOR};
 use bitmap_allocator::BitAlloc;
 use rcore_memory::paging::*;
-
 pub fn init(boot_info: &BootInfo) {
     init_frame_allocator(boot_info);
     init_heap();
@@ -19,4 +19,18 @@ fn init_frame_allocator(boot_info: &BootInfo) {
             );
         }
     }
+}
+
+/// The method for initializing kernel virtual memory space, a memory space of 512 GiB.
+/// The memory space is resided at the 509th item of the first-level page table.
+/// After the initialization, mapping on this space will be "broadcast" to all page tables.
+pub fn init_kernel_kseg2_map() {
+    let mut page_table = unsafe { PageTableImpl::kernel_table() };
+    // Dirty hack here:
+    // We do not really need the mapping. Indeed, we only need the second-level page table.
+    // Second-level page table item can then be copied to all page tables safely.
+    // This hack requires the page table not to recycle the second level page table on unmap.
+
+    page_table.map(0xfffffe8000000000, 0x0).update();
+    page_table.unmap(0xfffffe8000000000);
 }

@@ -20,3 +20,12 @@ Cargo.lock
 
 # for vim
 *.swp
+
+# for idea
+.idea
+
+# for kernel module building
+# C & Rust
+modules/*/objs
+# Rust
+modules/*/target
