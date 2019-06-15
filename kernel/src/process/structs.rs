@@ -3,7 +3,7 @@ use core::fmt;
 
 use core::str;
 use log::*;
-use rcore_memory::{PAGE_SIZE, Page};
+use rcore_memory::{Page, PAGE_SIZE};
 use rcore_thread::Tid;
 use spin::RwLock;
 use xmas_elf::{
@@ -174,7 +174,7 @@ impl Thread {
             _ => return Err("invalid ELF arch"),
         }
 
-        let mut auxv={
+        let mut auxv = {
             let mut map = BTreeMap::new();
             if let Some(phdr_vaddr) = elf.get_phdr_vaddr() {
                 map.insert(abi::AT_PHDR, phdr_vaddr as usize);
@@ -196,18 +196,19 @@ impl Thread {
                 .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
                 .map_err(|_| "interpreter not found")?;
             // load loader by bias and set aux vector.
-            let mut interp_data: [u8; 0x3c0] = unsafe { MaybeUninit::uninitialized().into_initialized() };
+            let mut interp_data: [u8; 0x3c0] =
+                unsafe { MaybeUninit::uninitialized().into_initialized() };
             interp_inode
                 .read_at(0, &mut interp_data)
                 .map_err(|_| "failed to read from INode")?;
-            let elf_interp=ElfFile::new(&interp_data)?;
+            let elf_interp = ElfFile::new(&interp_data)?;
             elf_interp.append_as_interpreter(&interp_inode, &mut vm, bias);
             info!("entry: {:x}", elf.header.pt2.entry_point() as usize);
             auxv.insert(abi::AT_ENTRY, elf.header.pt2.entry_point() as usize);
             auxv.insert(abi::AT_BASE, bias);
-            entry_addr=elf_interp.header.pt2.entry_point() as usize + bias;
+            entry_addr = elf_interp.header.pt2.entry_point() as usize + bias;
         }
-
+        debug!("{:#x?}", vm);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
@@ -233,17 +234,12 @@ impl Thread {
         };
 
         // Make init info
-        let init_info = ProcInitInfo {
-            args,
-            envs,
-            auxv
-        };
+        let init_info = ProcInitInfo { args, envs, auxv };
         unsafe {
             vm.with(|| ustack_top = init_info.push_at(ustack_top));
         }
 
         trace!("{:#x?}", vm);
-
 
         Ok((vm, entry_addr, ustack_top))
     }
@@ -469,7 +465,7 @@ impl ElfExt for ElfFile<'_> {
     fn make_memory_set(&self, inode: &Arc<INode>) -> (MemorySet, usize) {
         debug!("creating MemorySet from ELF");
         let mut ms = MemorySet::new();
-        let mut farthest_memory:usize=0;
+        let mut farthest_memory: usize = 0;
         for ph in self.program_iter() {
             if ph.get_type() != Ok(Type::Load) {
                 continue;
@@ -487,31 +483,31 @@ impl ElfExt for ElfFile<'_> {
                 },
                 "elf",
             );
-            if ph.virtual_addr() as usize+ph.mem_size() as usize > farthest_memory{
-                farthest_memory=ph.virtual_addr() as usize+ph.mem_size() as usize;
+            if ph.virtual_addr() as usize + ph.mem_size() as usize > farthest_memory {
+                farthest_memory = ph.virtual_addr() as usize + ph.mem_size() as usize;
             }
         }
-        (ms, (Page::of_addr(farthest_memory+PAGE_SIZE)).start_address())
+        (ms, (Page::of_addr(farthest_memory + PAGE_SIZE)).start_address())
     }
-    fn append_as_interpreter(&self, inode: &Arc<INode>, ms: &mut MemorySet, bias: usize){
+    fn append_as_interpreter(&self, inode: &Arc<INode>, ms: &mut MemorySet, bias: usize) {
         debug!("inserting interpreter from ELF");
 
-        for ph in self.program_iter(){
-            if ph.get_type()!=Ok(Type::Load){
+        for ph in self.program_iter() {
+            if ph.get_type() != Ok(Type::Load) {
                 continue;
             }
             ms.push(
-                ph.virtual_addr() as usize +bias,
+                ph.virtual_addr() as usize + bias,
                 ph.virtual_addr() as usize + ph.mem_size() as usize + bias,
                 ph.flags().to_attr(),
-                File{
+                File {
                     file: INodeForMap(inode.clone()),
                     mem_start: ph.virtual_addr() as usize + bias,
                     file_start: ph.offset() as usize,
-                    file_end: ph.offset() as usize+ph.file_size() as usize,
-                    allocator: GlobalFrameAlloc
+                    file_end: ph.offset() as usize + ph.file_size() as usize,
+                    allocator: GlobalFrameAlloc,
                 },
-                "elf-interp"
+                "elf-interp",
             )
         }
     }

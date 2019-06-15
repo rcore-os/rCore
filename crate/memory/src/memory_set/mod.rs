@@ -49,7 +49,7 @@ impl MemoryArea {
             self.check_read_array(ptr, count)
         }
     }
-    /// Test whether this area is (page) overlap with area [`start_addr`, `end_addr`]
+    /// Test whether this area is (page) overlap with area [`start_addr`, `end_addr`)
     pub fn is_overlap_with(&self, start_addr: VirtAddr, end_addr: VirtAddr) -> bool {
         let p0 = Page::of_addr(self.start_addr);
         let p1 = Page::of_addr(self.end_addr - 1) + 1;
@@ -196,13 +196,15 @@ impl<T: PageTableExt> MemorySet<T> {
     /// Add an area to this set
     pub fn push(
         &mut self,
-        start_addr: VirtAddr,
-        end_addr: VirtAddr,
+        mut start_addr: VirtAddr,
+        mut end_addr: VirtAddr,
         attr: MemoryAttr,
         handler: impl MemoryHandler,
         name: &'static str,
     ) {
-        assert!(start_addr <= end_addr, "invalid memory area");
+        start_addr = start_addr & !(PAGE_SIZE - 1);
+        end_addr = (end_addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        assert!(start_addr < end_addr, "invalid memory area");
         assert!(
             self.test_free_area(start_addr, end_addr),
             "memory area overlap"

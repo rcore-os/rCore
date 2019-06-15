@@ -23,11 +23,11 @@ impl Page {
         }
     }
 
-    /// Returns a range of pages between address `begin` and `end`
+    /// Returns a range of pages between address [begin, end)
     pub fn range_of(begin: VirtAddr, end: VirtAddr) -> PageRange {
         PageRange {
             start: Page::of_addr(begin),
-            end: Page::of_addr(end - 1) + 1,
+            end: Page::of_addr(end - 1),
         }
     }
 }
@@ -59,7 +59,7 @@ impl Iterator for PageRange {
     type Item = Page;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.start < self.end {
+        if self.start <= self.end {
             let page = self.start.clone();
             self.start += 1;
             Some(page)
