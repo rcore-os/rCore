@@ -337,7 +337,7 @@ kernel: $(dtb)
 ifeq ($(arch), x86_64)
 	@bootimage build $(build_args)
 	@echo "Now patching kernel symbols onto kernel."
-	../tools/fill_symbols/x86_64.sh target/x86_64/$(mode)/rcore
+	@../tools/fill_symbols/x86_64.sh target/x86_64/$(mode)/rcore
 	@echo "Generate bootimage again."
 	@bootimage build $(build_args)
 	@mv target/x86_64/bootimage.bin $(bootimage)

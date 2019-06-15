@@ -189,8 +189,9 @@ impl Thread {
         let (mut vm, bias) = elf.make_memory_set(inode);
 
         // Check interpreter (for dynamic link)
+        // When interpreter is used, map both dynamic linker and executable
         if let Ok(loader_path) = elf.get_interpreter() {
-            info!("Handling interpreter... bias={:x}", bias);
+            info!("Handling interpreter... offset={:x}", bias);
             // assuming absolute path
             let interp_inode = crate::fs::ROOT_INODE
                 .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
@@ -203,12 +204,11 @@ impl Thread {
                 .map_err(|_| "failed to read from INode")?;
             let elf_interp = ElfFile::new(&interp_data)?;
             elf_interp.append_as_interpreter(&interp_inode, &mut vm, bias);
-            info!("entry: {:x}", elf.header.pt2.entry_point() as usize);
+            debug!("entry point: {:x}", elf.header.pt2.entry_point() as usize);
             auxv.insert(abi::AT_ENTRY, elf.header.pt2.entry_point() as usize);
             auxv.insert(abi::AT_BASE, bias);
             entry_addr = elf_interp.header.pt2.entry_point() as usize + bias;
         }
-        debug!("{:#x?}", vm);
 
         // User stack
         use crate::consts::{USER_STACK_OFFSET, USER_STACK_SIZE};
@@ -238,8 +238,6 @@ impl Thread {
         unsafe {
             vm.with(|| ustack_top = init_info.push_at(ustack_top));
         }
-
-        trace!("{:#x?}", vm);
 
         Ok((vm, entry_addr, ustack_top))
     }

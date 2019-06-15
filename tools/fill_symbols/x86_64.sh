@@ -1,13 +1,26 @@
 #!/bin/bash
+objdump=objdump
+nm=nm
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    objdump=/usr/local/opt/binutils/bin/objdump
+    nm=/usr/local/opt/binutils/bin/nm
+    if hash $objdump 2>/dev/null; then
+        echo "Found GNU objdump"
+    else
+        echo "No GNU objdump found, use brew install binutils"
+        exit 1
+    fi
+fi
+
 echo "Filling kernel symbols."
 rcore=$1
 tmpfile=$(mktemp /tmp/rcore-symbols.txt.XXXXXX)
 echo "Writing symbol table."
-nm $1 >$tmpfile
+$nm $1 >$tmpfile
 gzip $tmpfile
 tmpfile=$tmpfile.gz
-symbol_table_loc=$((16#$(objdump -D $rcore -j .data -F |grep "<rcore_symbol_table>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
-symbol_table_size_loc=$((16#$(objdump -D $rcore -j .data -F |grep "<rcore_symbol_table_size>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
+symbol_table_loc=$((16#$($objdump -D $rcore -j .data -F |grep "<rcore_symbol_table>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
+symbol_table_size_loc=$((16#$($objdump -D $rcore -j .data -F |grep "<rcore_symbol_table_size>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
 echo $symbol_table_loc
 echo $symbol_table_size_loc
 FILESIZE=$(stat -c%s "$tmpfile")
