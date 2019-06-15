@@ -1,5 +1,6 @@
 use crate::consts::PHYSICAL_MEMORY_OFFSET;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
+use core::mem::ManuallyDrop;
 use log::*;
 use rcore_memory::paging::*;
 use riscv::addr::*;
@@ -146,19 +147,24 @@ impl Entry for PageEntry {
 
 impl PageTableImpl {
     /// Unsafely get the current active page table.
-    /// WARN: You MUST call `core::mem::forget` for it after use!
-    pub unsafe fn active() -> Self {
+    /// Using ManuallyDrop to wrap the page table: this is how `core::mem::forget` is implemented now.
+    pub unsafe fn active() -> ManuallyDrop<Self> {
         #[cfg(target_arch = "riscv32")]
         let mask = 0x7fffffff;
         #[cfg(target_arch = "riscv64")]
         let mask = 0x0fffffff_ffffffff;
         let frame = Frame::of_ppn(PageTableImpl::active_token() & mask);
         let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET);
-        PageTableImpl {
+        ManuallyDrop::new(PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
             entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
-        }
+        })
+    }
+    /// The method for getting the kernel page table.
+    /// In riscv kernel page table and user page table are the same table. However you have to do the initialization.
+    pub unsafe fn kernel_table() -> ManuallyDrop<Self> {
+        Self::active()
     }
 }
 

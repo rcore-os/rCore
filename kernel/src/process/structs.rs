@@ -485,7 +485,10 @@ impl ElfExt for ElfFile<'_> {
                 farthest_memory = ph.virtual_addr() as usize + ph.mem_size() as usize;
             }
         }
-        (ms, (Page::of_addr(farthest_memory + PAGE_SIZE)).start_address())
+        (
+            ms,
+            (Page::of_addr(farthest_memory + PAGE_SIZE)).start_address(),
+        )
     }
     fn append_as_interpreter(&self, inode: &Arc<INode>, ms: &mut MemorySet, bias: usize) {
         debug!("inserting interpreter from ELF");

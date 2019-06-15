@@ -251,7 +251,7 @@ impl ModuleManager {
             let mut min_addr: usize;
             let mut off_start: usize;
             max_addr = 0;
-            min_addr = 0xffffffff_ffffffff;
+            min_addr = ::core::usize::MAX;
             off_start = 0;
             for ph in elf.program_iter() {
                 if ph.get_type().unwrap() == Load {

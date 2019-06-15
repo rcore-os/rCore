@@ -25,4 +25,9 @@ pub const MEMORY_END: usize = 0x8800_0000;
 pub const USER_STACK_OFFSET: usize = 0x40000000 - USER_STACK_SIZE;
 pub const USER_STACK_SIZE: usize = 0x10000;
 
+#[cfg(target_arch = "riscv32")]
+pub const KSEG2_START: usize = 0xfe80_0000;
+#[cfg(target_arch = "riscv64")]
+pub const KSEG2_START: usize = 0xffff_fe80_0000_0000;
+
 pub const MAX_DTB_SIZE: usize = 0x2000;

@@ -208,7 +208,7 @@ impl PageTableImpl {
         ))
     }
     /// The method for getting the kernel page table.
-    /// In x86_64 case kernel page table and user page table are the same table. However you have to do the initialization.
+    /// In x86_64 kernel page table and user page table are the same table. However you have to do the initialization.
     pub unsafe fn kernel_table() -> ManuallyDrop<Self> {
         Self::active()
     }
