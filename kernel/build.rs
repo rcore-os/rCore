@@ -7,7 +7,7 @@ use std::path::Path;
 fn main() {
     println!("cargo:rerun-if-env-changed=LOG");
     println!("cargo:rerun-if-env-changed=BOARD");
-    println!("cargo:rerun-if-env-changed=SFSIMG");
+    println!("cargo:rerun-if-env-changed=USER_IMG");
 
     let arch: String = std::env::var("ARCH").unwrap();
     let board: String = std::env::var("BOARD").unwrap();

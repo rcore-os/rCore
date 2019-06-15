@@ -31,7 +31,7 @@ global_asm!(concat!(
 	.global _user_img_end
 _user_img_start:
     .incbin ""#,
-    env!("SFSIMG"),
+    env!("USER_IMG"),
     r#""
 _user_img_end:
 "#

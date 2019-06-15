@@ -19,7 +19,7 @@
 #   d    = int | in_asm | ...   QEMU debug info
 #   mode = debug | release
 #   LOG  = off | error | warn | info | debug | trace
-#   SFSIMG = <sfsimg>            SFS image path of user programs
+#   USER_IMG = <sfsimg>          image path of user programs
 #   smp     = 1 | 2 | ...        SMP core number
 #   graphic = on | off | console Enable/disable qemu graphical output, or print console to graphic output
 #   board   = none               Running on QEMU
@@ -56,18 +56,8 @@ user_dir := ../user
 
 ### export environments ###
 
-ifeq ($(arch), $(filter $(arch), aarch64 mipsel))
-#link user img, so use original image
-export SFSIMG = $(user_dir)/build/$(arch).img
-else
-# board is pc or qemu?
-ifeq ($(board), $(filter $(board), pc u540 k210 rocket_chip))
-#link user img, so use original image
-export SFSIMG = $(user_dir)/build/$(arch).img
-else
-export SFSIMG = $(user_dir)/build/$(arch).qcow2
-endif # pc or qemu
-endif # aarch64 mipsel
+export USER_IMG = $(user_dir)/build/$(arch).img
+export USER_QCOW2 = $(user_dir)/build/$(arch).qcow2
 
 ifeq ($(arch), aarch64)
 board := raspi3
@@ -107,7 +97,7 @@ qemu_opts += \
 	-device isa-debug-exit
 ifeq ($(board), none)
 qemu_opts += \
-	-drive format=qcow2,file=$(SFSIMG),media=disk,cache=writeback,id=sfsimg,if=none \
+	-drive format=qcow2,file=$(USER_QCOW2),media=disk,cache=writeback,id=sfsimg,if=none \
 	-device ahci,id=ahci0 \
 	-device ide-drive,drive=sfsimg,bus=ahci0.0
 endif
@@ -135,7 +125,7 @@ qemu_opts += \
 	-serial mon:stdio \
 	-kernel ../tools/opensbi/virt_rv32.elf \
 	-device loader,addr=0x80400000,file=$(kernel_img) \
-	-drive file=$(SFSIMG),format=qcow2,id=sfs \
+	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
@@ -157,7 +147,7 @@ qemu_opts += \
 	-serial mon:stdio \
 	-kernel ../tools/opensbi/virt_rv64.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
-	-drive file=$(SFSIMG),format=qcow2,id=sfs \
+	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs
 endif
 qemu_net_opts += \
@@ -172,7 +162,7 @@ qemu_opts += \
 	-machine $(board) \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img) \
-	-sd $(kernel_img)
+	-drive file=$(USER_QCOW2),format=qcow2,id=sfs
 
 else ifeq ($(arch), mipsel)
 ifeq ($(board), malta)
