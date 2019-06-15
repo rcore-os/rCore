@@ -304,7 +304,7 @@ $(bootloader): $(kernel)
 ifeq ($(need_bootloader), true)
 ifeq ($(arch), aarch64)
 	@echo "Patching symbols into kernel."
-	../tools/fill_symbols/aarch64.sh target/aarch64/$(mode)/rcore
+	@../tools/fill_symbols/aarch64.sh target/aarch64/$(mode)/rcore $(prefix)
 endif
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped

@@ -3,11 +3,11 @@ echo "Filling kernel symbols."
 rcore=$1
 tmpfile=$(mktemp /tmp/rcore-symbols.txt.XXXXXX)
 echo "Writing symbol table."
-aarch64-elf-nm $1 >$tmpfile
+$2nm $1 >$tmpfile
 gzip $tmpfile
 tmpfile=$tmpfile.gz
-symbol_table_loc=$((16#$(aarch64-elf-objdump -D $rcore -j .data -F |grep "<rcore_symbol_table>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
-symbol_table_size_loc=$((16#$(aarch64-elf-objdump -D $rcore -j .data -F |grep "<rcore_symbol_table_size>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
+symbol_table_loc=$((16#$($2objdump -D $rcore -j .data -F |grep "<rcore_symbol_table>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
+symbol_table_size_loc=$((16#$($2objdump -D $rcore -j .data -F |grep "<rcore_symbol_table_size>" |grep -oEi "0x[0-9a-f]+" |grep -oEi "[0-9a-f][0-9a-f]+")))
 echo $symbol_table_loc
 echo $symbol_table_size_loc
 FILESIZE=$(stat -c%s "$tmpfile")
