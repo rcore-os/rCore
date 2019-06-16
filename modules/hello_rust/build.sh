@@ -1,8 +1,19 @@
 #!/bin/bash
-ARCH=x86_64
-TEXT_TYPE=elf64-x86-64
-BIN_ARCH=i386:x86-64
-PREFIX=
+if [[ "$1" == "x86_64" ]]; then
+    ARCH=x86_64
+    TEXT_TYPE=elf64-x86-64
+    BIN_ARCH=i386:x86-64
+    PREFIX=
+elif [[ "$1" == "aarch64" ]]; then
+    ARCH=aarch64
+    TEXT_TYPE=elf64-littleaarch64
+    BIN_ARCH=aarch64
+    PREFIX=aarch64-elf-
+else
+    echo "Not supported target"
+    exit 1
+fi
+
 echo "Step 1. Fetching dependencies according to cargo."
 echo "// Dummy file" > src/lib.rs
 echo '#![no_std]' >> src/lib.rs
