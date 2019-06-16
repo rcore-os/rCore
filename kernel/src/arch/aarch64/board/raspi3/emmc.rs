@@ -393,7 +393,6 @@ macro_rules! timeout_wait {
 impl EmmcCtl {
     pub fn new() -> EmmcCtl {
         //TODO: improve it!
-        info!("EmmcClt::new()");
         EmmcCtl {
             emmc: Emmc::new(),
             card_supports_sdhc: false,
@@ -470,7 +469,7 @@ impl EmmcCtl {
         let buf = mailbox::get_clock_rate(0x1);
         if buf.is_ok() {
             let base_clock = buf.unwrap();
-            info!("EmmcCtl: base clock rate is {}Hz.", base_clock);
+            debug!("EmmcCtl: base clock rate is {}Hz.", base_clock);
             return base_clock;
         } else {
             warn!("EmmcCtl: property mailbox did not return a valid clock id.");
@@ -749,7 +748,6 @@ impl EmmcCtl {
     }
 
     pub fn sd_issue_command_scr(&mut self, timeout: u32) -> bool {
-        info!("EmmcCtl::sd_issue_command_scr()");
         self.sd_handle_interrupts();
         let command = SEND_SCR;
         let cmd = command & 0xff;
@@ -762,14 +760,12 @@ impl EmmcCtl {
         if self.card_rca != 0 {
             rca = self.card_rca << 16;
         }
-        info!("EmmcCtl: issue APP_CMD");
         self.sd_issue_command_int(sd_commands[APP_CMD as usize], rca, timeout);
 
         if self.last_cmd_success {
             self.last_cmd = command;
             let command = sd_acommands[cmd as usize];
-            info!("EmmcCtl: issue SEND_SCR");
-            info!(
+            debug!(
                 "EmmcCtl: block_size = {}, blocks_to_transfer = {}.",
                 self.block_size, self.blocks_to_transfer
             );
@@ -794,7 +790,7 @@ impl EmmcCtl {
                     let mut cur_word_no = 0;
                     while (cur_word_no < blocks_size_u32) {
                         let word = self.emmc.registers.DATA.read();
-                        info!(
+                        debug!(
                             "EmmcCtl: block#{}, word#{} = 0x{:08X}, pos = {}",
                             cur_block,
                             cur_word_no,
@@ -875,35 +871,29 @@ impl EmmcCtl {
     }
 
     pub fn sd_card_init(&mut self) -> bool {
-        info!("EmmcCtl::sd_card_init()");
         let ver = self.emmc.registers.SLOTISR_VER.read();
         let vendor = ver >> 24;
         let sdversion = (ver >> 16) & 0xff;
         let slot_status = ver & 0xff;
-        info!("EmmcCtl: vendor version number: {}", vendor);
-        info!("EmmcCtl: host controller version number: {}", sdversion);
-        info!("EmmcCtl: slot status: 0b{:b}", slot_status);
+        debug!("EmmcCtl: vendor version number: {}", vendor);
+        debug!("EmmcCtl: host controller version number: {}", sdversion);
+        debug!("EmmcCtl: slot status: 0b{:b}", slot_status);
 
-        info!("EmmcCtl: ctl0");
         let mut control0 = self.emmc.registers.CONTROL0.read();
-        info!("EmmcCtl: ctl0 = 0x{:X}", control0);
         let mut control1 = self.emmc.registers.CONTROL1.read();
-        info!("EmmcCtl: ctl1 = 0x{:X}", control1);
         control1 |= (1 << 24);
         // Disable clock
         control1 &= !(1 << 2);
         control1 &= !(1 << 0);
-        info!("EmmcCtl: new ctl1 = 0x{:X}", control1);
         self.emmc.registers.CONTROL1.write(control1);
-        info!("EmmcCtl: ctl1 written.");
 
         if !timeout_wait!((self.emmc.registers.CONTROL1.read() & (0x7 << 24)) == 0) {
             return false;
         }
 
-        info!("EmmcCtl: checking for a valid card");
+        debug!("EmmcCtl: checking for a valid card");
         let tmp_status = self.emmc.registers.STATUS.read();
-        info!(
+        debug!(
             "EmmcCtl: try to get current status, status = 0x{:X}",
             tmp_status
         );
@@ -911,17 +901,13 @@ impl EmmcCtl {
         if !timeout_wait!((self.emmc.registers.STATUS.read() & (1 << 16)) != 0, 500000) {
             return false;
         }
-        info!("here?");
 
         // Clear control2
         self.emmc.registers.CONTROL2.write(0);
-        info!("EmmcCtl: control2 cleared.");
-        info!("EmmcCtl: setting base clock.");
         let clk = self.sd_get_base_clock_hz();
         let base_clock = if clk > 0 { clk } else { 100000000 };
 
         // Set clock rate to something slow
-        info!("EmmcCtl: Set clock rate to something slow.");
         control1 = self.emmc.registers.CONTROL1.read();
         control1 |= 1;
 
@@ -938,7 +924,6 @@ impl EmmcCtl {
             return false;
         }
 
-        info!("EmmcCtl: trying to enable the SD clock.");
         // Enable the SD clock
         usleep(2000);
         control1 = self.emmc.registers.CONTROL1.read();
@@ -947,13 +932,10 @@ impl EmmcCtl {
         usleep(2000);
 
         // Mask off sending interrupts to the ARM
-        info!("EmmcCtl: Mask off sending interrupts to the ARM.");
         self.emmc.registers.IRPT_EN.write(0);
         // Reset interrupts
-        info!("EmmcCtl: Reset interrupts.");
         self.emmc.registers.INTERRUPT.write(0xffffffff);
         // Have all interrupts sent to the INTERRUPT register
-        info!("EmmcCtl: Have all interrupts sent to the INTERRUPT register.");
         let irpt_mask = 0xffffffff & (!SD_CARD_INTERRUPT);
         self.emmc.registers.IRPT_MASK.write(0xffffffff);
 
@@ -963,7 +945,7 @@ impl EmmcCtl {
         self.base_clock = base_clock;
 
         // Send CMD0 to the card (reset to idle state)
-        info!("EmmcCtl: Send CMD0 to the card (reset to idle state).");
+        debug!("EmmcCtl: Send CMD0 to the card (reset to idle state).");
         if !self.sd_issue_command(GO_IDLE_STATE, 0, 500000) {
             warn!("EmmcCtl: no CMD0 response.");
             return false;
@@ -972,7 +954,6 @@ impl EmmcCtl {
         // Send CMD8 to the card
         // Voltage supplied = 0x1 = 2.7-3.6V (standard)
         // Check pattern = 10101010b (as per PLSS 4.3.13) = 0xAA
-        info!("EmmcCtl: Send CMD8 to the card.");
         self.sd_issue_command(SEND_IF_COND, 0x1aa, 500000);
         let v2_later = if self.timeout() {
             false
@@ -998,9 +979,7 @@ impl EmmcCtl {
 
         // Here we are supposed to check the response to CMD5 (HCSS 3.6)
         // It only returns if the card is a SDIO card
-        info!("EmmcCtl: Check the response to CMD5.");
         self.sd_issue_command(IO_SET_OP_COND, 0, 10000);
-        info!("EmmcCtl: IO_SET_OP_COND sent.");
         if !self.timeout() {
             if self.cmd_timeout() {
                 if !self.sd_reset_cmd() {
@@ -1013,7 +992,6 @@ impl EmmcCtl {
             }
         }
 
-        info!("EmmcCtl: Sending inquiry ACMD41.");
         if !self.sd_issue_command(ACMD!(41), 0, 500000) {
             warn!("EmmcCtl: inquiry ACMD41 failed.");
             return false;
@@ -1053,17 +1031,16 @@ impl EmmcCtl {
 
         // At this point, we know the card is definitely an SD card, so will definitely
         //  support SDR12 mode which runs at 25 MHz
-        info!("EmmcCtl: Set the clock rate to 25MHz.");
         self.sd_switch_clock_rate(base_clock, 25000000 /* SD_CLOCK_NORMAL */);
 
         // A small wait before the voltage switch
         usleep(5000);
 
         // Switch to 1.8V mode if possible
-        info!("EmmcCtl: card_supports_18v = {}", self.card_supports_18v);
+        debug!("EmmcCtl: card_supports_18v = {}", self.card_supports_18v);
         if (self.card_supports_18v) {
             // As per HCSS 3.6.1
-            info!("EmmcCtl: Switch to 1.8v mode.");
+            debug!("EmmcCtl: Switch to 1.8v mode.");
             // Send VOLTAGE_SWITCH
             if !self.sd_issue_command(VOLTAGE_SWITCH, 0, 500000) {
                 self.failed_voltage_switch = 1;
@@ -1120,7 +1097,7 @@ impl EmmcCtl {
             return false;
         }
 
-        info!(
+        debug!(
             "EmmcCtl: card CID: {:08X}{:08X}{:08X}{:08X}",
             self.last_r[0], self.last_r[1], self.last_r[2], self.last_r[3]
         );
@@ -1164,7 +1141,7 @@ impl EmmcCtl {
         }
 
         // Now select the card (toggles it to transfer state)
-        info!("EmmcCtl: Toggle the card to transfer state.");
+        debug!("EmmcCtl: Toggle the card to transfer state.");
         if !self.sd_issue_command(SELECT_CARD, self.card_rca << 16, 500000) {
             warn!("EmmcCtl: Error sending SELECT_CARD.");
             return false;
@@ -1179,7 +1156,7 @@ impl EmmcCtl {
         }
 
         // If not an SDHC card, ensure BLOCKLEN is 512 bytes
-        info!("EmmcCtl: card_supports_sdhc = {}.", self.card_supports_sdhc);
+        debug!("EmmcCtl: card_supports_sdhc = {}.", self.card_supports_sdhc);
         if !self.card_supports_sdhc {
             if !self.sd_issue_command(SET_BLOCKLEN, 512, 500000) {
                 return false;
@@ -1212,7 +1189,7 @@ impl EmmcCtl {
 
         // Determine card version
         // Note that the SCR is big-endian
-        info!("EmmcCtl: Check the card version.");
+        debug!("EmmcCtl: Check the card version.");
         let scr0 = byte_swap(self.sd_scr.scr[0]);
         self.sd_scr.sd_version = SD_VER_UNKNOWN;
         let sd_spec = (scr0 >> (56 - 32)) & 0xf;
@@ -1253,16 +1230,7 @@ impl EmmcCtl {
             }
         }
 
-        info!(
-            "EmmcCtl: scr0 = 0x{:08X}, scr1 = 0x{:08X}",
-            self.sd_scr.scr[0], self.sd_scr.scr[1]
-        );
-        info!(
-            "EmmcCtl: SCR: 0x{:08X}{:08X}",
-            byte_swap(self.sd_scr.scr[0]),
-            byte_swap(self.sd_scr.scr[1])
-        );
-        info!(
+        debug!(
             "EmmcCtl: SCR: version {}, bus_widths 0x{:X}",
             sd_version(self.sd_scr.sd_version),
             self.sd_scr.sd_bus_widths
@@ -1290,7 +1258,6 @@ impl EmmcCtl {
         }
 
         // Reset interrupt register
-        info!("EmmcCtl: Reset interrupt register.");
         self.emmc.registers.INTERRUPT.write(0xffffffff);
 
         true
