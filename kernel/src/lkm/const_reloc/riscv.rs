@@ -13,7 +13,10 @@ pub const R_RISCV_TLS_TPREL32: usize = 10;
 pub const R_RISCV_TLS_TPREL64: usize = 11;
 
 pub const REL_NONE: usize = R_RISCV_NONE;
-pub const REL_SYMBOLIC: usize = 0; // dunno
+#[cfg(target_arch = "riscv32")]
+pub const REL_SYMBOLIC: usize = R_RISCV_32;
+#[cfg(target_arch = "riscv64")]
+pub const REL_SYMBOLIC: usize = R_RISCV_64;
 pub const REL_OFFSET32: usize = 0; // dunno
 pub const REL_GOT: usize = 0; // dunno
 pub const REL_PLT: usize = R_RISCV_JUMP_SLOT;

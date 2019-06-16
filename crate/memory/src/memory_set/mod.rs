@@ -1,6 +1,6 @@
 //! Memory management structures
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{Debug, Error, Formatter};
 use core::mem::size_of;
 

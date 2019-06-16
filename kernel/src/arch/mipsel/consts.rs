@@ -15,3 +15,5 @@ pub const USER_STACK_OFFSET: usize = 0x7000_0000 - USER_STACK_SIZE;
 pub const USER_STACK_SIZE: usize = 0x10000;
 
 pub const MAX_DTB_SIZE: usize = 0x2000;
+
+pub const KSEG2_START: usize = 0xfe80_0000;

@@ -1,5 +1,6 @@
 // Depends on kernel
 use crate::memory::{alloc_frame, dealloc_frame};
+use core::mem::ManuallyDrop;
 use mips::addr::*;
 use mips::paging::{
     FrameAllocator, FrameDeallocator, Mapper, PageTable as MIPSPageTable, PageTableEntry,
@@ -148,15 +149,21 @@ impl Entry for PageEntry {
 
 impl PageTableImpl {
     /// Unsafely get the current active page table.
-    /// WARN: You MUST call `core::mem::forget` for it after use!
-    pub unsafe fn active() -> Self {
+    /// Using ManuallyDrop to wrap the page table: this is how `core::mem::forget` is implemented now.
+    pub unsafe fn active() -> ManuallyDrop<Self> {
         let frame = Frame::of_addr(PhysAddr::new(get_root_page_table_ptr() & 0x7fffffff));
         let table = root_page_table_buffer();
-        PageTableImpl {
+        ManuallyDrop::new(PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
             entry: unsafe { core::mem::MaybeUninit::uninitialized().into_initialized() },
-        }
+        })
+    }
+
+    /// The method for getting the kernel page table.
+    /// In mipsel kernel page table and user page table are the same table. However you have to do the initialization.
+    pub unsafe fn kernel_table() -> ManuallyDrop<Self> {
+        Self::active()
     }
 }
 
