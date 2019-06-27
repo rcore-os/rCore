@@ -93,7 +93,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "bootloader"
 version = "0.4.0"
-source = "git+https://github.com/rcore-os/bootloader?branch=vga#861e0448eba3085d9af6b5b3c9454d5c8d59f82e"
+source = "git+https://github.com/rcore-os/bootloader?branch=vga#485addfdd7dc348aaba4cc99391d04070effd8fa"
 dependencies = [
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
