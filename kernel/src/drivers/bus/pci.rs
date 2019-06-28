@@ -151,6 +151,7 @@ pub fn init_driver(dev: &PCIDevice) {
                 let vaddr = phys_to_virt(addr as usize);
                 let index = NET_DRIVERS.read().len();
                 e1000::init(name, irq, vaddr, len as usize, index);
+                return;
             }
         }
         (0x8086, 0x10fb) => {
@@ -163,23 +164,23 @@ pub fn init_driver(dev: &PCIDevice) {
                     dev.loc,
                     ixgbe::ixgbe_init(name, irq, vaddr, len as usize, index),
                 );
-            }
-        }
-        (0x8086, 0x2922) | (0x8086, 0xa282) | (0x8086, 0x8d02) => {
-            // 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]
-            // 200 Series PCH SATA controller [AHCI mode]
-            // C610/X99 series chipset 6-Port SATA Controller [AHCI mode]
-            if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[5] {
-                info!("Found AHCI dev {:?} BAR5 {:x?}", dev, addr);
-                let irq = unsafe { enable(dev.loc) };
-                assert!(len as usize <= PAGE_SIZE);
-                let vaddr = phys_to_virt(addr as usize);
-                if let Some(driver) = ahci::init(irq, vaddr, len as usize) {
-                    PCI_DRIVERS.lock().insert(dev.loc, driver);
-                }
+                return;
             }
         }
         _ => {}
+    }
+    if dev.id.class == 0x01 && dev.id.subclass == 0x06 {
+        // Mass storage class
+        // SATA subclass
+        if let Some(BAR::Memory(addr, len, _, _)) = dev.bars[5] {
+            info!("Found AHCI dev {:?} BAR5 {:x?}", dev, addr);
+            let irq = unsafe { enable(dev.loc) };
+            assert!(len as usize <= PAGE_SIZE);
+            let vaddr = phys_to_virt(addr as usize);
+            if let Some(driver) = ahci::init(irq, vaddr, len as usize) {
+                PCI_DRIVERS.lock().insert(dev.loc, driver);
+            }
+        }
     }
 }
 

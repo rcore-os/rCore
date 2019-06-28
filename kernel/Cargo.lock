@@ -220,7 +220,7 @@ dependencies = [
 [[package]]
 name = "isomorphic_drivers"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/isomorphic_drivers#b6492b0759e4d6819f6591c3d29ef5ed83138531"
+source = "git+https://github.com/rcore-os/isomorphic_drivers#93503c0d9378524a0cd137cae4661e6f28a97343"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -318,7 +318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "pci"
 version = "0.0.1"
-source = "git+https://github.com/rcore-os/pci-rs#3f5ca7b27f8d365f1a9b5e45d249e78bff944927"
+source = "git+https://github.com/rcore-os/pci-rs#8ecefe4f222df16b2009b1bab7c4db029b02a0bb"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
