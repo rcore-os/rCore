@@ -1,6 +1,6 @@
 pub use self::context::*;
 use crate::arch::paging::get_root_page_table_ptr;
-use crate::drivers::DRIVERS;
+use crate::drivers::{DRIVERS, IRQ_MANAGER};
 use log::*;
 use mips::addr::*;
 use mips::interrupts;
@@ -131,13 +131,7 @@ fn try_process_serial() -> bool {
 }
 
 fn try_process_drivers() -> bool {
-    // TODO
-    for driver in DRIVERS.read().iter() {
-        if driver.try_handle_interrupt(None) == true {
-            return true;
-        }
-    }
-    return false;
+    IRQ_MANAGER.read().try_handle_interrupt(None)
 }
 
 fn ipi() {

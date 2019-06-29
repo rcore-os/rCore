@@ -19,7 +19,9 @@ use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{provider::Provider, DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::super::{
+    provider::Provider, DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY,
+};
 
 #[derive(Clone)]
 struct IXGBEDriver {
@@ -220,6 +222,7 @@ pub fn ixgbe_init(
     };
 
     let driver = Arc::new(ixgbe_iface);
+    IRQ_MANAGER.write().register_opt(irq, driver.clone());
     DRIVERS.write().push(driver.clone());
     NET_DRIVERS.write().push(driver.clone());
     driver

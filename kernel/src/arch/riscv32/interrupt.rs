@@ -1,5 +1,5 @@
 pub use self::context::*;
-use crate::drivers::DRIVERS;
+use crate::drivers::{DRIVERS, IRQ_MANAGER};
 use log::*;
 use riscv::register::*;
 
@@ -99,12 +99,7 @@ fn try_process_serial() -> bool {
 }
 
 fn try_process_drivers() -> bool {
-    for driver in DRIVERS.read().iter() {
-        if driver.try_handle_interrupt(None) == true {
-            return true;
-        }
-    }
-    return false;
+    IRQ_MANAGER.read().try_handle_interrupt(None)
 }
 
 fn ipi() {

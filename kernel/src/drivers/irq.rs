@@ -4,7 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-struct IrqManager {
+pub struct IrqManager {
     // drivers that only respond to specific irq
     mapping: BTreeMap<u32, Vec<Arc<Driver>>>,
     // drivers that respond to all irqs
@@ -36,6 +36,14 @@ impl IrqManager {
         self.all.push(driver);
     }
 
+    pub fn register_opt(&mut self, irq_opt: Option<u32>, driver: Arc<Driver>) {
+        if let Some(irq) = irq_opt {
+            self.register_irq(irq, driver);
+        } else {
+            self.register_all(driver);
+        }
+    }
+
     pub fn deregister_irq(&mut self, irq: u32, driver: Arc<Driver>) {
         if let Some(e) = self.mapping.get_mut(&irq) {
             e.retain(|d| !Arc::ptr_eq(&d, &driver));
@@ -46,17 +54,19 @@ impl IrqManager {
         self.all.retain(|d| !Arc::ptr_eq(&d, &driver));
     }
 
-    pub fn handle_interrupt(&self, irq: u32) -> bool {
-        if let Some(e) = self.mapping.get(&irq) {
-            for dri in e.iter() {
-                if dri.try_handle_interrupt(Some(irq)) {
-                    return true;
+    pub fn try_handle_interrupt(&self, irq_opt: Option<u32>) -> bool {
+        if let Some(irq) = irq_opt {
+            if let Some(e) = self.mapping.get(&irq) {
+                for dri in e.iter() {
+                    if dri.try_handle_interrupt(Some(irq)) {
+                        return true;
+                    }
                 }
             }
         }
 
         for dri in self.all.iter() {
-            if dri.try_handle_interrupt(Some(irq)) {
+            if dri.try_handle_interrupt(irq_opt) {
                 return true;
             }
         }

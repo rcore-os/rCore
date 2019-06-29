@@ -16,7 +16,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;
-use super::super::{DeviceType, Driver, DRIVERS};
+use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER};
 use super::test::mandelbrot;
 use crate::memory::phys_to_virt;
 
@@ -399,5 +399,6 @@ pub fn virtio_gpu_init(node: &Node) {
     setup_framebuffer(&mut driver);
 
     let driver = Arc::new(VirtIOGpuDriver(Mutex::new(driver)));
+    IRQ_MANAGER.write().register_all(driver.clone());
     DRIVERS.write().push(driver);
 }

@@ -15,7 +15,7 @@ use smoltcp::Result;
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY};
 use crate::memory::phys_to_virt;
 
 const AXI_STREAM_FIFO_ISR: *mut u32 = phys_to_virt(0x64A0_0000) as *mut u32;
@@ -253,6 +253,7 @@ pub fn router_init() {
 
         let driver = Arc::new(router_iface);
         DRIVERS.write().push(driver.clone());
+        IRQ_MANAGER.write().register_all(driver.clone());
         NET_DRIVERS.write().push(driver.clone());
     }
 

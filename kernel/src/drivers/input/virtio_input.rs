@@ -18,7 +18,7 @@ use crate::arch::cpu;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::bus::virtio_mmio::*;
-use super::super::{DeviceType, Driver, DRIVERS};
+use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER};
 use crate::memory::phys_to_virt;
 
 struct VirtIOInput {
@@ -222,5 +222,6 @@ pub fn virtio_input_init(node: &Node) {
         .write(VirtIODeviceStatus::DRIVER_OK.bits());
 
     let driver = Arc::new(VirtIOInputDriver(Mutex::new(driver)));
+    IRQ_MANAGER.write().register_all(driver.clone());
     DRIVERS.write().push(driver);
 }

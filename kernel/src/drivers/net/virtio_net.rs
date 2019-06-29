@@ -20,7 +20,7 @@ use crate::sync::SpinNoIrqLock as Mutex;
 use crate::HEAP_ALLOCATOR;
 
 use super::super::bus::virtio_mmio::*;
-use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS};
+use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS};
 use crate::memory::phys_to_virt;
 
 pub struct VirtIONet {
@@ -290,5 +290,6 @@ pub fn virtio_net_init(node: &Node) {
     let net_driver = Arc::new(VirtIONetDriver(Arc::new(Mutex::new(driver))));
 
     DRIVERS.write().push(net_driver.clone());
+    IRQ_MANAGER.write().register_all(net_driver.clone());
     NET_DRIVERS.write().push(net_driver);
 }

@@ -66,7 +66,7 @@
 
 use super::consts::*;
 use super::TrapFrame;
-use crate::drivers::DRIVERS;
+use crate::drivers::{DRIVERS, IRQ_MANAGER};
 use bitflags::*;
 use log::*;
 
@@ -96,11 +96,9 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
                 COM2 => com2(),
                 IDE => ide(),
                 _ => {
-                    for driver in DRIVERS.read().iter() {
-                        if driver.try_handle_interrupt(Some(irq.into())) == true {
-                            debug!("driver processed interrupt");
-                            return;
-                        }
+                    if IRQ_MANAGER.read().try_handle_interrupt(Some(irq.into())) {
+                        debug!("driver processed interrupt");
+                        return;
                     }
                     warn!("unhandled external IRQ number: {}", irq);
                 }

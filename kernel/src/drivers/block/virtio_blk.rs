@@ -14,7 +14,7 @@ use volatile::Volatile;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 use super::super::bus::virtio_mmio::*;
-use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
+use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS, IRQ_MANAGER};
 use crate::memory::phys_to_virt;
 
 pub struct VirtIOBlk {
@@ -213,5 +213,6 @@ pub fn virtio_blk_init(node: &Node) {
 
     let driver = Arc::new(driver);
     DRIVERS.write().push(driver.clone());
+    IRQ_MANAGER.write().register_all(driver.clone());
     BLK_DRIVERS.write().push(driver);
 }

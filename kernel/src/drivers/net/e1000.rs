@@ -20,7 +20,7 @@ use crate::drivers::provider::Provider;
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY};
 
 #[derive(Clone)]
 pub struct E1000Driver(Arc<Mutex<E1000<Provider>>>);
@@ -202,5 +202,6 @@ pub fn init(name: String, irq: Option<u32>, header: usize, size: usize, index: u
 
     let driver = Arc::new(e1000_iface);
     DRIVERS.write().push(driver.clone());
+    IRQ_MANAGER.write().register_opt(irq, driver.clone());
     NET_DRIVERS.write().push(driver);
 }

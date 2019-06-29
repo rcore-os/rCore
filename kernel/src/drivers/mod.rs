@@ -97,6 +97,7 @@ lazy_static! {
     pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
+    pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
 }
 
 pub struct BlockDriver(pub Arc<Driver>);
