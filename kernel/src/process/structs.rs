@@ -103,7 +103,7 @@ impl Thread {
         Box::new(Thread {
             context: Context::null(),
             // safety: other fields will never be used
-            ..core::mem::MaybeUninit::uninitialized().into_initialized()
+            ..core::mem::MaybeUninit::zeroed().assume_init()
         })
     }
 
@@ -146,7 +146,7 @@ impl Thread {
     ) -> Result<(MemorySet, usize, usize), &'static str> {
         // Read ELF header
         // 0x3c0: magic number from ld-musl.so
-        let mut data: [u8; 0x3c0] = unsafe { MaybeUninit::uninitialized().into_initialized() };
+        let mut data: [u8; 0x3c0] = unsafe { MaybeUninit::zeroed().assume_init() };
         inode
             .read_at(0, &mut data)
             .map_err(|_| "failed to read from INode")?;
@@ -197,8 +197,7 @@ impl Thread {
                 .lookup_follow(loader_path, FOLLOW_MAX_DEPTH)
                 .map_err(|_| "interpreter not found")?;
             // load loader by bias and set aux vector.
-            let mut interp_data: [u8; 0x3c0] =
-                unsafe { MaybeUninit::uninitialized().into_initialized() };
+            let mut interp_data: [u8; 0x3c0] = unsafe { MaybeUninit::zeroed().assume_init() };
             interp_inode
                 .read_at(0, &mut interp_data)
                 .map_err(|_| "failed to read from INode")?;

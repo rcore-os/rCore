@@ -147,7 +147,7 @@ impl MockPageTable {
         use core::mem::MaybeUninit;
         MockPageTable {
             entries: [MockEntry::default(); PAGE_COUNT],
-            data: unsafe { MaybeUninit::uninitialized().into_initialized() },
+            data: unsafe { MaybeUninit::zeroed().assume_init() },
             page_fault_handler: None,
         }
     }

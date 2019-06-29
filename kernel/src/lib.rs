@@ -8,6 +8,7 @@
 #![feature(global_asm)]
 #![feature(fnbox)]
 #![feature(maybe_uninit)]
+#![feature(alloc_prelude)]
 #![deny(unused_must_use)]
 #![no_std]
 

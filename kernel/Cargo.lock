@@ -14,6 +14,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "acpi"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "apic"
 version = "0.1.0"
 source = "git+https://github.com/rcore-os/apic-rs#3bc93873eaa4d21f09fc4134853d0a1ff917951b"
@@ -397,6 +406,7 @@ name = "rcore"
 version = "0.2.0"
 dependencies = [
  "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
+ "acpi 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -709,6 +719,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)" = "<none>"
+"checksum acpi 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "78e6a32e8cfd10171d029c68aba977ddd83a6b598dec2816d27d32890c63c164"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum as-slice 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "293dac66b274fab06f95e7efb05ec439a6b70136081ea522d270bc351ae5bb27"

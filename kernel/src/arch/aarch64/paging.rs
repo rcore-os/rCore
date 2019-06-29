@@ -213,7 +213,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+            entry: core::mem::MaybeUninit::zeroed().assume_init(),
         })
     }
     /// The method for getting the kernel page table.
@@ -224,7 +224,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+            entry: core::mem::MaybeUninit::zeroed().assume_init(),
         })
     }
 }
@@ -239,7 +239,7 @@ impl PageTableExt for PageTableImpl {
             PageTableImpl {
                 page_table: MappedPageTable::new(table, frame_to_page_table),
                 root_frame: frame,
-                entry: core::mem::MaybeUninit::uninitialized().into_initialized(),
+                entry: core::mem::MaybeUninit::zeroed().assume_init(),
             }
         }
     }

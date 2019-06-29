@@ -2,6 +2,7 @@ use bootloader::bootinfo::{BootInfo, MemoryRegionType};
 use core::sync::atomic::*;
 use log::*;
 
+pub mod acpi;
 pub mod board;
 pub mod consts;
 pub mod cpu;
@@ -64,6 +65,8 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     crate::drivers::init();
     // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
+    // load acpi
+    acpi::init();
 
     // wake up other CPUs
     AP_CAN_INIT.store(true, Ordering::Relaxed);
