@@ -1,0 +1,65 @@
+use super::Driver;
+use alloc::collections::btree_map::Entry;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
+struct IrqManager {
+    // drivers that only respond to specific irq
+    mapping: BTreeMap<u32, Vec<Arc<Driver>>>,
+    // drivers that respond to all irqs
+    all: Vec<Arc<Driver>>,
+}
+
+impl IrqManager {
+    pub fn new() -> IrqManager {
+        IrqManager {
+            mapping: BTreeMap::new(),
+            all: Vec::new(),
+        }
+    }
+
+    pub fn register_irq(&mut self, irq: u32, driver: Arc<Driver>) {
+        match self.mapping.entry(irq) {
+            Entry::Occupied(mut e) => {
+                e.get_mut().push(driver);
+            }
+            Entry::Vacant(e) => {
+                let mut v = Vec::new();
+                v.push(driver);
+                e.insert(v);
+            }
+        }
+    }
+
+    pub fn register_all(&mut self, driver: Arc<Driver>) {
+        self.all.push(driver);
+    }
+
+    pub fn deregister_irq(&mut self, irq: u32, driver: Arc<Driver>) {
+        if let Some(e) = self.mapping.get_mut(&irq) {
+            e.retain(|d| !Arc::ptr_eq(&d, &driver));
+        }
+    }
+
+    pub fn deregister_all(&mut self, driver: Arc<Driver>) {
+        self.all.retain(|d| !Arc::ptr_eq(&d, &driver));
+    }
+
+    pub fn handle_interrupt(&self, irq: u32) -> bool {
+        if let Some(e) = self.mapping.get(&irq) {
+            for dri in e.iter() {
+                if dri.try_handle_interrupt(Some(irq)) {
+                    return true;
+                }
+            }
+        }
+
+        for dri in self.all.iter() {
+            if dri.try_handle_interrupt(Some(irq)) {
+                return true;
+            }
+        }
+        false
+    }
+}

@@ -18,6 +18,7 @@ mod device_tree;
 mod gpu;
 #[allow(dead_code)]
 mod input;
+pub mod irq;
 #[allow(dead_code)]
 pub mod net;
 mod provider;

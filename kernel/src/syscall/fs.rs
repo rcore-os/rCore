@@ -338,7 +338,7 @@ impl Syscall<'_> {
     ) -> SysResult {
         // TODO: check permissions based on uid/gid
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         let flags = AtFlags::from_bits_truncate(flags);
         if !proc.pid.is_init() {
             // we trust pid 0 process
@@ -419,7 +419,7 @@ impl Syscall<'_> {
         len: usize,
     ) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         info!(
             "readlinkat: dirfd: {}, path: {:?}, base: {:?}, len: {}",
@@ -465,7 +465,7 @@ impl Syscall<'_> {
 
     pub fn sys_truncate(&mut self, path: *const u8, len: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         info!("truncate: path: {:?}, len: {}", path, len);
         proc.lookup_inode(&path)?.resize(len)?;
         Ok(0)
@@ -678,7 +678,7 @@ impl Syscall<'_> {
 
     pub fn sys_unlinkat(&mut self, dirfd: usize, path: *const u8, flags: usize) -> SysResult {
         let proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "unlinkat: dirfd: {}, path: {:?}, flags: {:?}",
