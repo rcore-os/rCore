@@ -14,6 +14,12 @@ pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
     unreachable!()
 }
 
+pub unsafe fn reboot() -> ! {
+    use x86_64::instructions::port::Port;
+    Port::new(0x64).write(0xfeu8);
+    unreachable!()
+}
+
 pub fn id() -> usize {
     CpuId::new()
         .get_feature_info()

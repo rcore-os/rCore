@@ -11,3 +11,7 @@ pub fn id() -> usize {
 pub unsafe fn exit_in_qemu(_error_code: u8) -> ! {
     unimplemented!()
 }
+
+pub unsafe fn reboot() -> ! {
+    unimplemented!()
+}

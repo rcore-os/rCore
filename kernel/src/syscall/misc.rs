@@ -122,6 +122,10 @@ impl Syscall<'_> {
             unsafe {
                 cpu::exit_in_qemu(1);
             }
+        } else if cmd == LINUX_REBOOT_CMD_RESTART {
+            unsafe {
+                cpu::reboot();
+            }
         }
         Ok(0)
     }
@@ -188,7 +192,14 @@ impl Syscall<'_> {
     }
 }
 
-const LINUX_REBOOT_CMD_HALT: u32 = 0xcdef0123;
+const LINUX_REBOOT_CMD_RESTART: u32 = 0x01234567;
+const LINUX_REBOOT_CMD_HALT: u32 = 0xCDEF0123;
+const LINUX_REBOOT_CMD_CAD_ON: u32 = 0x89ABCDEF;
+const LINUX_REBOOT_CMD_CAD_OFF: u32 = 0x00000000;
+const LINUX_REBOOT_CMD_POWER_OFF: u32 = 0x4321FEDC;
+const LINUX_REBOOT_CMD_RESTART2: u32 = 0xA1B2C3D4;
+const LINUX_REBOOT_CMD_SW_SUSPEND: u32 = 0xD000FCE2;
+const LINUX_REBOOT_CMD_KEXEC: u32 = 0x45584543;
 
 #[repr(C)]
 #[derive(Debug, Default)]

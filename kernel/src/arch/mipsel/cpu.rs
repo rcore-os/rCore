@@ -31,3 +31,8 @@ pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
     /* nothing to do */
     loop {}
 }
+
+pub unsafe fn reboot() -> ! {
+    /* nothing to do */
+    loop {}
+}

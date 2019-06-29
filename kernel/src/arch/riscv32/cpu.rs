@@ -21,3 +21,7 @@ pub fn halt() {
 pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
     super::sbi::shutdown()
 }
+
+pub unsafe fn reboot() -> ! {
+    super::sbi::shutdown()
+}
