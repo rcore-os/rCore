@@ -274,7 +274,7 @@ impl Syscall<'_> {
         mode: usize,
     ) -> SysResult {
         let mut proc = self.process();
-        let path = unsafe { check_and_clone_cstr(path)? };
+        let path = check_and_clone_cstr(path)?;
         let flags = OpenFlags::from_bits_truncate(flags);
         info!(
             "openat: dir_fd: {}, path: {:?}, flags: {:?}, mode: {:#o}",

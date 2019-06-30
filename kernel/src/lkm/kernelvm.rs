@@ -122,7 +122,7 @@ impl VirtualArea {
         let mut aligned_end = (page_addr + size + PAGE_SIZE - 1);
         aligned_end = aligned_end - aligned_end % PAGE_SIZE;
         let lock = parent.allocator.lock();
-        let mut active_pt = unsafe { lock.kernel_table() };
+        let mut active_pt = lock.kernel_table();
         for p in Page::range_of(aligned_start_addr, aligned_end) {
             parent
                 .page_allocator
@@ -137,7 +137,7 @@ impl VirtualArea {
     }
     pub fn unmap(&mut self, allocator: &LockedVMM, parent: &mut ByFrame<GlobalFrameAlloc>) {
         let lock = allocator.lock();
-        let mut active_pt = unsafe { lock.kernel_table() };
+        let mut active_pt = lock.kernel_table();
         for p in Page::range_of(self.start, self.end) {
             parent.unmap(active_pt.deref_mut(), p.start_address());
         }

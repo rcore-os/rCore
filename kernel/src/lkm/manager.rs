@@ -56,10 +56,8 @@ fn neg(u: usize) -> usize {
     (-(u as i64)) as usize
 }
 unsafe fn write_to_addr(base: usize, offset: usize, val: usize) {
-    unsafe {
-        let addr = base + offset;
-        *(addr as *mut usize) = val;
-    }
+    let addr = base + offset;
+    *(addr as *mut usize) = val;
 }
 impl ModuleManager {
     fn create_stub_symbol(symbol_name: &str, symbol_loc: usize) -> ModuleSymbol {
@@ -108,7 +106,7 @@ impl ModuleManager {
             .unwrap();
         use core::slice;
         use core::str::from_utf8;
-        self.init_kernel_symbols(unsafe { from_utf8(&real_symbols).unwrap() });
+        self.init_kernel_symbols(from_utf8(&real_symbols).unwrap());
     }
     pub fn init_kernel_symbols(&mut self, kernel_symbols: &str) {
         let lines = kernel_symbols.lines();

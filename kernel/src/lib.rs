@@ -1,5 +1,4 @@
 #![feature(lang_items)]
-#![feature(alloc)]
 #![feature(naked_functions)]
 #![feature(untagged_unions)]
 #![feature(asm)]
@@ -7,9 +6,10 @@
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(fnbox)]
-#![feature(maybe_uninit)]
 #![feature(alloc_prelude)]
 #![deny(unused_must_use)]
+#![deny(stable_features)]
+#![deny(unused_unsafe)]
 #![no_std]
 
 // just keep it ...
