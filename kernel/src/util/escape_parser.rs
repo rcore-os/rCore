@@ -45,8 +45,8 @@ impl CharacterAttribute {
             24 => self.underline = false,
             27 => self.reverse = false,
             29 => self.strikethrough = false,
-            30...37 | 90...97 => self.foreground = ConsoleColor::from_console_code(code).unwrap(),
-            40...47 | 100...107 => {
+            30..=37 | 90..=97 => self.foreground = ConsoleColor::from_console_code(code).unwrap(),
+            40..=47 | 100..=107 => {
                 self.background = ConsoleColor::from_console_code(code - 10).unwrap()
             }
             _ => { /* unimplemented!() */ }
@@ -136,7 +136,7 @@ impl EscapeParser {
                 _ => { /* unimplemented!() */ }
             },
             ParseStatus::ParsingCSI => match byte {
-                b'0'...b'9' => {
+                b'0'..=b'9' => {
                     let digit = (byte - b'0') as u32;
                     let param = self.current_param.unwrap_or(0) as u32;
                     let res = param * 10 + digit;
@@ -150,7 +150,7 @@ impl EscapeParser {
                     return None;
                 }
                 // @A–Z[\]^_`a–z{|}~
-                0x40...0x7E => {
+                0x40..=0x7E => {
                     if let Some(param) = self.current_param {
                         self.params.push(param).unwrap();
                     }

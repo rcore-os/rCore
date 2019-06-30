@@ -86,7 +86,7 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         Breakpoint => breakpoint(),
         DoubleFault => double_fault(tf),
         PageFault => page_fault(tf),
-        IRQ0...63 => {
+        IRQ0..=63 => {
             let irq = tf.trap_num as u8 - IRQ0;
             super::ack(irq); // must ack before switching
             match irq {

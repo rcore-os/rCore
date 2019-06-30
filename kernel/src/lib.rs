@@ -10,6 +10,7 @@
 #![deny(unused_must_use)]
 #![deny(stable_features)]
 #![deny(unused_unsafe)]
+#![deny(ellipsis_inclusive_range_patterns)]
 #![no_std]
 
 // just keep it ...
