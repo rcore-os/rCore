@@ -176,11 +176,11 @@ impl PageTableExt for PageTableImpl {
         let table = unsafe { &mut *(phys_to_virt(target) as *mut RvPageTable) };
         table.zero();
 
-        // MaybeUninit is not working
+        // MaybeUninit is not working, dunno why
         PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: unsafe { core::mem::zeroed() },
+            entry: unsafe { core::mem::uninitialized() },
         }
     }
 
