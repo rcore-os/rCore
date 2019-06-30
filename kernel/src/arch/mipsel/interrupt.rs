@@ -18,23 +18,21 @@ pub fn init() {
     extern "C" {
         fn trap_entry();
     }
-    unsafe {
-        // Set the exception vector address
-        cp0::ebase::write_u32(trap_entry as u32);
-        println!("Set ebase = {:x}", trap_entry as u32);
+    // Set the exception vector address
+    cp0::ebase::write_u32(trap_entry as u32);
+    println!("Set ebase = {:x}", trap_entry as u32);
 
-        let mut status = cp0::status::read();
-        // Enable IPI
-        status.enable_soft_int0();
-        status.enable_soft_int1();
-        // Enable clock interrupt
-        status.enable_hard_int5();
-        // Enable serial interrupt
-        #[cfg(feature = "board_thinpad")]
-        status.enable_hard_int0();
+    let mut status = cp0::status::read();
+    // Enable IPI
+    status.enable_soft_int0();
+    status.enable_soft_int1();
+    // Enable clock interrupt
+    status.enable_hard_int5();
+    // Enable serial interrupt
+    #[cfg(feature = "board_thinpad")]
+    status.enable_hard_int0();
 
-        cp0::status::write(status);
-    }
+    cp0::status::write(status);
     info!("interrupt: init end");
 }
 

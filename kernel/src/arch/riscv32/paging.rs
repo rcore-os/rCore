@@ -158,7 +158,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: unsafe { core::mem::MaybeUninit::zeroed().assume_init() },
+            entry: core::mem::MaybeUninit::zeroed().assume_init(),
         })
     }
     /// The method for getting the kernel page table.

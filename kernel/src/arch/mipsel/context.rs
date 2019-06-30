@@ -299,7 +299,7 @@ impl Context {
     /// The SATP register will be set to `satp`.
     /// All the other registers are same as the original.
     pub unsafe fn new_fork(tf: &TrapFrame, kstack_top: usize, satp: usize) -> Self {
-        let tls = unsafe { *(_cur_tls as *const usize) };
+        let tls = *(_cur_tls as *const usize);
         InitStack {
             context: ContextData::new(satp, tls),
             tf: {

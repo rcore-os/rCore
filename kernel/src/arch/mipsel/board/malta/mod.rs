@@ -19,11 +19,9 @@ pub fn init_serial_early() {
     // initialize serial driver
     serial::init(0xbf000900);
     // Enable serial interrupt
-    unsafe {
-        let mut status = cp0::status::read();
-        status.enable_hard_int2();
-        cp0::status::write(status);
-    }
+    let mut status = cp0::status::read();
+    status.enable_hard_int2();
+    cp0::status::write(status);
     println!("Hello QEMU Malta!");
 }
 

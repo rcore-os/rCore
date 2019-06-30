@@ -83,9 +83,7 @@ pub fn root_page_table_buffer() -> &'static mut MIPSPageTable {
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs
 impl Entry for PageEntry {
     fn update(&mut self) {
-        unsafe {
-            TLBEntry::clear_all();
-        }
+        TLBEntry::clear_all();
     }
     fn accessed(&self) -> bool {
         self.0.flags().contains(EF::ACCESSED)
@@ -156,7 +154,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
-            entry: unsafe { core::mem::MaybeUninit::zeroed().assume_init() },
+            entry: core::mem::MaybeUninit::zeroed().assume_init(),
         })
     }
 
@@ -199,9 +197,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     fn flush_tlb() {
-        unsafe {
-            TLBEntry::clear_all();
-        }
+        TLBEntry::clear_all();
     }
 }
 
