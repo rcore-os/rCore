@@ -41,7 +41,7 @@ impl FrameExt for Frame {
 
 pub struct PageTableImpl(
     MappedPageTable<'static, fn(Frame) -> *mut x86PageTable>,
-    PageEntry,
+    Option<PageEntry>,
     Frame,
 );
 
@@ -77,8 +77,8 @@ impl PageTable for PageTableImpl {
             let entry = unsafe { &mut (&mut *page_table)[index] };
             if level == 3 {
                 let page = Page::of_addr(addr);
-                self.1 = PageEntry(entry, page, self.2);
-                return Some(&mut self.1 as &mut Entry);
+                self.1 = Some(PageEntry(entry, page, self.2));
+                return Some(self.1.as_mut().unwrap());
             }
             if !entry.flags().contains(EF::PRESENT) {
                 return None;
@@ -203,7 +203,7 @@ impl PageTableImpl {
         let table = &mut *frame_to_page_table(frame);
         ManuallyDrop::new(PageTableImpl(
             MappedPageTable::new(table, frame_to_page_table),
-            core::mem::MaybeUninit::zeroed().assume_init(),
+            None,
             frame,
         ))
     }
@@ -223,7 +223,7 @@ impl PageTableExt for PageTableImpl {
         unsafe {
             PageTableImpl(
                 MappedPageTable::new(table, frame_to_page_table),
-                core::mem::MaybeUninit::zeroed().assume_init(),
+                None,
                 frame,
             )
         }

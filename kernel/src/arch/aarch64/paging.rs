@@ -19,7 +19,7 @@ type Page = PageAllSizes<Size4KiB>;
 pub struct PageTableImpl {
     page_table: MappedPageTable<'static, fn(Frame) -> *mut Aarch64PageTable>,
     root_frame: Frame,
-    entry: PageEntry,
+    entry: Option<PageEntry>,
 }
 
 pub struct PageEntry(&'static mut PageTableEntry, Page);
@@ -55,8 +55,8 @@ impl PageTable for PageTableImpl {
         let page = Page::of_addr(vaddr as u64);
         if let Ok(e) = self.page_table.get_entry_mut(page) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
-            self.entry = PageEntry(e, page);
-            Some(&mut self.entry as &mut Entry)
+            self.entry = Some(PageEntry(e, page));
+            Some(self.entry.as_mut().unwrap())
         } else {
             None
         }
@@ -213,7 +213,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::zeroed().assume_init(),
+            entry: None,
         })
     }
     /// The method for getting the kernel page table.
@@ -224,7 +224,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: MappedPageTable::new(table, frame_to_page_table),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::zeroed().assume_init(),
+            entry: None,
         })
     }
 }
@@ -239,7 +239,7 @@ impl PageTableExt for PageTableImpl {
             PageTableImpl {
                 page_table: MappedPageTable::new(table, frame_to_page_table),
                 root_frame: frame,
-                entry: core::mem::MaybeUninit::zeroed().assume_init(),
+                entry: None,
             }
         }
     }

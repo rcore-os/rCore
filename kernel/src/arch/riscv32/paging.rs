@@ -20,7 +20,7 @@ type TopLevelPageTable<'a> = riscv::paging::Rv39PageTable<'a>;
 pub struct PageTableImpl {
     page_table: TopLevelPageTable<'static>,
     root_frame: Frame,
-    entry: PageEntry,
+    entry: Option<PageEntry>,
 }
 
 /// PageTableEntry: the contents of this entry.
@@ -51,8 +51,8 @@ impl PageTable for PageTableImpl {
         let page = Page::of_addr(VirtAddr::new(vaddr));
         if let Ok(e) = self.page_table.ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
-            self.entry = PageEntry(e, page);
-            Some(&mut self.entry as &mut Entry)
+            self.entry = Some(PageEntry(e, page));
+            Some(self.entry.as_mut().unwrap())
         } else {
             None
         }
@@ -158,7 +158,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::zeroed().assume_init(),
+            entry: None,
         })
     }
     /// The method for getting the kernel page table.
@@ -176,11 +176,10 @@ impl PageTableExt for PageTableImpl {
         let table = unsafe { &mut *(phys_to_virt(target) as *mut RvPageTable) };
         table.zero();
 
-        // MaybeUninit is not working, dunno why
         PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
-            entry: unsafe { core::mem::uninitialized() },
+            entry: None,
         }
     }
 

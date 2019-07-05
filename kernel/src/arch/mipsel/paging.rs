@@ -12,7 +12,7 @@ use rcore_memory::paging::*;
 pub struct PageTableImpl {
     page_table: TwoLevelPageTable<'static>,
     root_frame: Frame,
-    entry: PageEntry,
+    entry: Option<PageEntry>,
 }
 
 /// PageTableEntry: the contents of this entry.
@@ -43,8 +43,8 @@ impl PageTable for PageTableImpl {
         let page = Page::of_addr(VirtAddr::new(vaddr));
         if let Ok(e) = self.page_table.ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };
-            self.entry = PageEntry(e, page);
-            Some(&mut self.entry as &mut Entry)
+            self.entry = Some(PageEntry(e, page));
+            Some(self.entry.as_mut().unwrap())
         } else {
             None
         }
@@ -154,7 +154,7 @@ impl PageTableImpl {
         ManuallyDrop::new(PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
-            entry: core::mem::MaybeUninit::zeroed().assume_init(),
+            entry: None,
         })
     }
 
@@ -176,7 +176,7 @@ impl PageTableExt for PageTableImpl {
         PageTableImpl {
             page_table: TwoLevelPageTable::new(table),
             root_frame: frame,
-            entry: unsafe { core::mem::MaybeUninit::zeroed().assume_init() },
+            entry: None,
         }
     }
 
