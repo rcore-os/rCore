@@ -15,8 +15,18 @@ dependencies = [
 
 [[package]]
 name = "acpi"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.3.0"
+source = "git+https://github.com/rust-osdev/acpi#e00c0a87568ecf7813e9758b217364fac9bf2237"
+dependencies = [
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "aml_parser"
+version = "0.3.0"
+source = "git+https://github.com/rust-osdev/acpi#e00c0a87568ecf7813e9758b217364fac9bf2237"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -147,7 +157,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -406,7 +416,8 @@ name = "rcore"
 version = "0.2.0"
 dependencies = [
  "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
- "acpi 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "acpi 0.3.0 (git+https://github.com/rust-osdev/acpi)",
+ "aml_parser 0.3.0 (git+https://github.com/rust-osdev/acpi)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -719,7 +730,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)" = "<none>"
-"checksum acpi 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "78e6a32e8cfd10171d029c68aba977ddd83a6b598dec2816d27d32890c63c164"
+"checksum acpi 0.3.0 (git+https://github.com/rust-osdev/acpi)" = "<none>"
+"checksum aml_parser 0.3.0 (git+https://github.com/rust-osdev/acpi)" = "<none>"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum as-slice 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "293dac66b274fab06f95e7efb05ec439a6b70136081ea522d270bc351ae5bb27"

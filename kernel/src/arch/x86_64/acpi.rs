@@ -1,6 +1,8 @@
 use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
 use acpi::{search_for_rsdp_bios, AcpiHandler, PhysicalMapping};
 use core::ptr::NonNull;
+use crate::memory::phys_to_virt;
+use core::slice;
 
 struct Handler;
 
@@ -27,5 +29,7 @@ impl AcpiHandler for Handler {
 pub fn init() {
     let mut handler = Handler {};
     let res = unsafe { search_for_rsdp_bios(&mut handler) };
-    debug!("ACPI {:#x?}", res);
+    if let Ok(acpi) = res {
+        debug!("ACPI {:#x?}", acpi);
+    }
 }

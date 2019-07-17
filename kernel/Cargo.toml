@@ -77,7 +77,8 @@ x86_64 = "0.6"
 raw-cpuid = "6.0"
 uart_16550 = "0.2"
 pc-keyboard = "0.5"
-acpi = "0.2"
+acpi = { git = "https://github.com/rust-osdev/acpi" }
+aml_parser = { git = "https://github.com/rust-osdev/acpi" }
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
 riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
