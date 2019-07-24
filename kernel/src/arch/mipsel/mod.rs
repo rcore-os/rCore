@@ -24,18 +24,13 @@ pub mod board;
 #[path = "board/mipssim/mod.rs"]
 pub mod board;
 
-extern "C" {
-    fn _dtb_start();
-    fn _dtb_end();
-}
-
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
     // unsafe { cpu::set_cpu_id(hartid); }
 
     let ebase = cp0::ebase::read_u32();
     let cpu_id = ebase & 0x3ff;
-    let dtb_start = _dtb_start as usize;
+    let dtb_start = board::DTB.as_ptr() as usize;
 
     if cpu_id != BOOT_CPU_ID {
         // TODO: run others_main on other CPU
@@ -79,4 +74,3 @@ const BOOT_CPU_ID: u32 = 0;
 global_asm!(include_str!("boot/context.gen.s"));
 global_asm!(include_str!("boot/entry.gen.s"));
 global_asm!(include_str!("boot/trap.gen.s"));
-global_asm!(include_str!("boot/dtb.gen.s"));

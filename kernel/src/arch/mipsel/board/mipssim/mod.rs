@@ -8,6 +8,9 @@ pub mod fb;
 #[path = "../../../../drivers/serial/16550_reg.rs"]
 pub mod serial;
 
+/// Device tree bytes
+pub static DTB: &'static [u8] = include_bytes!("device.dtb");
+
 /// Initialize serial port first
 pub fn init_serial_early() {
     serial::init(0xbfd003f8);

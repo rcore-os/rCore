@@ -1,5 +1,8 @@
 use crate::memory::phys_to_virt;
 
+/// Device tree bytes
+pub static DTB: &'static [u8] = include_bytes!("device.dtb");
+
 /// Mask all external interrupt except serial.
 pub unsafe fn init_external_interrupt() {
     const HART0_S_MODE_INTERRUPT_ENABLES: *mut u64 = phys_to_virt(0x0C00_2080) as *mut u64;

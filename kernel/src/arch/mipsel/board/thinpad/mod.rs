@@ -11,6 +11,9 @@ pub mod serial;
 use fb::FramebufferInfo;
 use fb::FramebufferResult;
 
+/// Device tree bytes
+pub static DTB: &'static [u8] = include_bytes!("device.dtb");
+
 /// Initialize serial port first
 pub fn init_serial_early() {
     serial::init(0xa3000000);

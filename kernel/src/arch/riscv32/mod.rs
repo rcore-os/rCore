@@ -34,11 +34,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 
     #[cfg(feature = "board_rocket_chip")]
     {
-        extern "C" {
-            fn _dtb_start();
-            fn _dtb_end();
-        }
-        device_tree_vaddr = _dtb_start as usize;
+        device_tree_vaddr = board::DTB.as_ptr() as usize;
     }
 
     if hartid != BOOT_HART_ID {
@@ -126,5 +122,3 @@ global_asm!(include_str!("boot/entry64.asm"));
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/entry_k210.asm"));
 global_asm!(include_str!("boot/trap.asm"));
-#[cfg(feature = "board_rocket_chip")]
-global_asm!(include_str!("boot/dtb.gen.s"));

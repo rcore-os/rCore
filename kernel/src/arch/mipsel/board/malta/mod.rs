@@ -14,6 +14,9 @@ pub mod vga;
 
 use fb::FramebufferInfo;
 
+/// Device tree bytes
+pub static DTB: &'static [u8] = include_bytes!("device.dtb");
+
 /// Initialize serial port first
 pub fn init_serial_early() {
     // initialize serial driver
