@@ -126,6 +126,6 @@ pub fn processor() -> &'static Processor {
 }
 
 #[no_mangle]
-pub fn new_kernel_context(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<Context> {
+pub fn new_kernel_context(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<dyn Context> {
     Thread::new_kernel(entry, arg)
 }

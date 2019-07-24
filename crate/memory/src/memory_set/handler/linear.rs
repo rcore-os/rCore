@@ -6,31 +6,31 @@ pub struct Linear {
 }
 
 impl MemoryHandler for Linear {
-    fn box_clone(&self) -> Box<MemoryHandler> {
+    fn box_clone(&self) -> Box<dyn MemoryHandler> {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
+    fn map(&self, pt: &mut dyn PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let target = (addr as isize + self.offset) as PhysAddr;
         let entry = pt.map(addr, target);
         attr.apply(entry);
     }
 
-    fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn unmap(&self, pt: &mut dyn PageTable, addr: VirtAddr) {
         pt.unmap(addr);
     }
 
     fn clone_map(
         &self,
-        pt: &mut PageTable,
-        _src_pt: &mut PageTable,
+        pt: &mut dyn PageTable,
+        _src_pt: &mut dyn PageTable,
         addr: VirtAddr,
         attr: &MemoryAttr,
     ) {
         self.map(pt, addr, attr);
     }
 
-    fn handle_page_fault(&self, _pt: &mut PageTable, _addr: VirtAddr) -> bool {
+    fn handle_page_fault(&self, _pt: &mut dyn PageTable, _addr: VirtAddr) -> bool {
         false
     }
 }

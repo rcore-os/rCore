@@ -14,14 +14,14 @@ pub trait PageTable {
 
     /// Map a page of virual address `addr` to the frame of physics address `target`
     /// Return the page table entry of the mapped virual address
-    fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut Entry;
+    fn map(&mut self, addr: VirtAddr, target: PhysAddr) -> &mut dyn Entry;
 
     /// Unmap a page of virual address `addr`
     fn unmap(&mut self, addr: VirtAddr);
 
     /// Get the page table entry of a page of virual address `addr`
     /// If its page do not exist, return `None`
-    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut Entry>;
+    fn get_entry(&mut self, addr: VirtAddr) -> Option<&mut dyn Entry>;
 
     /// Get a mutable reference of the content of a page of virtual address `addr`
     fn get_page_slice_mut<'a>(&mut self, addr: VirtAddr) -> &'a mut [u8];

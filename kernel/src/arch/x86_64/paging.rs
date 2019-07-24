@@ -48,7 +48,7 @@ pub struct PageTableImpl(
 pub struct PageEntry(&'static mut PageTableEntry, Page, Frame);
 
 impl PageTable for PageTableImpl {
-    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut dyn Entry {
         let flags = EF::PRESENT | EF::WRITABLE | EF::NO_EXECUTE;
         unsafe {
             self.0
@@ -70,7 +70,7 @@ impl PageTable for PageTableImpl {
         flush_tlb_all(addr);
     }
 
-    fn get_entry(&mut self, addr: usize) -> Option<&mut Entry> {
+    fn get_entry(&mut self, addr: usize) -> Option<&mut dyn Entry> {
         let mut page_table = frame_to_page_table(self.2);
         for level in 0..4 {
             let index = (addr >> (12 + (3 - level) * 9)) & 0o777;

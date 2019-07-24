@@ -238,6 +238,6 @@ pub fn get_bar0_mem(loc: Location) -> Option<(usize, usize)> {
 }
 
 lazy_static! {
-    pub static ref PCI_DRIVERS: Mutex<BTreeMap<Location, Arc<Driver>>> =
+    pub static ref PCI_DRIVERS: Mutex<BTreeMap<Location, Arc<dyn Driver>>> =
         Mutex::new(BTreeMap::new());
 }

@@ -876,7 +876,7 @@ impl Process {
         dirfd: usize,
         path: &str,
         follow: bool,
-    ) -> Result<Arc<INode>, SysError> {
+    ) -> Result<Arc<dyn INode>, SysError> {
         debug!(
             "lookup_inode_at: dirfd: {:?}, cwd: {:?}, path: {:?}, follow: {:?}",
             dirfd as isize, self.cwd, path, follow
@@ -916,7 +916,7 @@ impl Process {
         }
     }
 
-    pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, SysError> {
+    pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>, SysError> {
         self.lookup_inode_at(AT_FDCWD, path, true)
     }
 }

@@ -1,12 +1,13 @@
+//! Interface for inter-processor interrupt.
+//! This module wraps inter-processor interrupt into a broadcast-calling style.
+
 use crate::memory::phys_to_virt;
-/// Interface for inter-processor interrupt.
-/// This module wraps inter-processor interrupt into a broadcast-calling style.
-use alloc::boxed::{Box, FnBox};
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use apic::{LocalApic, XApic, LAPIC_ADDR};
 use core::sync::atomic::{spin_loop_hint, AtomicU8, Ordering};
 
-pub type IPIEventItem = Box<FnBox()>;
+pub type IPIEventItem = Box<dyn Fn()>;
 
 unsafe fn get_apic() -> XApic {
     let mut lapic = XApic::new(phys_to_virt(LAPIC_ADDR));

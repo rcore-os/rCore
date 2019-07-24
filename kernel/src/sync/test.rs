@@ -21,7 +21,7 @@ impl Philosopher {
         Philosopher { name, left, right }
     }
 
-    fn eat(&self, table: &Arc<Table>) {
+    fn eat(&self, table: &Arc<dyn Table>) {
         table.eat(self.name, self.left, self.right);
     }
 
@@ -79,7 +79,7 @@ impl Table for MonitorTable {
     }
 }
 
-fn philosopher(table: Arc<Table>) {
+fn philosopher(table: Arc<dyn Table>) {
     let philosophers = vec![
         Philosopher::new("1", 0, 1),
         Philosopher::new("2", 1, 2),

@@ -6,17 +6,17 @@ pub struct Delay<T: FrameAllocator> {
 }
 
 impl<T: FrameAllocator> MemoryHandler for Delay<T> {
-    fn box_clone(&self) -> Box<MemoryHandler> {
+    fn box_clone(&self) -> Box<dyn MemoryHandler> {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: VirtAddr, attr: &MemoryAttr) {
+    fn map(&self, pt: &mut dyn PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         let entry = pt.map(addr, 0);
         entry.set_present(false);
         attr.apply(entry);
     }
 
-    fn unmap(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn unmap(&self, pt: &mut dyn PageTable, addr: VirtAddr) {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
             self.allocator.dealloc(entry.target());
@@ -29,8 +29,8 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
 
     fn clone_map(
         &self,
-        pt: &mut PageTable,
-        src_pt: &mut PageTable,
+        pt: &mut dyn PageTable,
+        src_pt: &mut dyn PageTable,
         addr: VirtAddr,
         attr: &MemoryAttr,
     ) {
@@ -48,7 +48,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         }
     }
 
-    fn handle_page_fault(&self, pt: &mut PageTable, addr: VirtAddr) -> bool {
+    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
             // not a delay case

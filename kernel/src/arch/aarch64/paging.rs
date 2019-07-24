@@ -25,7 +25,7 @@ pub struct PageTableImpl {
 pub struct PageEntry(&'static mut PageTableEntry, Page);
 
 impl PageTable for PageTableImpl {
-    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut dyn Entry {
         let flags = EF::default();
         let attr = MairNormal::attr_value();
         unsafe {
@@ -51,7 +51,7 @@ impl PageTable for PageTableImpl {
             .flush();
     }
 
-    fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut dyn Entry> {
         let page = Page::of_addr(vaddr as u64);
         if let Ok(e) = self.page_table.get_entry_mut(page) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };

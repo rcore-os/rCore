@@ -94,13 +94,13 @@ pub trait Driver: Send + Sync {
 
 lazy_static! {
     // NOTE: RwLock only write when initializing drivers
-    pub static ref DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
-    pub static ref NET_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
-    pub static ref BLK_DRIVERS: RwLock<Vec<Arc<Driver>>> = RwLock::new(Vec::new());
+    pub static ref DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
+    pub static ref NET_DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
+    pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
     pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
 }
 
-pub struct BlockDriver(pub Arc<Driver>);
+pub struct BlockDriver(pub Arc<dyn Driver>);
 
 impl BlockDevice for BlockDriver {
     const BLOCK_SIZE_LOG2: u8 = 9; // 512

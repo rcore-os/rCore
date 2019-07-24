@@ -20,7 +20,7 @@ pub struct PageTableImpl {
 pub struct PageEntry(&'static mut PageTableEntry, Page);
 
 impl PageTable for PageTableImpl {
-    fn map(&mut self, addr: usize, target: usize) -> &mut Entry {
+    fn map(&mut self, addr: usize, target: usize) -> &mut dyn Entry {
         // map the 4K `page` to the 4K `frame` with `flags`
         let flags = EF::VALID | EF::WRITABLE | EF::CACHEABLE;
         let page = Page::of_addr(VirtAddr::new(addr));
@@ -39,7 +39,7 @@ impl PageTable for PageTableImpl {
         flush.flush();
     }
 
-    fn get_entry(&mut self, vaddr: usize) -> Option<&mut Entry> {
+    fn get_entry(&mut self, vaddr: usize) -> Option<&mut dyn Entry> {
         let page = Page::of_addr(VirtAddr::new(vaddr));
         if let Ok(e) = self.page_table.ref_entry(page.clone()) {
             let e = unsafe { &mut *(e as *mut PageTableEntry) };

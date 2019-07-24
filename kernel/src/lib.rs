@@ -5,7 +5,6 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
-#![feature(fnbox)]
 #![feature(alloc_prelude)]
 #![deny(unused_must_use)]
 #![deny(stable_features)]

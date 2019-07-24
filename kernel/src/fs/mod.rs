@@ -39,7 +39,7 @@ _user_img_end:
 
 lazy_static! {
     /// The root of file system
-    pub static ref ROOT_INODE: Arc<INode> = {
+    pub static ref ROOT_INODE: Arc<dyn INode> = {
         #[cfg(not(feature = "link_user"))]
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
@@ -80,7 +80,7 @@ pub trait INodeExt {
     fn read_as_vec(&self) -> Result<Vec<u8>>;
 }
 
-impl INodeExt for INode {
+impl INodeExt for dyn INode {
     fn read_as_vec(&self) -> Result<Vec<u8>> {
         let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);

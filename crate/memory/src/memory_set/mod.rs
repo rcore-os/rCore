@@ -18,7 +18,7 @@ pub struct MemoryArea {
     start_addr: VirtAddr,
     end_addr: VirtAddr,
     attr: MemoryAttr,
-    handler: Box<MemoryHandler>,
+    handler: Box<dyn MemoryHandler>,
     name: &'static str,
 }
 
@@ -58,13 +58,13 @@ impl MemoryArea {
         !(p1 <= p2 || p0 >= p3)
     }
     /// Map all pages in the area to page table `pt`
-    fn map(&self, pt: &mut PageTable) {
+    fn map(&self, pt: &mut dyn PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             self.handler.map(pt, page.start_address(), &self.attr);
         }
     }
     /// Unmap all pages in the area from page table `pt`
-    fn unmap(&self, pt: &mut PageTable) {
+    fn unmap(&self, pt: &mut dyn PageTable) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             self.handler.unmap(pt, page.start_address());
         }
@@ -103,7 +103,7 @@ impl MemoryAttr {
     }
     /// Apply the attributes to page table entry, then update it.
     /// NOTE: You may need to set present manually.
-    pub fn apply(&self, entry: &mut Entry) {
+    pub fn apply(&self, entry: &mut dyn Entry) {
         entry.set_user(self.user);
         entry.set_writable(!self.readonly);
         entry.set_execute(self.execute);

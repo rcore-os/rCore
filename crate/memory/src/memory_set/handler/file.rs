@@ -15,17 +15,17 @@ pub trait Read: Clone + Send + Sync + 'static {
 }
 
 impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
-    fn box_clone(&self) -> Box<MemoryHandler> {
+    fn box_clone(&self) -> Box<dyn MemoryHandler> {
         Box::new(self.clone())
     }
 
-    fn map(&self, pt: &mut PageTable, addr: usize, attr: &MemoryAttr) {
+    fn map(&self, pt: &mut dyn PageTable, addr: usize, attr: &MemoryAttr) {
         let entry = pt.map(addr, 0);
         entry.set_present(false);
         attr.apply(entry);
     }
 
-    fn unmap(&self, pt: &mut PageTable, addr: usize) {
+    fn unmap(&self, pt: &mut dyn PageTable, addr: usize) {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
             self.allocator.dealloc(entry.target());
@@ -38,8 +38,8 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
 
     fn clone_map(
         &self,
-        pt: &mut PageTable,
-        src_pt: &mut PageTable,
+        pt: &mut dyn PageTable,
+        src_pt: &mut dyn PageTable,
         addr: usize,
         attr: &MemoryAttr,
     ) {
@@ -57,7 +57,7 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
         }
     }
 
-    fn handle_page_fault(&self, pt: &mut PageTable, addr: usize) -> bool {
+    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: usize) -> bool {
         let addr = addr & !(PAGE_SIZE - 1);
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
@@ -74,7 +74,7 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
 }
 
 impl<F: Read, T: FrameAllocator> File<F, T> {
-    fn fill_data(&self, pt: &mut PageTable, addr: VirtAddr) {
+    fn fill_data(&self, pt: &mut dyn PageTable, addr: VirtAddr) {
         let data = pt.get_page_slice_mut(addr);
         let file_offset = addr + self.file_start - self.mem_start;
         let read_size = (self.file_end as isize - file_offset as isize)

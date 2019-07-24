@@ -8,7 +8,7 @@ use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
 
 #[derive(Clone)]
 pub struct FileHandle {
-    inode: Arc<INode>,
+    inode: Arc<dyn INode>,
     offset: u64,
     options: OpenOptions,
     pub path: String,
@@ -31,7 +31,7 @@ pub enum SeekFrom {
 }
 
 impl FileHandle {
-    pub fn new(inode: Arc<INode>, options: OpenOptions, path: String) -> Self {
+    pub fn new(inode: Arc<dyn INode>, options: OpenOptions, path: String) -> Self {
         return FileHandle {
             inode,
             offset: 0,
@@ -120,7 +120,7 @@ impl FileHandle {
         self.inode.metadata()
     }
 
-    pub fn lookup_follow(&self, path: &str, max_follow: usize) -> Result<Arc<INode>> {
+    pub fn lookup_follow(&self, path: &str, max_follow: usize) -> Result<Arc<dyn INode>> {
         self.inode.lookup_follow(path, max_follow)
     }
 
@@ -141,7 +141,7 @@ impl FileHandle {
         self.inode.io_control(cmd, arg)
     }
 
-    pub fn inode(&self) -> Arc<INode> {
+    pub fn inode(&self) -> Arc<dyn INode> {
         self.inode.clone()
     }
 
