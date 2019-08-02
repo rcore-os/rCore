@@ -23,7 +23,7 @@ impl SerialRead for SerialPort {
     fn receive(&mut self) -> u8 {
         unsafe {
             let ports = self as *mut _ as *mut [Port<u8>; 6];
-            let data = &(*ports)[0];
+            let data = &mut (*ports)[0];
             data.read()
         }
     }

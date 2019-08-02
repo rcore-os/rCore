@@ -49,12 +49,12 @@ opt-level = 2
 [dependencies]
 log = "0.4"
 spin = "0.5"
-xmas-elf = "0.6"
-bitflags = "1.0"
-bit_field = "0.9"
+xmas-elf = "0.7"
+bitflags = "1.1"
+bit_field = "0.10"
 volatile = "0.2"
-heapless = "0.4"
-bitvec = { version = "0.11", default-features = false, features = ["alloc"] }
+heapless = "0.5"
+bitvec = { version = "0.14", default-features = false, features = ["alloc"] }
 console-traits = "0.3"
 buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
@@ -70,18 +70,18 @@ rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "22c759f4" 
 rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "22c759f4" }
 rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "22c759f4" }
 rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "22c759f4" }
-compression = { version = "0.1.3", default-features = false, features = ["gzip"] }
+compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { git = "https://github.com/rcore-os/bootloader", branch = "vga" }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
-x86_64 = "0.6"
+x86_64 = "0.7"
 raw-cpuid = "6.0"
 uart_16550 = "0.2"
 pc-keyboard = "0.5"
-acpi = { git = "https://github.com/rust-osdev/acpi" }
-aml_parser = { git = "https://github.com/rust-osdev/acpi" }
+acpi = "0.3"
+aml_parser = "0.3"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
 riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
@@ -98,16 +98,6 @@ paste = "0.1"
 default-target = "targets/x86_64.json"
 output = "target/x86_64/bootimage.bin"
 minimum-image-size = 0      # The minimum output file size (in MiB)
-# The command invoked on `bootimage run`
-# (the "{}" will be replaced with the path to the bootable disk image)
-run-command = ["qemu-system-x86_64",
-    "-drive", "format=raw,file={}",
-    # TODO: use USER_IMG environment variable
-    "-drive", "format=raw,file=../user/img/ucore-i386-pic.img,media=disk,cache=writeback",
-    "-serial", "mon:stdio",
-    "-device", "isa-debug-exit",
-    "-smp", "4"
-]
 
 [build-dependencies]
 cc = "1.0"

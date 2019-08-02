@@ -7,7 +7,7 @@ const CMOS_DATA: u16 = 0x71;
 
 unsafe fn check_updating() -> bool {
     let mut addr = Port::<u8>::new(CMOS_ADDR);
-    let data = Port::<u8>::new(CMOS_DATA);
+    let mut data = Port::<u8>::new(CMOS_DATA);
 
     addr.write(0x0A);
     return (data.read() & 0x80) != 0;
@@ -15,7 +15,7 @@ unsafe fn check_updating() -> bool {
 
 unsafe fn read_rtc(reg: u8) -> u8 {
     let mut addr = Port::<u8>::new(CMOS_ADDR);
-    let data = Port::<u8>::new(CMOS_DATA);
+    let mut data = Port::<u8>::new(CMOS_DATA);
 
     addr.write(reg);
     return data.read();

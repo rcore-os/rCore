@@ -20,8 +20,8 @@ pub fn receive() -> Option<DecodedKey> {
     }
 
     let mut keyboard = KEYBOARD.lock();
-    let data_port = Port::<u8>::new(0x60);
-    let status_port = Port::<u8>::new(0x64);
+    let mut data_port = Port::<u8>::new(0x60);
+    let mut status_port = Port::<u8>::new(0x64);
 
     // Output buffer status = 1
     if unsafe { status_port.read() } & (1 << 0) != 0 {
