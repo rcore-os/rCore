@@ -3,6 +3,9 @@ use alloc::{sync::Arc, vec::Vec};
 use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs::vfs::*;
 use rcore_fs_sfs::SimpleFileSystem;
+use rcore_fs_mountfs::MountFS;
+use rcore_fs_ramfs::RamFS;
+use rcore_fs_devfs::{DevFS, special::*};
 
 use crate::drivers::BlockDriver;
 
@@ -69,8 +72,26 @@ lazy_static! {
             Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
         };
 
+        // use SFS as rootfs
         let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
-        sfs.root_inode()
+        let rootfs = MountFS::new(sfs);
+        let root = rootfs.root_inode();
+
+        // create DevFS
+        let devfs = DevFS::new();
+        devfs.add("null", Arc::new(NullINode::default())).expect("failed to mknod /dev/null");
+        devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
+
+        // mount DevFS at /dev
+        let dev = root.create("dev", FileType::Dir, 0o666).expect("failed to mkdir /dev");
+        dev.mount(devfs).expect("failed to mount DevFS");
+
+        // mount RamFS at /tmp
+        let ramfs = RamFS::new();
+        let tmp = root.create("tmp", FileType::Dir, 0o666).expect("failed to mkdir /tmp");
+        tmp.mount(ramfs).expect("failed to mount RamFS");
+
+        root
     };
 }
 

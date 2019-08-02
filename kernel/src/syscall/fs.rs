@@ -951,6 +951,8 @@ impl From<FsError> for SysError {
             FsError::IOCTLError => SysError::EINVAL,
             FsError::NoDevice => SysError::EINVAL,
             FsError::Again => SysError::EAGAIN,
+            FsError::SymLoop => SysError::ELOOP,
+            FsError::Busy => SysError::EBUSY,
         }
     }
 }
