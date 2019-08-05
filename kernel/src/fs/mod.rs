@@ -2,10 +2,10 @@ use alloc::{sync::Arc, vec::Vec};
 
 use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs::vfs::*;
-use rcore_fs_sfs::SimpleFileSystem;
+use rcore_fs_devfs::{special::*, DevFS};
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
-use rcore_fs_devfs::{DevFS, special::*};
+use rcore_fs_sfs::SimpleFileSystem;
 
 use crate::drivers::BlockDriver;
 
@@ -83,12 +83,16 @@ lazy_static! {
         devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
 
         // mount DevFS at /dev
-        let dev = root.create("dev", FileType::Dir, 0o666).expect("failed to mkdir /dev");
+        let dev = root.find(true, "dev").unwrap_or_else(|_| {
+            root.create("dev", FileType::Dir, 0o666).expect("failed to mkdir /dev")
+        });
         dev.mount(devfs).expect("failed to mount DevFS");
 
         // mount RamFS at /tmp
         let ramfs = RamFS::new();
-        let tmp = root.create("tmp", FileType::Dir, 0o666).expect("failed to mkdir /tmp");
+        let tmp = root.find(true, "tmp").unwrap_or_else(|_| {
+            root.create("tmp", FileType::Dir, 0o666).expect("failed to mkdir /tmp")
+        });
         tmp.mount(ramfs).expect("failed to mount RamFS");
 
         root
