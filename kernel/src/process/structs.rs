@@ -452,7 +452,12 @@ trait ElfExt {
 
     /// Append current ELF file as interpreter into given memory set.
     /// This will insert the interpreter it a place which is "good enough" (since ld.so should be PIC).
-    fn append_as_interpreter(&self, inode: &Arc<dyn INode>, memory_set: &mut MemorySet, bias: usize);
+    fn append_as_interpreter(
+        &self,
+        inode: &Arc<dyn INode>,
+        memory_set: &mut MemorySet,
+        bias: usize,
+    );
 
     /// Get virtual address of PHDR section if it has.
     fn get_phdr_vaddr(&self) -> Option<u64>;

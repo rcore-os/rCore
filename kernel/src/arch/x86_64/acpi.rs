@@ -1,7 +1,7 @@
 use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
+use crate::memory::phys_to_virt;
 use acpi::{search_for_rsdp_bios, AcpiHandler, PhysicalMapping};
 use core::ptr::NonNull;
-use crate::memory::phys_to_virt;
 use core::slice;
 
 struct Handler;

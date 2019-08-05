@@ -1295,7 +1295,7 @@ impl From<Metadata> for Stat {
             nlink: info.nlinks as u64,
             uid: info.uid as u32,
             gid: info.gid as u32,
-            rdev: 0,
+            rdev: info.rdev as u64,
             size: info.size as u64,
             blksize: info.blk_size as u64,
             blocks: info.blocks as u64,
