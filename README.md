@@ -32,8 +32,8 @@ See [Travis script](./.travis.yml) for details.
 ```bash
 $ rustup component add rust-src llvm-tools-preview
 $ cargo install cargo-binutils
-$ cargo install cargo-xbuild --force
-$ cargo install bootimage --version 0.5.7 --force
+$ cargo install cargo-xbuild
+$ cargo install bootimage --version 0.6.6
 ```
 
 ```bash

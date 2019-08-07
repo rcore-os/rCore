@@ -4,7 +4,7 @@ dist: xenial
 
 language: rust
 
-rust: nightly-2019-03-05
+rust: nightly-2019-06-15
 
 os:
   - linux
@@ -14,7 +14,7 @@ cache:
   cargo: true
   directories:
     - $HOME/Library/Caches/Homebrew
-    - $TRAVIS_BUILD_DIR/qemu-3.1.0
+    - $TRAVIS_BUILD_DIR/qemu-4.0.0
 
 addons:
   homebrew:
@@ -36,8 +36,8 @@ matrix:
 
 install:
   - if [ $ARCH = riscv32 ] || [ $ARCH = riscv64 ]; then
-      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.02.0-x86_64-linux-ubuntu14";
-      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.02.0-x86_64-apple-darwin";
+      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.05.3-x86_64-linux-ubuntu14";
+      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.05.3-x86_64-apple-darwin";
       wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
       tar xf $FILE.tar.gz;
       export PATH=$PATH:$PWD/$FILE/bin;
@@ -48,57 +48,28 @@ install:
       wget https://developer.arm.com/-/media/Files/downloads/gnu-a/8.2-2018.11/$FILE.tar.xz;
       tar -xf $FILE.tar.xz;
       export PATH=$PATH:$PWD/$FILE/bin;
-      wget https://musl.cc/aarch64-linux-musl-cross.tgz;
-      tar -xf aarch64-linux-musl-cross.tgz;
-      export PATH=$PATH:$PWD/aarch64-linux-musl-cross/bin;
     elif [ $TRAVIS_OS_NAME = osx ]; then
       brew tap SergioBenitez/osxct;
       brew install aarch64-none-elf;
     fi;
     fi
-  - if [ $ARCH = x86_64 ]; then
-    if [ $TRAVIS_OS_NAME = linux ]; then
-    sudo apt update;
-    sudo apt install linux-headers-$(uname -r);
-    wget https://musl.cc/x86_64-linux-musl-cross.tgz;
-    tar -xf x86_64-linux-musl-cross.tgz;
-    export PATH=$PATH:$PWD/x86_64-linux-musl-cross/bin;
-    fi;
-    fi
-
   - if [ $TRAVIS_OS_NAME = linux ]; then
-      wget https://download.qemu.org/qemu-3.1.0.tar.xz && tar xJf qemu-3.1.0.tar.xz > /dev/null && cd qemu-3.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
-      export PATH=$PATH:$PWD/qemu-3.1.0/$ARCH-softmmu:$PWD/qemu-3.1.0;
+      wget https://download.qemu.org/qemu-4.0.0.tar.xz && tar xJf qemu-4.0.0.tar.xz > /dev/null && cd qemu-4.0.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
+      export PATH=$PATH:$PWD/qemu-4.0.0/$ARCH-softmmu:$PWD/qemu-4.0.0;
       sudo apt update;
-      sudo apt install libfuse-dev device-tree-compiler -y;
+      sudo apt install device-tree-compiler -y;
     fi
-
-  - if [ $ARCH = riscv32 ]; then
-    if [ $TRAVIS_OS_NAME = linux ]; then
+  - if [ $TRAVIS_OS_NAME = linux ]; then
+    [ $ARCH = riscv32 ] && export FILE="riscv32-linux-musl-cross";
+    [ $ARCH = riscv64 ] && export FILE="riscv64-linux-musl-cross";
+    [ $ARCH = mipsel  ] && export FILE="mipsel-linux-musln32-cross";
+    [ $ARCH = aarch64 ] && export FILE="aarch64-linux-musl-cross";
+    [ $ARCH = x86_64  ] && export FILE="x86_64-linux-musl-cross";
     sudo apt update;
     sudo apt install linux-headers-$(uname -r);
-    wget https://musl.cc/riscv32-linux-musl-cross.tgz;
-    tar -xf riscv32-linux-musl-cross.tgz;
-    export PATH=$PATH:$PWD/riscv32-linux-musl-cross/bin;
-    fi;
-    fi
-  - if [ $ARCH = riscv64 ]; then
-    if [ $TRAVIS_OS_NAME = linux ]; then
-    sudo apt update;
-    sudo apt install linux-headers-$(uname -r);
-    wget https://musl.cc/riscv64-linux-musl-cross.tgz;
-    tar -xf riscv64-linux-musl-cross.tgz;
-    export PATH=$PATH:$PWD/riscv64-linux-musl-cross/bin;
-    fi;
-    fi
-  - if [ $ARCH = mipsel ]; then
-    if [ $TRAVIS_OS_NAME = linux ]; then
-    sudo apt update;
-    sudo apt install linux-headers-$(uname -r);
-    wget https://musl.cc/mipsel-linux-musln32-cross.tgz;
-    tar -xf mipsel-linux-musln32-cross.tgz;
-    export PATH=$PATH:$PWD/mipsel-linux-musln32-cross/bin;
-    fi;
+    wget https://musl.cc/$FILE.tgz;
+    tar -xf $FILE.tgz;
+    export PATH=$PATH:$PWD/$FILE/bin;
     fi
 
 
@@ -107,7 +78,7 @@ before_script:
   - (test -x $HOME/.cargo/bin/cargo-objdump || cargo install cargo-binutils)
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)
   - if [ $ARCH = x86_64 ]; then
-      (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage);
+      (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage --version 0.6.6);
     fi
 
 script:
