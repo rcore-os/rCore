@@ -444,11 +444,11 @@ dependencies = [
  "pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
- "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
- "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
- "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
- "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
+ "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
+ "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
+ "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
+ "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "rcore-memory 0.1.0",
  "rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread)",
  "riscv 0.5.0 (git+https://github.com/rcore-os/riscv)",
@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e#b7f7d9e2feaa298a892ba3655b20c2ab0bc79097"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=33f86c47#33f86c4757e224cc841b769bf6dfbde414a5393a"
 dependencies = [
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -471,42 +471,42 @@ dependencies = [
 [[package]]
 name = "rcore-fs-devfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e#b7f7d9e2feaa298a892ba3655b20c2ab0bc79097"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=33f86c47#33f86c4757e224cc841b769bf6dfbde414a5393a"
 dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-mountfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e#b7f7d9e2feaa298a892ba3655b20c2ab0bc79097"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=33f86c47#33f86c4757e224cc841b769bf6dfbde414a5393a"
 dependencies = [
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-ramfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e#b7f7d9e2feaa298a892ba3655b20c2ab0bc79097"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=33f86c47#33f86c4757e224cc841b769bf6dfbde414a5393a"
 dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "spin 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e#b7f7d9e2feaa298a892ba3655b20c2ab0bc79097"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=33f86c47#33f86c4757e224cc841b769bf6dfbde414a5393a"
 dependencies = [
  "bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -830,11 +830,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
 "checksum rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d0e7a549d590831370895ab7ba4ea0c1b6b011d106b5ff2da6eee112615e6dc0"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
-"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)" = "<none>"
-"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)" = "<none>"
-"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)" = "<none>"
-"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)" = "<none>"
-"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=b7f7d9e)" = "<none>"
+"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
+"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
+"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
+"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
+"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
 "checksum rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread)" = "<none>"
 "checksum rdrand 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"

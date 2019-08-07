@@ -8,23 +8,6 @@ use core::any::Any;
 #[derive(Default)]
 pub struct Vga;
 
-macro_rules! impl_inode {
-    () => {
-        fn set_metadata(&self, _metadata: &Metadata) -> Result<()> { Ok(()) }
-        fn sync_all(&self) -> Result<()> { Ok(()) }
-        fn sync_data(&self) -> Result<()> { Ok(()) }
-        fn resize(&self, _len: usize) -> Result<()> { Err(FsError::NotSupported) }
-        fn create(&self, _name: &str, _type_: FileType, _mode: u32) -> Result<Arc<dyn INode>> { Err(FsError::NotDir) }
-        fn unlink(&self, _name: &str) -> Result<()> { Err(FsError::NotDir) }
-        fn link(&self, _name: &str, _other: &Arc<dyn INode>) -> Result<()> { Err(FsError::NotDir) }
-        fn move_(&self, _old_name: &str, _target: &Arc<dyn INode>, _new_name: &str) -> Result<()> { Err(FsError::NotDir) }
-        fn find(&self, _name: &str) -> Result<Arc<dyn INode>> { Err(FsError::NotDir) }
-        fn get_entry(&self, _id: usize) -> Result<String> { Err(FsError::NotDir) }
-        fn fs(&self) -> Arc<dyn FileSystem> { unimplemented!() }
-        fn as_any_ref(&self) -> &dyn Any { self }
-    };
-}
-
 impl INode for Vga {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         Err(FsError::NotSupported)
@@ -97,7 +80,7 @@ impl INode for Vga {
         //let fb_fix_info = unsafe{ &mut *(data as *mut fb_fix_screeninfo) };
         //Ok(())
     }
-    impl_inode!();
+    fn as_any_ref(&self) -> &dyn Any { self }
 }
 
 const FBIOGET_FSCREENINFO: u32 = 0x4602;
