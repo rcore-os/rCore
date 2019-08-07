@@ -53,7 +53,6 @@ lazy_static! {
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
 }
 
-
 impl INode for Stdin {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         if self.can_read() {
@@ -78,19 +77,19 @@ impl INode for Stdin {
             TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                 // pretend to be tty
                 Ok(())
-            },
+            }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
                 // TODO: verify pointer
-                unsafe {
-                    *(data as *mut u32) = 0
-                };
+                unsafe { *(data as *mut u32) = 0 };
                 Ok(())
             }
-            _ => Err(FsError::NotSupported)
+            _ => Err(FsError::NotSupported),
         }
     }
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl INode for Stdout {
@@ -116,17 +115,17 @@ impl INode for Stdout {
             TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                 // pretend to be tty
                 Ok(())
-            },
+            }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
                 // TODO: verify pointer
-                unsafe {
-                    *(data as *mut u32) = 0
-                };
+                unsafe { *(data as *mut u32) = 0 };
                 Ok(())
             }
-            _ => Err(FsError::NotSupported)
+            _ => Err(FsError::NotSupported),
         }
     }
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }

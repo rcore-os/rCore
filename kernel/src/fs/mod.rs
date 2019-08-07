@@ -13,6 +13,7 @@ pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::pseudo::*;
+pub use self::random::*;
 pub use self::stdio::{STDIN, STDOUT};
 pub use self::vga::*;
 
@@ -22,6 +23,7 @@ mod file_like;
 mod ioctl;
 mod pipe;
 mod pseudo;
+mod random;
 mod stdio;
 pub mod vga;
 
@@ -81,6 +83,8 @@ lazy_static! {
         let devfs = DevFS::new();
         devfs.add("null", Arc::new(NullINode::default())).expect("failed to mknod /dev/null");
         devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
+        devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/zero");
+        devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/zero");
 
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {

@@ -56,5 +56,7 @@ impl INode for Pseudo {
             rdev: 0,
         })
     }
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }

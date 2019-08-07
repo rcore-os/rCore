@@ -80,7 +80,9 @@ impl INode for Vga {
         //let fb_fix_info = unsafe{ &mut *(data as *mut fb_fix_screeninfo) };
         //Ok(())
     }
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }
 
 const FBIOGET_FSCREENINFO: u32 = 0x4602;

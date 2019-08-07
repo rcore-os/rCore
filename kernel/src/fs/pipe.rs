@@ -104,5 +104,7 @@ impl INode for Pipe {
         })
     }
 
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }
