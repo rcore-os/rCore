@@ -4,7 +4,6 @@ pub mod pic;
 pub mod pit;
 pub mod rtc_cmos;
 pub mod serial;
-pub mod vga;
 
 use super::{board, BootInfo};
 

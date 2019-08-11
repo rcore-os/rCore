@@ -5,7 +5,6 @@ use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 use crate::processor;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::util::color::ConsoleColor;
 
 lazy_static! {
     static ref LOG_LOCK: Mutex<()> = Mutex::new(());
@@ -39,16 +38,15 @@ macro_rules! println {
 
 /// Add escape sequence to print with color in Linux console
 macro_rules! with_color {
-    ($args: ident, $color: ident) => {{
-        let code = $color.to_console_code();
-        format_args!("\u{1B}[{}m{}\u{1B}[0m", code as u8, $args)
+    ($args: ident, $color_code: ident) => {{
+        format_args!("\u{1B}[{}m{}\u{1B}[0m", $color_code as u8, $args)
     }};
 }
 
-fn print_in_color(args: fmt::Arguments, color: ConsoleColor) {
+fn print_in_color(args: fmt::Arguments, color_code: u8) {
     use crate::arch::io;
     let _guard = LOG_LOCK.lock();
-    io::putfmt(with_color!(args, color));
+    io::putfmt(with_color!(args, color_code));
 }
 
 pub fn print(args: fmt::Arguments) {
@@ -70,26 +68,24 @@ impl Log for SimpleLogger {
         if let Some(tid) = processor().tid_option() {
             print_in_color(
                 format_args!("[{:>5}][{}] {}\n", record.level(), tid, record.args()),
-                ConsoleColor::from(record.level()),
+                level_to_color_code(record.level()),
             );
         } else {
             print_in_color(
                 format_args!("[{:>5}][-] {}\n", record.level(), record.args()),
-                ConsoleColor::from(record.level()),
+                level_to_color_code(record.level()),
             );
         }
     }
     fn flush(&self) {}
 }
 
-impl From<Level> for ConsoleColor {
-    fn from(level: Level) -> Self {
-        match level {
-            Level::Error => ConsoleColor::Red,
-            Level::Warn => ConsoleColor::BrightYellow,
-            Level::Info => ConsoleColor::Blue,
-            Level::Debug => ConsoleColor::Green,
-            Level::Trace => ConsoleColor::BrightBlack,
-        }
+fn level_to_color_code(level: Level) -> u8 {
+    match level {
+        Level::Error => 31,     // Red
+        Level::Warn => 93,      // BrightYellow
+        Level::Info => 34,      // Blue
+        Level::Debug => 32,     // Green
+        Level::Trace => 90,     // BrightBlack
     }
 }

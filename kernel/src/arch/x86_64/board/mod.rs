@@ -72,7 +72,7 @@ pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> FramebufferResul
         fb::ColorConfig::RGB565
     } else {
         // assume BGRA8888 for now
-        fb::ColorConfig::BGRA8888
+        fb::ColorConfig::RGBA8888
     };
     Ok((fb_info, config, phys_to_virt(framebuffer)))
 }

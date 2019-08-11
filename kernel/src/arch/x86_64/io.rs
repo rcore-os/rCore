@@ -19,7 +19,6 @@ pub fn putfmt(fmt: Arguments) {
     // print to graphic
     #[cfg(feature = "consolegraphic")]
     {
-        use super::driver::vga::VGA_WRITER;
         unsafe { CONSOLE.force_unlock() }
         if let Some(console) = CONSOLE.lock().as_mut() {
             console.write_fmt(fmt).unwrap();

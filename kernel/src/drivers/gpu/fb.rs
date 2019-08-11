@@ -51,7 +51,8 @@ use self::ColorDepth::*;
 pub enum ColorConfig {
     RGB332,
     RGB565,
-    BGRA8888,
+    RGBA8888, // QEMU and low version RPi use RGBA
+    BGRA8888, // RPi3 B+ uses BGRA
     VgaPalette,
 }
 use self::ColorConfig::*;
@@ -125,7 +126,14 @@ impl ColorBuffer {
     }
 }
 
-/// Frambuffer structure
+impl fmt::Debug for ColorBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ColorBuffer({:#x})", unsafe { self.base_addr })
+    }
+}
+
+/// Framebuffer structure
+#[derive(Debug)]
 pub struct Framebuffer {
     pub fb_info: FramebufferInfo,
     pub color_depth: ColorDepth,
@@ -133,39 +141,23 @@ pub struct Framebuffer {
     buf: ColorBuffer,
 }
 
-impl fmt::Debug for Framebuffer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut f = f.debug_struct("Framebuffer");
-        f.field("fb_info", &self.fb_info);
-        f.field("color_depth", &self.color_depth);
-        f.field("color_config", &self.color_config);
-        f.field("base_addr", unsafe { &self.buf.base_addr });
-        f.finish()
-    }
-}
-
 impl Framebuffer {
     fn new(width: u32, height: u32, depth: u32) -> Result<Framebuffer, String> {
-        let probed_info = super::probe_fb_info(width, height, depth);
+        let (info, config, addr) = super::probe_fb_info(width, height, depth)?;
 
-        match probed_info {
-            Ok((info, config, addr)) => {
-                let color_depth = match info.depth {
-                    8 => ColorDepth8,
-                    16 => ColorDepth16,
-                    32 => ColorDepth32,
-                    24 => ColorDepth24,
-                    _ => Err(format!("unsupported color depth {}", info.depth))?,
-                };
-                Ok(Framebuffer {
-                    buf: ColorBuffer::new(color_depth, addr, info.screen_size as usize),
-                    color_config: config,
-                    color_depth,
-                    fb_info: info,
-                })
-            }
-            Err(e) => Err(e)?,
-        }
+        let color_depth = match info.depth {
+            8 => ColorDepth8,
+            16 => ColorDepth16,
+            32 => ColorDepth32,
+            24 => ColorDepth24,
+            _ => Err(format!("unsupported color depth {}", info.depth))?,
+        };
+        Ok(Framebuffer {
+            buf: ColorBuffer::new(color_depth, addr, info.screen_size as usize),
+            color_config: config,
+            color_depth,
+            fb_info: info,
+        })
     }
 
     #[inline]
@@ -189,7 +181,7 @@ impl Framebuffer {
         match self.color_depth {
             ColorDepth8 => self.buf.read8(y * self.fb_info.xres + x) as u32,
             ColorDepth16 => self.buf.read16(y * self.fb_info.xres + x) as u32,
-            ColorDepth24 => self.buf.read16(y * self.fb_info.xres + x) as u32, // TODO
+            ColorDepth24 => unimplemented!(),
             ColorDepth32 => self.buf.read32(y * self.fb_info.xres + x),
         }
     }
@@ -256,6 +248,50 @@ impl Framebuffer {
 
     pub fn fill_fix_screeninfo(&self, fix_info: &mut fb_fix_screeninfo) {
         fix_info.line_length = self.fb_info.pitch;
+    }
+}
+
+use rcore_console::Rgb888;
+use rcore_console::embedded_graphics::prelude::*;
+
+/// To be the backend of rCore `Console`
+impl Drawing<Rgb888> for Framebuffer {
+    fn draw<T>(&mut self, item: T)
+    where
+        T: IntoIterator<Item = Pixel<Rgb888>>,
+    {
+        for Pixel(coord, color) in item {
+            let pixel = color.pack32(self.color_config);
+            self.write(coord[0], coord[1], pixel);
+        }
+    }
+}
+
+trait ColorEncode {
+    /// Encode `Rgb888` to a pixel in the framebuffer
+    fn pack32(&self, config: ColorConfig) -> u32;
+}
+
+impl ColorEncode for Rgb888 {
+    #[inline]
+    fn pack32(&self, config: ColorConfig) -> u32 {
+        match config {
+            ColorConfig::RGB332 => {
+                (((self.r() >> 5) << 5) | ((self.g() >> 5) << 2) | (self.b() >> 6)) as u32
+            }
+            ColorConfig::RGB565 => {
+                (((self.r() as u16 & 0xF8) << 8)
+                    | ((self.g() as u16 & 0xFC) << 3)
+                    | (self.b() as u16 >> 3)) as u32
+            }
+            ColorConfig::RGBA8888 => {
+                ((self.r() as u32) << 16) | ((self.g() as u32) << 8) | (self.b() as u32)
+            }
+            ColorConfig::BGRA8888 => {
+                ((self.b() as u32) << 16) | ((self.g() as u32) << 8) | (self.r() as u32)
+            }
+            _ => unimplemented!(),
+        }
     }
 }
 
