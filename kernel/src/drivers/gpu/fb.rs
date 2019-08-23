@@ -251,8 +251,8 @@ impl Framebuffer {
     }
 }
 
-use rcore_console::Rgb888;
 use rcore_console::embedded_graphics::prelude::*;
+use rcore_console::Rgb888;
 
 /// To be the backend of rCore `Console`
 impl Drawing<Rgb888> for Framebuffer {

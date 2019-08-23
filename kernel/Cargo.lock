@@ -15,7 +15,7 @@ dependencies = [
 
 [[package]]
 name = "acpi"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -24,8 +24,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "aml_parser"
-version = "0.3.0"
+name = "aml"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -153,7 +153,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -381,8 +381,8 @@ name = "rcore"
 version = "0.2.0"
 dependencies = [
  "aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)",
- "acpi 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "aml_parser 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
  "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -402,7 +402,7 @@ dependencies = [
  "pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=f09eae7)",
+ "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=18402290)",
  "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
@@ -422,10 +422,9 @@ dependencies = [
 [[package]]
 name = "rcore-console"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-console?rev=f09eae7#f09eae71f3bcf051e4cd2da6187a7fda182cf487"
+source = "git+https://github.com/rcore-os/rcore-console?rev=18402290#18402290a64f2fc30db7e492b1332b016cceb326"
 dependencies = [
  "embedded-graphics 0.6.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "vte 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -753,8 +752,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum aarch64 2.6.1 (git+https://github.com/rcore-os/aarch64)" = "<none>"
-"checksum acpi 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7f54fe0b8fab5735c62dde036310a14c76b8fb6b5141aed6b6d29052d39ffe4b"
-"checksum aml_parser 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7854f484fca0c341d5511a9e602a7ada15423c370056b9e874ff201a693559f4"
+"checksum acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2c18d706bdc322dd4f8f7930a5879ad8df3d78d4452a678d5419c72f9f69acea"
+"checksum aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b7669e841017880c2710777c46ec654272163379bbe55de6e17a2a2388d44d92"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum autocfg 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0e49efa51329a5fd37e7c79db4621af617cd4e3e5bc224939808d076077077bf"
@@ -802,7 +801,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
 "checksum rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d0e7a549d590831370895ab7ba4ea0c1b6b011d106b5ff2da6eee112615e6dc0"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
-"checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=f09eae7)" = "<none>"
+"checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=18402290)" = "<none>"
 "checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
 "checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
 "checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"

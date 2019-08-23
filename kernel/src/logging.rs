@@ -65,14 +65,26 @@ impl Log for SimpleLogger {
         if !self.enabled(record.metadata()) {
             return;
         }
+
         if let Some(tid) = processor().tid_option() {
             print_in_color(
-                format_args!("[{:>5}][{}] {}\n", record.level(), tid, record.args()),
+                format_args!(
+                    "[{:>5}][{}][{}] {}\n",
+                    record.level(),
+                    tid,
+                    record.target(),
+                    record.args()
+                ),
                 level_to_color_code(record.level()),
             );
         } else {
             print_in_color(
-                format_args!("[{:>5}][-] {}\n", record.level(), record.args()),
+                format_args!(
+                    "[{:>5}][-][{}] {}\n",
+                    record.level(),
+                    record.target(),
+                    record.args()
+                ),
                 level_to_color_code(record.level()),
             );
         }
@@ -82,10 +94,10 @@ impl Log for SimpleLogger {
 
 fn level_to_color_code(level: Level) -> u8 {
     match level {
-        Level::Error => 31,     // Red
-        Level::Warn => 93,      // BrightYellow
-        Level::Info => 34,      // Blue
-        Level::Debug => 32,     // Green
-        Level::Trace => 90,     // BrightBlack
+        Level::Error => 31, // Red
+        Level::Warn => 93,  // BrightYellow
+        Level::Info => 34,  // Blue
+        Level::Debug => 32, // Green
+        Level::Trace => 90, // BrightBlack
     }
 }
