@@ -266,11 +266,12 @@ fn setup_framebuffer(driver: &mut VirtIOGpu) {
     let frame_buffer = unsafe {
         HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(size as usize, PAGE_SIZE).unwrap())
     } as usize;
-    mandelbrot(
-        driver.rect.width,
-        driver.rect.height,
-        frame_buffer as *mut u32,
-    );
+    // test framebuffer
+//    mandelbrot(
+//        driver.rect.width,
+//        driver.rect.height,
+//        frame_buffer as *mut u32,
+//    );
     driver.frame_buffer = frame_buffer;
     let request_resource_attach_backing = unsafe {
         &mut *(driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut VirtIOGpuResourceAttachBacking)

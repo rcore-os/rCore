@@ -4,8 +4,6 @@
 #   make justrun                Run the last build
 #   make runnet                 Build and run in QEMU with nic
 #   make justrunnet             Run the last build with nic
-#   make runui                  Build and run in QEMU with gui
-#   make justrunui              Run the last build with gui
 #   make runtest                Build and run in QEMU with specified program
 #   make justruntest            Run the last build with specified program
 #   make doc                    Generate docs
@@ -50,7 +48,6 @@ kernel_img := $(build_path)/kernel.img
 bootimage := $(build_path)/bootimage.bin
 bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
-bbl_path := $(PWD)/../riscv-pk
 user_dir := ../user
 
 
@@ -126,13 +123,12 @@ qemu_opts += \
 	-kernel ../tools/opensbi/virt_rv32.elf \
 	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
-	-device virtio-blk-device,drive=sfs
+	-device virtio-blk-device,drive=sfs \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
-qemu_ui_opts += \
-	-device virtio-gpu-device \
-	-device virtio-mouse-device
 
 else ifeq ($(arch), riscv64)
 ifeq ($(board), u540)
@@ -148,14 +144,13 @@ qemu_opts += \
 	-kernel ../tools/opensbi/virt_rv64.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
-	-device virtio-blk-device,drive=sfs
+	-device virtio-blk-device,drive=sfs \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device
 endif
 qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device virtio-net-device,netdev=net0
-qemu_ui_opts += \
-	-device virtio-gpu-device \
-	-device virtio-mouse-device
 
 else ifeq ($(arch), aarch64)
 qemu_opts += \
@@ -233,10 +228,7 @@ prefix := riscv64-unknown-elf-
 else ifeq ($(arch), mipsel)
 prefix ?= mipsel-linux-musln32-
 else ifeq ($(arch), aarch64)
-prefix ?= aarch64-none-elf-
-ifeq (,$(shell which $(prefix)ld))
-	prefix := aarch64-elf-
-endif
+prefix ?= aarch64-linux-musl-
 endif
 
 gdb := $(prefix)gdb
@@ -246,7 +238,7 @@ strip := cargo strip --
 dtc := dtc
 hostcc := gcc
 
-.PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runui justrunui runtest justruntest
+.PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runtest justruntest
 
 all: kernel
 
@@ -260,7 +252,6 @@ doc:
 
 run: build justrun
 runnet: build justrunnet
-runui: build justrunui
 runtest: build justruntest
 
 justrun:
@@ -268,9 +259,6 @@ justrun:
 
 justrunnet: build
 	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
-
-justrunui: build
-	@qemu-system-$(arch) $(qemu_opts) $(qemu_ui_opts)
 
 justruntest: build
 	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
