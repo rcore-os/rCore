@@ -2,11 +2,13 @@
 
 use crate::consts::MEMORY_OFFSET;
 use crate::memory::{init_heap, virt_to_phys, FRAME_ALLOCATOR};
+use aarch64::{paging::frame::PhysFrame, asm::ttbr_el1_write};
 use log::*;
 use rcore_memory::PAGE_SIZE;
 
 /// Memory initialization.
 pub fn init() {
+    ttbr_el1_write(0, PhysFrame::of_addr(0));
     init_frame_allocator();
     init_heap();
     info!("memory: init end");

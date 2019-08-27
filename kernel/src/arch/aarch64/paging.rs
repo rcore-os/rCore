@@ -9,7 +9,7 @@ use aarch64::paging::{
     page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size4KiB,
 };
-use aarch64::{PhysAddr, VirtAddr};
+use aarch64::PhysAddr;
 use core::mem::ManuallyDrop;
 use log::*;
 use rcore_memory::paging::*;
@@ -26,7 +26,7 @@ pub struct PageEntry(&'static mut PageTableEntry, Page);
 
 impl PageTable for PageTableImpl {
     fn map(&mut self, addr: usize, target: usize) -> &mut dyn Entry {
-        let flags = EF::default();
+        let flags = EF::default_page() | EF::PXN | EF::UXN;
         let attr = MairNormal::attr_value();
         unsafe {
             self.page_table
@@ -85,6 +85,7 @@ pub enum MMIOType {
     Unsupported = 3,
 }
 
+// TODO: software dirty bit needs to be reconsidered
 impl Entry for PageEntry {
     fn update(&mut self) {
         tlb_invalidate(self.1.start_address());
@@ -161,9 +162,11 @@ impl Entry for PageEntry {
     }
     fn set_execute(&mut self, value: bool) {
         if self.user() {
-            self.as_flags().set(EF::UXN, !value)
+            self.as_flags().set(EF::UXN, !value);
+            self.as_flags().set(EF::PXN, true);
         } else {
-            self.as_flags().set(EF::PXN, !value)
+            self.as_flags().set(EF::PXN, !value);
+            self.as_flags().set(EF::UXN, true)
         }
     }
     fn mmio(&self) -> u8 {

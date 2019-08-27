@@ -1,5 +1,5 @@
 use aarch64::addr::{PhysAddr, VirtAddr};
-use aarch64::paging::{memory_attribute::*, Page, PageTable, PageTableFlags as EF, PhysFrame};
+use aarch64::paging::{memory_attribute::*, Page, PageTable, PageTableAttribute, PageTableFlags as EF, PhysFrame};
 use aarch64::paging::{Size1GiB, Size2MiB, Size4KiB};
 use aarch64::{asm::*, barrier, regs::*};
 use bcm2837::consts::RAW_IO_BASE;
@@ -42,7 +42,7 @@ fn create_page_table(start_paddr: usize, end_paddr: usize) {
     p3.zero();
     p2.zero();
 
-    let block_flags = EF::VALID | EF::AF | EF::WRITE | EF::UXN;
+    let block_flags = EF::default_block() | EF::UXN;
     // normal memory
     for frame in PhysFrame::<Size2MiB>::range_of(start_paddr as u64, end_paddr as u64) {
         let paddr = frame.start_address();
@@ -58,10 +58,10 @@ fn create_page_table(start_paddr: usize, end_paddr: usize) {
         p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
     }
 
-    p3[0].set_frame(frame_lvl2, EF::default(), MairNormal::attr_value());
+    p3[0].set_frame(frame_lvl2, EF::default_table(), PageTableAttribute::new(0, 0, 0));
     p3[1].set_block::<Size1GiB>(PhysAddr::new(0x4000_0000), block_flags | EF::PXN, MairDevice::attr_value());
 
-    p4[0].set_frame(frame_lvl3, EF::default(), MairNormal::attr_value());
+    p4[0].set_frame(frame_lvl3, EF::default_table(), PageTableAttribute::new(0, 0, 0));
 
     // the bootloader is still running at the lower virtual address range,
     // so the TTBR0_EL1 also needs to be set.
