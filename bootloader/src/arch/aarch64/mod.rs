@@ -2,7 +2,7 @@ use aarch64::addr::{PhysAddr, VirtAddr};
 use aarch64::paging::{memory_attribute::*, Page, PageTable, PageTableAttribute, PageTableFlags as EF, PhysFrame};
 use aarch64::paging::{Size1GiB, Size2MiB, Size4KiB};
 use aarch64::{asm::*, barrier, regs::*};
-use bcm2837::consts::RAW_IO_BASE;
+use bcm2837::addr::{phys_to_virt, virt_to_phys, PHYSICAL_IO_BASE};
 use core::ptr;
 use fixedvec::FixedVec;
 use xmas_elf::program::{ProgramHeader64, Type};
@@ -10,19 +10,7 @@ use xmas_elf::program::{ProgramHeader64, Type};
 const PAGE_SIZE: usize = 4096;
 const ALIGN_2MB: u64 = 0x200000;
 
-const PHYSICAL_MEMORY_OFFSET: u64 = 0xFFFF_0000_0000_0000;
-
 global_asm!(include_str!("boot.S"));
-
-/// Convert physical address to virtual address
-const fn phys_to_virt(paddr: u64) -> u64 {
-    PHYSICAL_MEMORY_OFFSET + paddr
-}
-
-/// Convert virtual address to physical address
-const fn virt_to_phys(vaddr: u64) -> u64 {
-    vaddr - PHYSICAL_MEMORY_OFFSET
-}
 
 // TODO: set segments permission
 fn create_page_table(start_paddr: usize, end_paddr: usize) {
@@ -46,14 +34,14 @@ fn create_page_table(start_paddr: usize, end_paddr: usize) {
     // normal memory
     for frame in PhysFrame::<Size2MiB>::range_of(start_paddr as u64, end_paddr as u64) {
         let paddr = frame.start_address();
-        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64()));
+        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64() as usize) as u64);
         let page = Page::<Size2MiB>::containing_address(vaddr);
         p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
     }
     // device memory
-    for frame in PhysFrame::<Size2MiB>::range_of(RAW_IO_BASE as u64, 0x4000_0000) {
+    for frame in PhysFrame::<Size2MiB>::range_of(PHYSICAL_IO_BASE as u64, 0x4000_0000) {
         let paddr = frame.start_address();
-        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64()));
+        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64() as usize) as u64);
         let page = Page::<Size2MiB>::containing_address(vaddr);
         p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
     }
@@ -133,7 +121,7 @@ pub fn map_kernel(kernel_start: usize, segments: &FixedVec<ProgramHeader64>) {
 
         unsafe {
             let src = (kernel_start as u64 + offset) as *const u8;
-            let dst = virt_to_phys(virt_addr) as *mut u8;
+            let dst = virt_to_phys(virt_addr as usize) as *mut u8;
             ptr::copy(src, dst, file_size as usize);
             ptr::write_bytes(dst.offset(file_size as isize), 0, (mem_size - file_size) as usize);
         }
@@ -146,6 +134,6 @@ pub fn map_kernel(kernel_start: usize, segments: &FixedVec<ProgramHeader64>) {
         }
     }
 
-    create_page_table(0, RAW_IO_BASE);
+    create_page_table(0, PHYSICAL_IO_BASE);
     enable_mmu();
 }

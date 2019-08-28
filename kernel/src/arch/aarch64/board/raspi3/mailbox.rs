@@ -3,8 +3,10 @@
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
 use super::fb::FramebufferInfo;
+use crate::memory::virt_to_phys;
 use aarch64::asm;
 use alloc::string::String;
+use bcm2837::addr::phys_to_bus;
 use bcm2837::mailbox::{Mailbox, MailboxChannel};
 use core::mem;
 use lazy_static::lazy_static;
@@ -185,15 +187,18 @@ macro_rules! send_request {
             end_tag: RPI_FIRMWARE_PROPERTY_END,
         });
 
-        let start = &req as *const _ as u32;
-        let end = start + req.0.buf_size;
+        let start = &req as *const _ as usize;
+        let end = start + req.0.buf_size as usize;
         {
             // flush data cache around mailbox accesses
             let mut mbox = MAILBOX.lock();
-            asm::flush_dcache_range(start as usize, end as usize);
-            mbox.write(MailboxChannel::Property, start);
+            asm::flush_dcache_range(start, end);
+            mbox.write(
+                MailboxChannel::Property,
+                phys_to_bus(virt_to_phys(start) as u32),
+            );
             mbox.read(MailboxChannel::Property);
-            asm::flush_dcache_range(start as usize, end as usize);
+            asm::flush_dcache_range(start, end);
         }
 
         match req.0.req_resp_code {

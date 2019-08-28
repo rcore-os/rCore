@@ -15,9 +15,11 @@ dependencies = [
 
 [[package]]
 name = "bcm2837"
-version = "1.0.0"
-source = "git+https://github.com/rcore-os/bcm2837#b29a8db5504b7eaa6f8adf2c3ff916d1ffd15194"
+version = "2.0.0"
+source = "git+https://github.com/rcore-os/bcm2837#e2e044c3d4117fd4c5283f6a0d8dc0566b760292"
 dependencies = [
+ "aarch64 2.7.0 (git+https://github.com/rcore-os/aarch64)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -39,6 +41,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "cc"
 version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "cfg-if"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -66,6 +73,14 @@ dependencies = [
 name = "libc"
 version = "0.2.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "log"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "pulldown-cmark"
@@ -105,7 +120,7 @@ name = "rcore-bootloader"
 version = "0.1.0"
 dependencies = [
  "aarch64 2.7.0 (git+https://github.com/rcore-os/aarch64)",
- "bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)",
+ "bcm2837 2.0.0 (git+https://github.com/rcore-os/bcm2837)",
  "cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -212,15 +227,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum aarch64 2.7.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
-"checksum bcm2837 1.0.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
+"checksum bcm2837 2.0.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "926013f2860c46252efceabb19f4a6b308197505082c609025aa6706c011d427"
 "checksum cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)" = "c9ce8bb087aacff865633f0bd5aeaed910fe2fe55b55f4739527f2e023a2e53d"
+"checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
 "checksum fixedvec 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "7c6c16d316ccdac21a4dd648e314e76facbbaf316e83ca137d0857a9c07419d0"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
 "checksum libc 0.2.50 (registry+https://github.com/rust-lang/crates.io-index)" = "aab692d7759f5cd8c859e169db98ae5b52c924add2af5fbbca11d12fefb567c1"
+"checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum pulldown-cmark 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8361e81576d2e02643b04950e487ec172b687180da65c731c03cf336784e6c07"
 "checksum rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"

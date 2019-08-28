@@ -2,7 +2,7 @@
 
 use crate::consts::MEMORY_OFFSET;
 use crate::memory::{init_heap, virt_to_phys, FRAME_ALLOCATOR};
-use aarch64::{paging::frame::PhysFrame, asm::ttbr_el1_write};
+use aarch64::{asm::ttbr_el1_write, paging::frame::PhysFrame};
 use log::*;
 use rcore_memory::PAGE_SIZE;
 

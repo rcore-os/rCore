@@ -1,6 +1,6 @@
 //! Raspberry PI 3 Model B/B+
 
-use bcm2837::atags::Atags;
+use bcm2837::{addr::bus_to_phys, atags::Atags};
 
 pub mod emmc;
 #[path = "../../../../drivers/gpu/fb.rs"]
@@ -11,9 +11,6 @@ pub mod serial;
 pub mod timer;
 
 use fb::{ColorConfig, FramebufferResult};
-
-pub const IO_REMAP_BASE: usize = bcm2837::consts::IO_BASE;
-pub const IO_REMAP_END: usize = bcm2837::consts::KERNEL_OFFSET + 0x4000_1000;
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
@@ -68,7 +65,7 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
         ))?;
     }
 
-    let paddr = info.bus_addr & !0xC0000000;
+    let paddr = bus_to_phys(info.bus_addr);
     let vaddr = crate::memory::phys_to_virt(paddr as usize);
     if vaddr == 0 {
         Err(format!(
