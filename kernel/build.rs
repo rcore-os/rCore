@@ -2,7 +2,6 @@ extern crate cc;
 
 use std::fs::File;
 use std::io::{Result, Write};
-use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=LOG");
@@ -10,7 +9,11 @@ fn main() {
     println!("cargo:rerun-if-env-changed=USER_IMG");
 
     let arch: String = std::env::var("ARCH").unwrap();
-    let board: String = std::env::var("BOARD").unwrap();
+    let _board: String = std::env::var("BOARD").unwrap();
+    if let Ok(user_img) = std::env::var("USER_IMG") {
+        println!("cargo:rerun-if-changed={}", user_img);
+    }
+
     match arch.as_str() {
         "x86_64" => {
             gen_vector_asm().unwrap();

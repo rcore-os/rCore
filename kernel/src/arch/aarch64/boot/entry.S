@@ -2,7 +2,8 @@
 .globl _start
 
 _start:
-    ldr     x0, =bootstacktop
-    mov     sp, x0
+    msr     ttbr0_el1, xzr
+    ldr     x8, =bootstacktop
+    mov     sp, x8
     bl      rust_main
 1:  b       1b

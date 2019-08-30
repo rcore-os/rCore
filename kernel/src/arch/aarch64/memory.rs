@@ -3,24 +3,22 @@
 use crate::consts::MEMORY_OFFSET;
 use crate::memory::{init_heap, virt_to_phys, FRAME_ALLOCATOR};
 use aarch64::{asm::ttbr_el1_write, paging::frame::PhysFrame};
+use bootinfo::BootInfo;
 use log::*;
 use rcore_memory::PAGE_SIZE;
 
 /// Memory initialization.
-pub fn init() {
-    ttbr_el1_write(0, PhysFrame::of_addr(0));
-    init_frame_allocator();
+pub fn init(boot_info: &BootInfo) {
+    init_frame_allocator(boot_info);
     init_heap();
     info!("memory: init end");
 }
 
-fn init_frame_allocator() {
+fn init_frame_allocator(boot_info: &BootInfo) {
     use bitmap_allocator::BitAlloc;
     use core::ops::Range;
 
-    let end = super::board::probe_memory()
-        .expect("failed to find memory map")
-        .1;
+    let end = boot_info.physical_memory_end;
     let start = virt_to_phys(_end as usize + PAGE_SIZE);
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(start, end));

@@ -7,10 +7,8 @@ edition = "2018"
 [dependencies]
 xmas-elf = "0.6.2"
 fixedvec = "0.2.3"
+bootinfo = { path = "bootinfo" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "2.7.0" }
-bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.0.0" }
-
-[build-dependencies]
-cc = "1.0"
+bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.1.0", features = ["bare_metal"] }
