@@ -10,7 +10,7 @@ pub mod mailbox;
 pub mod serial;
 pub mod timer;
 
-use fb::{ColorConfig, FramebufferResult};
+use fb::{ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
@@ -75,10 +75,23 @@ pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
         ))?;
     }
 
-    let color_config = match info.depth {
-        16 => ColorConfig::RGB565,
-        32 => ColorConfig::BGRA8888,
+    let depth = ColorDepth::try_from(info.depth)?;
+    let format = match info.depth {
+        16 => ColorFormat::RGB565,
+        32 => ColorFormat::BGRA8888,
         _ => Err(format!("unsupported color depth {}", info.depth))?,
     };
-    Ok((info, color_config, vaddr))
+    Ok(FramebufferInfo {
+        xres: info.xres,
+        yres: info.yres,
+        xres_virtual: info.xres_virtual,
+        yres_virtual: info.yres_virtual,
+        xoffset: info.xoffset,
+        yoffset: info.yoffset,
+        depth: depth,
+        format: format,
+        paddr: paddr as usize,
+        vaddr: vaddr,
+        screen_size: info.screen_size as usize,
+    })
 }

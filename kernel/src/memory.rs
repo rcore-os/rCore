@@ -24,7 +24,6 @@ use core::mem::size_of;
 use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
-use rcore_memory::paging::PageTable;
 use rcore_memory::*;
 
 pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;

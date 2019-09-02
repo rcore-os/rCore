@@ -25,16 +25,19 @@ pub struct FramebufferInfo {
     pub yoffset: u32,
 
     /// bits per pixel
-    pub depth: u32,
-    /// bytes per line
-    pub pitch: u32,
+    pub depth: ColorDepth,
+    /// color encoding format of RGBA
+    pub format: ColorFormat,
 
-    /// bus address, starts from 0xC0000000/0x40000000
-    /// (see https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes)
-    pub bus_addr: u32,
+    /// phsyical address
+    pub paddr: usize,
+    /// virtual address
+    pub vaddr: usize,
     /// screen buffer size
-    pub screen_size: u32,
+    pub screen_size: usize,
 }
+
+pub type FramebufferResult = Result<FramebufferInfo, String>;
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
@@ -46,17 +49,27 @@ pub enum ColorDepth {
 }
 use self::ColorDepth::*;
 
+impl ColorDepth {
+    pub fn try_from(depth: u32) -> Result<Self, String> {
+        match depth {
+            8 => Ok(ColorDepth8),
+            16 => Ok(ColorDepth16),
+            32 => Ok(ColorDepth32),
+            24 => Ok(ColorDepth24),
+            _ => Err(format!("unsupported color depth {}", depth)),
+        }
+    }
+}
+
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
-pub enum ColorConfig {
+pub enum ColorFormat {
     RGB332,
     RGB565,
     RGBA8888, // QEMU and low version RPi use RGBA
     BGRA8888, // RPi3 B+ uses BGRA
     VgaPalette,
 }
-
-pub type FramebufferResult = Result<(FramebufferInfo, ColorConfig, usize), String>;
 
 #[repr(C)]
 union ColorBuffer {
@@ -67,20 +80,20 @@ union ColorBuffer {
 }
 
 impl ColorBuffer {
-    fn new(color_depth: ColorDepth, base_addr: usize, size: usize) -> ColorBuffer {
+    fn new(color_depth: ColorDepth, vaddr: usize, size: usize) -> ColorBuffer {
         unsafe {
             match color_depth {
                 ColorDepth8 => ColorBuffer {
-                    buf8: core::slice::from_raw_parts_mut(base_addr as *mut u8, size),
+                    buf8: core::slice::from_raw_parts_mut(vaddr as *mut u8, size),
                 },
                 ColorDepth16 => ColorBuffer {
-                    buf16: core::slice::from_raw_parts_mut(base_addr as *mut u16, size / 2),
+                    buf16: core::slice::from_raw_parts_mut(vaddr as *mut u16, size / 2),
                 },
                 ColorDepth24 => ColorBuffer {
-                    buf8: core::slice::from_raw_parts_mut(base_addr as *mut u8, size),
+                    buf8: core::slice::from_raw_parts_mut(vaddr as *mut u8, size),
                 },
                 ColorDepth32 => ColorBuffer {
-                    buf32: core::slice::from_raw_parts_mut(base_addr as *mut u32, size / 4),
+                    buf32: core::slice::from_raw_parts_mut(vaddr as *mut u32, size / 4),
                 },
             }
         }
@@ -135,26 +148,14 @@ impl fmt::Debug for ColorBuffer {
 #[derive(Debug)]
 pub struct Framebuffer {
     pub fb_info: FramebufferInfo,
-    pub color_depth: ColorDepth,
-    pub color_config: ColorConfig,
     buf: ColorBuffer,
 }
 
 impl Framebuffer {
     fn new(width: u32, height: u32, depth: u32) -> Result<Framebuffer, String> {
-        let (info, config, addr) = super::probe_fb_info(width, height, depth)?;
-
-        let color_depth = match info.depth {
-            8 => ColorDepth8,
-            16 => ColorDepth16,
-            32 => ColorDepth32,
-            24 => ColorDepth24,
-            _ => Err(format!("unsupported color depth {}", info.depth))?,
-        };
+        let info = super::probe_fb_info(width, height, depth)?;
         Ok(Framebuffer {
-            buf: ColorBuffer::new(color_depth, addr, info.screen_size as usize),
-            color_config: config,
-            color_depth,
+            buf: ColorBuffer::new(info.depth, info.vaddr, info.screen_size),
             fb_info: info,
         })
     }
@@ -165,19 +166,19 @@ impl Framebuffer {
     }
 
     #[inline]
-    pub fn framebuffer_size(&self) -> usize {
-        self.fb_info.screen_size as usize
+    pub fn paddr(&self) -> usize {
+        self.fb_info.paddr
     }
 
     #[inline]
-    pub fn bus_addr(&self) -> usize {
-        self.fb_info.bus_addr as usize
+    pub fn framebuffer_size(&self) -> usize {
+        self.fb_info.screen_size
     }
 
     /// Read pixel at `(x, y)`.
     #[inline]
     pub fn read(&self, x: u32, y: u32) -> u32 {
-        match self.color_depth {
+        match self.fb_info.depth {
             ColorDepth8 => self.buf.read8(y * self.fb_info.xres + x) as u32,
             ColorDepth16 => self.buf.read16(y * self.fb_info.xres + x) as u32,
             ColorDepth24 => unimplemented!(),
@@ -188,7 +189,7 @@ impl Framebuffer {
     /// Write pixel at `(x, y)`.
     #[inline]
     pub fn write(&mut self, x: u32, y: u32, pixel: u32) {
-        match self.color_depth {
+        match self.fb_info.depth {
             ColorDepth8 => self.buf.write8(y * self.fb_info.xres + x, pixel as u8),
             ColorDepth16 => self.buf.write16(y * self.fb_info.xres + x, pixel as u16),
             ColorDepth24 => self.buf.write24(y * self.fb_info.xres + x, pixel),
@@ -215,10 +216,11 @@ impl Framebuffer {
     pub fn fill(&mut self, offset: usize, size: usize, pixel: u32) {
         const USIZE: usize = core::mem::size_of::<usize>();
         let mut value: usize = 0;
-        let repeat = USIZE * 8 / self.fb_info.depth as usize;
-        let mask = ((1u64 << self.fb_info.depth) - 1) as usize;
+        let depth = self.fb_info.depth as usize;
+        let repeat = USIZE * 8 / depth;
+        let mask = ((1u64 << depth) - 1) as usize;
         for _i in 0..repeat {
-            value <<= self.fb_info.depth;
+            value <<= depth;
             value += pixel as usize & mask;
         }
 
@@ -232,7 +234,7 @@ impl Framebuffer {
 
     /// Fill the entire buffer with `0`.
     pub fn clear(&mut self) {
-        self.fill(0, self.fb_info.screen_size as usize, 0);
+        self.fill(0, self.fb_info.screen_size, 0);
     }
 
     pub fn fill_var_screeninfo(&self, var_info: &mut fb_var_screeninfo) {
@@ -242,11 +244,11 @@ impl Framebuffer {
         var_info.yres_virtual = self.fb_info.yres_virtual;
         var_info.xoffset = self.fb_info.xoffset;
         var_info.yoffset = self.fb_info.yoffset;
-        var_info.bits_per_pixel = self.fb_info.depth;
+        var_info.bits_per_pixel = self.fb_info.depth as u32;
     }
 
     pub fn fill_fix_screeninfo(&self, fix_info: &mut fb_fix_screeninfo) {
-        fix_info.line_length = self.fb_info.pitch;
+        fix_info.line_length = self.fb_info.xres * self.fb_info.depth as u32 / 8
     }
 }
 
@@ -260,7 +262,7 @@ impl Drawing<Rgb888> for Framebuffer {
         T: IntoIterator<Item = Pixel<Rgb888>>,
     {
         for Pixel(coord, color) in item {
-            let pixel = color.pack32(self.color_config);
+            let pixel = color.pack32(self.fb_info.format);
             self.write(coord[0], coord[1], pixel);
         }
     }
@@ -268,25 +270,25 @@ impl Drawing<Rgb888> for Framebuffer {
 
 trait ColorEncode {
     /// Encode `Rgb888` to a pixel in the framebuffer
-    fn pack32(&self, config: ColorConfig) -> u32;
+    fn pack32(&self, format: ColorFormat) -> u32;
 }
 
 impl ColorEncode for Rgb888 {
     #[inline]
-    fn pack32(&self, config: ColorConfig) -> u32 {
-        match config {
-            ColorConfig::RGB332 => {
+    fn pack32(&self, format: ColorFormat) -> u32 {
+        match format {
+            ColorFormat::RGB332 => {
                 (((self.r() >> 5) << 5) | ((self.g() >> 5) << 2) | (self.b() >> 6)) as u32
             }
-            ColorConfig::RGB565 => {
+            ColorFormat::RGB565 => {
                 (((self.r() as u16 & 0xF8) << 8)
                     | ((self.g() as u16 & 0xFC) << 3)
                     | (self.b() as u16 >> 3)) as u32
             }
-            ColorConfig::RGBA8888 => {
+            ColorFormat::RGBA8888 => {
                 ((self.r() as u32) << 16) | ((self.g() as u32) << 8) | (self.b() as u32)
             }
-            ColorConfig::BGRA8888 => {
+            ColorFormat::BGRA8888 => {
                 ((self.b() as u32) << 16) | ((self.g() as u32) << 8) | (self.r() as u32)
             }
             _ => unimplemented!(),

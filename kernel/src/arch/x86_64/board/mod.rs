@@ -5,7 +5,7 @@ use crate::consts::KERNEL_OFFSET;
 use crate::memory::phys_to_virt;
 use bootloader::bootinfo::{BootInfo, VbeModeInfo};
 use core::mem::zeroed;
-use fb::{ColorConfig, FramebufferInfo, FramebufferResult, FRAME_BUFFER};
+use fb::{ColorFormat, ColorDepth, FramebufferInfo, FramebufferResult, FRAME_BUFFER};
 
 static mut VBE_MODE: VbeModeInfo = VbeModeInfo {
     attributes: 0,
@@ -54,25 +54,25 @@ pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> FramebufferResul
     let pitch = unsafe { VBE_MODE.pitch as u32 };
     let framebuffer = unsafe { VBE_MODE.framebuffer as usize };
     let depth = unsafe { VBE_MODE.bpp as u32 };
-    let fb_info = FramebufferInfo {
+    let format = if depth == 8 {
+        fb::ColorFormat::RGB332
+    } else if depth == 16 {
+        fb::ColorFormat::RGB565
+    } else {
+        // assume BGRA8888 for now
+        fb::ColorFormat::RGBA8888
+    };
+    Ok(FramebufferInfo {
         xres: width,
         yres: height,
         xres_virtual: width,
         yres_virtual: height,
         xoffset: 0,
         yoffset: 0,
-        depth: depth,
-        pitch: pitch, // TOKNOW
-        bus_addr: framebuffer as u32,
-        screen_size: width * height * (depth / 8),
-    };
-    let config = if depth == 8 {
-        fb::ColorConfig::RGB332
-    } else if depth == 16 {
-        fb::ColorConfig::RGB565
-    } else {
-        // assume BGRA8888 for now
-        fb::ColorConfig::RGBA8888
-    };
-    Ok((fb_info, config, phys_to_virt(framebuffer)))
+        depth: ColorDepth::try_from(depth)?,
+        format: format,
+        paddr: framebuffer,
+        vaddr: phys_to_virt(framebuffer),
+        screen_size: (width * height * (depth / 8)) as usize,
+    })
 }

@@ -2,7 +2,6 @@
 //!
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
-use super::fb::FramebufferInfo;
 use crate::memory::virt_to_phys;
 use aarch64::asm;
 use alloc::string::String;
@@ -175,6 +174,35 @@ struct PropertyMailboxRequest<T: Sized> {
 #[derive(Debug)]
 struct Align16<T: Sized>(PropertyMailboxRequest<T>);
 
+/// Some information of raspberry pi framebuffer
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct RaspiFramebufferInfo {
+    /// visible width
+    pub xres: u32,
+    /// visible height
+    pub yres: u32,
+    /// virtual width
+    pub xres_virtual: u32,
+    /// virtual height
+    pub yres_virtual: u32,
+    /// virtual offset x
+    pub xoffset: u32,
+    /// virtual offset y
+    pub yoffset: u32,
+
+    /// bits per pixel
+    pub depth: u32,
+    /// bytes per line
+    pub pitch: u32,
+
+    /// bus address, starts from 0xC0000000/0x40000000
+    /// (see https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes)
+    pub bus_addr: u32,
+    /// screen buffer size
+    pub screen_size: u32,
+}
+
 /// Pack a sequence of concatenated tags into a request, and send the address
 /// to the mailbox.
 /// Returns `PropertyMailboxResult<typeof($tags)>`.
@@ -285,12 +313,12 @@ pub fn framebuffer_set_virtual_offset(
 }
 
 /// Allocate framebuffer on GPU and try to set width/height/depth.
-/// Returns `FramebufferInfo`.
+/// Returns `RaspiFramebufferInfo`.
 pub fn framebuffer_alloc(
     width: u32,
     height: u32,
     depth: u32,
-) -> PropertyMailboxResult<FramebufferInfo> {
+) -> PropertyMailboxResult<RaspiFramebufferInfo> {
     #[repr(C, packed)]
     #[derive(Debug)]
     struct FramebufferAllocTag {
@@ -348,7 +376,7 @@ pub fn framebuffer_alloc(
     };
 
     let ret = send_request!(tags)?;
-    Ok(FramebufferInfo {
+    Ok(RaspiFramebufferInfo {
         xres: ret.set_physical_size.buf[0],
         yres: ret.set_physical_size.buf[1],
         xres_virtual: ret.set_virtual_size.buf[0],

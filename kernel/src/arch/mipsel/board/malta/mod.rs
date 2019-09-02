@@ -37,17 +37,17 @@ pub fn init_driver() {
 }
 
 pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
-    let fb_info = FramebufferInfo {
+    Ok(FramebufferInfo {
         xres: 800,
         yres: 600,
         xres_virtual: 800,
         yres_virtual: 600,
         xoffset: 0,
         yoffset: 0,
-        depth: 8,
-        pitch: 800,
-        bus_addr: 0xb0000000,
+        depth: fb::ColorDepth::try_from(8)?,
+        format: fb::ColorFormat::VgaPalette,
+        paddr: 0xb0000000,
+        vaddr: 0xb0000000,
         screen_size: 800 * 600,
-    };
-    Ok((fb_info, fb::ColorConfig::VgaPalette, 0xb0000000))
+    })
 }

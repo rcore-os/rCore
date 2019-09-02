@@ -65,7 +65,7 @@ impl Syscall<'_> {
                             addr,
                             addr + len,
                             attr,
-                            Linear::new((crate::memory::virt_to_phys(fb.base_addr()) - addr) as isize),
+                            Linear::new((fb.paddr() - addr) as isize),
                             "mmap_file",
                         );
                         info!("mmap for /dev/fb0");
