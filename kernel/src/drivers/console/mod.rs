@@ -13,12 +13,14 @@ lazy_static! {
 
 /// Initialize console driver
 pub fn init() {
-    if let Some(fb) = FRAME_BUFFER.lock().take() {
-        // FIXME: now take FrameBuffer out of global variable, then move into Console
-        let console = Console::on_frame_buffer(fb.fb_info.xres, fb.fb_info.yres, fb);
-        *CONSOLE.lock() = Some(console);
-        info!("console: init end");
-    } else {
-        warn!("console: init failed");
+    if cfg!(feature = "consolegraphic") {
+        if let Some(fb) = FRAME_BUFFER.lock().take() {
+            // FIXME: now take FrameBuffer out of global variable, then move into Console
+            let console = Console::on_frame_buffer(fb.fb_info.xres, fb.fb_info.yres, fb);
+            *CONSOLE.lock() = Some(console);
+            info!("console: init end");
+        } else {
+            warn!("console: init failed");
+        }
     }
 }

@@ -1,6 +1,6 @@
 //! Framebuffer
 
-use crate::fs::vga::{fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo};
+use crate::fs::vga::{fb_fix_screeninfo, fb_var_screeninfo};
 use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -55,7 +55,6 @@ pub enum ColorConfig {
     BGRA8888, // RPi3 B+ uses BGRA
     VgaPalette,
 }
-use self::ColorConfig::*;
 
 pub type FramebufferResult = Result<(FramebufferInfo, ColorConfig, usize), String>;
 

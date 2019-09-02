@@ -56,12 +56,16 @@ impl Syscall<'_> {
             match &*file.path {
                 "/dev/fb0" => {
                     use crate::arch::board::fb::FRAME_BUFFER;
+                    let attr = prot.to_attr();
+                    #[cfg(feature = "board_raspi3")]
+                    let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
+
                     if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
                         self.vm().push(
                             addr,
                             addr + len,
-                            prot.to_attr(),
-                            Linear::new((fb.bus_addr() - addr) as isize),
+                            attr,
+                            Linear::new((crate::memory::virt_to_phys(fb.base_addr()) - addr) as isize),
                             "mmap_file",
                         );
                         info!("mmap for /dev/fb0");

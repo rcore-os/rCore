@@ -3,7 +3,7 @@ use aarch64::paging::{memory_attribute::*, PageTable, PageTableAttribute, PageTa
 use aarch64::paging::{Page, PhysFrame, Size1GiB, Size2MiB, Size4KiB};
 use aarch64::{asm::*, barrier, regs::*};
 use bcm2837::addr::{phys_to_virt, virt_to_phys};
-use bcm2837::addr::{PHYSICAL_IO_START, PHYSICAL_IO_END, PHYSICAL_MEMORY_OFFSET};
+use bcm2837::addr::{PHYSICAL_IO_END, PHYSICAL_IO_START, PHYSICAL_MEMORY_OFFSET};
 use bcm2837::atags::Atags;
 use bootinfo::BootInfo;
 use core::ptr;
@@ -14,6 +14,15 @@ const PAGE_SIZE: usize = 4096;
 const ALIGN_2MB: u64 = 0x200000;
 
 global_asm!(include_str!("boot.S"));
+
+fn map_2mib(p2: &mut PageTable, start: usize, end: usize, flag: EF, attr: PageTableAttribute) {
+    for frame in PhysFrame::<Size2MiB>::range_of(start as u64, end as u64) {
+        let paddr = frame.start_address();
+        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64() as usize) as u64);
+        let page = Page::<Size2MiB>::containing_address(vaddr);
+        p2[page.p2_index()].set_block::<Size2MiB>(paddr, flag, attr);
+    }
+}
 
 // TODO: set segments permission
 fn create_page_table(start_paddr: usize, end_paddr: usize) {
@@ -35,19 +44,11 @@ fn create_page_table(start_paddr: usize, end_paddr: usize) {
 
     let block_flags = EF::default_block() | EF::UXN;
     // normal memory
-    for frame in PhysFrame::<Size2MiB>::range_of(start_paddr as u64, end_paddr as u64) {
-        let paddr = frame.start_address();
-        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64() as usize) as u64);
-        let page = Page::<Size2MiB>::containing_address(vaddr);
-        p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags, MairNormal::attr_value());
-    }
+    map_2mib(p2, start_paddr, end_paddr, block_flags, MairNormal::attr_value());
+    // normal non-cacheable memory
+    map_2mib(p2, end_paddr, PHYSICAL_IO_START, block_flags | EF::PXN, MairNormalNonCacheable::attr_value());
     // device memory
-    for frame in PhysFrame::<Size2MiB>::range_of(PHYSICAL_IO_START as u64, PHYSICAL_IO_END as u64) {
-        let paddr = frame.start_address();
-        let vaddr = VirtAddr::new(phys_to_virt(paddr.as_u64() as usize) as u64);
-        let page = Page::<Size2MiB>::containing_address(vaddr);
-        p2[page.p2_index()].set_block::<Size2MiB>(paddr, block_flags | EF::PXN, MairDevice::attr_value());
-    }
+    map_2mib(p2, PHYSICAL_IO_START, PHYSICAL_IO_END, block_flags | EF::PXN, MairDevice::attr_value());
 
     p3[0].set_frame(frame_lvl2, EF::default_table(), PageTableAttribute::new(0, 0, 0));
     p3[1].set_block::<Size1GiB>(PhysAddr::new(PHYSICAL_IO_END as u64), block_flags | EF::PXN, MairDevice::attr_value());
