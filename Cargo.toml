@@ -1,6 +1,0 @@
-[workspace]
-members = [
-    "crate/memory",
-    "crate/sync",
-]
-exclude = ["kernel", "bootloader", "user/rust", "modules"]

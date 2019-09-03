@@ -16,14 +16,12 @@ Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kend
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-03-05
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-06-15
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
-* [bootimage](https://github.com/rust-osdev/bootimage) (for x86_64)
 * [RISCV64 GNU toolchain](https://www.sifive.com/boards) (for riscv32/64)
 * [AArch64 GNU toolchain](https://cs140e.sergio.bz/assignments/0-blinky/) (for aarch64)
 * [musl-cross-make](https://github.com/richfelker/musl-cross-make) (for userland musl, or download prebuilt toolchain from [musl.cc](https://musl.cc/))
-* [libfuse-dev](https://github.com/libfuse/libfuse) (for userland image generation)
 
 See [Travis script](./.travis.yml) for details.
 
@@ -33,7 +31,6 @@ See [Travis script](./.travis.yml) for details.
 $ rustup component add rust-src llvm-tools-preview
 $ cargo install cargo-binutils
 $ cargo install cargo-xbuild
-$ cargo install bootimage --version 0.6.6
 ```
 
 ```bash

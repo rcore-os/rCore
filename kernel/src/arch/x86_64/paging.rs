@@ -1,3 +1,4 @@
+use super::consts::*;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use core::mem::ManuallyDrop;
 use core::sync::atomic::Ordering;
@@ -21,7 +22,6 @@ pub trait PageExt {
 
 impl PageExt for Page {
     fn of_addr(address: usize) -> Self {
-        use x86_64;
         Page::containing_address(VirtAddr::new(address as u64))
     }
     fn range_of(begin: usize, end: usize) -> PageRange {
@@ -231,18 +231,13 @@ impl PageTableExt for PageTableImpl {
 
     fn map_kernel(&mut self) {
         let table = unsafe { &mut *frame_to_page_table(Cr3::read().0) };
-        // Kernel at 0xffff_ff00_0000_0000
-        // Kernel stack at 0x0000_57ac_0000_0000 (defined in bootloader crate)
-        // Kseg2 at 0xffff_fe80_0000_0000
-        let ekernel = table[510].clone();
-        let ephysical = table[0x1f8].clone();
-        let estack = table[175].clone();
-        let ekseg2 = table[509].clone();
+        let ekernel = table[KERNEL_PM4].clone();
+        let ephysical = table[PHYSICAL_MEMORY_PM4].clone();
+        let ekseg2 = table[KSEG2_PM4].clone();
         let table = unsafe { &mut *frame_to_page_table(self.2) };
-        table[510].set_addr(ekernel.addr(), ekernel.flags() | EF::GLOBAL);
-        table[0x1f8].set_addr(ephysical.addr(), ephysical.flags() | EF::GLOBAL);
-        table[175].set_addr(estack.addr(), estack.flags() | EF::GLOBAL);
-        table[509].set_addr(ekseg2.addr(), ekseg2.flags() | EF::GLOBAL);
+        table[KERNEL_PM4].set_addr(ekernel.addr(), ekernel.flags() | EF::GLOBAL);
+        table[PHYSICAL_MEMORY_PM4].set_addr(ephysical.addr(), ephysical.flags() | EF::GLOBAL);
+        table[KSEG2_PM4].set_addr(ekseg2.addr(), ekseg2.flags() | EF::GLOBAL);
     }
 
     fn token(&self) -> usize {

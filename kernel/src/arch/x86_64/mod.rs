@@ -1,6 +1,6 @@
-use bootloader::bootinfo::{BootInfo, MemoryRegionType};
 use core::sync::atomic::*;
 use log::*;
+use rboot::BootInfo;
 
 pub mod acpi;
 pub mod board;
@@ -22,7 +22,7 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
-pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
+pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
     let cpu_id = cpu::id();
     println!("Hello world! from CPU {}!", cpu_id);
 
@@ -35,14 +35,15 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     // First init log mod, so that we can print log info.
     crate::logging::init();
+
+    // check BootInfo from bootloader
+    let boot_info = unsafe { &*boot_info };
     info!("{:#x?}", boot_info);
     assert_eq!(
         boot_info.physical_memory_offset as usize,
         consts::PHYSICAL_MEMORY_OFFSET
     );
 
-    // Init trap handling.
-    idt::init();
     // setup fast syscall in x86_64
     interrupt::fast_syscall::init();
 
@@ -53,9 +54,13 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     // Init GDT
     gdt::init();
+    // Init trap handling
+    // WARN: IDT must be initialized after GDT.
+    //       Because x86_64::IDT will use current CS segment in IDT entry.
+    idt::init();
     // Init virtual space
     memory::init_kernel_kseg2_map();
-    //get local apic id of cpu
+    // get local apic id of cpu
     cpu::init();
     // now we can start LKM.
     crate::lkm::manager::ModuleManager::init();
@@ -77,10 +82,10 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
 /// The entry point for other processors
 fn other_start() -> ! {
-    // init trap handling.
-    idt::init();
     // init gdt
     gdt::init();
+    // init trap handling
+    idt::init();
     // init local apic
     cpu::init();
     // setup fast syscall in x86_64

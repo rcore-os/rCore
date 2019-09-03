@@ -19,7 +19,6 @@ pub mod board;
 
 global_asm!(include_str!("boot/entry.S"));
 
-
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn rust_main(boot_info: &'static BootInfo) -> ! {

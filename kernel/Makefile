@@ -45,7 +45,8 @@ target := $(arch)
 build_path := target/$(target)/$(mode)
 kernel := $(build_path)/rcore
 kernel_img := $(build_path)/kernel.img
-bootimage := $(build_path)/bootimage.bin
+ESP := $(build_path)/esp
+OVMF := ../rboot/OVMF.fd
 bootloader_dir = ../bootloader
 bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 user_dir := ../user
@@ -58,7 +59,6 @@ export USER_QCOW2 = $(user_dir)/build/$(arch).qcow2
 
 ifeq ($(arch), aarch64)
 board := raspi3
-need_bootloader := true
 endif
 
 # currently only mipsel architecture and rocket-chip need DTB linked to the kernel
@@ -88,7 +88,8 @@ qemu_ui_opts :=
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
-	-drive format=raw,file=$(bootimage) \
+	-drive if=pflash,format=raw,file=$(OVMF),readonly=on \
+	-drive format=raw,file=fat:rw:$(ESP) \
 	-serial mon:stdio \
 	-m 4G \
 	-device isa-debug-exit
@@ -288,20 +289,26 @@ sym:
 
 ### bootloader and kernel image ###
 
-$(bootloader): $(kernel)
-ifeq ($(need_bootloader), true)
+bootloader: $(kernel)
+ifeq ($(arch), x86_64)
+	@cd ../rboot && make build
+endif
 ifeq ($(arch), aarch64)
 	@echo "Patching symbols into kernel."
 	@../tools/fill_symbols/aarch64.sh target/aarch64/$(mode)/rcore $(prefix)
-endif
 	@echo Building $(arch) bootloader
 	@$(strip) $(kernel) -o $(kernel)_stripped
 	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
 	@rm $(kernel)_stripped
 endif
 
-$(kernel_img): kernel $(bootloader)
-ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+$(kernel_img): kernel bootloader
+ifeq ($(arch), x86_64)
+	@mkdir -p $(ESP)/EFI/rCore $(ESP)/EFI/Boot
+	@cp ../rboot/target/x86_64-unknown-uefi/release/rboot.efi $(ESP)/EFI/Boot/BootX64.efi
+	@cp ../rboot/rboot.conf $(ESP)/EFI/Boot/rboot.conf
+	@cp $(kernel) $(ESP)/EFI/rCore/kernel.elf
+else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
 	@$(objcopy) $(bootloader) --strip-all -O binary $@
@@ -313,12 +320,9 @@ endif
 kernel: $(dtb)
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
-	@bootimage build $(build_args)
+	@cargo xbuild $(build_args)
 	@echo "Now patching kernel symbols onto kernel."
 	@../tools/fill_symbols/x86_64.sh target/x86_64/$(mode)/rcore
-	@echo "Generate bootimage again."
-	@bootimage build $(build_args)
-	@mv target/x86_64/bootimage.bin $(bootimage)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
 	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
