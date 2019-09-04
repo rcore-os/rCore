@@ -13,9 +13,10 @@ use rcore_fs::dev::{self, BlockDevice, DevError};
 pub mod block;
 #[allow(dead_code)]
 pub mod bus;
+pub mod console;
 mod device_tree;
 #[allow(dead_code)]
-mod gpu;
+pub mod gpu;
 #[allow(dead_code)]
 mod input;
 pub mod irq;

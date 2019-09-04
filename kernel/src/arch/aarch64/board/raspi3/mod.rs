@@ -3,14 +3,12 @@
 use bcm2837::{addr::bus_to_phys, atags::Atags};
 
 pub mod emmc;
-#[path = "../../../../drivers/gpu/fb.rs"]
-pub mod fb;
 pub mod irq;
 pub mod mailbox;
 pub mod serial;
 pub mod timer;
 
-use fb::{ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
+use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
@@ -20,8 +18,9 @@ pub fn init_serial_early() {
 
 /// Initialize raspi3 drivers
 pub fn init_driver() {
-    #[cfg(not(feature = "nographic"))]
-    fb::init();
+    if let Ok(fb_info) = probe_fb_info(0, 0, 0) {
+        fb::init(fb_info);
+    }
     timer::init();
     emmc::init();
 }
@@ -40,7 +39,7 @@ pub fn probe_memory() -> Option<(usize, usize)> {
     None
 }
 
-pub fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
+fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
     let (width, height) = if width == 0 || height == 0 {
         mailbox::framebuffer_get_physical_size()?
     } else {

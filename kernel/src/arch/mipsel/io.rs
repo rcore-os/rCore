@@ -1,7 +1,7 @@
 //! Input/output for mipsel.
 
-use super::driver::console::CONSOLE;
 use super::driver::serial::*;
+use crate::drivers::console::CONSOLE;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {

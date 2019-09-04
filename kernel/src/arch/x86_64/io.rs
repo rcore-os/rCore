@@ -1,5 +1,5 @@
-use super::driver::console::CONSOLE;
 use super::driver::serial::*;
+use crate::drivers::console::CONSOLE;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {
@@ -10,7 +10,7 @@ pub fn getchar() -> char {
 }
 
 pub fn putfmt(fmt: Arguments) {
-    // print to console
+    // output to serial
     unsafe {
         COM1.force_unlock();
     }

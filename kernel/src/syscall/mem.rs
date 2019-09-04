@@ -55,7 +55,7 @@ impl Syscall<'_> {
             info!("mmap path is {} ", &*file.path);
             match &*file.path {
                 "/dev/fb0" => {
-                    use crate::arch::board::fb::FRAME_BUFFER;
+                    use crate::drivers::gpu::fb::FRAME_BUFFER;
                     let attr = prot.to_attr();
                     #[cfg(feature = "board_raspi3")]
                     let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);

@@ -5,11 +5,7 @@ pub mod pit;
 pub mod rtc_cmos;
 pub mod serial;
 
-use super::{board, BootInfo};
-
-pub use self::board::fb;
-#[path = "../../../drivers/console/mod.rs"]
-pub mod console;
+use super::BootInfo;
 
 pub fn init(boot_info: &BootInfo) {
     // Use IOAPIC instead of PIC
@@ -34,9 +30,6 @@ pub fn init(boot_info: &BootInfo) {
     enable_irq(consts::PIRQG);
     enable_irq(consts::PIRQH);
     */
-    board::init_driver(boot_info);
-    console::init();
-    //if let Some(con) = console::CONSOLE.lock().as_mut() {
-    //con.clear();
-    //}
+    super::board::init_driver(boot_info);
+    crate::drivers::console::init();
 }

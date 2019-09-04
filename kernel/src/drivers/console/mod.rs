@@ -1,6 +1,6 @@
 //! Framebuffer console display driver
 
-use super::fb::{Framebuffer, FRAME_BUFFER};
+use super::gpu::fb::{Framebuffer, FRAME_BUFFER};
 use rcore_console::{Console, ConsoleOnGraphic};
 use spin::Mutex;
 

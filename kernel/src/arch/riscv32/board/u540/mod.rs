@@ -1,6 +1,3 @@
-#[path = "../../../../drivers/gpu/fb.rs"]
-pub mod fb;
-
 use super::consts::KERNEL_OFFSET;
 use crate::memory::phys_to_virt;
 
@@ -26,8 +23,4 @@ pub unsafe fn enable_serial_interrupt() {
     const UART_REG_IE: usize = 4;
     const UART_RXWM: u8 = 0x2;
     SERIAL_BASE.add(UART_REG_IE).write_volatile(UART_RXWM);
-}
-
-pub fn probe_fb_info(_width: u32, _height: u32, _depth: u32) -> fb::FramebufferResult {
-    unimplemented!()
 }

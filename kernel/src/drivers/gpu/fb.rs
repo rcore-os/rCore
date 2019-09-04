@@ -152,12 +152,11 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    fn new(width: u32, height: u32, depth: u32) -> Result<Framebuffer, String> {
-        let info = super::probe_fb_info(width, height, depth)?;
-        Ok(Framebuffer {
+    fn new(info: FramebufferInfo) -> Framebuffer {
+        Framebuffer {
             buf: ColorBuffer::new(info.depth, info.vaddr, info.screen_size),
             fb_info: info,
-        })
+        }
     }
 
     #[inline]
@@ -301,12 +300,10 @@ lazy_static! {
 }
 
 /// Initialize framebuffer
-pub fn init() {
-    match Framebuffer::new(0, 0, 0) {
-        Ok(fb) => {
-            info!("framebuffer: init end\n{:#x?}", fb);
-            *FRAME_BUFFER.lock() = Some(fb);
-        }
-        Err(err) => warn!("framebuffer init failed: {}", err),
-    }
+///
+/// Called in arch mod if the board have a framebuffer
+pub fn init(info: FramebufferInfo) {
+    let fb = Framebuffer::new(info);
+    info!("framebuffer: init end\n{:#x?}", fb);
+    *FRAME_BUFFER.lock() = Some(fb);
 }

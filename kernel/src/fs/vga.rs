@@ -1,6 +1,6 @@
 use rcore_fs::vfs::*;
 
-use crate::arch::board::fb::FRAME_BUFFER;
+use crate::drivers::gpu::fb::FRAME_BUFFER;
 use crate::memory::phys_to_virt;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::any::Any;
