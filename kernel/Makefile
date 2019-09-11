@@ -84,7 +84,6 @@ export DTB = $(dtb)
 qemu_opts := \
 	-smp cores=$(smp)
 qemu_net_opts :=
-qemu_ui_opts := 
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
@@ -220,12 +219,12 @@ endif
 ### prefix ###
 ifeq ($(arch), x86_64)
 ifeq ($(uname), Darwin)
-prefix := x86_64-elf-
+prefix := x86_64-linux-musl-
 endif
 else ifeq ($(arch), riscv32)
-prefix := riscv64-unknown-elf-
+prefix := riscv64-linux-musl-
 else ifeq ($(arch), riscv64)
-prefix := riscv64-unknown-elf-
+prefix := riscv64-linux-musl-
 else ifeq ($(arch), mipsel)
 prefix ?= mipsel-linux-musln32-
 else ifeq ($(arch), aarch64)

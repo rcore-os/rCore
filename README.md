@@ -6,9 +6,12 @@ Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 
 Going to be the next generation teaching operating system.
 
-Supported architectures: x86_64, RISCV32/64, AArch64, MIPS32
+Supported architectures and boards:
 
-Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kendryte K210 and FPGA running Rocket Chip / [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
+* x86_64: PC (i5/i7)
+* RISCV32/64: HiFive Unleashed, Kendryte K210, [FPGA running Rocket Chip](https://github.com/jiegec/fpga-zynq)
+* AArch64: Raspberry Pi 3B+
+* MIPS32: [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 
@@ -16,12 +19,10 @@ Tested boards: QEMU, HiFive Unleashed, x86_64 PC (i5/i7), Raspberry Pi 3B+, Kend
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-06-15
+* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-09-01
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
-* [RISCV64 GNU toolchain](https://www.sifive.com/boards) (for riscv32/64)
-* [AArch64 GNU toolchain](https://cs140e.sergio.bz/assignments/0-blinky/) (for aarch64)
-* [musl-cross-make](https://github.com/richfelker/musl-cross-make) (for userland musl, or download prebuilt toolchain from [musl.cc](https://musl.cc/))
+* [musl-based GCC toolchains](https://musl.cc/)
 
 See [Travis script](./.travis.yml) for details.
 
@@ -62,6 +63,7 @@ This is a project of THU courses:
 * [Comprehensive Experiment of Computer System (2018 Summer)](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
 * [Operating System Train (2018 Autumn)](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2018)
 * [Operating System (2019 Spring)](http://os.cs.tsinghua.edu.cn/oscourse/OS2019spring/projects)
+* [Operating System Train (2019 Autumn)](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2019)
 
 [Reports](./docs) and [Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
 

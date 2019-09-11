@@ -4,17 +4,17 @@ dist: xenial
 
 language: rust
 
-rust: nightly-2019-06-15
+rust: nightly-2019-09-01
 
 os:
   - linux
-  # - osx # too slow and hard to fix, skip it for now
+  - osx
 
 cache:
   cargo: true
   directories:
     - $HOME/Library/Caches/Homebrew
-    - $TRAVIS_BUILD_DIR/qemu-4.0.0
+    - $TRAVIS_BUILD_DIR/qemu-4.1.0
 
 addons:
   homebrew:
@@ -25,49 +25,32 @@ env:
   matrix:
     - ARCH="riscv64"
     - ARCH="riscv64" OPTS="board=u540"
+    - ARCH="riscv64" OPTS="board=k210"
+    - ARCH="riscv64" OPTS="board=rocket_chip"
     - ARCH="riscv32"
     - ARCH="x86_64"
+    - ARCH="x86_64" OPTS="board=pc"
     - ARCH="aarch64"
     - ARCH="mipsel" OPTS="board=malta"
 
-matrix:
-    allow_failures:
-        - os: osx
-
 install:
-  - if [ $ARCH = riscv32 ] || [ $ARCH = riscv64 ]; then
-      [ $TRAVIS_OS_NAME = linux ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.05.3-x86_64-linux-ubuntu14";
-      [ $TRAVIS_OS_NAME = osx   ] && export FILE="riscv64-unknown-elf-gcc-8.2.0-2019.05.3-x86_64-apple-darwin";
-      wget https://static.dev.sifive.com/dev-tools/$FILE.tar.gz;
-      tar xf $FILE.tar.gz;
-      export PATH=$PATH:$PWD/$FILE/bin;
-    fi
-  - if [ $ARCH = aarch64 ]; then
-    if [ $TRAVIS_OS_NAME = linux ]; then
-      export FILE="gcc-arm-8.2-2018.11-x86_64-aarch64-elf";
-      wget https://developer.arm.com/-/media/Files/downloads/gnu-a/8.2-2018.11/$FILE.tar.xz;
-      tar -xf $FILE.tar.xz;
-      export PATH=$PATH:$PWD/$FILE/bin;
-    elif [ $TRAVIS_OS_NAME = osx ]; then
-      brew tap SergioBenitez/osxct;
-      brew install aarch64-none-elf;
-    fi;
-    fi
   - if [ $TRAVIS_OS_NAME = linux ]; then
-      wget https://download.qemu.org/qemu-4.0.0.tar.xz && tar xJf qemu-4.0.0.tar.xz > /dev/null && cd qemu-4.0.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
-      export PATH=$PATH:$PWD/qemu-4.0.0/$ARCH-softmmu:$PWD/qemu-4.0.0;
+      wget https://download.qemu.org/qemu-4.1.0.tar.xz && tar xJf qemu-4.1.0.tar.xz > /dev/null && cd qemu-4.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
+      export PATH=$PATH:$PWD/qemu-4.1.0/$ARCH-softmmu:$PWD/qemu-4.1.0;
       sudo apt update;
       sudo apt install device-tree-compiler -y;
     fi
-  - if [ $TRAVIS_OS_NAME = linux ]; then
+  - if [ 1 ]; then
     [ $ARCH = riscv32 ] && export FILE="riscv32-linux-musl-cross";
     [ $ARCH = riscv64 ] && export FILE="riscv64-linux-musl-cross";
     [ $ARCH = mipsel  ] && export FILE="mipsel-linux-musln32-cross";
     [ $ARCH = aarch64 ] && export FILE="aarch64-linux-musl-cross";
     [ $ARCH = x86_64  ] && export FILE="x86_64-linux-musl-cross";
-    sudo apt update;
-    sudo apt install linux-headers-$(uname -r);
+    if [ $TRAVIS_OS_NAME = linux ]; then
     wget https://musl.cc/$FILE.tgz;
+    elif [ $TRAVIS_OS_NAME = osx ]; then
+    wget https://mac.musl.cc/$FILE.tgz;
+    fi;
     tar -xf $FILE.tgz;
     export PATH=$PATH:$PWD/$FILE/bin;
     fi
@@ -77,9 +60,6 @@ before_script:
   - rustup component add rust-src llvm-tools-preview
   - (test -x $HOME/.cargo/bin/cargo-objdump || cargo install cargo-binutils)
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)
-  - if [ $ARCH = x86_64 ]; then
-      (test -x $HOME/.cargo/bin/bootimage || cargo install bootimage --version 0.6.6);
-    fi
 
 script:
   - cd user && make sfsimg arch=$ARCH && cd ..
