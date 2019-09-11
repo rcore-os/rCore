@@ -342,7 +342,7 @@ dependencies = [
  "pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rboot 0.1.0",
- "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=18402290)",
+ "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=323c176)",
  "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
  "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)",
@@ -362,7 +362,7 @@ dependencies = [
 [[package]]
 name = "rcore-console"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-console?rev=18402290#18402290a64f2fc30db7e492b1332b016cceb326"
+source = "git+https://github.com/rcore-os/rcore-console?rev=323c176#323c176a473b5799add98baa1f3ebf0dd2592c1a"
 dependencies = [
  "embedded-graphics 0.6.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vte 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -725,7 +725,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)" = "cf3d2011ab5c909338f7887f4fc896d35932e29146c12c8d01da6b22a80ba759"
 "checksum quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)" = "faf4799c5d274f3868a4aae320a0a182cbd2baee377b378f080e16a23e9d80db"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
-"checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=18402290)" = "<none>"
+"checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=323c176)" = "<none>"
 "checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
 "checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
 "checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=33f86c47)" = "<none>"
