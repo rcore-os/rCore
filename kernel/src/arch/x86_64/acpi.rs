@@ -1,8 +1,6 @@
-use crate::arch::consts::PHYSICAL_MEMORY_OFFSET;
 use crate::memory::phys_to_virt;
-use acpi::{search_for_rsdp_bios, AcpiHandler, PhysicalMapping};
+use acpi::{parse_rsdp, AcpiHandler, PhysicalMapping};
 use core::ptr::NonNull;
-use core::slice;
 
 struct Handler;
 
@@ -14,7 +12,7 @@ impl AcpiHandler for Handler {
     ) -> PhysicalMapping<T> {
         PhysicalMapping {
             physical_start: physical_address,
-            virtual_start: NonNull::new((physical_address + PHYSICAL_MEMORY_OFFSET) as *mut T)
+            virtual_start: NonNull::new(phys_to_virt(physical_address) as *mut T)
                 .unwrap(),
             region_length: size,
             mapped_length: size,
@@ -26,9 +24,8 @@ impl AcpiHandler for Handler {
     }
 }
 
-pub fn init() {
-    let mut handler = Handler {};
-    let res = unsafe { search_for_rsdp_bios(&mut handler) };
+pub fn init(rsdp_addr: usize) {
+    let res = parse_rsdp(&mut Handler, rsdp_addr);
     if let Ok(acpi) = res {
         debug!("ACPI {:#x?}", acpi);
     }

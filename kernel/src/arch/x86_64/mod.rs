@@ -70,7 +70,7 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
     // load acpi
-    acpi::init();
+    acpi::init(boot_info.acpi2_rsdp_addr as usize);
 
     // wake up other CPUs
     AP_CAN_INIT.store(true, Ordering::Relaxed);
