@@ -260,9 +260,9 @@ impl Drawing<Rgb888> for Framebuffer {
     where
         T: IntoIterator<Item = Pixel<Rgb888>>,
     {
-        for Pixel(coord, color) in item {
+        for Pixel(point, color) in item {
             let pixel = color.pack32(self.fb_info.format);
-            self.write(coord[0], coord[1], pixel);
+            self.write(point[0] as u32, point[1] as u32, pixel);
         }
     }
 }

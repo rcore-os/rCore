@@ -11,10 +11,13 @@ pub fn getchar() -> char {
 
 pub fn putfmt(fmt: Arguments) {
     // output to serial
-    unsafe {
-        COM1.force_unlock();
+    #[cfg(not(feature = "board_pc"))]
+    {
+        unsafe {
+            COM1.force_unlock();
+        }
+        COM1.lock().write_fmt(fmt).unwrap();
     }
-    COM1.lock().write_fmt(fmt).unwrap();
 
     // print to graphic
     #[cfg(feature = "consolegraphic")]

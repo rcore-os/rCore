@@ -1,5 +1,5 @@
 use super::paging::PageTableImpl;
-use crate::memory::{init_heap, FRAME_ALLOCATOR};
+use crate::memory::FRAME_ALLOCATOR;
 use bitmap_allocator::BitAlloc;
 use rboot::{BootInfo, MemoryType};
 use rcore_memory::paging::*;
@@ -7,7 +7,6 @@ use rcore_memory::PAGE_SIZE;
 
 pub fn init(boot_info: &BootInfo) {
     init_frame_allocator(boot_info);
-    init_heap();
     info!("memory: init end");
 }
 

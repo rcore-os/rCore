@@ -1,19 +1,11 @@
 pub mod ide;
 pub mod keyboard;
-pub mod pic;
-pub mod pit;
 pub mod rtc_cmos;
 pub mod serial;
 
 use super::BootInfo;
 
 pub fn init(boot_info: &BootInfo) {
-    // Use IOAPIC instead of PIC
-    pic::disable();
-
-    // Use APIC Timer instead of PIT
-    // pit::init();
-
     serial::init();
     keyboard::init();
 
@@ -30,6 +22,9 @@ pub fn init(boot_info: &BootInfo) {
     enable_irq(consts::PIRQG);
     enable_irq(consts::PIRQH);
     */
+}
+
+pub fn init_graphic(boot_info: &BootInfo) {
     super::board::init_driver(boot_info);
     crate::drivers::console::init();
 }

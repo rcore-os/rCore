@@ -22,7 +22,7 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
-pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
+pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     let cpu_id = cpu::id();
     println!("Hello world! from CPU {}!", cpu_id);
 
@@ -33,11 +33,12 @@ pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
         other_start();
     }
 
-    // First init log mod, so that we can print log info.
+    // init log, heap and graphic output
     crate::logging::init();
+    crate::memory::init_heap();
+    driver::init_graphic(boot_info);
 
     // check BootInfo from bootloader
-    let boot_info = unsafe { &*boot_info };
     info!("{:#x?}", boot_info);
     assert_eq!(
         boot_info.physical_memory_offset as usize,
@@ -47,10 +48,8 @@ pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
     // setup fast syscall in x86_64
     interrupt::fast_syscall::init();
 
-    // Init physical memory management and heap.
+    // Init physical memory management
     memory::init(boot_info);
-
-    // Now heap is available
 
     // Init GDT
     gdt::init();
