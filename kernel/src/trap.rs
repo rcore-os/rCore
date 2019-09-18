@@ -20,10 +20,10 @@ pub fn timer() {
 
 pub fn error(tf: &TrapFrame) -> ! {
     error!("{:#x?}", tf);
-    let tid = processor().tid();
-    error!("On CPU{} Thread {}", cpu::id(), tid);
-
-    processor().manager().exit(tid, 0x100);
+    unsafe {
+        let mut proc = current_thread().proc.lock();
+        proc.exit(0x100);
+    }
     processor().yield_now();
     unreachable!();
 }
