@@ -1,6 +1,6 @@
 sudo: false
 
-dist: xenial
+dist: bionic
 
 language: rust
 
@@ -40,21 +40,6 @@ install:
       sudo apt update;
       sudo apt install device-tree-compiler -y;
     fi
-  - if [ 1 ]; then
-    [ $ARCH = riscv32 ] && export FILE="riscv32-linux-musl-cross";
-    [ $ARCH = riscv64 ] && export FILE="riscv64-linux-musl-cross";
-    [ $ARCH = mipsel  ] && export FILE="mipsel-linux-musln32-cross";
-    [ $ARCH = aarch64 ] && export FILE="aarch64-linux-musl-cross";
-    [ $ARCH = x86_64  ] && export FILE="x86_64-linux-musl-cross";
-    if [ $TRAVIS_OS_NAME = linux ]; then
-    wget https://musl.cc/$FILE.tgz;
-    elif [ $TRAVIS_OS_NAME = osx ]; then
-    wget https://mac.musl.cc/$FILE.tgz;
-    fi;
-    tar -xf $FILE.tgz;
-    export PATH=$PATH:$PWD/$FILE/bin;
-    fi
-
 
 before_script:
   - rustup component add rust-src llvm-tools-preview
@@ -62,7 +47,7 @@ before_script:
   - (test -x $HOME/.cargo/bin/cargo-xbuild || cargo install cargo-xbuild)
 
 script:
-  - cd user && make sfsimg arch=$ARCH && cd ..
+  - cd user && make sfsimg arch=$ARCH prebuilt=1 && cd ..
   - cd kernel && make build arch=$ARCH $OPTS && cd ..
   - if [ $ARCH = riscv32 ]; then
         cd tests && ./test.sh && cd ..;

@@ -257,10 +257,10 @@ runtest: build justruntest
 justrun:
 	@qemu-system-$(arch) $(qemu_opts)
 
-justrunnet: build
+justrunnet:
 	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
 
-justruntest: build
+justruntest:
 	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
