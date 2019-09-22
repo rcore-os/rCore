@@ -118,7 +118,7 @@ else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/virt_rv32.elf \
+	-bios default \
 	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
@@ -133,13 +133,13 @@ ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/fu540.elf \
+	-bios ../tools/opensbi/fu540.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img)
 else
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/virt_rv64.elf \
+	-bios default \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \

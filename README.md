@@ -21,7 +21,7 @@ Supported architectures and boards:
 
 * [Rust](https://www.rust-lang.org) toolchain
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild), [cargo-binutils](https://github.com/rust-embedded/cargo-binutils)
-* [QEMU](https://www.qemu.org) >= 3.1.0
+* [QEMU](https://www.qemu.org) >= 4.1.0
 * [musl-based GCC toolchains](https://musl.cc/) (only for building [user programs](https://github.com/rcore-os/rcore-user))
 
 Setup on Linux or macOS:
