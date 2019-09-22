@@ -14,10 +14,12 @@ cache:
   cargo: true
   directories:
     - $HOME/Library/Caches/Homebrew
-    - $TRAVIS_BUILD_DIR/qemu-4.1.0
+    - $TRAVIS_BUILD_DIR/qemu-4.1.0/$ARCH-softmmu
 
 addons:
   homebrew:
+    update: true
+    brewfile: true
     packages:
       - qemu
 
@@ -52,3 +54,6 @@ script:
   - if [ $ARCH = riscv32 ]; then
         cd tests && ./test.sh && cd ..;
     fi
+
+before_cache:
+  - if [ $TRAVIS_OS_NAME = osx ]; then brew cleanup; fi
