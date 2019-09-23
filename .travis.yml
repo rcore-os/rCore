@@ -4,7 +4,7 @@ dist: bionic
 
 language: rust
 
-rust: nightly-2019-09-01
+rust: nightly-2019-07-15
 
 os:
   - linux

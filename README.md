@@ -19,7 +19,7 @@ Supported architectures and boards:
 
 ### Environment
 
-* [Rust](https://www.rust-lang.org) toolchain at nightly-2019-09-01
+* [Rust](https://www.rust-lang.org) toolchain
 * Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild)
 * [QEMU](https://www.qemu.org) >= 3.1.0
 * [musl-based GCC toolchains](https://musl.cc/)
