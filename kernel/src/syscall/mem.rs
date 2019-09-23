@@ -60,7 +60,7 @@ impl Syscall<'_> {
                     #[cfg(feature = "board_raspi3")]
                     let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
 
-                    if let Some(fb) = FRAME_BUFFER.lock().as_mut() {
+                    if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
                         self.vm().push(
                             addr,
                             addr + len,

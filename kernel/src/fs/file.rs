@@ -146,7 +146,7 @@ impl FileHandle {
     }
 
     pub fn fcntl(&mut self, cmd: usize, arg: usize) -> Result<()> {
-        if arg == 2048 && cmd == 4 {
+        if arg & 0x800 > 0 && cmd == 4 {
             self.options.nonblock = true;
         }
         Ok(())
