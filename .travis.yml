@@ -22,6 +22,7 @@ addons:
     brewfile: true
     packages:
       - qemu
+      - dtc
 
 env:
   matrix:
