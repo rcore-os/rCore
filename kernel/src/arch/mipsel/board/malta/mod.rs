@@ -36,7 +36,7 @@ pub fn init_driver() {
         yres_virtual: 600,
         xoffset: 0,
         yoffset: 0,
-        depth: fb::ColorDepth::try_from(8)?,
+        depth: fb::ColorDepth::ColorDepth8,
         format: fb::ColorFormat::VgaPalette,
         paddr: 0xb0000000,
         vaddr: 0xb0000000,
