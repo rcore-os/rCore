@@ -107,10 +107,6 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "bootinfo"
-version = "0.1.0"
-
-[[package]]
 name = "buddy_system_allocator"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -338,7 +334,6 @@ dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
  "bitvec 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bootinfo 0.1.0",
  "buddy_system_allocator 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "compression 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",

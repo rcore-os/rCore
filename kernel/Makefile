@@ -231,8 +231,8 @@ else ifeq ($(arch), aarch64)
 prefix ?= aarch64-linux-musl-
 endif
 
-gdb := $(prefix)gdb
-objdump := cargo objdump -- -arch-name=$(subst _,-,$(arch))
+gdb := gdb
+objdump := cargo objdump $(build_args) -- -print-imm-hex
 objcopy := cargo objcopy -- --binary-architecture=$(subst _,-,$(arch))
 strip := cargo strip --
 dtc := dtc
@@ -292,14 +292,6 @@ bootloader: $(kernel)
 ifeq ($(arch), x86_64)
 	@cd ../rboot && make build
 endif
-ifeq ($(arch), aarch64)
-	@echo "Patching symbols into kernel."
-	@../tools/fill_symbols/aarch64.sh target/aarch64/$(mode)/rcore $(prefix)
-	@echo Building $(arch) bootloader
-	@$(strip) $(kernel) -o $(kernel)_stripped
-	@cd $(bootloader_dir) && make arch=$(arch) mode=$(mode) payload=../kernel/$(kernel)_stripped
-	@rm $(kernel)_stripped
-endif
 
 $(kernel_img): kernel bootloader
 ifeq ($(arch), x86_64)
@@ -310,7 +302,7 @@ ifeq ($(arch), x86_64)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), aarch64)
-	@$(objcopy) $(bootloader) --strip-all -O binary $@
+	@$(objcopy) $(kernel) --strip-all -O binary $@
 else ifeq ($(arch), mipsel)
 # qemu-system-mipsel accepts ELF file only, so objcopy is not needed
 	@$(strip) $(kernel) -o $@

@@ -54,13 +54,13 @@ lazy_static! {
 }
 
 /// Convert physical address to virtual address
-// #[inline]
+#[inline]
 pub const fn phys_to_virt(paddr: usize) -> usize {
     PHYSICAL_MEMORY_OFFSET + paddr
 }
 
 /// Convert virtual address to physical address
-// #[inline]
+#[inline]
 pub const fn virt_to_phys(vaddr: usize) -> usize {
     vaddr - PHYSICAL_MEMORY_OFFSET
 }

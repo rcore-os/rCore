@@ -1,5 +1,4 @@
 use super::driver::serial::*;
-use crate::drivers::console::CONSOLE;
 use core::fmt::{Arguments, Write};
 
 pub fn getchar() -> char {
@@ -22,6 +21,7 @@ pub fn putfmt(fmt: Arguments) {
     // print to graphic
     #[cfg(feature = "consolegraphic")]
     {
+        use crate::drivers::console::CONSOLE;
         unsafe { CONSOLE.force_unlock() }
         if let Some(console) = CONSOLE.lock().as_mut() {
             console.write_fmt(fmt).unwrap();

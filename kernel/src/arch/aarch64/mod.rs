@@ -1,7 +1,6 @@
 //! Entrance and initialization for aarch64.
 
-use bootinfo::BootInfo;
-
+mod boot;
 pub mod consts;
 pub mod cpu;
 pub mod driver;
@@ -17,22 +16,14 @@ pub mod timer;
 #[path = "board/raspi3/mod.rs"]
 pub mod board;
 
-global_asm!(include_str!("boot/entry.S"));
-
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
-pub extern "C" fn rust_main(boot_info: &'static BootInfo) -> ! {
+pub extern "C" fn rust_main() -> ! {
     board::init_serial_early();
 
     crate::logging::init();
-    info!("{:x?}", boot_info);
-    assert_eq!(
-        boot_info.physical_memory_offset,
-        consts::PHYSICAL_MEMORY_OFFSET
-    );
-
     interrupt::init();
-    memory::init(boot_info);
+    memory::init();
     crate::lkm::manager::ModuleManager::init();
     driver::init();
     println!("{}", LOGO);
