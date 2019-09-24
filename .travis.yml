@@ -14,7 +14,7 @@ cache:
   cargo: true
   directories:
     - $HOME/Library/Caches/Homebrew
-    - $TRAVIS_BUILD_DIR/qemu-4.1.0/$ARCH-softmmu
+    - $TRAVIS_BUILD_DIR/qemu-4.1.0
 
 addons:
   homebrew:
@@ -38,7 +38,7 @@ env:
 
 install:
   - if [ $TRAVIS_OS_NAME = linux ]; then
-      wget https://download.qemu.org/qemu-4.1.0.tar.xz && tar xJf qemu-4.1.0.tar.xz > /dev/null && cd qemu-4.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
+      [ ! -d qemu-4.1.0/$ARCH-softmmu ] && wget https://download.qemu.org/qemu-4.1.0.tar.xz && tar xJf qemu-4.1.0.tar.xz > /dev/null && cd qemu-4.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
       export PATH=$PATH:$PWD/qemu-4.1.0/$ARCH-softmmu:$PWD/qemu-4.1.0;
       sudo apt update;
       sudo apt install device-tree-compiler -y;
