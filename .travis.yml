@@ -52,9 +52,7 @@ before_script:
 script:
   - cd user && make sfsimg arch=$ARCH prebuilt=1 && cd ..
   - cd kernel && make build arch=$ARCH $OPTS && cd ..
-  - if [ $ARCH = riscv32 ]; then
-        cd tests && ./test.sh && cd ..;
-    fi
+  - cd kernel && make test arch=$ARCH $OPTS && cd ..
 
 before_cache:
   - if [ $TRAVIS_OS_NAME = osx ]; then brew cleanup; fi
