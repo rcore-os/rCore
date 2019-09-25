@@ -87,7 +87,7 @@ riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "2.7.0" }
-bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.1.0", optional = true }
+bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.2.0", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
 mips = "^0.2.0"

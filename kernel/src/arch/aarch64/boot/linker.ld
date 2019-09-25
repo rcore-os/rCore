@@ -26,6 +26,7 @@ SECTIONS {
   }
 
   .stack : {
+    . = ALIGN(4K);
     *(.bss.stack)
   }
 

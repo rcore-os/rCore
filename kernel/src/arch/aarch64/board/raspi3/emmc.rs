@@ -1,3 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_mut)]
+#![allow(unused_parens)]
+#![allow(unused_imports)]
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+#![allow(unused_assignments)]
+#![allow(non_upper_case_globals)]
+
 use super::mailbox;
 use crate::thread;
 use bcm2837::emmc::*;

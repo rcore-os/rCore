@@ -47,8 +47,6 @@ kernel := $(build_path)/rcore
 kernel_img := $(build_path)/kernel.img
 ESP := $(build_path)/esp
 OVMF := ../rboot/OVMF.fd
-bootloader_dir = ../bootloader
-bootloader := $(bootloader_dir)/target/$(target)/$(mode)/rcore-bootloader
 user_dir := ../user
 
 
@@ -244,7 +242,6 @@ all: kernel
 
 clean:
 	@cargo clean
-	@cd $(bootloader_dir) && make clean
 	@cd $(user_dir) && make clean
 
 doc:

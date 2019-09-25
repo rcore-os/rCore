@@ -65,8 +65,8 @@ dependencies = [
 
 [[package]]
 name = "bcm2837"
-version = "2.1.0"
-source = "git+https://github.com/rcore-os/bcm2837#d657e4429535c95f8c0beae9a05f650fcafbc488"
+version = "2.2.0"
+source = "git+https://github.com/rcore-os/bcm2837#76296a900759d169c690443c29c84307df9055e3"
 dependencies = [
  "aarch64 2.7.0 (git+https://github.com/rcore-os/aarch64)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -329,7 +329,7 @@ dependencies = [
  "acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
- "bcm2837 2.1.0 (git+https://github.com/rcore-os/bcm2837)",
+ "bcm2837 2.2.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
@@ -697,7 +697,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum autocfg 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0e49efa51329a5fd37e7c79db4621af617cd4e3e5bc224939808d076077077bf"
 "checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
-"checksum bcm2837 2.1.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
+"checksum bcm2837 2.2.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
 "checksum bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"

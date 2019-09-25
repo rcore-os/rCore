@@ -110,6 +110,8 @@ jump_to_main:
 
 .section .bss.stack
 .align 12
+.global bootstack
+.global bootstacktop
 bootstack:
     .space 0x100000 // 1M
 bootstacktop:

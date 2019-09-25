@@ -1,11 +1,8 @@
-use aarch64::paging::{
-    memory_attribute::*, PageTable, PageTableAttribute as Attr, PageTableFlags as EF,
-};
-use aarch64::paging::{Page, PhysFrame, Size1GiB, Size2MiB, Size4KiB};
+use super::board::{PERIPHERALS_END, PERIPHERALS_START};
+use crate::memory::phys_to_virt;
+use aarch64::paging::{memory_attribute::*, PageTableAttribute as Attr, PageTableFlags as EF};
+use aarch64::paging::{Page, PageTable, PhysFrame, Size1GiB, Size2MiB, Size4KiB};
 use aarch64::{addr::PhysAddr, asm, barrier, regs::*};
-use bcm2837::addr::{phys_to_virt, PHYSICAL_IO_END, PHYSICAL_IO_START};
-
-const PAGE_SIZE: usize = 4096;
 
 global_asm!(include_str!("entry.S"));
 
@@ -21,25 +18,26 @@ fn map_2mib(p2: &mut PageTable, start: usize, end: usize, flag: EF, attr: Attr) 
 #[no_mangle]
 #[link_section = ".text.boot"]
 extern "C" fn create_init_paging() {
-    let frame_lvl4 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl4 as u64);
-    let frame_lvl3 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl3 as u64);
-    let frame_lvl2 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl2 as u64);
     let p4 = unsafe { &mut *(page_table_lvl4 as *mut PageTable) };
     let p3 = unsafe { &mut *(page_table_lvl3 as *mut PageTable) };
     let p2 = unsafe { &mut *(page_table_lvl2 as *mut PageTable) };
+    let frame_lvl3 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl3 as u64);
+    let frame_lvl2 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl2 as u64);
     p4.zero();
     p3.zero();
     p2.zero();
 
     let block_flags = EF::default_block() | EF::UXN;
-    // 0x0000_0000 ~ 0x80_0000_0000
+    // 0x0000_0000_0000 ~ 0x0080_0000_0000
     p4[0].set_frame(frame_lvl3, EF::default_table(), Attr::new(0, 0, 0));
+    // 0x8000_0000_0000 ~ 0x8080_0000_0000
+    p4[256].set_frame(frame_lvl3, EF::default_table(), Attr::new(0, 0, 0));
 
     // 0x0000_0000 ~ 0x4000_000
     p3[0].set_frame(frame_lvl2, EF::default_table(), Attr::new(0, 0, 0));
     // 0x4000_0000 ~ 0x8000_000
     p3[1].set_block::<Size1GiB>(
-        PhysAddr::new(PHYSICAL_IO_END as u64),
+        PhysAddr::new(PERIPHERALS_END as u64),
         block_flags | EF::PXN,
         MairDevice::attr_value(),
     );
@@ -48,15 +46,15 @@ extern "C" fn create_init_paging() {
     map_2mib(
         p2,
         0,
-        PHYSICAL_IO_START,
+        PERIPHERALS_START,
         block_flags,
         MairNormal::attr_value(),
     );
     // device memory (0x3F00_000 ~ 0x4000_000)
     map_2mib(
         p2,
-        PHYSICAL_IO_START,
-        PHYSICAL_IO_END,
+        PERIPHERALS_START,
+        PERIPHERALS_END & !((1 << 30) - 1),
         block_flags | EF::PXN,
         MairDevice::attr_value(),
     );
@@ -121,7 +119,6 @@ extern "C" fn clear_bss() {
     }
 }
 
-#[allow(dead_code)]
 extern "C" {
     fn sbss();
     fn ebss();

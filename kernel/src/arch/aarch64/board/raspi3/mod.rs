@@ -10,6 +10,9 @@ pub mod timer;
 
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
 
+pub const PERIPHERALS_START: usize = bcm2837::addr::PERIPHERALS_START;
+pub const PERIPHERALS_END: usize = bcm2837::addr::PERIPHERALS_END;
+
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
     serial::init();
@@ -65,7 +68,7 @@ fn probe_fb_info(width: u32, height: u32, depth: u32) -> FramebufferResult {
     }
 
     let paddr = bus_to_phys(info.bus_addr);
-    let vaddr = crate::memory::phys_to_virt(paddr as usize);
+    let vaddr = super::memory::ioremap(paddr as usize, info.screen_size as usize, "fb");
     if vaddr == 0 {
         Err(format!(
             "cannot remap memory range [{:#x?}..{:#x?}]",
