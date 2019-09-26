@@ -7,7 +7,7 @@ use aarch64::paging::{
     mapper::{MappedPageTable, Mapper},
     memory_attribute::*,
     page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
-    FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size4KiB,
+    FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size2MiB, Size4KiB,
 };
 use aarch64::PhysAddr;
 use core::mem::ManuallyDrop;
@@ -230,6 +230,30 @@ impl PageTableImpl {
             entry: None,
         })
     }
+    /// Activate as kernel page table (TTBR1_EL1).
+    /// Used in `arch::memory::map_kernel()`.
+    pub unsafe fn activate_as_kernel(&self) {
+        ttbr_el1_write(1, Frame::of_addr(self.token() as u64));
+        tlb_invalidate_all();
+    }
+    /// Map physical memory [start, end)
+    /// to virtual space [phys_to_virt(start), phys_to_virt(end))
+    pub fn map_physical_memory(&mut self, start: usize, end: usize) {
+        info!("mapping physical memory");
+        let flags = EF::default_block() | EF::UXN | EF::PXN;
+        let attr = MairNormal::attr_value();
+        for frame in Frame::range_of(start as u64, end as u64) {
+            let paddr = frame.start_address();
+            let vaddr = phys_to_virt(paddr.as_u64() as usize);
+            let page = PageAllSizes::<Size2MiB>::of_addr(vaddr as u64);
+            unsafe {
+                self.page_table
+                    .map_to(page, frame, flags, attr, &mut FrameAllocatorForAarch64)
+                    .expect("failed to map physical memory")
+                    .flush();
+            }
+        }
+    }
 }
 
 impl PageTableExt for PageTableImpl {
@@ -256,7 +280,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     unsafe fn set_token(token: usize) {
-        ttbr_el1_write(0, Frame::containing_address(PhysAddr::new(token as u64)));
+        ttbr_el1_write(0, Frame::of_addr(token as u64));
     }
 
     fn active_token() -> usize {
