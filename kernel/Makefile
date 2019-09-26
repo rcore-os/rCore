@@ -2,10 +2,8 @@
 #   make build                  Build
 #   make run                    Build and run in QEMU
 #   make justrun                Run the last build
-#   make runnet                 Build and run in QEMU with nic
-#   make justrunnet             Run the last build with nic
-#   make runtest                Build and run in QEMU with specified program
-#   make justruntest            Run the last build with specified program
+#   make test                   Build and run in QEMU with specified program
+#   make justtest               Run the last build with specified program
 #   make doc                    Generate docs
 #   make asm                    Open the deassemble file of the last build
 #   make header                 Open 'objdump -h' of the last build
@@ -26,6 +24,7 @@
 #         | k210                 Only available on riscv64, run on K210, use Sv39
 #         | rocket_chip          Only available on riscv64, run on Rocket Chip, use Sv39
 #         | raspi3               Only available on aarch64, run on Raspberry Pi 3 Model B/B+
+#   net = on | off               Only available on x86_64, enable NIC
 #   pci_passthru = 0000:00:00.1  Only available on x86_64, passthrough the specified PCI device
 #   init = /bin/ls               Only available on riscv64, run specified program instead of user shell
 #   extra_nic = on | off         Only available on x86_64, add an additional e1000 nic
@@ -41,6 +40,7 @@ pci_passthru ?=
 init ?=
 extra_nic ?= off
 
+qemu := qemu-system-$(arch)
 target := $(arch)
 build_path := target/$(target)/$(mode)
 kernel := $(build_path)/rcore
@@ -180,6 +180,11 @@ ifeq ($(graphic), off)
 qemu_opts += -nographic
 endif
 
+ifeq ($(net), on)
+qemu_opts += $(qemu_net_opts)
+qemu := sudo $(qemu)
+endif
+
 ### build args ###
 ifeq ($(graphic), off)
 features += nographic
@@ -236,7 +241,7 @@ strip := cargo strip --
 dtc := dtc
 hostcc := gcc
 
-.PHONY: all clean build asm doc debug kernel sfsimg install run justrun runnet justrunnet runtest justruntest
+.PHONY: all clean build asm doc debug kernel sfsimg install run justrun test justtest
 
 all: kernel
 
@@ -248,20 +253,17 @@ doc:
 	@cargo rustdoc -- --document-private-items
 
 run: build justrun
-runnet: build justrunnet
-runtest: build justruntest
+test: build justtest
 
 justrun:
-	@qemu-system-$(arch) $(qemu_opts)
+	@$(qemu) $(qemu_opts)
 
-justrunnet: build
-	@sudo qemu-system-$(arch) $(qemu_opts) $(qemu_net_opts)
-
-justruntest: build
-	@qemu-system-$(arch) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
+justtest:
+	# unavailable now
+	@#$(qemu) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(init) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
-	@qemu-system-$(arch) $(qemu_opts) -s -S &
+	@$(qemu) $(qemu_opts) -s -S &
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
@@ -309,8 +311,6 @@ kernel: $(dtb)
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
 	@cargo xbuild $(build_args)
-	@echo "Now patching kernel symbols onto kernel."
-	@../tools/fill_symbols/x86_64.sh target/x86_64/$(mode)/rcore
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
 	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
