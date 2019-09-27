@@ -29,3 +29,7 @@ Cargo.lock
 modules/*/objs
 # Rust
 modules/*/target
+
+# musl tools
+x86_64-linux-musl-cross/
+

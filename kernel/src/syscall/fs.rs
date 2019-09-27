@@ -68,6 +68,8 @@ impl Syscall<'_> {
         Ok(len)
     }
 
+    /// sys_ppoll function is for handling the third argument of sys_poll.
+
     pub fn sys_ppoll(
         &mut self,
         ufds: *mut PollFd,
@@ -96,6 +98,7 @@ impl Syscall<'_> {
             );
         }
 
+        /// check whether the fds is valid and is owned by this process
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
         for poll in polls.iter() {
             if proc.files.get(&(poll.fd as usize)).is_none() {
@@ -109,6 +112,8 @@ impl Syscall<'_> {
             use PollEvents as PE;
             let proc = self.process();
             let mut events = 0;
+
+            /// iterate each poll to check whether it is ready
             for poll in polls.iter_mut() {
                 poll.revents = PE::empty();
                 if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
@@ -135,11 +140,15 @@ impl Syscall<'_> {
             }
             drop(proc);
 
+
+            /// some event happens, so evoke the process
             if events > 0 {
                 return Some(Ok(events));
             }
 
             let current_time_ms = crate::trap::uptime_msec();
+
+            /// time runs out, so the evoke the process
             if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
                 return Some(Ok(0));
             }
