@@ -198,15 +198,6 @@ ifneq ($(init), )
 features += run_cmdline
 endif
 
-ifeq ($(board), raspi3)
-# qemu only has generic timer
-# TODO: configure system/generic timer automatically
-raspi3_timer ?= generic
-ifeq ($(raspi3_timer), generic)
-features += raspi3_use_generic_timer
-endif
-endif
-
 ifneq ($(board), none)
 features += board_$(board)
 endif

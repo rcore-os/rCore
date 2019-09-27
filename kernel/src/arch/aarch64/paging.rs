@@ -9,7 +9,7 @@ use aarch64::paging::{
     page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size2MiB, Size4KiB,
 };
-use aarch64::PhysAddr;
+use aarch64::{align_down, align_up, PhysAddr, ALIGN_2MIB};
 use core::mem::ManuallyDrop;
 use log::*;
 use rcore_memory::paging::*;
@@ -240,9 +240,11 @@ impl PageTableImpl {
     /// to virtual space [phys_to_virt(start), phys_to_virt(end))
     pub fn map_physical_memory(&mut self, start: usize, end: usize) {
         info!("mapping physical memory");
+        let aligned_start = align_down(start as u64, ALIGN_2MIB);
+        let aligned_end = align_up(end as u64, ALIGN_2MIB);
         let flags = EF::default_block() | EF::UXN | EF::PXN;
         let attr = MairNormal::attr_value();
-        for frame in Frame::range_of(start as u64, end as u64) {
+        for frame in Frame::<Size2MiB>::range_of(aligned_start, aligned_end) {
             let paddr = frame.start_address();
             let vaddr = phys_to_virt(paddr.as_u64() as usize);
             let page = PageAllSizes::<Size2MiB>::of_addr(vaddr as u64);
