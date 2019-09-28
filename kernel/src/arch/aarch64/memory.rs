@@ -2,7 +2,7 @@
 
 use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
-use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use log::*;
 use rcore_memory::PAGE_SIZE;
 
@@ -14,6 +14,14 @@ pub fn init() {
     info!("memory: init end");
 }
 
+pub fn init_other() {
+    unsafe {
+        if let Some(ms) = KERNEL_MEMORY_SET.as_mut() {
+            ms.get_page_table_mut().activate_as_kernel();
+        }
+    }
+}
+
 fn init_frame_allocator() {
     use bitmap_allocator::BitAlloc;
     use core::ops::Range;
@@ -21,7 +29,7 @@ fn init_frame_allocator() {
     let end = super::board::probe_memory()
         .expect("failed to find memory map")
         .1;
-    let start = _end as usize - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE;
+    let start = kernel_offset(_end as usize) + MEMORY_OFFSET + PAGE_SIZE;
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(start, end));
     info!("FrameAllocator init end");

@@ -2,7 +2,7 @@
 //!
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
-use crate::consts::KERNEL_OFFSET;
+use crate::memory::kernel_offset;
 use aarch64::asm;
 use alloc::string::String;
 use bcm2837::addr::phys_to_bus;
@@ -223,7 +223,7 @@ macro_rules! send_request {
             asm::flush_dcache_range(start, end);
             mbox.write(
                 MailboxChannel::Property,
-                phys_to_bus((start - KERNEL_OFFSET) as u32),
+                phys_to_bus(kernel_offset(start) as u32),
             );
             mbox.read(MailboxChannel::Property);
             asm::flush_dcache_range(start, end);
