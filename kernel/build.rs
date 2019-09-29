@@ -5,6 +5,7 @@ use std::io::{Result, Write};
 
 fn main() {
     println!("cargo:rerun-if-env-changed=LOG");
+    println!("cargo:rerun-if-env-changed=SMP");
     println!("cargo:rerun-if-env-changed=BOARD");
     println!("cargo:rerun-if-env-changed=USER_IMG");
 

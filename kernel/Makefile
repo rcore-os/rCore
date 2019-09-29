@@ -153,6 +153,7 @@ qemu_net_opts += \
 else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
+	-smp 4 \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs
