@@ -98,6 +98,7 @@ extern "C" fn enable_mmu() {
     let frame_lvl4 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl4 as u64);
     asm::ttbr_el1_write(0, frame_lvl4);
     asm::ttbr_el1_write(1, frame_lvl4);
+    asm::tlb_invalidate_all();
 
     // Switch the MMU on.
     //
@@ -109,6 +110,10 @@ extern "C" fn enable_mmu() {
 
     // Force MMU init to complete before next instruction
     unsafe { barrier::isb(barrier::SY) }
+
+    // Invalidate the local I-cache so that any instructions fetched
+    // speculatively from the PoC are discarded
+    asm::flush_icache_all();
 }
 
 #[no_mangle]
