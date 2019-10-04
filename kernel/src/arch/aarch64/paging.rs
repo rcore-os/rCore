@@ -1,8 +1,7 @@
 //! Page table implementations for aarch64.
 
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
-use aarch64::asm::{flush_dcache_range, flush_icache_all};
-use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
+use aarch64::cache::*;
 use aarch64::paging::{
     frame::PhysFrame as Frame,
     mapper::{MappedPageTable, Mapper},
@@ -10,6 +9,8 @@ use aarch64::paging::{
     page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
     FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size2MiB, Size4KiB,
 };
+use aarch64::translation::{invalidate_tlb_vaddr, local_invalidate_tlb_all};
+use aarch64::translation::{ttbr_el1_read, ttbr_el1_write};
 use aarch64::{align_down, align_up, PhysAddr, ALIGN_2MIB};
 use core::mem::ManuallyDrop;
 use log::*;
@@ -74,10 +75,20 @@ impl PageTable for PageTableImpl {
 
     fn flush_cache_copy_user(&mut self, start: usize, end: usize, execute: bool) {
         if execute {
-            // clean D-cache to PoU to ensure new instructions has been written into memory
-            flush_dcache_range(start, end);
-            // invalidate I-cache to PoU to ensure old instructions has been flushed
-            flush_icache_all();
+            // clean D-cache to PoU to ensure new instructions has been written
+            // into memory
+            DCache::<Clean, PoU>::flush_range(start, end, ISH);
+            // invalidate I-cache to PoU to ensure old instructions has been
+            // flushed
+            if get_l1_icache_policy() == L1ICachePolicy::PIPT {
+                // Cortex-A57 use PIPT, address translation is transparent
+                ICache::<Invalidate, PoU>::flush_range(start, end, ISH);
+            } else {
+                // Cortex-A53 (raspi3) use VIPT, the effect of invalidation is
+                // only visible to the VA, need to invalidate the entire
+                // I-cache to invalidate all aliases of a PA.
+                ICache::flush_all();
+            }
         }
     }
 }
@@ -98,7 +109,7 @@ pub enum MMIOType {
 // TODO: software dirty bit needs to be reconsidered
 impl Entry for PageEntry {
     fn update(&mut self) {
-        tlb_invalidate(self.1.start_address());
+        invalidate_tlb_vaddr(self.1.start_address());
     }
 
     fn present(&self) -> bool {
@@ -244,7 +255,7 @@ impl PageTableImpl {
     /// Used in `arch::memory::map_kernel()`.
     pub unsafe fn activate_as_kernel(&self) {
         ttbr_el1_write(1, Frame::of_addr(self.token() as u64));
-        tlb_invalidate_all();
+        local_invalidate_tlb_all();
     }
     /// Map physical memory [start, end)
     /// to virtual space [phys_to_virt(start), phys_to_virt(end))
@@ -300,7 +311,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     fn flush_tlb() {
-        tlb_invalidate_all();
+        local_invalidate_tlb_all();
     }
 }
 

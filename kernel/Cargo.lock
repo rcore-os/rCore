@@ -2,8 +2,8 @@
 # It is not intended for manual editing.
 [[package]]
 name = "aarch64"
-version = "2.8.0"
-source = "git+https://github.com/rcore-os/aarch64#e56d6b52b8be11ce18a6395cd87c07905bdf4422"
+version = "3.0.0"
+source = "git+https://github.com/rcore-os/aarch64#fe633820b6866f5442be0ae6de7fd9182333a27a"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -65,10 +65,10 @@ dependencies = [
 
 [[package]]
 name = "bcm2837"
-version = "2.4.0"
-source = "git+https://github.com/rcore-os/bcm2837#960c7dd5b510bc28015c5733c3c90e3e3b0c8514"
+version = "2.5.0"
+source = "git+https://github.com/rcore-os/bcm2837#63468ef3465d5e104d828472686cbd779378f1df"
 dependencies = [
- "aarch64 2.8.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -325,11 +325,11 @@ dependencies = [
 name = "rcore"
 version = "0.2.0"
 dependencies = [
- "aarch64 2.8.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)",
  "acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)",
- "bcm2837 2.4.0 (git+https://github.com/rcore-os/bcm2837)",
+ "bcm2837 2.5.0 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
@@ -690,14 +690,14 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum aarch64 2.8.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
+"checksum aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
 "checksum acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2c18d706bdc322dd4f8f7930a5879ad8df3d78d4452a678d5419c72f9f69acea"
 "checksum aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b7669e841017880c2710777c46ec654272163379bbe55de6e17a2a2388d44d92"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs)" = "<none>"
 "checksum array-init 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "23589ecb866b460d3a0f1278834750268c607e8e28a1b982c907219f3178cd72"
 "checksum autocfg 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0e49efa51329a5fd37e7c79db4621af617cd4e3e5bc224939808d076077077bf"
 "checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
-"checksum bcm2837 2.4.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
+"checksum bcm2837 2.5.0 (git+https://github.com/rcore-os/bcm2837)" = "<none>"
 "checksum bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"

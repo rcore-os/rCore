@@ -1,6 +1,6 @@
 use crate::consts::SMP_CORES;
 use crate::memory::{kernel_offset, phys_to_virt};
-use aarch64::asm;
+use aarch64::{asm, cache::*};
 use core::{cmp, mem};
 
 pub use super::board::{CPU_NUM, CPU_SPIN_TABLE};
@@ -24,9 +24,10 @@ pub unsafe fn start_others() {
         let release_addr = phys_to_virt(CPU_SPIN_TABLE[i]) as *mut usize;
         let entry_addr = kernel_offset(slave_startup as usize);
         *release_addr = entry_addr;
-        asm::flush_dcache_range(
+        DCache::<CleanAndInvalidate, PoC>::flush_area(
             release_addr as usize,
-            release_addr as usize + mem::size_of::<usize>(),
+            mem::size_of::<usize>(),
+            SY,
         );
         asm::sev();
     }

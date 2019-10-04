@@ -3,7 +3,7 @@ use crate::memory::phys_to_virt;
 use aarch64::paging::{memory_attribute::*, PageTableAttribute as Attr, PageTableFlags as EF};
 use aarch64::paging::{Page, PageTable, PhysFrame, Size1GiB, Size2MiB, Size4KiB};
 use aarch64::{align_down, align_up, PhysAddr, ALIGN_1GIB, ALIGN_2MIB};
-use aarch64::{asm, barrier, regs::*};
+use aarch64::{barrier, cache, regs::*, translation};
 
 global_asm!(include_str!("entry.S"));
 
@@ -96,24 +96,19 @@ extern "C" fn enable_mmu() {
 
     // Set both TTBR0_EL1 and TTBR1_EL1
     let frame_lvl4 = PhysFrame::<Size4KiB>::of_addr(page_table_lvl4 as u64);
-    asm::ttbr_el1_write(0, frame_lvl4);
-    asm::ttbr_el1_write(1, frame_lvl4);
-    asm::tlb_invalidate_all();
-
-    // Switch the MMU on.
-    //
-    // First, force all previous changes to be seen before the MMU is enabled.
-    unsafe { barrier::isb(barrier::SY) }
+    translation::ttbr_el1_write(0, frame_lvl4);
+    translation::ttbr_el1_write(1, frame_lvl4);
+    translation::local_invalidate_tlb_all();
 
     // Enable the MMU and turn on data and instruction caching.
     SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
 
     // Force MMU init to complete before next instruction
-    unsafe { barrier::isb(barrier::SY) }
+    unsafe { barrier::isb() }
 
     // Invalidate the local I-cache so that any instructions fetched
     // speculatively from the PoC are discarded
-    asm::flush_icache_all();
+    cache::ICache::local_flush_all();
 }
 
 #[no_mangle]
