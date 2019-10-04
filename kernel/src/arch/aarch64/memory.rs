@@ -4,7 +4,12 @@ use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use log::*;
+use spin::Mutex;
 use rcore_memory::PAGE_SIZE;
+
+lazy_static! {
+    static ref KERNEL_MEMORY_SET: Mutex<Option<MemorySet>> = Mutex::new(None);
+}
 
 /// Memory initialization.
 pub fn init() {
@@ -15,10 +20,8 @@ pub fn init() {
 }
 
 pub fn init_other() {
-    unsafe {
-        if let Some(ms) = KERNEL_MEMORY_SET.as_mut() {
-            ms.get_page_table_mut().activate_as_kernel();
-        }
+    if let Some(ms) = KERNEL_MEMORY_SET.lock().as_mut() {
+        unsafe { ms.get_page_table_mut().activate_as_kernel() };
     }
 }
 
@@ -41,8 +44,6 @@ fn init_frame_allocator() {
         page_start..page_end
     }
 }
-
-static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 
 /// Create fine-grained mappings for the kernel
 fn map_kernel() {
@@ -93,11 +94,9 @@ fn map_kernel() {
 
     let page_table = ms.get_page_table_mut();
     page_table.map_physical_memory(0, super::board::PERIPHERALS_START);
+    unsafe { page_table.activate_as_kernel() };
+    *KERNEL_MEMORY_SET.lock() = Some(ms);
 
-    unsafe {
-        page_table.activate_as_kernel();
-        KERNEL_MEMORY_SET = Some(ms);
-    }
     info!("map kernel end");
 }
 
@@ -105,7 +104,7 @@ fn map_kernel() {
 pub fn ioremap(paddr: usize, len: usize, name: &'static str) -> usize {
     let offset = -(KERNEL_OFFSET as isize);
     let vaddr = paddr.wrapping_add(KERNEL_OFFSET);
-    if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
+    if let Some(ms) = KERNEL_MEMORY_SET.lock().as_mut() {
         ms.push(
             vaddr,
             vaddr + len,
