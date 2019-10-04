@@ -51,6 +51,7 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
             let entry = pt.map(addr, target);
             attr.apply(entry);
             pt.get_page_slice_mut(addr).copy_from_slice(data);
+            pt.flush_cache_copy_user(addr, addr + data.len(), attr.execute);
         } else {
             // delay map
             self.map(pt, addr, attr);
@@ -63,18 +64,20 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
         if entry.present() {
             return false;
         }
+        let execute = entry.execute();
         let frame = self.allocator.alloc().expect("failed to alloc frame");
         entry.set_target(frame);
         entry.set_present(true);
         entry.update();
 
-        self.fill_data(pt, addr);
+        let read_size = self.fill_data(pt, addr);
+        pt.flush_cache_copy_user(addr, addr + read_size, execute);
         true
     }
 }
 
 impl<F: Read, T: FrameAllocator> File<F, T> {
-    fn fill_data(&self, pt: &mut dyn PageTable, addr: VirtAddr) {
+    fn fill_data(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> usize {
         let data = pt.get_page_slice_mut(addr);
         let file_offset = addr + self.file_start - self.mem_start;
         let read_size = (self.file_end as isize - file_offset as isize)
@@ -84,6 +87,7 @@ impl<F: Read, T: FrameAllocator> File<F, T> {
         if read_size != PAGE_SIZE {
             data[read_size..].iter_mut().for_each(|x| *x = 0);
         }
+        read_size
     }
 }
 

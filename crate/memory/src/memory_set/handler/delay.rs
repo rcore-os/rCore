@@ -42,6 +42,7 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
             let entry = pt.map(addr, target);
             attr.apply(entry);
             pt.get_page_slice_mut(addr).copy_from_slice(data);
+            pt.flush_cache_copy_user(addr, addr + data.len(), attr.execute);
         } else {
             // delay map
             self.map(pt, addr, attr);
@@ -60,9 +61,11 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         entry.update();
         //init with zero for delay mmap mode
         let data = pt.get_page_slice_mut(addr);
+        let len = data.len();
         for x in data {
             *x = 0;
         }
+        pt.flush_cache_copy_user(addr, addr + len, false);
         true
     }
 }

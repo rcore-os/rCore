@@ -66,6 +66,8 @@ impl PageTable for PageTableImpl {
         let vaddr = frame.start_address().as_usize() + PHYSICAL_MEMORY_OFFSET;
         unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
+
+    fn flush_cache_copy_user(&mut self, _start: usize, _end: usize, _execute: bool) {}
 }
 
 /// implementation for the Entry trait in /crate/memory/src/paging/mod.rs

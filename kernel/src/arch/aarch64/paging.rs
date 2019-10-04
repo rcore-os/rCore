@@ -1,6 +1,7 @@
 //! Page table implementations for aarch64.
 
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
+use aarch64::asm::{flush_dcache_range, flush_icache_all};
 use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
 use aarch64::paging::{
     frame::PhysFrame as Frame,
@@ -69,6 +70,15 @@ impl PageTable for PageTableImpl {
             .unwrap();
         let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
         unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
+    }
+
+    fn flush_cache_copy_user(&mut self, start: usize, end: usize, execute: bool) {
+        if execute {
+            // clean D-cache to PoU to ensure new instructions has been written into memory
+            flush_dcache_range(start, end);
+            // invalidate I-cache to PoU to ensure old instructions has been flushed
+            flush_icache_all();
+        }
     }
 }
 
