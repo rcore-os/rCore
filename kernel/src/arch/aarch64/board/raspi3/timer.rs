@@ -9,7 +9,7 @@ pub fn init() {
     info!("timer: init end");
 }
 
-/// Set next timer interrupt to 10 ms from now.
+/// Returns the current time in microseconds.
 pub fn get_cycle() -> u64 {
     Timer::new().read()
 }
