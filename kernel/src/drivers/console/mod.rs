@@ -7,9 +7,7 @@ use spin::Mutex;
 // Console -> TextBuffer -> FrameBuffer
 type RCoreConsole = ConsoleOnGraphic<Framebuffer>;
 
-lazy_static! {
-    pub static ref CONSOLE: Mutex<Option<RCoreConsole>> = Mutex::new(None);
-}
+pub static CONSOLE: Mutex<Option<RCoreConsole>> = Mutex::new(None);
 
 /// Initialize console driver
 pub fn init() {

@@ -295,9 +295,7 @@ impl ColorEncode for Rgb888 {
     }
 }
 
-lazy_static! {
-    pub static ref FRAME_BUFFER: Mutex<Option<Framebuffer>> = Mutex::new(None);
-}
+pub static FRAME_BUFFER: Mutex<Option<Framebuffer>> = Mutex::new(None);
 
 /// Initialize framebuffer
 ///

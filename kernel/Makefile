@@ -153,6 +153,7 @@ qemu_net_opts += \
 else ifeq ($(arch), aarch64)
 qemu_opts += \
 	-machine $(board) \
+	-smp 4 \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs
@@ -196,15 +197,6 @@ endif
 
 ifneq ($(init), )
 features += run_cmdline
-endif
-
-ifeq ($(board), raspi3)
-# qemu only has generic timer
-# TODO: configure system/generic timer automatically
-raspi3_timer ?= generic
-ifeq ($(raspi3_timer), generic)
-features += raspi3_use_generic_timer
-endif
 endif
 
 ifneq ($(board), none)

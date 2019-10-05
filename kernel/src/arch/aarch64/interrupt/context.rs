@@ -1,8 +1,8 @@
 //! TrapFrame and context definitions for aarch64.
 
-use aarch64::asm::{tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write_asid};
 use aarch64::barrier;
 use aarch64::paging::PhysFrame;
+use aarch64::translation::{local_invalidate_tlb_all, ttbr_el1_read, ttbr_el1_write_asid};
 use lazy_static::lazy_static;
 use spin::Mutex;
 
@@ -229,7 +229,7 @@ impl AsidAllocator {
             if self.0.generation == 0 {
                 self.0.generation += 1;
             }
-            tlb_invalidate_all();
+            local_invalidate_tlb_all();
         }
         self.0.value += 1;
         return self.0;

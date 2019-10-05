@@ -10,13 +10,18 @@ pub mod timer;
 
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
 
+pub const BOARD_NAME: &'static str = "Raspberry Pi 3";
 pub const PERIPHERALS_START: usize = bcm2837::addr::PERIPHERALS_START;
 pub const PERIPHERALS_END: usize = bcm2837::addr::PERIPHERALS_END;
+pub const CPU_NUM: usize = 4;
+
+/// BCM2837 spin table (ref: linux/arch/arm/boot/dts/bcm2837.dtsi)
+#[no_mangle]
+pub static CPU_SPIN_TABLE: [usize; CPU_NUM] = [0xd8, 0xe0, 0xe8, 0xf0];
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
     serial::init();
-    println!("Hello Raspberry Pi!");
 }
 
 /// Initialize raspi3 drivers
@@ -24,7 +29,6 @@ pub fn init_driver() {
     if let Ok(fb_info) = probe_fb_info(0, 0, 0) {
         fb::init(fb_info);
     }
-    timer::init();
     emmc::init();
 }
 

@@ -2,9 +2,12 @@
 
 use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
-use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use log::*;
 use rcore_memory::PAGE_SIZE;
+use spin::Mutex;
+
+static KERNEL_MEMORY_SET: Mutex<Option<MemorySet>> = Mutex::new(None);
 
 /// Memory initialization.
 pub fn init() {
@@ -14,6 +17,12 @@ pub fn init() {
     info!("memory: init end");
 }
 
+pub fn init_other() {
+    if let Some(ms) = KERNEL_MEMORY_SET.lock().as_mut() {
+        unsafe { ms.get_page_table_mut().activate_as_kernel() };
+    }
+}
+
 fn init_frame_allocator() {
     use bitmap_allocator::BitAlloc;
     use core::ops::Range;
@@ -21,7 +30,7 @@ fn init_frame_allocator() {
     let end = super::board::probe_memory()
         .expect("failed to find memory map")
         .1;
-    let start = _end as usize - KERNEL_OFFSET + MEMORY_OFFSET + PAGE_SIZE;
+    let start = kernel_offset(_end as usize) + MEMORY_OFFSET + PAGE_SIZE;
     let mut ba = FRAME_ALLOCATOR.lock();
     ba.insert(to_range(start, end));
     info!("FrameAllocator init end");
@@ -33,8 +42,6 @@ fn init_frame_allocator() {
         page_start..page_end
     }
 }
-
-static mut KERNEL_MEMORY_SET: Option<MemorySet> = None;
 
 /// Create fine-grained mappings for the kernel
 fn map_kernel() {
@@ -85,11 +92,9 @@ fn map_kernel() {
 
     let page_table = ms.get_page_table_mut();
     page_table.map_physical_memory(0, super::board::PERIPHERALS_START);
+    unsafe { page_table.activate_as_kernel() };
+    *KERNEL_MEMORY_SET.lock() = Some(ms);
 
-    unsafe {
-        page_table.activate_as_kernel();
-        KERNEL_MEMORY_SET = Some(ms);
-    }
     info!("map kernel end");
 }
 
@@ -97,7 +102,7 @@ fn map_kernel() {
 pub fn ioremap(paddr: usize, len: usize, name: &'static str) -> usize {
     let offset = -(KERNEL_OFFSET as isize);
     let vaddr = paddr.wrapping_add(KERNEL_OFFSET);
-    if let Some(ms) = unsafe { KERNEL_MEMORY_SET.as_mut() } {
+    if let Some(ms) = KERNEL_MEMORY_SET.lock().as_mut() {
         ms.push(
             vaddr,
             vaddr + len,

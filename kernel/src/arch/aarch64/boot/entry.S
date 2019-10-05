@@ -3,18 +3,20 @@
 
 _start:
     # pc == 0x80000
+    # only the primary CPU starts here, other CPUs start from 0x0 and spin
+    # until the spin table holds a jump address. (see qemu/hw/arm/raspi.c)
 
     # read cpu affinity, start core 0, halt rest
-    mrs     x1, mpidr_el1
-    and     x1, x1, #3
-    cbnz    x1, halt
+    mrs     x19, mpidr_el1
+    and     x19, x19, #3
+    cbnz    x19, halt
     bl      el_setup
     bl      clear_bss
     bl      create_init_paging
     b       master_startup
 
 halt:
-    # core affinity != 0, halt it
+    # unreachable
     wfe
     b       halt
 
@@ -51,8 +53,9 @@ switch_to_el1:
     beq     el_setup_end
 
     # at EL2
-    # set the temporary stack for EL1 in lower WA range
-    adr     x0, _start
+    # set the temporary stack for EL1 in lower VA range
+    adrp    x0, _start
+    sub     x0, x0, x19, lsl #16
     msr     sp_el1, x0
 
     # set-up HCR_EL2, enable AArch64 in EL1 (bits 1, 31) (ref: D10.2.45)
@@ -89,24 +92,38 @@ switch_to_el1:
     eret
 el_setup_end:
     # at EL1
-    adr     x0, _start
+    adrp    x0, _start
+    sub     x0, x0, x19, lsl #16
     mov     sp, x0
     ret
 
-# enable paging, jump to upper VA range
+# primary CPU: enable paging, jump to upper VA range
 master_startup:
     bl      enable_mmu
+    ldr     x0, =master_main
     ldr     x8, =jump_to_main
     br      x8
 
-# set-up kernel stack, jump to main
+# other CPUs: jump to EL1, enable paging, jump to upper VA range
+.global slave_startup
+slave_startup:
+    mrs     x19, mpidr_el1
+    and     x19, x19, #3
+    bl      el_setup
+    bl      enable_mmu
+    ldr     x0, =others_main
+    ldr     x8, =jump_to_main
+    br      x8
+
+# set-up kernel stack, jump to master_main/others_main
 jump_to_main:
     msr     ttbr0_el1, xzr
     ldr     x8, =bootstacktop
+    sub     x8, x8, x19, lsl #18
     mov     sp, x8
     mov     x29, xzr
     mov     x30, xzr
-    b       rust_main
+    br      x0
 
 .section .bss.stack
 .align 12

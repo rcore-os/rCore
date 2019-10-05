@@ -2,7 +2,7 @@
 
 use super::context::TrapFrame;
 use super::syndrome::{Fault, Syndrome};
-use crate::arch::board::irq::handle_irq;
+use crate::arch::board::irq::{handle_irq, is_timer_irq};
 
 use aarch64::regs::*;
 use log::*;
@@ -41,7 +41,12 @@ pub struct Info {
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
-    trace!("Interrupt: {:?}, ELR: {:#x?}", info, tf.elr);
+    trace!(
+        "Exception @ CPU{}: {:?}, ELR: {:#x?}",
+        crate::arch::cpu::id(),
+        info,
+        tf.elr
+    );
     match info.kind {
         Kind::Synchronous => {
             let syndrome = Syndrome::from(esr);
@@ -60,10 +65,16 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                 _ => crate::trap::error(tf),
             }
         }
-        Kind::Irq => handle_irq(tf),
+        Kind::Irq => {
+            if is_timer_irq() {
+                handle_timer()
+            } else {
+                handle_irq(tf)
+            }
+        }
         _ => crate::trap::error(tf),
     }
-    trace!("Interrupt end");
+    trace!("Exception end");
 }
 
 fn handle_break(_num: u16, tf: &mut TrapFrame) {
@@ -90,6 +101,11 @@ fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         tf,
     );
     tf.x0 = ret as usize;
+}
+
+fn handle_timer() {
+    crate::arch::timer::set_next();
+    crate::trap::timer();
 }
 
 fn handle_page_fault(tf: &mut TrapFrame) {
