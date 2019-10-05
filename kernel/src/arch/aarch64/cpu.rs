@@ -13,6 +13,7 @@ pub fn id() -> usize {
     asm::cpuid()
 }
 
+/// Write `slave_startup` address to the spin table to start other CPUs.
 pub unsafe fn start_others() {
     extern "C" {
         fn slave_startup();

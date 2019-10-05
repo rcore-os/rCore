@@ -15,6 +15,7 @@ pub const PERIPHERALS_START: usize = bcm2837::addr::PERIPHERALS_START;
 pub const PERIPHERALS_END: usize = bcm2837::addr::PERIPHERALS_END;
 pub const CPU_NUM: usize = 4;
 
+/// BCM2837 spin table (ref: linux/arch/arm/boot/dts/bcm2837.dtsi)
 #[no_mangle]
 pub static CPU_SPIN_TABLE: [usize; CPU_NUM] = [0xd8, 0xe0, 0xe8, 0xf0];
 

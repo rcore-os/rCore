@@ -3,24 +3,22 @@
 
 _start:
     # pc == 0x80000
+    # only the primary CPU starts here, other CPUs start from 0x0 and spin
+    # until the spin table holds a jump address. (see qemu/hw/arm/raspi.c)
 
     # read cpu affinity, start core 0, halt rest
     mrs     x19, mpidr_el1
     and     x19, x19, #3
-    cbnz    x19, slave_spin
+    cbnz    x19, halt
     bl      el_setup
     bl      clear_bss
     bl      create_init_paging
     b       master_startup
 
-slave_spin:
-    ldr     x0, =CPU_SPIN_TABLE
-    and     x0, x0, #0xffffffff
-    ldr     x0, [x0, x19, lsl #3]
-1:  wfe
-    ldr     x1, [x0]
-    cbz     x1, 1b
-    br      x1
+halt:
+    # unreachable
+    wfe
+    b       halt
 
 # switch to EL1, setup system registers of other EL
 el_setup:
