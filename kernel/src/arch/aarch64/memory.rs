@@ -4,12 +4,10 @@ use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use log::*;
-use spin::Mutex;
 use rcore_memory::PAGE_SIZE;
+use spin::Mutex;
 
-lazy_static! {
-    static ref KERNEL_MEMORY_SET: Mutex<Option<MemorySet>> = Mutex::new(None);
-}
+static KERNEL_MEMORY_SET: Mutex<Option<MemorySet>> = Mutex::new(None);
 
 /// Memory initialization.
 pub fn init() {
