@@ -1,7 +1,5 @@
 sudo: false
 
-dist: bionic
-
 language: rust
 
 rust: nightly-2019-07-15
@@ -10,6 +8,10 @@ os:
   - linux
   - osx
 
+dist: bionic
+
+osx_image: xcode11
+
 cache:
   cargo: true
   directories:
@@ -17,9 +19,11 @@ cache:
     - $TRAVIS_BUILD_DIR/qemu-4.1.0
 
 addons:
-  homebrew:
+  apt:
     update: true
-    brewfile: true
+    packages:
+      - device-tree-compiler
+  homebrew:
     packages:
       - qemu
       - dtc
@@ -40,8 +44,6 @@ install:
   - if [ $TRAVIS_OS_NAME = linux ]; then
       [ ! -d qemu-4.1.0/$ARCH-softmmu ] && wget https://download.qemu.org/qemu-4.1.0.tar.xz && tar xJf qemu-4.1.0.tar.xz > /dev/null && cd qemu-4.1.0 && ./configure --target-list=$ARCH-softmmu && make && cd ..;
       export PATH=$PATH:$PWD/qemu-4.1.0/$ARCH-softmmu:$PWD/qemu-4.1.0;
-      sudo apt update;
-      sudo apt install device-tree-compiler -y;
     fi
 
 before_script:
@@ -53,6 +55,3 @@ script:
   - cd user && make sfsimg arch=$ARCH prebuilt=1 && cd ..
   - cd kernel && make build arch=$ARCH $OPTS && cd ..
   - cd kernel && make test arch=$ARCH $OPTS && cd ..
-
-before_cache:
-  - if [ $TRAVIS_OS_NAME = osx ]; then brew cleanup; fi
