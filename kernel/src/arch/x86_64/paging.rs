@@ -93,6 +93,8 @@ impl PageTable for PageTableImpl {
         let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
         unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
+
+    fn flush_cache_copy_user(&mut self, _start: usize, _end: usize, _execute: bool) {}
 }
 
 fn frame_to_page_table(frame: Frame) -> *mut x86PageTable {

@@ -1,11 +1,11 @@
 ENTRY(_start)
 
 SECTIONS {
-  . = 0xffff000000100000; /* Load the kernel at this address. It's also kernel stack top address */
+  . = 0xffff000000080000; /* Load the kernel at this address. */
 
   .text : {
     stext = .;
-    *(.text.entry)
+    *(.text.boot)
     *(.text .text.* .gnu.linkonce.t*)
     . = ALIGN(4K);
     etext = .;
@@ -25,6 +25,11 @@ SECTIONS {
     edata = .;
   }
 
+  .stack : {
+    . = ALIGN(4K);
+    *(.bss.stack)
+  }
+
   .bss : {
     . = ALIGN(32);
     sbss = .;
@@ -32,13 +37,6 @@ SECTIONS {
     *(COMMON)
     . = ALIGN(4K);
     ebss = .;
-  }
-
-  .stack : {
-    . = ALIGN(4K);
-    bootstack = .;
-    . += 0x100000;
-    bootstacktop = .;
   }
 
   /* end of the binary */

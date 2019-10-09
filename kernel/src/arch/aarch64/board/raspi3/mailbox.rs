@@ -2,8 +2,8 @@
 //!
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
-use crate::memory::virt_to_phys;
-use aarch64::asm;
+use crate::memory::kernel_offset;
+use aarch64::cache::*;
 use alloc::string::String;
 use bcm2837::addr::phys_to_bus;
 use bcm2837::mailbox::{Mailbox, MailboxChannel};
@@ -220,13 +220,13 @@ macro_rules! send_request {
         {
             // flush data cache around mailbox accesses
             let mut mbox = MAILBOX.lock();
-            asm::flush_dcache_range(start, end);
+            DCache::<Clean, PoC>::flush_range(start, end, SY);
             mbox.write(
                 MailboxChannel::Property,
-                phys_to_bus(virt_to_phys(start) as u32),
+                phys_to_bus(kernel_offset(start) as u32),
             );
             mbox.read(MailboxChannel::Property);
-            asm::flush_dcache_range(start, end);
+            DCache::<Invalidate, PoC>::flush_range(start, end, SY);
         }
 
         match req.0.req_resp_code {

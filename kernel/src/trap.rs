@@ -20,21 +20,10 @@ pub fn timer() {
 
 pub fn error(tf: &TrapFrame) -> ! {
     error!("{:#x?}", tf);
-    let tid = processor().tid();
-    error!("On CPU{} Thread {}", cpu::id(), tid);
-    let thread = unsafe { current_thread() };
-    let mut proc=thread.proc.lock();
-    proc.threads.retain(|&id| id != tid);
-    if proc.threads.len()==0 {
+    unsafe {
+        let mut proc = current_thread().proc.lock();
         proc.exit(0x100);
-    }    
-    drop(proc);
-    // TODO: futex wait, and make sure that no dangerous operation here.
-    //  A better approach would be using a real signal...
-    //  But I'm not inventing the world again.
-    //  Anyway, you can emulate a signal receiver, and every thread kills itself when it receives a signal.
-    //  At least this is a bit better than any cross-thread killing.
-    processor().manager().exit(tid, 0x100);
+    }
     processor().yield_now();
     unreachable!();
 }

@@ -1,3 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_mut)]
+#![allow(unused_parens)]
+#![allow(unused_imports)]
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+#![allow(unused_assignments)]
+#![allow(non_upper_case_globals)]
+
 use super::mailbox;
 use crate::thread;
 use bcm2837::emmc::*;
@@ -324,11 +333,9 @@ pub struct EmmcCtl {
     card_removal: bool,
     base_clock: u32,
 }
-use crate::arch::board::timer::get_cycle;
 
-fn usleep(cnt: u32) {
-    let now = get_cycle();
-    while get_cycle() - now < cnt as u64 {}
+fn usleep(cnt: usize) {
+    bcm2837::timer::delay_us(cnt);
 }
 
 fn byte_swap(b: u32) -> u32 {

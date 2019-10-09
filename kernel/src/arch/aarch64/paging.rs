@@ -1,15 +1,17 @@
 //! Page table implementations for aarch64.
 
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
-use aarch64::asm::{tlb_invalidate, tlb_invalidate_all, ttbr_el1_read, ttbr_el1_write};
+use aarch64::cache::*;
 use aarch64::paging::{
     frame::PhysFrame as Frame,
     mapper::{MappedPageTable, Mapper},
     memory_attribute::*,
     page_table::{PageTable as Aarch64PageTable, PageTableEntry, PageTableFlags as EF},
-    FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size4KiB,
+    FrameAllocator, FrameDeallocator, Page as PageAllSizes, Size2MiB, Size4KiB,
 };
-use aarch64::PhysAddr;
+use aarch64::translation::{invalidate_tlb_vaddr, local_invalidate_tlb_all};
+use aarch64::translation::{ttbr_el1_read, ttbr_el1_write};
+use aarch64::{align_down, align_up, PhysAddr, ALIGN_2MIB};
 use core::mem::ManuallyDrop;
 use log::*;
 use rcore_memory::paging::*;
@@ -70,6 +72,25 @@ impl PageTable for PageTableImpl {
         let vaddr = phys_to_virt(frame.start_address().as_u64() as usize);
         unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
+
+    fn flush_cache_copy_user(&mut self, start: usize, end: usize, execute: bool) {
+        if execute {
+            // clean D-cache to PoU to ensure new instructions has been written
+            // into memory
+            DCache::<Clean, PoU>::flush_range(start, end, ISH);
+            // invalidate I-cache to PoU to ensure old instructions has been
+            // flushed
+            if get_l1_icache_policy() == L1ICachePolicy::PIPT {
+                // Cortex-A57 use PIPT, address translation is transparent
+                ICache::<Invalidate, PoU>::flush_range(start, end, ISH);
+            } else {
+                // Cortex-A53 (raspi3) use VIPT, the effect of invalidation is
+                // only visible to the VA, need to invalidate the entire
+                // I-cache to invalidate all aliases of a PA.
+                ICache::flush_all();
+            }
+        }
+    }
 }
 
 fn frame_to_page_table(frame: Frame) -> *mut Aarch64PageTable {
@@ -88,7 +109,7 @@ pub enum MMIOType {
 // TODO: software dirty bit needs to be reconsidered
 impl Entry for PageEntry {
     fn update(&mut self) {
-        tlb_invalidate(self.1.start_address());
+        invalidate_tlb_vaddr(self.1.start_address());
     }
 
     fn present(&self) -> bool {
@@ -230,6 +251,32 @@ impl PageTableImpl {
             entry: None,
         })
     }
+    /// Activate as kernel page table (TTBR1_EL1).
+    /// Used in `arch::memory::map_kernel()`.
+    pub unsafe fn activate_as_kernel(&self) {
+        ttbr_el1_write(1, Frame::of_addr(self.token() as u64));
+        local_invalidate_tlb_all();
+    }
+    /// Map physical memory [start, end)
+    /// to virtual space [phys_to_virt(start), phys_to_virt(end))
+    pub fn map_physical_memory(&mut self, start: usize, end: usize) {
+        info!("mapping physical memory");
+        let aligned_start = align_down(start as u64, ALIGN_2MIB);
+        let aligned_end = align_up(end as u64, ALIGN_2MIB);
+        let flags = EF::default_block() | EF::UXN | EF::PXN;
+        let attr = MairNormal::attr_value();
+        for frame in Frame::<Size2MiB>::range_of(aligned_start, aligned_end) {
+            let paddr = frame.start_address();
+            let vaddr = phys_to_virt(paddr.as_u64() as usize);
+            let page = PageAllSizes::<Size2MiB>::of_addr(vaddr as u64);
+            unsafe {
+                self.page_table
+                    .map_to(page, frame, flags, attr, &mut FrameAllocatorForAarch64)
+                    .expect("failed to map physical memory")
+                    .flush();
+            }
+        }
+    }
 }
 
 impl PageTableExt for PageTableImpl {
@@ -256,7 +303,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     unsafe fn set_token(token: usize) {
-        ttbr_el1_write(0, Frame::containing_address(PhysAddr::new(token as u64)));
+        ttbr_el1_write(0, Frame::of_addr(token as u64));
     }
 
     fn active_token() -> usize {
@@ -264,7 +311,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     fn flush_tlb() {
-        tlb_invalidate_all();
+        local_invalidate_tlb_all();
     }
 }
 

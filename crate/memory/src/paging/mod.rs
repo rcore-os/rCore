@@ -26,6 +26,9 @@ pub trait PageTable {
     /// Get a mutable reference of the content of a page of virtual address `addr`
     fn get_page_slice_mut<'a>(&mut self, addr: VirtAddr) -> &'a mut [u8];
 
+    /// When copied user data (in page fault handler)，maybe need to flush I/D cache.
+    fn flush_cache_copy_user(&mut self, start: VirtAddr, end: VirtAddr, execute: bool);
+
     /// Read data from virtual address `addr`
     /// Used for testing with mock
     fn read(&mut self, _addr: VirtAddr) -> u8 {

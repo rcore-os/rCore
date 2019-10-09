@@ -14,7 +14,7 @@
 
 use super::HEAP_ALLOCATOR;
 pub use crate::arch::paging::*;
-use crate::consts::{MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
+use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
 use crate::sync::SpinNoIrqLock;
 use bitmap_allocator::BitAlloc;
@@ -54,15 +54,21 @@ lazy_static! {
 }
 
 /// Convert physical address to virtual address
-// #[inline]
+#[inline]
 pub const fn phys_to_virt(paddr: usize) -> usize {
     PHYSICAL_MEMORY_OFFSET + paddr
 }
 
 /// Convert virtual address to physical address
-// #[inline]
+#[inline]
 pub const fn virt_to_phys(vaddr: usize) -> usize {
     vaddr - PHYSICAL_MEMORY_OFFSET
+}
+
+/// Convert virtual address to the offset of kernel
+#[inline]
+pub const fn kernel_offset(vaddr: usize) -> usize {
+    vaddr - KERNEL_OFFSET
 }
 
 #[derive(Debug, Clone, Copy)]

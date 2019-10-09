@@ -58,6 +58,8 @@ impl PageTable for PageTableImpl {
         let vaddr = frame.to_kernel_unmapped().as_usize();
         unsafe { core::slice::from_raw_parts_mut(vaddr as *mut u8, 0x1000) }
     }
+
+    fn flush_cache_copy_user(&mut self, _start: usize, _end: usize, _execute: bool) {}
 }
 
 extern "C" {

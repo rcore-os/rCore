@@ -1,7 +1,0 @@
-[package]
-name = "bootinfo"
-version = "0.1.0"
-authors = ["equation314 <equation618@gmail.com>"]
-edition = "2018"
-
-[dependencies]
