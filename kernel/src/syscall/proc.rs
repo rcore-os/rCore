@@ -96,6 +96,10 @@ impl Syscall<'_> {
             // if found, return
             if let Some((pid, exit_code)) = find {
                 proc.child_exit_code.remove(&pid);
+                {
+                    let mut process_table = PROCESSES.write();
+                    process_table.remove(&pid);
+                }
                 if let Some(wstatus) = wstatus {
                     *wstatus = exit_code as i32;
                 }
