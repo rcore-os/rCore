@@ -382,7 +382,7 @@ impl Process {
         // assign pid
         let pid = (0..)
             .find(|i| match process_table.get(i) {
-                Some(p) if p.upgrade().is_some() => false,
+                Some(p) => false,
                 _ => true,
             })
             .unwrap();
