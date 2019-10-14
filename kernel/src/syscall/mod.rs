@@ -24,6 +24,7 @@ pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
 pub use self::time::*;
+pub use self::ipc::*;
 
 mod custom;
 mod fs;
@@ -258,6 +259,11 @@ impl Syscall<'_> {
                 self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8)
             }
             SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+
+            // sem
+            SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
+            SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
+            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3]),
 
             // system
             SYS_GETPID => self.sys_getpid(),

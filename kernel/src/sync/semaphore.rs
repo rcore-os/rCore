@@ -41,6 +41,9 @@ impl Semaphore {
             count = self.cvar.wait(count);
         }
         *count -= 1;
+        if (count > 0) {
+            self.cvar.notify_one();
+        }
     }
 
     /// Release a resource from this semaphore.
@@ -60,6 +63,25 @@ impl Semaphore {
     pub fn access(&self) -> SemaphoreGuard {
         self.acquire();
         SemaphoreGuard { sem: self }
+    }
+
+    /// Modify by k atomically
+    pub fn modify(&self, k: isize, wait: bool) -> Result {
+        match(k) {
+            k if k > 0 {
+                self.lock.lock() += k;
+                self.cvar.notify_one();
+            },
+            k if k <= 0 {
+                let mut count = self.lock.lock();
+                while *count < k {
+                    if wait == false {
+                        return Err(EAGAIN)
+                    }
+                    count = self.cvar.wait(count);
+                }
+            }
+        }
     }
 }
 

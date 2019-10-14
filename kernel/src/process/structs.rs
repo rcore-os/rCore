@@ -18,6 +18,7 @@ use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
+use crate::ipc::SemArray;
 
 use super::abi::{self, ProcInitInfo};
 use crate::processor;
@@ -64,6 +65,8 @@ pub struct Process {
     pub cwd: String,
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
+    pub semaphores: RwLock<BTreeMap<usize, Arc<Mutex<SemArray>>>>,
+    pub semops: Vec<SemBuf>,
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
