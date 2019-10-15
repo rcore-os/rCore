@@ -6,6 +6,7 @@ use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
 use rcore_fs::vfs::PollStatus;
+use crate::sync::Condvar;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -53,6 +54,14 @@ impl FileLike {
                 let (read, write, error) = socket.poll();
                 PollStatus { read, write, error }
             }
+        };
+        Ok(status)
+    }
+
+    pub fn poll_condvar(&self) -> Option<&Condvar> {
+        let condvar = match self {
+            FileLike::File(file) => file.poll_condvar()?,
+            FileLike::Socket(socket) => socket.poll_condvar()?
         };
         Ok(status)
     }

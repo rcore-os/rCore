@@ -7,6 +7,7 @@ use core::mem::size_of;
 use rcore_fs::vfs::Timespec;
 
 use crate::drivers::SOCKET_ACTIVITY;
+use crate::trap::TICK_ACTIVITY;
 use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
@@ -98,22 +99,38 @@ impl Syscall<'_> {
             );
         }
 
-        /// check whether the fds is valid and is owned by this process
+        // check whether the fds is valid and is owned by this process
+        let mut condvars = Vec::new();
+        condvars.push(&(*TICK_ACTIVITY));
+
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
         for poll in polls.iter() {
-            if proc.files.get(&(poll.fd as usize)).is_none() {
-                return Err(SysError::EINVAL);
+            match proc.files.get(&(poll.fd as usize)){
+                None => {
+                    return Err(SysError::EINVAL);
+                },
+                Some(file_like) => {
+                    if let Some(condvar) = file_like.poll_condvar(){
+                        condvars.push(condvar);
+                    }
+                }
             }
         }
+        condvars = 
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-        Condvar::wait_events(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)], move || {
+
+
+//        condvars.push(&STDIN.pushed);
+//        condvars.push(&(*SOCKET_ACTIVITY));
+
+        Condvar::wait_events(&condvars., move || {
             use PollEvents as PE;
             let proc = self.process();
             let mut events = 0;
 
-            /// iterate each poll to check whether it is ready
+            // iterate each poll to check whether it is ready
             for poll in polls.iter_mut() {
                 poll.revents = PE::empty();
                 if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
@@ -140,15 +157,13 @@ impl Syscall<'_> {
             }
             drop(proc);
 
-
-            /// some event happens, so evoke the process
+            // some event happens, so evoke the process
             if events > 0 {
                 return Some(Ok(events));
             }
 
             let current_time_ms = crate::trap::uptime_msec();
-
-            /// time runs out, so the evoke the process
+            // time runs out, so the evoke the process
             if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
                 return Some(Ok(0));
             }
@@ -576,6 +591,7 @@ impl Syscall<'_> {
 
         // BUGFIX: '..' and '.'
         if path.len() > 0 {
+
             let cwd = match path.as_bytes()[0] {
                 b'/' => String::from("/"),
                 _ => proc.cwd.clone(),
