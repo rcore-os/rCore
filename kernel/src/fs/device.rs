@@ -1,12 +1,12 @@
 //! Implement Device
 
+#![allow(dead_code)]
+
 use rcore_fs::dev::*;
 use spin::RwLock;
 
 #[cfg(target_arch = "x86_64")]
 use crate::arch::driver::ide;
-
-use crate::sync::SpinNoIrqLock as Mutex;
 
 pub struct MemBuf(RwLock<&'static mut [u8]>);
 

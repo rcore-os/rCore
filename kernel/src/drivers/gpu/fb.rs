@@ -3,7 +3,6 @@
 use crate::fs::vga::{fb_fix_screeninfo, fb_var_screeninfo};
 use alloc::string::String;
 use core::fmt;
-use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
 
