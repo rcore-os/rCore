@@ -343,7 +343,7 @@ struct EmmcCtl {
 }
 
 fn usleep(cnt: usize) {
-    bcm2837::timer::delay_us(cnt);
+    bcm2837::timer::delay_us(cnt / 100);
 }
 
 fn byte_swap(b: u32) -> u32 {
@@ -1449,10 +1449,10 @@ pub fn init() {
         let driver = Arc::new(SDHCIDriver(Mutex::new(ctrl)));
 
         // test
-        use super::test::*;
-        test_read(driver.clone());
-        test_write(driver.clone());
-        test_speed(driver.clone());
+        // use super::test::*;
+        // test_read(driver.clone());
+        // test_write(driver.clone());
+        // test_speed(driver.clone());
 
         DRIVERS.write().push(driver.clone());
         IRQ_MANAGER.write().register_all(driver.clone());
