@@ -26,6 +26,8 @@ pub mod gpu;
 pub mod input;
 /// Interrupt controller
 pub mod irq;
+/// MMC controller
+pub mod mmc;
 /// Network controller
 pub mod net;
 /// For isomorphic_drivers

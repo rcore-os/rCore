@@ -1,14 +1,12 @@
-#![allow(dead_code)]
-#![allow(unused_mut)]
-#![allow(unused_parens)]
-#![allow(unused_imports)]
-#![allow(non_snake_case)]
-#![allow(unused_variables)]
-#![allow(unused_assignments)]
-#![allow(non_upper_case_globals)]
+//! BCM2835 Secure Digital Host Controller Interface driver
+//! TODO: refactor, speed up
 
-use super::mailbox;
+use crate::arch::board::mailbox;
+use crate::drivers::block::BlockDriver;
+use crate::drivers::{DeviceType, Driver, BLK_DRIVERS, DRIVERS, IRQ_MANAGER};
 use crate::sync::SpinNoIrqLock as Mutex;
+use alloc::string::String;
+use alloc::sync::Arc;
 use bcm2837::emmc::*;
 use core::mem;
 use core::slice;
@@ -293,7 +291,7 @@ const SD_RESET_ALL: u32 = (1 << 24);
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct SDScr {
+struct SDScr {
     scr: [u32; 2],
     sd_bus_widths: u32,
     sd_version: u32,
@@ -309,7 +307,7 @@ impl SDScr {
     }
 }
 
-pub struct EmmcCtl {
+struct EmmcCtl {
     emmc: Emmc,
     card_supports_sdhc: bool,
     card_supports_18v: bool,
@@ -948,7 +946,7 @@ impl EmmcCtl {
 
         usleep(2000);
 
-        self.block_size = 512;
+        self.block_size = BLOCK_SIZE;
         self.base_clock = base_clock;
 
         // Send CMD0 to the card (reset to idle state)
@@ -1270,7 +1268,12 @@ impl EmmcCtl {
         true
     }
 
-    pub fn read(&mut self, block_no_arg: u32, count: usize, buf: &mut [u32]) -> Result<(), ()> {
+    pub fn read_block(
+        &mut self,
+        block_no_arg: u32,
+        count: usize,
+        buf: &mut [u32],
+    ) -> Result<(), ()> {
         let mut block_no = block_no_arg;
         if !self.card_supports_sdhc {
             block_no *= 512;
@@ -1328,7 +1331,7 @@ impl EmmcCtl {
         Err(())
     }
 
-    pub fn write(&mut self, block_no_arg: u32, count: usize, buf: &[u32]) -> Result<(), ()> {
+    pub fn write_block(&mut self, block_no_arg: u32, count: usize, buf: &[u32]) -> Result<(), ()> {
         let mut block_no = block_no_arg;
         if !self.card_supports_sdhc {
             block_no *= 512;
@@ -1397,16 +1400,12 @@ impl EmmcCtl {
     }
 }
 
-lazy_static! {
-    pub static ref EMMC_CTL: Mutex<EmmcCtl> = Mutex::new(EmmcCtl::new());
-}
-
-fn demo() {
+fn demo(ctrl: &mut EmmcCtl) {
     // print out the first section of the sd_card.
     let section: [u8; 512] = [0; 512];
     let buf = unsafe { slice::from_raw_parts_mut(section.as_ptr() as *mut u32, 512 / 4) };
     println!("Trying to fetch the first section of the SD card.");
-    if !EMMC_CTL.lock().read(0, 1, buf).is_ok() {
+    if !ctrl.read_block(0, 1, buf).is_ok() {
         error!("Failed in fetching.");
         return;
     }
@@ -1457,13 +1456,12 @@ fn demo() {
     }
 }
 
-fn demo_write() {
+fn demo_write(ctrl: &mut EmmcCtl) {
     let section: [u8; 512] = [0; 512];
     let mut deadbeef: [u8; 512] = [0; 512];
     println!("Trying to fetch the second section of the SD card.");
-    if !EMMC_CTL
-        .lock()
-        .read(1, 1, unsafe {
+    if !ctrl
+        .read_block(1, 1, unsafe {
             slice::from_raw_parts_mut(section.as_ptr() as *mut u32, 512 / 4)
         })
         .is_ok()
@@ -1487,9 +1485,8 @@ fn demo_write() {
         deadbeef[i * 4 + 3] = 0xEF;
     }
 
-    if !EMMC_CTL
-        .lock()
-        .write(1, 1, unsafe {
+    if !ctrl
+        .write_block(1, 1, unsafe {
             slice::from_raw_parts(deadbeef.as_ptr() as *mut u32, 512 / 4)
         })
         .is_ok()
@@ -1497,9 +1494,8 @@ fn demo_write() {
         error!("Failed in writing.");
         return;
     }
-    if !EMMC_CTL
-        .lock()
-        .read(1, 1, unsafe {
+    if !ctrl
+        .read_block(1, 1, unsafe {
             slice::from_raw_parts_mut(deadbeef.as_ptr() as *mut u32, 512 / 4)
         })
         .is_ok()
@@ -1515,9 +1511,8 @@ fn demo_write() {
         println!("");
     }
     println!("");
-    if !EMMC_CTL
-        .lock()
-        .write(1, 1, unsafe {
+    if !ctrl
+        .write_block(1, 1, unsafe {
             slice::from_raw_parts(section.as_ptr() as *mut u32, 512 / 4)
         })
         .is_ok()
@@ -1538,14 +1533,52 @@ fn demo_write() {
     println!("Passed write() check.");
 }
 
+pub struct SDHCIDriver(Mutex<EmmcCtl>);
+
+impl Driver for SDHCIDriver {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
+        false
+    }
+
+    fn device_type(&self) -> DeviceType {
+        DeviceType::Block
+    }
+
+    fn get_id(&self) -> String {
+        format!("bcm2835_sdhci")
+    }
+}
+
+impl BlockDriver for SDHCIDriver {
+    fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
+        if buf.len() < BLOCK_SIZE {
+            return false;
+        }
+        let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, BLOCK_SIZE / 4) };
+        self.0.lock().read_block(block_id as u32, 1, buf).is_ok()
+    }
+
+    fn write_block(&self, block_id: usize, buf: &[u8]) -> bool {
+        if buf.len() < BLOCK_SIZE {
+            return false;
+        }
+        let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, BLOCK_SIZE / 4) };
+        self.0.lock().write_block(block_id as u32, 1, buf).is_ok()
+    }
+}
+
 pub fn init() {
     debug!("Initializing EmmcCtl...");
-    if EMMC_CTL.lock().init() == 0 {
-        debug!("EmmcCtl successfully initialized.");
-        //demo();
-        //demo_write();
-        info!("emmc: init end");
+    let mut ctrl = EmmcCtl::new();
+    if ctrl.init() == 0 {
+        //demo(&mut ctrl);
+        //demo_write(&mut ctrl);
+        let driver = Arc::new(SDHCIDriver(Mutex::new(ctrl)));
+        DRIVERS.write().push(driver.clone());
+        IRQ_MANAGER.write().register_all(driver.clone());
+        BLK_DRIVERS.write().push(driver);
+        info!("BCM2835 sdhci: successfully initialized");
     } else {
-        info!("emmc: init failed");
+        warn!("BCM2835 sdhci: init failed");
     }
 }

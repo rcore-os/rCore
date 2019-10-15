@@ -2,13 +2,13 @@
 
 use bcm2837::{addr::bus_to_phys, atags::Atags};
 
-pub mod emmc;
 pub mod irq;
 pub mod mailbox;
 pub mod serial;
 pub mod timer;
 
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
+use crate::drivers::mmc::bcm2835_sdhci;
 
 pub const BOARD_NAME: &'static str = "Raspberry Pi 3";
 pub const PERIPHERALS_START: usize = bcm2837::addr::PERIPHERALS_START;
@@ -29,7 +29,7 @@ pub fn init_driver() {
     if let Ok(fb_info) = probe_fb_info(0, 0, 0) {
         fb::init(fb_info);
     }
-    emmc::init();
+    bcm2835_sdhci::init();
 }
 
 /// Returns the (start address, end address) of the physical memory on this

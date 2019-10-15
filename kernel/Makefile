@@ -153,7 +153,7 @@ qemu_opts += \
 	-smp 4 \
 	-serial null -serial mon:stdio \
 	-kernel $(kernel_img) \
-	-drive file=$(USER_QCOW2),format=qcow2,id=sfs
+	-drive file=$(USER_QCOW2),if=sd,format=qcow2,id=sfs
 
 else ifeq ($(ARCH), mipsel)
 ifeq ($(BOARD), malta)
