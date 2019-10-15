@@ -47,22 +47,15 @@ lazy_static! {
     pub static ref ROOT_INODE: Arc<dyn INode> = {
         #[cfg(not(feature = "link_user"))]
         let device = {
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
-            {
-                let driver = BlockDriver(
-                    crate::drivers::BLK_DRIVERS
-                        .read().iter()
-                        .next().expect("Block device not found")
-                        .clone()
-                );
-                // enable block cache
-                Arc::new(BlockCache::new(driver, 0x100))
-                // Arc::new(driver)
-            }
-            #[cfg(target_arch = "aarch64")]
-            {
-                unimplemented!()
-            }
+            let driver = BlockDriver(
+                crate::drivers::BLK_DRIVERS
+                    .read().iter()
+                    .next().expect("Block device not found")
+                    .clone()
+            );
+            // enable block cache
+            Arc::new(BlockCache::new(driver, 0x100))
+            // Arc::new(driver)
         };
         #[cfg(feature = "link_user")]
         let device = {

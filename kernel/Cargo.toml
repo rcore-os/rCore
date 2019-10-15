@@ -26,7 +26,7 @@ board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
 consolegraphic = []
-board_raspi3 = ["bcm2837", "link_user"]
+board_raspi3 = ["bcm2837"]
 # for qemu machine
 board_malta = ["link_user"]
 board_mipssim = ["link_user"]
