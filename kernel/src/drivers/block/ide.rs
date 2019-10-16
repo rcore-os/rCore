@@ -166,3 +166,29 @@ mod port {
         Port::new(port).write(value)
     }
 }
+
+use rcore_fs::dev::{self, BlockDevice, DevError};
+
+impl BlockDevice for IDE {
+    const BLOCK_SIZE_LOG2: u8 = 9;
+
+    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> dev::Result<()> {
+        use core::slice;
+        assert!(buf.len() >= BLOCK_SIZE);
+        let buf = unsafe { slice::from_raw_parts_mut(buf.as_ptr() as *mut u32, BLOCK_SIZE / 4) };
+        self.read(block_id as u64, 1, buf).map_err(|_| DevError)?;
+        Ok(())
+    }
+
+    fn write_at(&self, block_id: usize, buf: &[u8]) -> dev::Result<()> {
+        use core::slice;
+        assert!(buf.len() >= BLOCK_SIZE);
+        let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *mut u32, BLOCK_SIZE / 4) };
+        self.write(block_id as u64, 1, buf).map_err(|_| DevError)?;
+        Ok(())
+    }
+
+    fn sync(&self) -> dev::Result<()> {
+        Ok(())
+    }
+}

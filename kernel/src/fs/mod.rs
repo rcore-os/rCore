@@ -7,8 +7,6 @@ use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sfs::SimpleFileSystem;
 
-use crate::drivers::BlockDriver;
-
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -46,29 +44,39 @@ lazy_static! {
     /// The root of file system
     pub static ref ROOT_INODE: Arc<dyn INode> = {
         #[cfg(not(feature = "link_user"))]
-        let device = {
-            let driver = BlockDriver(
+        let (device, size) = {
+            let blk = device::BlockDriver(
                 crate::drivers::BLK_DRIVERS
                     .read().iter()
                     .next().expect("Block device not found")
                     .clone()
             );
             // enable block cache
-            Arc::new(BlockCache::new(driver, 0x100))
-            // Arc::new(driver)
+            (Arc::new(BlockCache::new(blk, 0x100)), 0)
+            // (Arc::new(blk), 0)
         };
         #[cfg(feature = "link_user")]
-        let device = {
+        let (device, size) = {
             extern {
                 fn _user_img_start();
                 fn _user_img_end();
             }
             info!("SFS linked to kernel, from {:08x} to {:08x}", _user_img_start as usize, _user_img_end as usize);
-            Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) })
+            (
+                Arc::new(unsafe { device::MemBuf::new(_user_img_start, _user_img_end) }),
+                _user_img_end as usize - _user_img_start as usize
+            )
         };
 
+        let disk = device::Disk::new(device, size);
+
+        // test read/write speed
+        // device::test::test_speed(&disk);
+
         // use SFS as rootfs
-        let sfs = SimpleFileSystem::open(device).expect("failed to open SFS");
+        let sfs = disk.partition_iter().find_map(|p| {
+            SimpleFileSystem::open(p.clone()).ok()
+        }).expect("cannot find SFS partition on this disk");
         let rootfs = MountFS::new(sfs);
         let root = rootfs.root_inode();
 

@@ -1452,7 +1452,6 @@ pub fn init() {
         // use super::test::*;
         // test_read(driver.clone());
         // test_write(driver.clone());
-        // test_speed(driver.clone());
 
         DRIVERS.write().push(driver.clone());
         IRQ_MANAGER.write().register_all(driver.clone());

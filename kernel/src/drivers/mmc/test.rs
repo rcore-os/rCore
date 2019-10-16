@@ -116,35 +116,3 @@ pub fn test_write(driver: Arc<dyn Driver>) {
     }
     println!("Passed write check.");
 }
-
-#[cfg(target_arch = "aarch64")]
-pub fn test_speed(driver: Arc<dyn Driver>) {
-    let mut section: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
-    let count = 1024 * 100;
-    let mib = count as f32 * 512.0 / 1024.0 / 1024.0;
-
-    println!("================ Test read speed ================");
-    println!("Reading {} blocks ({} MiB) ...", count, mib);
-    let begin = crate::arch::timer::get_cycle();
-    let read_block_id = 2333;
-    for _ in 0..count {
-        driver.read_block(read_block_id, &mut section);
-    }
-    let end = crate::arch::timer::get_cycle();
-    let second = (end - begin) as f32 / 1000000.0;
-    println!("Time used: {:.3} s", second);
-    println!("Speed : {:.3} MiB/s", mib / second);
-
-    println!("================ Test write speed ================");
-    println!("Writing {} blocks ({} MiB) ...", count, mib);
-    let write_block_id = 6666;
-    driver.read_block(write_block_id, &mut section);
-    let begin = crate::arch::timer::get_cycle();
-    for _ in 0..count {
-        driver.write_block(write_block_id, &mut section);
-    }
-    let end = crate::arch::timer::get_cycle();
-    let second = (end - begin) as f32 / 1000000.0;
-    println!("Time used: {:.3} s", second);
-    println!("Speed : {:.3} MiB/s", mib / second);
-}

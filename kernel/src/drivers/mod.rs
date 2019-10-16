@@ -7,7 +7,6 @@ use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address};
 use spin::RwLock;
 
 use crate::sync::Condvar;
-use rcore_fs::dev::{self, BlockDevice, DevError};
 
 #[allow(dead_code)]
 pub mod block;
@@ -100,29 +99,6 @@ lazy_static! {
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
     pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
-}
-
-pub struct BlockDriver(pub Arc<dyn Driver>);
-
-impl BlockDevice for BlockDriver {
-    const BLOCK_SIZE_LOG2: u8 = 9; // 512
-    fn read_at(&self, block_id: usize, buf: &mut [u8]) -> dev::Result<()> {
-        match self.0.read_block(block_id, buf) {
-            true => Ok(()),
-            false => Err(DevError),
-        }
-    }
-
-    fn write_at(&self, block_id: usize, buf: &[u8]) -> dev::Result<()> {
-        match self.0.write_block(block_id, buf) {
-            true => Ok(()),
-            false => Err(DevError),
-        }
-    }
-
-    fn sync(&self) -> dev::Result<()> {
-        Ok(())
-    }
 }
 
 lazy_static! {
