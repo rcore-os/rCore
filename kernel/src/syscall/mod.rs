@@ -34,6 +34,7 @@ mod misc;
 mod net;
 mod proc;
 mod time;
+mod ipc;
 
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
@@ -263,7 +264,7 @@ impl Syscall<'_> {
             // sem
             SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
-            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3]),
+            //SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3]),
 
             // system
             SYS_GETPID => self.sys_getpid(),

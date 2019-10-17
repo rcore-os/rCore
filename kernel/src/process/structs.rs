@@ -18,7 +18,7 @@ use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
-use crate::ipc::SemArray;
+use crate::ipc::*;
 
 use super::abi::{self, ProcInitInfo};
 use crate::processor;
@@ -127,6 +127,8 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 exec_path: String::new(),
+                semaphores: RwLock::new(BTreeMap::new()),
+                semops: Vec::new(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -311,6 +313,8 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
+                semaphores: RwLock::new(BTreeMap::new()),
+                semops: Vec::new(),
                 pid: Pid(0),
                 parent: Weak::new(),
                 children: Vec::new(),
@@ -337,6 +341,8 @@ impl Thread {
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
+            semaphores: RwLock::new(BTreeMap::new()),
+            semops: Vec::new(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
             children: Vec::new(),

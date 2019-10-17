@@ -41,6 +41,7 @@ pub mod shell;
 pub mod sync;
 pub mod syscall;
 pub mod trap;
+pub mod ipc;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]

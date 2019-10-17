@@ -41,7 +41,7 @@ impl Semaphore {
             count = self.cvar.wait(count);
         }
         *count -= 1;
-        if (count > 0) {
+        if (*count > 0) {
             self.cvar.notify_one();
         }
     }
@@ -65,23 +65,34 @@ impl Semaphore {
         SemaphoreGuard { sem: self }
     }
 
-    /// Modify by k atomically
-    pub fn modify(&self, k: isize, wait: bool) -> Result {
+    /// Modify by k atomically. when wait is false avoid waiting.
+    pub fn modify(&self, k: isize, wait: bool) -> Result<usize, usize> {
         match(k) {
-            k if k > 0 {
-                self.lock.lock() += k;
+            k if k > 0 => {
+                *(self.lock.lock()) += k;
                 self.cvar.notify_one();
             },
-            k if k <= 0 {
+            k if k <= 0 => {
                 let mut count = self.lock.lock();
-                while *count < k {
+                let mut temp_k = k;
+                while *count < temp_k {
                     if wait == false {
-                        return Err(EAGAIN)
+                        return Err(1)
                     }
+                    temp_k -= *count;
+                    *count = 0;
                     count = self.cvar.wait(count);
                 }
+                *count -= temp_k;
+                if (*count > 0) {
+                    self.cvar.notify_one();
+                }
+            }
+            _ => {
+                return Err(1);                                                              //unknown error?
             }
         }
+        Ok(0)
     }
 }
 
