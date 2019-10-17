@@ -76,6 +76,7 @@ export ARCH = $(arch)
 export BOARD = $(board)
 export SMP = $(smp)
 export DTB = $(dtb)
+export FEATURES = $(extra_features)
 
 
 ### qemu options ###

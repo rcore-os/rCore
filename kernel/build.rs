@@ -6,6 +6,7 @@ use std::io::{Result, Write};
 fn main() {
     println!("cargo:rerun-if-env-changed=LOG");
     println!("cargo:rerun-if-env-changed=BOARD");
+    println!("cargo:rerun-if-env-changed=FEATURES");
 
     let arch: String = std::env::var("ARCH").unwrap();
     let _board: String = std::env::var("BOARD").unwrap();
