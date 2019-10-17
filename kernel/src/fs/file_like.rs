@@ -7,6 +7,7 @@ use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
 use rcore_fs::vfs::PollStatus;
 use crate::sync::Condvar;
+use alloc::vec::Vec;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -58,12 +59,15 @@ impl FileLike {
         Ok(status)
     }
 
-    pub fn poll_condvar(&self) -> Option<&Condvar> {
+    pub fn poll_condvar(&self, condvars: &mut Vec<&Condvar>) {
         let condvar = match self {
-            FileLike::File(file) => file.poll_condvar()?,
-            FileLike::Socket(socket) => socket.poll_condvar()?
+            FileLike::File(file) => {
+                condvars.push(&crate::fs::STDIN.pushed);
+            },
+            FileLike::Socket(socket) => {
+                condvars.push(&(*crate::drivers::SOCKET_ACTIVITY));
+            },
         };
-        Ok(status)
     }
 
     pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {

@@ -1,5 +1,4 @@
 //! Syscalls for file system
-
 use core::cell::UnsafeCell;
 use core::cmp::min;
 use core::mem::size_of;
@@ -102,6 +101,8 @@ impl Syscall<'_> {
         // check whether the fds is valid and is owned by this process
         let mut condvars = Vec::new();
         condvars.push(&(*TICK_ACTIVITY));
+        condvars.push(&STDIN.pushed);
+        condvars.push(&(*SOCKET_ACTIVITY));
 
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
         for poll in polls.iter() {
@@ -110,22 +111,16 @@ impl Syscall<'_> {
                     return Err(SysError::EINVAL);
                 },
                 Some(file_like) => {
-                    if let Some(condvar) = file_like.poll_condvar(){
-                        condvars.push(condvar);
-                    }
+//                    file_like.poll_condvar(&mut condvars);
                 }
             }
         }
-        condvars = 
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-
-
-//        condvars.push(&STDIN.pushed);
-//        condvars.push(&(*SOCKET_ACTIVITY));
-
-        Condvar::wait_events(&condvars., move || {
+    //&[&STDIN.pushed, &(*SOCKET_ACTIVITY)] condvars.as_slice()
+//        println!("poll called {:?}", condvars.len());
+        Condvar::wait_events(condvars.as_slice(),  move || {
             use PollEvents as PE;
             let proc = self.process();
             let mut events = 0;
@@ -210,6 +205,12 @@ impl Syscall<'_> {
             1 << 31
         };
 
+        let mut condvars = Vec::new();
+        condvars.push(&(*TICK_ACTIVITY));
+        condvars.push(&STDIN.pushed);
+        condvars.push(&(*SOCKET_ACTIVITY));
+        println!("select used");
+
         // for debugging
         if cfg!(debug_assertions) {
             debug!("files before select {:#?}", proc.files);
@@ -217,13 +218,13 @@ impl Syscall<'_> {
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-        Condvar::wait_events(&[&STDIN.pushed, &(*SOCKET_ACTIVITY)], move || {
+        Condvar::wait_events(condvars.as_slice(), move || {
             let proc = self.process();
             let mut events = 0;
             for (&fd, file_like) in proc.files.iter() {
-                if fd >= nfds {
-                    continue;
-                }
+//                if fd >= nfds {
+//                    continue;
+//                }
                 if !err_fds.contains(fd) && !read_fds.contains(fd) && !write_fds.contains(fd) {
                     continue;
                 }
@@ -264,6 +265,59 @@ impl Syscall<'_> {
 
             return None;
         })
+    }
+
+    pub fn sys_epoll_create(
+        &mut self,
+        size: usize,
+    ) -> SysResult {
+        info!("epoll_create: size: {:?}", size);
+
+        return Ok(0);
+
+    }
+
+    pub fn sys_epoll_create1(
+        &mut self,
+        flags: usize,
+    ) -> SysResult {
+        info!("epoll_create1: flags: {:?}", flags);
+
+        return Ok(0);
+    }
+
+    pub fn sys_epoll_ctl(
+        &mut self,
+        epfd: usize,
+        op: usize,
+        fd: usize,
+        event: *mut PollEvents,
+    ) -> SysResult {
+        return Ok(0);
+
+    }
+
+    pub fn sys_epoll_wait(
+        &mut self,
+        epfd: usize,
+        events: *mut EpollEvent,
+        maxevents: usize,
+        timeout: usize,
+    ) -> SysResult {
+        return Ok(0);
+
+    }
+
+    pub fn sys_epoll_pwait(
+        &mut self,
+        epfd: usize,
+        events: *mut EpollEvent,
+        maxevents: usize,
+        timeout: usize,
+        sigset_t: *mut SigSet_t,
+    ) -> SysResult {
+        return Ok(0);
+
     }
 
     pub fn sys_readv(&mut self, fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
@@ -591,7 +645,6 @@ impl Syscall<'_> {
 
         // BUGFIX: '..' and '.'
         if path.len() > 0 {
-
             let cwd = match path.as_bytes()[0] {
                 b'/' => String::from("/"),
                 _ => proc.cwd.clone(),
@@ -1556,6 +1609,23 @@ impl FdSet {
         }
     }
 }
+
+pub struct SigSet_t {
+    __val: [u64; 1024 / 8 / 8],
+}
+
+union epoll_data_t {
+    ptr: u64,
+    fd: i32,
+    v32: u32,
+    v64: u64,
+}
+
+pub struct EpollEvent {
+    events: u32,    /* Epoll events */
+    data: epoll_data_t,      /* User data variable */
+}
+
 
 /// Pathname is interpreted relative to the current working directory(CWD)
 const AT_FDCWD: usize = -100isize as usize;

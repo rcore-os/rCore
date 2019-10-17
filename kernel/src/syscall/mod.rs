@@ -165,7 +165,9 @@ impl Syscall<'_> {
             SYS_PPOLL => {
                 self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
             } // ignore sigmask
-            SYS_EPOLL_CREATE1 => self.unimplemented("epoll_create1", Err(SysError::ENOSYS)),
+            SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
+            SYS_EPOLL_PWAIT => self.sys_epoll_pwait(args[0], args[1] as *mut EpollEvent,
+                                                    args[2], args[3], args[4] as *mut SigSet_t),
 
             // file system
             SYS_STATFS => self.unimplemented("statfs", Err(SysError::EACCES)),
@@ -458,6 +460,7 @@ impl Syscall<'_> {
             SYS_ARCH_PRCTL => self.sys_arch_prctl(args[0] as i32, args[1]),
             SYS_TIME => self.sys_time(args[0] as *mut u64),
             SYS_EPOLL_CREATE => self.unimplemented("epoll_create", Err(SysError::ENOSYS)),
+        //    SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
             _ => return None,
         };
         Some(ret)
