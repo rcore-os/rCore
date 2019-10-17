@@ -1,6 +1,6 @@
 [submodule "user"]
     path = user
-    url = https://github.com/rcore-os/rcore-user.git
+    url = https://github.com/ssryps/rcore-user.git
 [submodule "rboot"]
 	path = rboot
 	url = https://github.com/rcore-os/rboot.git
