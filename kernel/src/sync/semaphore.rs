@@ -65,6 +65,11 @@ impl Semaphore {
         SemaphoreGuard { sem: self }
     }
 
+    pub fn check(&self, k: isize) -> Result<bool, bool> {
+        let mut count = self.lock.lock();
+        Ok((*count) >= k)
+    }
+
     /// Modify by k atomically. when wait is false avoid waiting.
     pub fn modify(&self, k: isize, wait: bool) -> Result<usize, usize> {
         match(k) {

@@ -24,13 +24,24 @@ pub struct SemBuf {
     pub sem_flg: i16,
 }
 
+pub struct SemUndo {
+    pub sem_id: i16,
+    pub sem_num: i16,
+    pub sem_op: i16
+}
+
+pub union SemctlUnion {
+    pub val: isize,
+    pub buf: usize, // semid_ds*, unimplemented
+    pub array: usize, // short*, unimplemented
+} // unused
+
 lazy_static! {
     pub static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<Mutex<SemArray>>>> =
         RwLock::new(BTreeMap::new());                                                   // not mentioned.
 }
 
 pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<Mutex<SemArray>> {
-
     let mut key2sem_table = KEY2SEM.write();
     let mut sem_array_ref: Arc<Mutex<SemArray>>;
 

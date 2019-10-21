@@ -8,7 +8,7 @@ use bitflags::*;
 pub use crate::ipc::SemArray;
 pub use crate::ipc::SemBuf;
 pub use crate::ipc::new_semary;
-//use crate::ipc::semary::*;
+pub use crate::ipc::SemctlUnion;
 
 use super::*;
 
@@ -42,13 +42,15 @@ impl Syscall<'_> {
         let mut semarray_table = proc.semaphores.write();
 
         for sembuf in sem_ops.iter() {
-            let mut wait = true;
             if (sembuf.sem_flg == (SEMFLAGS::IPC_NOWAIT.bits())) {
-                wait = false;
+                unimplemented!("Semaphore: semop.IPC_NOWAIT");
+            }
+            if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
+                unimplemented!("Semaphore: semop.SEM_UNDO");
             }
             let mut semarray_arc: Arc<Mutex<SemArray>> = (*semarray_table.get(&sem_id).unwrap()).clone();
             let mut semarray: &SemArray = &*semarray_arc.lock();
-            match((*semarray).sems[sembuf.sem_num as usize].modify(sembuf.sem_op as isize, wait)) {
+            match((*semarray).sems[sembuf.sem_num as usize].modify(sembuf.sem_op as isize, true)) {
                 Ok(0) => {},
                 Err(1) => {
                     return Err(SysError::EAGAIN);
@@ -57,10 +59,16 @@ impl Syscall<'_> {
                     return Err(SysError::EUNDEF);                                                                      // unknown error?
                 }
             }
+            /*if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
+                proc.semops.push(sembuf);
+            }*/
         }
         Ok(0)
     }
 
+    pub fn sys_semctl(&self, sem_id: usize, sem_num: usize, cmd: usize, arg: usize) -> SysResult {
+        unimplemented!("Semaphore: Semctl");
+    }
 }
 
 bitflags! {

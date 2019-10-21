@@ -18,7 +18,8 @@ use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
-use crate::ipc::*;
+use crate::ipc::SemArray;
+use crate::ipc::SemUndo;
 
 use super::abi::{self, ProcInitInfo};
 use crate::processor;
@@ -66,7 +67,7 @@ pub struct Process {
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
     pub semaphores: RwLock<BTreeMap<usize, Arc<Mutex<SemArray>>>>,
-    pub semops: Vec<SemBuf>,
+    pub semundos: Vec<SemUndo>,
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
@@ -128,7 +129,7 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::new(),
                 semaphores: RwLock::new(BTreeMap::new()),
-                semops: Vec::new(),
+                semundos: Vec::new(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -314,7 +315,7 @@ impl Thread {
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
                 semaphores: RwLock::new(BTreeMap::new()),
-                semops: Vec::new(),
+                semundos: Vec::new(),
                 pid: Pid(0),
                 parent: Weak::new(),
                 children: Vec::new(),
@@ -342,7 +343,7 @@ impl Thread {
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             semaphores: RwLock::new(BTreeMap::new()),
-            semops: Vec::new(),
+            semundos: Vec::new(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
             children: Vec::new(),
