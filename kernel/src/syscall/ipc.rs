@@ -52,7 +52,7 @@ impl Syscall<'_> {
             let mut semarray: &SemArray = &*semarray_arc.lock();
             match((*semarray).sems[sembuf.sem_num as usize].modify(sembuf.sem_op as isize, true)) {
                 Ok(0) => {},
-                Err(1) => {
+                Err(()) => {
                     return Err(SysError::EAGAIN);
                 },
                 _ => {
@@ -66,8 +66,24 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_semctl(&self, sem_id: usize, sem_num: usize, cmd: usize, arg: usize) -> SysResult {
-        unimplemented!("Semaphore: Semctl");
+    pub fn sys_semctl(&self, sem_id: usize, sem_num: usize, cmd: usize, arg: isize) -> SysResult {
+        let mut proc = self.process();
+        let mut semarray_table = proc.semaphores.write();
+        let mut semarray_arc: Arc<Mutex<SemArray>> = (*semarray_table.get(&sem_id).unwrap()).clone();
+        let mut semarray: &SemArray = &*semarray_arc.lock();
+        if (cmd == SEMCTLCMD::SETVAL.bits()) {
+            match (*semarray).sems[sem_num].set(arg) {
+                Ok(()) => {
+                    return Ok(0);
+                }
+                _ => {
+                    return Err(SysError::EUNDEF);
+                }
+            }
+            
+        } else {
+            unimplemented!("Semaphore: Semctl.(Not setval)");
+        }
     }
 }
 
@@ -76,5 +92,14 @@ bitflags! {
         /// For SemOP
         const IPC_NOWAIT = 0x800;
         const SEM_UNDO = 0x1000;
+    }
+}
+
+bitflags! {
+    pub struct SEMCTLCMD: usize {
+        //const GETVAL = 12;
+        //const GETALL = 13;
+        const SETVAL = 16;
+        //const SETALL = 17;
     }
 }

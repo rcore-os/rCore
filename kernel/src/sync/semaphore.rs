@@ -65,13 +65,24 @@ impl Semaphore {
         SemaphoreGuard { sem: self }
     }
 
-    pub fn check(&self, k: isize) -> Result<bool, bool> {
+    pub fn check(&self, k: isize) -> Result<bool, ()> {
         let mut count = self.lock.lock();
         Ok((*count) >= k)
     }
 
+    pub fn get(&self) -> Result<isize, ()> {
+        let mut count = self.lock.lock();
+        Ok((*count))
+    }
+
+    pub fn set(&self, k: isize) -> Result<(), ()> {
+        let mut count = self.lock.lock();
+        *count = k;
+        Ok(())
+    }
+
     /// Modify by k atomically. when wait is false avoid waiting.
-    pub fn modify(&self, k: isize, wait: bool) -> Result<usize, usize> {
+    pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
         match(k) {
             k if k > 0 => {
                 *(self.lock.lock()) += k;
@@ -82,7 +93,7 @@ impl Semaphore {
                 let mut temp_k = k;
                 while *count < temp_k {
                     if wait == false {
-                        return Err(1)
+                        return Err(());
                     }
                     temp_k -= *count;
                     *count = 0;
@@ -94,7 +105,7 @@ impl Semaphore {
                 }
             }
             _ => {
-                return Err(1);                                                              //unknown error?
+                return Err(());                                                              //unknown error?
             }
         }
         Ok(0)
