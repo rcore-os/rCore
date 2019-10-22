@@ -5,14 +5,14 @@ use crate::sync::Semaphore;
 use spin::RwLock;
 use core::cell::UnsafeCell;
 
-pub unsafe trait SemArrTrait {
+pub trait SemArrTrait {
     //fn new(key: usize, sems: Vec<Semaphore>) -> SemArray;
     fn get_x(&self, x: usize) -> &Semaphore;
 }
 
 pub struct SemArray {
     pub key: usize,
-    pub sems: UnsafeCell<Vec<Semaphore>>
+    pub sems: Vec<Semaphore>
 }
 
 unsafe impl Sync for SemArray {}
@@ -22,15 +22,15 @@ impl SemArray {
     pub fn new(key: usize, sems: Vec<Semaphore>) -> SemArray {
         SemArray {
             key: key,
-            sems: UnsafeCell::new(sems)
+            sems: sems
         }
     }
 }
 
-unsafe impl SemArrTrait for SemArray {
-    fn get_x(&self, x: usize) -> & Semaphore {
+impl SemArrTrait for SemArray {
+    fn get_x(&self, x: usize) -> &Semaphore {
         //unsafe { &mut self.sems.get()};
-        return unsafe {& (*self.sems.get())[x]};
+        &self.sems[x]
     }
 }
 
