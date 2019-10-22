@@ -277,6 +277,7 @@ impl Syscall<'_> {
                 queue.notify_one();
             }
         }
+        
         drop(proc);
 
         processor().manager().exit(tid, exit_code as usize);

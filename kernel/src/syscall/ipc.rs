@@ -8,9 +8,9 @@ use core::cell::UnsafeCell;
 
 pub use crate::ipc::SemArray;
 pub use crate::ipc::SemBuf;
-use crate::ipc::new_semary;
-use crate::ipc::SemctlUnion;
-use crate::ipc::semary::SemArrTrait;
+pub use crate::ipc::new_semary;
+pub use crate::ipc::SemctlUnion;
+pub use crate::ipc::semary::SemArrTrait;
 
 use super::*;
 
@@ -49,9 +49,6 @@ impl Syscall<'_> {
             if (sembuf.sem_flg == (SEMFLAGS::IPC_NOWAIT.bits())) {
                 unimplemented!("Semaphore: semop.IPC_NOWAIT");
             }
-            if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
-                unimplemented!("Semaphore: semop.SEM_UNDO");
-            }
             //let mut semarray_arc: Arc<SemArray> = (*((*semarray_table).get(&sem_id).unwrap())).clone();
             //let mut semarray: &mut SemArray = &mut *semarray_arc;
             
@@ -65,17 +62,20 @@ impl Syscall<'_> {
             let mut result;
 
             match(sembuf.sem_op) {
-                1 => {
-                    //result = (*semarray).sems[sembuf.sem_num as usize].release();
-                    result = sem_ptr.release();
+                1 => result = sem_ptr.release(),
+                -1 => result = sem_ptr.acquire(),
+                _ => unimplemented!("Semaphore: semop.(Not 1/-1)"),
+            }
+            if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
+                let mut proc = self.process();
+                let get_key = proc.semundos.get(&(sem_id, sembuf.sem_num));
+                let mut val = 0;
+                if (!get_key.is_none()) {
+                    val = *get_key.unwrap();
                 }
-                -1 => {
-                    //result = (*semarray).sems[sembuf.sem_num as usize].acquire();
-                    result = sem_ptr.acquire();
-                }
-                _ => {
-                    unimplemented!("Semaphore: semop.(Not 1/-1)");
-                }
+                val -= sembuf.sem_op;
+                proc.semundos.insert((sem_id, sembuf.sem_num), val);
+                //unimplemented!("Semaphore: semop.SEM_UNDO");
             }
         }
         info!("sem_op: {}", sem_ops[0].sem_op);
