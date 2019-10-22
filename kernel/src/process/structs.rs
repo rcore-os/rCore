@@ -18,8 +18,7 @@ use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
-use crate::ipc::SemArray;
-use crate::ipc::SemUndo;
+use crate::ipc::{SemArray, SemArrTrait, SemUndo};
 
 use super::abi::{self, ProcInitInfo};
 use crate::processor;
@@ -66,7 +65,7 @@ pub struct Process {
     pub cwd: String,
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
-    pub semaphores: RwLock<BTreeMap<usize, Arc<Mutex<SemArray>>>>,
+    pub semaphores: BTreeMap<usize, Arc<SemArray>>,
     pub semundos: Vec<SemUndo>,
 
     // relationship
@@ -128,7 +127,7 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 exec_path: String::new(),
-                semaphores: RwLock::new(BTreeMap::new()),
+                semaphores: BTreeMap::default(),
                 semundos: Vec::new(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
@@ -314,7 +313,7 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
-                semaphores: RwLock::new(BTreeMap::new()),
+                semaphores: BTreeMap::default(),
                 semundos: Vec::new(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -342,7 +341,7 @@ impl Thread {
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
-            semaphores: RwLock::new(BTreeMap::new()),
+            semaphores: proc.semaphores.clone(),
             semundos: Vec::new(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
@@ -419,6 +418,11 @@ impl Process {
         }
         self.futexes.get(&uaddr).unwrap().clone()
     }
+
+    pub fn get_semarray(&mut self, uaddr: usize) -> Arc<SemArray> {
+        self.semaphores.get(&uaddr).unwrap().clone()
+    }
+
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {

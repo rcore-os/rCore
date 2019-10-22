@@ -41,9 +41,9 @@ impl Semaphore {
             count = self.cvar.wait(count);
         }
         *count -= 1;
-        if (*count > 0) {
+        /*if (*count > 0) {
             self.cvar.notify_one();
-        }
+        }*/
     }
 
     /// Release a resource from this semaphore.
@@ -81,7 +81,7 @@ impl Semaphore {
         Ok(())
     }
 
-    /// Modify by k atomically. when wait is false avoid waiting.
+    /// Modify by k atomically. when wait is false avoid waiting. unused
     pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
         match(k) {
             k if k > 0 => {
@@ -91,15 +91,15 @@ impl Semaphore {
             k if k <= 0 => {
                 let mut count = self.lock.lock();
                 let mut temp_k = k;
-                while *count < temp_k {
+                while (*count + temp_k < 0) {
                     if wait == false {
                         return Err(());
                     }
-                    temp_k -= *count;
+                    temp_k += *count;
                     *count = 0;
                     count = self.cvar.wait(count);
                 }
-                *count -= temp_k;
+                *count += temp_k;
                 if (*count > 0) {
                     self.cvar.notify_one();
                 }

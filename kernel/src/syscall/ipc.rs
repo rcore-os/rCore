@@ -1,14 +1,16 @@
 
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
-use crate::sync::SpinNoIrqLock as Mutex;
+use crate::sync::SpinLock as Mutex;
 use crate::sync::Semaphore;
 use spin::RwLock;
 use bitflags::*;
+use core::cell::UnsafeCell;
 
 pub use crate::ipc::SemArray;
 pub use crate::ipc::SemBuf;
-pub use crate::ipc::new_semary;
-pub use crate::ipc::SemctlUnion;
+use crate::ipc::new_semary;
+use crate::ipc::SemctlUnion;
+use crate::ipc::semary::SemArrTrait;
 
 use super::*;
 
@@ -20,7 +22,8 @@ impl Syscall<'_> {
         }
 
         let mut proc = self.process();
-        let mut semarray_table = proc.semaphores.write();
+        let mut semarray_table/*: &mut BTreeMap<usize, Arc<SemArray>>*/ = &mut proc.semaphores;
+
         let sem_id = (0..)
             .find(|i| match semarray_table.get(i) {
                 Some(p) => false,
@@ -28,7 +31,7 @@ impl Syscall<'_> {
             })
             .unwrap();
 
-        let mut sem_array : Arc<Mutex<SemArray>> = new_semary(key, nsems, semflg);
+        let mut sem_array : Arc<SemArray> = new_semary(key, nsems, semflg);
 
         semarray_table.insert(sem_id, sem_array);
         Ok(sem_id)
@@ -38,8 +41,7 @@ impl Syscall<'_> {
         //let mut sem_bufs:Vec<SemBuf> = Vec::new();
         let sem_ops = unsafe { self.vm().check_read_array(sem_ops, num_sem_ops)? };
 
-        let mut proc = self.process();
-        let mut semarray_table = proc.semaphores.write();
+        //let mut semarray_table/*: &BTreeMap<usize, Arc<SemArray>>*/ = proc.semaphores;
 
         for sembuf in sem_ops.iter() {
             if (sembuf.sem_flg == (SEMFLAGS::IPC_NOWAIT.bits())) {
@@ -48,31 +50,39 @@ impl Syscall<'_> {
             if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
                 unimplemented!("Semaphore: semop.SEM_UNDO");
             }
-            let mut semarray_arc: Arc<Mutex<SemArray>> = (*semarray_table.get(&sem_id).unwrap()).clone();
-            let mut semarray: &SemArray = &*semarray_arc.lock();
-            match((*semarray).sems[sembuf.sem_num as usize].modify(sembuf.sem_op as isize, true)) {
-                Ok(0) => {},
-                Err(()) => {
-                    return Err(SysError::EAGAIN);
-                },
+            //let mut semarray_arc: Arc<SemArray> = (*((*semarray_table).get(&sem_id).unwrap())).clone();
+            //let mut semarray: &mut SemArray = &mut *semarray_arc;
+            let mut proc = self.process();
+            let sem_array: Arc<SemArray> = proc.get_semarray(sem_id);
+            let sem_ptr =  sem_array.get_x(sembuf.sem_num as usize);
+            
+            let mut result;
+            match(sembuf.sem_op) {
+                1 => {
+                    //result = (*semarray).sems[sembuf.sem_num as usize].release();
+                    result = sem_ptr.release();
+                }
+                -1 => {
+                    //result = (*semarray).sems[sembuf.sem_num as usize].acquire();
+                    result = sem_ptr.acquire();
+                }
                 _ => {
-                    return Err(SysError::EUNDEF);                                                                      // unknown error?
+                    unimplemented!("Semaphore: semop.(Not 1/-1)");
                 }
             }
-            /*if (sembuf.sem_flg == (SEMFLAGS::SEM_UNDO.bits())) {
-                proc.semops.push(sembuf);
-            }*/
         }
         Ok(0)
     }
 
     pub fn sys_semctl(&self, sem_id: usize, sem_num: usize, cmd: usize, arg: isize) -> SysResult {
+
         let mut proc = self.process();
-        let mut semarray_table = proc.semaphores.write();
-        let mut semarray_arc: Arc<Mutex<SemArray>> = (*semarray_table.get(&sem_id).unwrap()).clone();
-        let mut semarray: &SemArray = &*semarray_arc.lock();
+        let sem_array: Arc<SemArray> = proc.get_semarray(sem_id);
+        let sem_ptr =  sem_array.get_x(sem_num as usize);
+        //let mut sem_ptr: &mut Semaphore = proc.get_semarray(sem_id).get_x(sem_num as usize);
+
         if (cmd == SEMCTLCMD::SETVAL.bits()) {
-            match (*semarray).sems[sem_num].set(arg) {
+            match (sem_ptr.set(arg)) {
                 Ok(()) => {
                     return Ok(0);
                 }

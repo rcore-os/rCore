@@ -1,20 +1,36 @@
 use lazy_static::lazy_static;
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
-use crate::sync::SpinNoIrqLock as Mutex;
+use crate::sync::SpinLock as Mutex;
 use crate::sync::Semaphore;
 use spin::RwLock;
+use core::cell::UnsafeCell;
+
+pub unsafe trait SemArrTrait {
+    //fn new(key: usize, sems: Vec<Semaphore>) -> SemArray;
+    fn get_x(&self, x: usize) -> &Semaphore;
+}
 
 pub struct SemArray {
     pub key: usize,
-    pub sems: Vec<Semaphore>
+    pub sems: UnsafeCell<Vec<Semaphore>>
 }
+
+unsafe impl Sync for SemArray {}
+unsafe impl Send for SemArray {}
 
 impl SemArray {
     pub fn new(key: usize, sems: Vec<Semaphore>) -> SemArray {
         SemArray {
-            key,
-            sems
+            key: key,
+            sems: UnsafeCell::new(sems)
         }
+    }
+}
+
+unsafe impl SemArrTrait for SemArray {
+    fn get_x(&self, x: usize) -> & Semaphore {
+        //unsafe { &mut self.sems.get()};
+        return unsafe {& (*self.sems.get())[x]};
     }
 }
 
@@ -37,13 +53,13 @@ pub union SemctlUnion {
 } // unused
 
 lazy_static! {
-    pub static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<Mutex<SemArray>>>> =
+    pub static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<SemArray>>> =
         RwLock::new(BTreeMap::new());                                                   // not mentioned.
 }
 
-pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<Mutex<SemArray>> {
+pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<SemArray> {
     let mut key2sem_table = KEY2SEM.write();
-    let mut sem_array_ref: Arc<Mutex<SemArray>>;
+    let mut sem_array_ref: Arc<SemArray>;
 
     if key2sem_table.get(&key).is_none() {
         let mut semaphores: Vec<Semaphore> = Vec::new();
@@ -52,7 +68,7 @@ pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<Mutex<SemArray
         }
 
         let mut sem_array = SemArray::new(key, semaphores);
-        sem_array_ref = Arc::new(Mutex::new(sem_array));
+        sem_array_ref = Arc::new(sem_array);
         key2sem_table.insert(key, Arc::downgrade(&sem_array_ref));
     } else {
         sem_array_ref = key2sem_table.get(&key).unwrap().upgrade().unwrap();                               // no security check
