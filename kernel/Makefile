@@ -9,6 +9,7 @@
 #   make header                 Open 'objdump -h' of the last build
 #   make addr2line              Use addr2line to recover line info in backtrace
 #   make clean                  Clean
+#   make install                Install kernel image into real machine
 #
 # Options:
 #   arch    = x86_64 | riscv32 | riscv64 | aarch64 | mipsel
@@ -234,7 +235,7 @@ strip := cargo strip --
 dtc := dtc
 hostcc := gcc
 
-.PHONY: all clean build asm doc debug kernel sfsimg install run justrun test justtest
+.PHONY: all clean build asm doc debug kernel sfsimg install install_user run justrun test justtest addr2line
 
 all: kernel
 
@@ -334,25 +335,17 @@ sfsimg:
 
 ### install ###
 ifeq ($(board), raspi3)
-sd_card ?=
-
-ifeq ($(shell uname), Darwin)
-sd_card := /Volumes/boot
-else ifeq ($(shell uname), Linux)
-sd_card := /media/$(shell whoami)/boot
-endif
-
-ifdef sd_card
-.PHONY:
 install: $(kernel_img)
-	cp $(kernel_img) $(sd_card)/kernel8.img
-	sudo umount $(sd_card)
-endif
+	@../tools/raspi/mkimg.sh -k $<
 
+install_firmware:
+	@../tools/raspi/mkimg.sh -b ../tools/raspi/boot
+
+install_user:
+	@../tools/raspi/mkimg.sh -s $(USER_IMG)
 endif
 
 ifeq ($(board), u540)
-.PHONY:
 install: $(kernel_img)
 	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
 	@dd if=$< of=$(build_path)/bin bs=0x20000 seek=16
@@ -360,13 +353,11 @@ install: $(kernel_img)
 endif
 
 ifeq ($(board), k210)
-.PHONY:
 install: $(kernel_img)
 	@$(objcopy) -S -O binary ../tools/opensbi/k210.elf $(build_path)/k210.img
 	@dd if=$< of=$(build_path)/k210.img bs=0x10000 seek=1
 	@python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
 endif
 
-.PHONY:
 addr2line:
 	@python3.7 ../tools/addr2line.py $(prefix)addr2line $(arch) $(mode)
