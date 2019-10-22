@@ -61,7 +61,8 @@ pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<SemArray> {
     let mut key2sem_table = KEY2SEM.write();
     let mut sem_array_ref: Arc<SemArray>;
 
-    if key2sem_table.get(&key).is_none() {
+    let mut key_sem_array_ref = key2sem_table.get(&key);
+    if (key_sem_array_ref.is_none() || key_sem_array_ref.unwrap().upgrade().is_none()) {
         let mut semaphores: Vec<Semaphore> = Vec::new();
         for i in 0..nsems {
             semaphores.push(Semaphore::new(0));
