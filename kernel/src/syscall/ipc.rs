@@ -15,7 +15,8 @@ use crate::ipc::semary::SemArrTrait;
 use super::*;
 
 impl Syscall<'_> {
-    pub fn sys_semget(&self, key: usize, nsems: usize, semflg: usize) -> SysResult { // ipc not supported yet
+    pub fn sys_semget(&self, key: usize, nsems: usize, semflg: usize) -> SysResult {
+        info!("sys_semget: key: {}", key);
         let SEMMSL: usize = 256;
         if (nsems < 0 || nsems > SEMMSL) {
             return Err(SysError::EINVAL);
@@ -38,6 +39,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_semop(&self, sem_id: usize, sem_ops: *const SemBuf, num_sem_ops: usize) -> SysResult {
+        info!("sys_semop: sem_id: {}", sem_id);
         //let mut sem_bufs:Vec<SemBuf> = Vec::new();
         let sem_ops = unsafe { self.vm().check_read_array(sem_ops, num_sem_ops)? };
 
@@ -52,11 +54,16 @@ impl Syscall<'_> {
             }
             //let mut semarray_arc: Arc<SemArray> = (*((*semarray_table).get(&sem_id).unwrap())).clone();
             //let mut semarray: &mut SemArray = &mut *semarray_arc;
-            let mut proc = self.process();
-            let sem_array: Arc<SemArray> = proc.get_semarray(sem_id);
-            let sem_ptr =  sem_array.get_x(sembuf.sem_num as usize);
+            
+            let sem_array;
+            {
+                let mut proc = self.process();
+                sem_array = proc.get_semarray(sem_id);
+            }
+            let sem_ptr = sem_array.get_x(sembuf.sem_num as usize);
             
             let mut result;
+
             match(sembuf.sem_op) {
                 1 => {
                     //result = (*semarray).sems[sembuf.sem_num as usize].release();
@@ -71,11 +78,12 @@ impl Syscall<'_> {
                 }
             }
         }
+        info!("sem_op: {}", sem_ops[0].sem_op);
         Ok(0)
     }
 
     pub fn sys_semctl(&self, sem_id: usize, sem_num: usize, cmd: usize, arg: isize) -> SysResult {
-
+        info!("sys_semctl: sem_id: {}", sem_id);
         let mut proc = self.process();
         let sem_array: Arc<SemArray> = proc.get_semarray(sem_id);
         let sem_ptr =  sem_array.get_x(sem_num as usize);
