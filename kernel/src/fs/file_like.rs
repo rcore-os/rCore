@@ -2,6 +2,7 @@ use core::fmt;
 
 use super::ioctl::*;
 use super::FileHandle;
+use crate::syscall::EpollInstance;
 use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
@@ -15,6 +16,7 @@ use alloc::vec::Vec;
 pub enum FileLike {
     File(FileHandle),
     Socket(Box<dyn Socket>),
+    EpollInstance(EpollInstance),
 }
 
 impl FileLike {
@@ -22,6 +24,9 @@ impl FileLike {
         let len = match self {
             FileLike::File(file) => file.read(buf)?,
             FileLike::Socket(socket) => socket.read(buf).0?,
+            FileLike::EpollInstance(instance) => {
+                return Err(SysError::EPERM);
+            }
         };
         Ok(len)
     }
@@ -29,6 +34,9 @@ impl FileLike {
         let len = match self {
             FileLike::File(file) => file.write(buf)?,
             FileLike::Socket(socket) => socket.write(buf, None)?,
+            FileLike::EpollInstance(instance) => {
+                return Err(SysError::EPERM);
+            }
         };
         Ok(len)
     }
@@ -43,6 +51,9 @@ impl FileLike {
                     FileLike::Socket(socket) => {
                         socket.ioctl(request, arg1, arg2, arg3)?;
                     }
+                    FileLike::EpollInstance(instance) => {
+
+                    }
                 }
                 Ok(0)
             }
@@ -54,6 +65,9 @@ impl FileLike {
             FileLike::Socket(socket) => {
                 let (read, write, error) = socket.poll();
                 PollStatus { read, write, error }
+            }
+            FileLike::EpollInstance(instance) => {
+                return Err(SysError::EPERM);
             }
         };
         Ok(status)
@@ -67,6 +81,9 @@ impl FileLike {
             FileLike::Socket(socket) => {
                 condvars.push(&(*crate::drivers::SOCKET_ACTIVITY));
             },
+            FileLike::EpollInstance(instance) => {
+
+            }
         };
     }
 
@@ -76,9 +93,14 @@ impl FileLike {
             FileLike::Socket(socket) => {
                 //TODO
             }
+            FileLike::EpollInstance(instance) => {
+
+            }
         }
         Ok(0)
     }
+
+
 }
 
 impl fmt::Debug for FileLike {
@@ -86,6 +108,7 @@ impl fmt::Debug for FileLike {
         match self {
             FileLike::File(file) => write!(f, "File({:?})", file),
             FileLike::Socket(socket) => write!(f, "Socket({:?})", socket),
+            FileLike::EpollInstance(instance) => write!(f, "EpollInstance()"),
         }
     }
 }

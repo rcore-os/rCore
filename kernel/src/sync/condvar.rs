@@ -1,13 +1,17 @@
 use super::*;
-use crate::process::processor;
+use crate::process::{processor, current_thread};
 use crate::thread;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use crate::process::Process;
+use rcore_thread::std_thread::Thread;
+
 
 #[derive(Default)]
 pub struct Condvar {
     wait_queue: SpinNoIrqLock<VecDeque<Arc<thread::Thread>>>,
+    pub epoll_queue: SpinNoIrqLock< VecDeque<(Arc<SpinNoIrqLock<Process>>, usize, usize, usize)> >,
 }
 
 impl Condvar {
@@ -91,12 +95,16 @@ impl Condvar {
 
     pub fn notify_one(&self) {
         if let Some(t) = self.wait_queue.lock().front() {
+            self.epoll_callback(t);
             t.unpark();
         }
     }
+
+
     pub fn notify_all(&self) {
         let queue = self.wait_queue.lock();
         for t in queue.iter() {
+            self.epoll_callback(t);
             t.unpark();
         }
     }
@@ -115,4 +123,46 @@ impl Condvar {
 
         count
     }
+
+    pub fn add_epoll_list(condvar: &Condvar, proc: Arc<SpinNoIrqLock<Process>>, tid :usize, epfd: usize, fd: usize){
+        condvar.epoll_queue.lock().push_back((proc, tid, epfd, fd));
+    }
+
+    pub fn remove_epoll_list(condvar: &Condvar, tid :usize, epfd: usize, fd: usize) -> bool{
+        let mut epoll_list = condvar.epoll_queue.lock();
+        for idx in 0..epoll_list.len(){
+            if epoll_list[idx].1 == tid && epoll_list[idx].2 == epfd && epoll_list[idx].3 == fd{
+                epoll_list.remove(idx);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn epoll_callback(&self, thread: &Arc<Thread>) {
+        let epoll_list = self.epoll_queue.lock();
+        if epoll_list.len() <= 0 {
+            return;
+        }
+        for idx in 0..epoll_list.len(){
+            let proc = &epoll_list[idx].0;
+            let tid = &epoll_list[idx].1;
+            let epfd = &epoll_list[idx].2;
+            let fd = &epoll_list[idx].3;
+
+            if thread.id() == *tid {
+                let mut proc = proc.lock();
+                match proc.get_epoll_instance(*epfd) {
+                    Ok(instacne) => {
+                        let mut readylist = instacne.readyList.lock();
+                        if !readylist.contains(fd) {
+                            readylist.push_back(*fd);
+                        }
+                    }
+                    Err(r) => {}
+                }
+            }
+        }
+    }
+
 }

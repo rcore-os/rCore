@@ -15,6 +15,7 @@ use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
+use crate::syscall::{EpollEvent};
 
 pub use self::custom::*;
 pub use self::fs::*;
@@ -165,10 +166,13 @@ impl Syscall<'_> {
             SYS_PPOLL => {
                 self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
             } // ignore sigmask
-            SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
+            SYS_EPOLL_CREATE1 =>  self.sys_epoll_create1(args[0]),
+            SYS_EPOLL_CTL => self.sys_epoll_ctl(args[0], args[1], args[2], args[3] as *mut EpollEvent),
             SYS_EPOLL_PWAIT => self.sys_epoll_pwait(args[0], args[1] as *mut EpollEvent,
-                                                    args[2], args[3], args[4] as *mut SigSet_t),
+                                                    args[2], args[3], args[4]),
+            SYS_EVENTFD2=> self.unimplemented("eventfd2", Err(SysError::EACCES)),
 
+            SYS_SOCKETPAIR => self.unimplemented("socketpair", Err(SysError::EACCES)),
             // file system
             SYS_STATFS => self.unimplemented("statfs", Err(SysError::EACCES)),
             SYS_FSTATFS => self.unimplemented("fstatfs", Err(SysError::EACCES)),
@@ -348,6 +352,7 @@ impl Syscall<'_> {
                 if let Some(ret) = ret {
                     ret
                 } else {
+                    println!("unknown syscall id: {}, args: {:x?}", id, args);
                     error!("unknown syscall id: {}, args: {:x?}", id, args);
                     crate::trap::error(self.tf);
                 }
@@ -424,6 +429,9 @@ impl Syscall<'_> {
                 3 => self.sys_semctl(args[1], args[2], args[3], args[4] as isize),
                 _ => return None,
             },
+            SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
+            SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
+
             _ => return None,
         };
         Some(ret)
@@ -459,8 +467,8 @@ impl Syscall<'_> {
             SYS_CHOWN => self.unimplemented("chown", Ok(0)),
             SYS_ARCH_PRCTL => self.sys_arch_prctl(args[0] as i32, args[1]),
             SYS_TIME => self.sys_time(args[0] as *mut u64),
-            SYS_EPOLL_CREATE => self.unimplemented("epoll_create", Err(SysError::ENOSYS)),
-        //    SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
+            SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
+            SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
             _ => return None,
         };
         Some(ret)

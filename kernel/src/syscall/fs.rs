@@ -9,11 +9,17 @@ use crate::drivers::SOCKET_ACTIVITY;
 use crate::trap::TICK_ACTIVITY;
 use crate::fs::*;
 use crate::memory::MemorySet;
-use crate::sync::Condvar;
+use crate::sync::{Condvar, SpinNoIrqLock};
+use alloc::{collections::BTreeMap};
 
 use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
 
 use super::*;
+use bitflags::_core::task::Poll;
+use alloc::collections::VecDeque;
+use rcore_fs::vfs::PollStatus;
+use crate::net::server;
+use crate::process::Process;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -273,7 +279,11 @@ impl Syscall<'_> {
     ) -> SysResult {
         info!("epoll_create: size: {:?}", size);
 
-        return Ok(0);
+        if (size as i32) < 0 {
+            return Err(SysError::EINVAL);
+
+        }
+        return self.sys_epoll_create1(0);
 
     }
 
@@ -283,7 +293,13 @@ impl Syscall<'_> {
     ) -> SysResult {
         info!("epoll_create1: flags: {:?}", flags);
 
-        return Ok(0);
+        let mut proc = self.process();
+
+        let epollInstance = EpollInstance::new(flags);
+        let fd = proc.add_file(FileLike::EpollInstance(epollInstance));
+
+        println!("kernel> epoll create ");
+        Ok(fd)
     }
 
     pub fn sys_epoll_ctl(
@@ -291,9 +307,32 @@ impl Syscall<'_> {
         epfd: usize,
         op: usize,
         fd: usize,
-        event: *mut PollEvents,
+        event: *mut EpollEvent,
     ) -> SysResult {
-        return Ok(0);
+
+        let mut proc = self.process();
+        if !proc.pid.is_init() {
+            // we trust pid 0 process
+            info!("sys_epoll_ctl: epfd: {}, op: {:?}, fd: {:#x}", epfd, op, fd);
+        }
+
+        let slice = unsafe { self.vm().check_read_array(event, 1)? };
+
+        if proc.files.get(&fd).is_none(){
+            return Err(SysError::EPERM);
+        }
+
+        let epollInstance = match proc.get_epoll_instance(epfd) {
+            Ok(ins) => ins,
+            Err(err) => {
+                return Err(err);
+            }
+        };
+
+        let ret = epollInstance.epoll_ctl(&self.vm(),op, fd, event)?;
+
+        println!("kernel> epoll ctl");
+        return Ok(ret);
 
     }
 
@@ -304,8 +343,7 @@ impl Syscall<'_> {
         maxevents: usize,
         timeout: usize,
     ) -> SysResult {
-        return Ok(0);
-
+        self.sys_epoll_pwait(epfd, events, maxevents, timeout, 0)
     }
 
     pub fn sys_epoll_pwait(
@@ -313,11 +351,176 @@ impl Syscall<'_> {
         epfd: usize,
         events: *mut EpollEvent,
         maxevents: usize,
-        timeout: usize,
-        sigset_t: *mut SigSet_t,
+        timeout_msecs: usize,
+        sigset_t: usize,
     ) -> SysResult {
-        return Ok(0);
+        info!("epoll_pwait: epfd: {}, timeout: {:?}", epfd, timeout_msecs);
 
+        let mut proc = self.process();
+        let writeslice = unsafe { self.vm().check_write_array(events,  maxevents)? };
+        let epollInstance = proc.get_unmut_epoll_instance(epfd)?;
+        let keys: Vec<_> = epollInstance.events.keys().cloned().collect();
+
+        for (k, v) in epollInstance.events.iter(){
+         //   if !v.contains(EpollEvent::EPOLLET) {
+                match &proc.files.get(k) {
+                    None => {
+                        return Err(SysError::EINVAL);
+                    },
+                    Some(file_like) => {
+                        let status = file_like.poll()?;
+                        if status.write || status.read || status.error {
+                            epollInstance.readyList.lock().push_back(*k);
+                        }
+                    }
+                }
+           // }
+        }
+
+        drop(proc);
+
+
+        let mut callbacks = alloc::vec![];
+        for fd in &keys {
+            let mut proc = self.process();
+            match proc.files.get(&fd){
+                None => {
+                    return Err(SysError::EINVAL);
+                },
+                Some(file_like) => {
+                    match file_like{
+                        FileLike::File(file) => {
+                            Condvar::add_epoll_list( &crate::fs::STDIN.pushed, self.thread.proc.clone(),
+                                                     thread::current().id(),  epfd, *fd);
+                            callbacks.push((0, thread::current().id(),  epfd, *fd));
+                        },
+                        FileLike::Socket(socket) => {
+                            Condvar::add_epoll_list( &(*crate::drivers::SOCKET_ACTIVITY), self.thread.proc.clone(),
+                                                     thread::current().id(),  epfd, *fd);
+                            callbacks.push((1, thread::current().id(),  epfd, *fd));
+                        },
+                        FileLike::EpollInstance(instance) => {
+                            return Err(SysError::EINVAL);
+                        }
+                    };
+                }
+            }
+            drop(proc);
+        }
+
+        let mut condvars = Vec::new();
+        condvars.push(&(*TICK_ACTIVITY));
+        condvars.push(&STDIN.pushed);
+        condvars.push(&(*SOCKET_ACTIVITY));
+
+
+        let begin_time_ms = crate::trap::uptime_msec();
+        let condition = move || {
+            use PollEvents as PE;
+            let mut proc = self.process();
+
+            let epollInstance = match proc.get_epoll_instance(epfd) {
+                Ok(ins) => ins,
+                Err(err) => {
+                    return Some(Err(err));
+                }
+            };
+            let readylist = epollInstance.readyList.lock().clone();
+         //   println!("readylist : {:?}", readylist);
+            let mut events_num = 0;
+
+            for infd in readylist.iter() {
+                let mut status: PollStatus = Default::default();
+                {
+                    if proc.files.get(&infd).is_some() {
+                        let file_like = proc.files.get(&infd).unwrap();
+                        let _status = match file_like.poll() {
+                            Ok(ret) => ret,
+                            Err(err) => return Some(Err(err)),
+                        };
+                        status.write = _status.write;
+                        status.read = _status.read;
+                        status.error = _status.error;
+                    }
+                }
+
+                {
+                    let epollInstance = match proc.get_epoll_instance(epfd) {
+                        Ok(ins) => ins,
+                        Err(err) => {
+                            return Some(Err(err));
+                        }
+                    };
+                    let epollevent = epollInstance.events.get_mut(&infd)?;
+
+                    if status.error {
+                        unsafe {
+                            let _ = epollevent.copy_result_to(EpollEvent::EPOLLERR, &self.vm(), events, events_num);
+                        }
+                        events_num += 1;
+                    }
+                    if status.read && epollevent.contains(EpollEvent::EPOLLIN) {
+                        unsafe {
+                            let _ = epollevent.copy_result_to(EpollEvent::EPOLLIN, &self.vm(), events, events_num);
+                        }
+                        events_num += 1;
+                    }
+                    if status.write && epollevent.contains(EpollEvent::EPOLLOUT) {
+                        unsafe {
+                            let _ = epollevent.copy_result_to(EpollEvent::EPOLLOUT, &self.vm(), events, events_num);
+                        }
+                        events_num += 1;
+                    }
+                }
+//                } else {
+//                    unsafe {
+//                        epollevent.copy_result_to(EpollEvent::EPOLLERR, &self.vm(), events, events_num);
+//                    }
+//                    events_num += 1;
+//                }
+            }
+
+            {
+                let epollInstance = match proc.get_epoll_instance(epfd) {
+                    Ok(ins) => ins,
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                };
+                let mut lock = epollInstance.readyList.lock();
+                lock.retain(|x| false);
+            }
+
+            drop(proc);
+
+            // some event happens, so evoke the process
+            if events_num > 0 {
+                return Some(Ok(events_num));
+            }
+
+            let current_time_ms = crate::trap::uptime_msec();
+            // time runs out, so the evoke the process
+            if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
+                return Some(Ok(0));
+            }
+            return None;
+        };
+
+        let num = Condvar::wait_events(condvars.as_slice(), condition).unwrap();
+
+        for cb in callbacks.iter(){
+            if cb.0 == 0 {
+                if !Condvar::remove_epoll_list( &crate::fs::STDIN.pushed, cb.1, cb.2, cb.3){
+                    println!("something goes wrong");
+                }
+            }
+            if cb.0 == 1 {
+                if !Condvar::remove_epoll_list( &(*crate::drivers::SOCKET_ACTIVITY), cb.1, cb.2, cb.3){
+                    println!("something goes wrong");
+                }
+            }
+        }
+        Ok(num)
     }
 
     pub fn sys_readv(&mut self, fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
@@ -1610,22 +1813,167 @@ impl FdSet {
     }
 }
 
-pub struct SigSet_t {
-    __val: [u64; 1024 / 8 / 8],
+
+//#[derive(Clone)]
+pub struct EpollInstance {
+    pub events: BTreeMap<usize, EpollEvent>,
+    pub readyList: SpinNoIrqLock<VecDeque<usize>>,
 }
 
-union epoll_data_t {
+impl Clone for EpollInstance {
+    fn clone(&self) -> Self {
+        EpollInstance::new(0)
+    }
+}
+
+impl EpollInstance {
+    pub fn new(flags: usize) -> Self {
+        return EpollInstance {
+            events:  BTreeMap::new(),
+            readyList: Default::default(),
+        }
+    }
+
+    pub fn epoll_ctl(&mut self, vm: &MemorySet, op: usize, fd: usize, event: *mut EpollEvent) -> SysResult {
+        match (op as i32) {
+            EPollCtlOp::EPOLLCTLADD => {
+                if self.events.get(&fd).is_none() {
+                    let evs = unsafe { vm.check_read_array(event, 1)? };
+                    for ev in evs.iter() {
+                        self.events.insert(fd, ev.clone());
+                    }
+                } else {
+                    return Err(SysError::EPERM);
+                }
+
+            }
+            EPollCtlOp::EPOLLCTLMOD => {
+                if self.events.get(&fd).is_some() {
+                    let evs = unsafe { vm.check_read_array(event, 1)? };
+                    for ev in evs.iter() {
+                        self.events.remove(&fd);
+                        self.events.insert(fd, ev.clone());
+                    }
+                } else {
+                    return Err(SysError::EPERM);
+                }
+            }
+            EPollCtlOp::EPOLLCTLDEL => {
+                if self.events.get(&fd).is_some() {
+                    let evs = unsafe { vm.check_read_array(event, 1)? };
+                    for ev in evs.iter() {
+                        self.events.remove(&fd);
+                    }
+                } else {
+                    return Err(SysError::EPERM);
+                }
+
+            }
+            _ => {
+                return Err(SysError::EPERM);
+            }
+        }
+        Ok(0)
+    }
+}
+
+
+//#[derive(Clone)]
+//union EpollData {
+//    ptr: u64,
+//    fd: i32,
+//    v32: u32,
+//    v64: u64,
+//}
+
+#[derive(Clone)]
+pub struct EpollData {
     ptr: u64,
-    fd: i32,
-    v32: u32,
-    v64: u64,
 }
 
+#[repr(packed)]
+#[derive(Clone)]
 pub struct EpollEvent {
     events: u32,    /* Epoll events */
-    data: epoll_data_t,      /* User data variable */
+    data: EpollData,      /* User data variable */
 }
 
+impl EpollEvent{
+    unsafe fn copy_result_to(&mut self, events: u32, vm: &MemorySet,
+                             baseAddr: *mut EpollEvent, idx: usize) -> SysResult{
+        let tmp = self.events;
+        self.events = events;
+
+        let addr = baseAddr as usize + idx * size_of::<EpollEvent>();
+        let written_len = size_of::<EpollEvent>();
+        let target = vm.check_write_array(addr as *mut u8, written_len)?;
+        let source = slice::from_raw_parts(self as *mut EpollEvent as *const u8, written_len);
+        target.copy_from_slice(source);
+        self.events = tmp;
+
+        Ok(0)
+    }
+
+    fn contains(&self, events: u32) -> bool {
+        if (self.events & events) == 0 {
+            return false;
+        } else {
+            return true;
+        }
+    }
+}
+
+pub struct EPollCtlOp;
+impl EPollCtlOp{
+    const EPOLLCTLADD: i32 = 1;    /* Add a file descriptor to the interface.  */
+    const EPOLLCTLDEL: i32 = 2;    /* Remove a file descriptor from the interface.  */
+    const EPOLLCTLMOD: i32 = 3;    /* Change file descriptor epoll_event structure.  */
+}
+
+
+impl EpollEvent {
+    const EPOLLIN: u32 = 0x001;
+    const EPOLLOUT: u32 = 0x004;
+    const EPOLLERR: u32 = 0x008;
+    const EPOLLHUP: u32 = 0x010;
+
+    const EPOLLPRI: u32 = 0x002;
+    const EPOLLRDNORM: u32 = 0x040;
+    const EPOLLRDBAND: u32 = 0x080;
+    const EPOLLWRNORM: u32 = 0x100;
+    const EPOLLWRBAND: u32 = 0x200;
+    const EPOLLMSG: u32 = 0x400;
+    const EPOLLRDHUP: u32 = 0x2000;
+    const EPOLLEXCLUSIVE: u32 = 1 << 28;
+    const EPOLLWAKEUP: u32 = 1 << 29;
+    const EPOLLONESHOT: u32 = 1 << 30;
+    const EPOLLET: u32 = 1 << 31;
+}
+
+
+impl Process {
+    pub fn get_epoll_instance(&mut self, fd: usize) -> Result<&mut EpollInstance, SysError> {
+        match self.get_file_like(fd)? {
+            FileLike::EpollInstance(instance) => Ok(instance),
+            _ => Err(SysError::EPERM),
+        }
+    }
+
+    pub fn get_unmut_epoll_instance(&self, fd: usize) -> Result<&EpollInstance, SysError> {
+        match self.files.get(&fd) {
+            Some(file_like) => {
+                match file_like {
+                    FileLike::EpollInstance(instance) => Ok(&instance),
+                    _ => Err(SysError::EPERM),
+                }
+            }
+            None => {
+                return Err(SysError::EPERM);
+            }
+        }
+    }
+
+}
 
 /// Pathname is interpreted relative to the current working directory(CWD)
 const AT_FDCWD: usize = -100isize as usize;

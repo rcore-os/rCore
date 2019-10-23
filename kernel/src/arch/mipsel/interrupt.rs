@@ -119,7 +119,7 @@ fn external() {
 
 fn try_process_serial() -> bool {
     match super::io::getchar_option() {
-        Some(ch) => {
+        Some(ch) => {is
             trace!("Get char {} from serial", ch);
             crate::trap::serial(ch);
             true

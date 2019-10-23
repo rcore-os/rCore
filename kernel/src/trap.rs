@@ -29,6 +29,7 @@ pub fn timer() {
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
+    println!("kernel error");
     error!("{:#x?}", tf);
     unsafe {
         let mut proc = current_thread().proc.lock();
