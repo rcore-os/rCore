@@ -14,7 +14,7 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::ipc::{SemArrTrait, SemArray, SemUndo};
+use crate::ipc::SemArray;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -419,23 +419,19 @@ impl Process {
         self.futexes.get(&uaddr).unwrap().clone()
     }
 
-    pub fn get_semarray(&mut self, uaddr: usize) -> Arc<SemArray> {
-        self.semaphores.get(&uaddr).unwrap().clone()
+    pub fn get_semarray(&mut self, id: usize) -> Arc<SemArray> {
+        self.semaphores.get(&id).unwrap().clone()
     }
 
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {
         // perform semaphores undo
-        let sem_undos = self.semundos.clone();
-        for ((sem_id, sem_num), sem_op) in sem_undos.iter() {
-            info!(
-                "sem_arr: {}, sem_num: {}, sem_op: {}",
-                *sem_id, *sem_num, *sem_op
-            );
-            let sem_array = self.get_semarray(*sem_id);
-            let sem_ptr = sem_array.get_x(*sem_num as usize);
-            match (*sem_op) {
+        for (&(id, num), &op) in self.semundos.iter() {
+            debug!("semundo: id: {}, num: {}, op: {}", id, num, op);
+            let sem_array = self.semaphores[&id].clone();
+            let sem_ptr = &sem_array[num as usize];
+            match op {
                 1 => sem_ptr.release(),
                 0 => {}
                 _ => unimplemented!("Semaphore: semundo.(Not 1)"),

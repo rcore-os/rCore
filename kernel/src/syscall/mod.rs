@@ -262,7 +262,7 @@ impl Syscall<'_> {
             SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
 
             // sem
-            SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
+            SYS_SEMGET => self.sys_semget(args[0], args[1] as isize, args[2]),
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
             SYS_SEMCTL => self.sys_semctl(
                 args[0],

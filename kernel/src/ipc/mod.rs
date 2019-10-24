@@ -1,3 +1,3 @@
-pub mod semary;
+mod semary;
 
 pub use self::semary::*;

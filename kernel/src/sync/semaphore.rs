@@ -41,9 +41,6 @@ impl Semaphore {
             count = self.cvar.wait(count);
         }
         *count -= 1;
-        /*if (*count > 0) {
-            self.cvar.notify_one();
-        }*/
     }
 
     /// Release a resource from this semaphore.
@@ -65,47 +62,37 @@ impl Semaphore {
         SemaphoreGuard { sem: self }
     }
 
-    pub fn check(&self, k: isize) -> Result<bool, ()> {
+    /// Get the current count
+    pub fn get(&self) -> isize {
         let mut count = self.lock.lock();
-        Ok((*count) >= k)
+        *count
     }
 
-    pub fn get(&self) -> Result<isize, ()> {
+    /// Set the current count
+    pub fn set(&self, value: isize) {
         let mut count = self.lock.lock();
-        Ok((*count))
-    }
-
-    pub fn set(&self, k: isize) -> Result<(), ()> {
-        let mut count = self.lock.lock();
-        *count = k;
-        Ok(())
+        *count = value;
     }
 
     /// Modify by k atomically. when wait is false avoid waiting. unused
     pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
-        match (k) {
-            k if k > 0 => {
-                *(self.lock.lock()) += k;
+        if k > 0 {
+            *(self.lock.lock()) += k;
+            self.cvar.notify_one();
+        } else if k <= 0 {
+            let mut count = self.lock.lock();
+            let mut temp_k = k;
+            while *count + temp_k < 0 {
+                if wait == false {
+                    return Err(());
+                }
+                temp_k += *count;
+                *count = 0;
+                count = self.cvar.wait(count);
+            }
+            *count += temp_k;
+            if *count > 0 {
                 self.cvar.notify_one();
-            }
-            k if k <= 0 => {
-                let mut count = self.lock.lock();
-                let mut temp_k = k;
-                while (*count + temp_k < 0) {
-                    if wait == false {
-                        return Err(());
-                    }
-                    temp_k += *count;
-                    *count = 0;
-                    count = self.cvar.wait(count);
-                }
-                *count += temp_k;
-                if (*count > 0) {
-                    self.cvar.notify_one();
-                }
-            }
-            _ => {
-                return Err(()); //unknown error?
             }
         }
         Ok(0)
