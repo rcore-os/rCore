@@ -14,7 +14,7 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::ipc::SemArray;
+use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -65,8 +65,7 @@ pub struct Process {
     pub cwd: String,
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
-    pub semaphores: BTreeMap<usize, Arc<SemArray>>,
-    pub semundos: BTreeMap<(usize, i16), i16>,
+    pub semaphores: SemProc,
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
@@ -127,8 +126,7 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 exec_path: String::new(),
-                semaphores: BTreeMap::default(),
-                semundos: BTreeMap::default(),
+                semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -313,8 +311,7 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
-                semaphores: BTreeMap::default(),
-                semundos: BTreeMap::default(),
+                semaphores: SemProc::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
                 children: Vec::new(),
@@ -342,7 +339,6 @@ impl Thread {
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
-            semundos: BTreeMap::default(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
             children: Vec::new(),
@@ -419,25 +415,9 @@ impl Process {
         self.futexes.get(&uaddr).unwrap().clone()
     }
 
-    pub fn get_semarray(&mut self, id: usize) -> Arc<SemArray> {
-        self.semaphores.get(&id).unwrap().clone()
-    }
-
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {
-        // perform semaphores undo
-        for (&(id, num), &op) in self.semundos.iter() {
-            debug!("semundo: id: {}, num: {}, op: {}", id, num, op);
-            let sem_array = self.semaphores[&id].clone();
-            let sem_ptr = &sem_array[num as usize];
-            match op {
-                1 => sem_ptr.release(),
-                0 => {}
-                _ => unimplemented!("Semaphore: semundo.(Not 1)"),
-            }
-        }
-
         // quit all threads
         for tid in self.threads.iter() {
             processor().manager().exit(*tid, 1);

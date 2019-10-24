@@ -21,12 +21,8 @@ impl Syscall<'_> {
         }
         let nsems = nsems as usize;
 
-        let mut proc = self.process();
-        let mut semarray_table = &mut proc.semaphores;
-
-        let id = (0..).find(|i| semarray_table.get(i).is_none()).unwrap();
-        let mut sem_array = SemArray::get_or_create(key, nsems, flags);
-        semarray_table.insert(id, sem_array);
+        let sem_array = SemArray::get_or_create(key, nsems, flags);
+        let id = self.process().semaphores.add(sem_array);
         Ok(id)
     }
 
@@ -34,7 +30,7 @@ impl Syscall<'_> {
         info!("semop: id: {}", id);
         let ops = unsafe { self.vm().check_read_array(ops, num_ops)? };
 
-        let sem_array = self.process().get_semarray(id);
+        let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
         for &SemBuf { num, op, flags } in ops.iter() {
             let flags = SemFlags::from_bits_truncate(flags);
             if flags.contains(SemFlags::IPC_NOWAIT) {
@@ -48,10 +44,7 @@ impl Syscall<'_> {
                 _ => unimplemented!("Semaphore: semop.(Not 1/-1)"),
             };
             if flags.contains(SemFlags::SEM_UNDO) {
-                let mut proc = self.process();
-                let old_val = *proc.semundos.get(&(id, num)).unwrap_or(&0);
-                let new_val = old_val - op;
-                proc.semundos.insert((id, num), new_val);
+                self.process().semaphores.add_undo(id, num, op);
             }
         }
         Ok(0)
@@ -59,8 +52,7 @@ impl Syscall<'_> {
 
     pub fn sys_semctl(&self, id: usize, num: usize, cmd: usize, arg: isize) -> SysResult {
         info!("semctl: id: {}, num: {}, cmd: {}", id, num, cmd);
-        let mut proc = self.process();
-        let sem_array: Arc<SemArray> = proc.get_semarray(id);
+        let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
         let sem = &sem_array[num as usize];
 
         const GETVAL: usize = 12;
@@ -76,9 +68,12 @@ impl Syscall<'_> {
     }
 }
 
+/// An operation to be performed on a single semaphore
+///
+/// Ref: [http://man7.org/linux/man-pages/man2/semop.2.html]
 #[repr(C)]
 pub struct SemBuf {
-    num: i16,
+    num: u16,
     op: i16,
     flags: i16,
 }
@@ -93,6 +88,7 @@ bitflags! {
     pub struct SemFlags: i16 {
         /// For SemOP
         const IPC_NOWAIT = 0x800;
+        /// it will be automatically undone when the process terminates.
         const SEM_UNDO = 0x1000;
     }
 }
