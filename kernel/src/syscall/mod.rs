@@ -18,23 +18,23 @@ use crate::util;
 
 pub use self::custom::*;
 pub use self::fs::*;
+pub use self::ipc::*;
 pub use self::lkm::*;
 pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
 pub use self::time::*;
-pub use self::ipc::*;
 
 mod custom;
 mod fs;
+mod ipc;
 mod lkm;
 mod mem;
 mod misc;
 mod net;
 mod proc;
 mod time;
-mod ipc;
 
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
@@ -264,7 +264,12 @@ impl Syscall<'_> {
             // sem
             SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
-            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize/* as SemctlUnion*/),
+            SYS_SEMCTL => self.sys_semctl(
+                args[0],
+                args[1],
+                args[2],
+                args[3] as isize, /* as SemctlUnion*/
+            ),
 
             // system
             SYS_GETPID => self.sys_getpid(),

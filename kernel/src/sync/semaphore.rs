@@ -83,11 +83,11 @@ impl Semaphore {
 
     /// Modify by k atomically. when wait is false avoid waiting. unused
     pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
-        match(k) {
+        match (k) {
             k if k > 0 => {
                 *(self.lock.lock()) += k;
                 self.cvar.notify_one();
-            },
+            }
             k if k <= 0 => {
                 let mut count = self.lock.lock();
                 let mut temp_k = k;
@@ -105,7 +105,7 @@ impl Semaphore {
                 }
             }
             _ => {
-                return Err(());                                                              //unknown error?
+                return Err(()); //unknown error?
             }
         }
         Ok(0)

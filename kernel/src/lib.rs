@@ -32,6 +32,7 @@ pub mod backtrace;
 pub mod consts;
 pub mod drivers;
 pub mod fs;
+pub mod ipc;
 pub mod lang;
 pub mod lkm;
 pub mod memory;
@@ -41,7 +42,6 @@ pub mod shell;
 pub mod sync;
 pub mod syscall;
 pub mod trap;
-pub mod ipc;
 
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
