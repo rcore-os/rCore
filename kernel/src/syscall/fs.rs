@@ -361,22 +361,28 @@ impl Syscall<'_> {
         let epollInstance = proc.get_unmut_epoll_instance(epfd)?;
         let keys: Vec<_> = epollInstance.events.keys().cloned().collect();
 
+        {
+            epollInstance.readyList.lock().clear();
+        }
         for (k, v) in epollInstance.events.iter(){
-         //   if !v.contains(EpollEvent::EPOLLET) {
+          //  if !v.contains(EpollEvent::EPOLLET) {
                 match &proc.files.get(k) {
                     None => {
-                        return Err(SysError::EINVAL);
+                    //    println!("error get file");
+                  //      return Err(SysError::EINVAL);
                     },
                     Some(file_like) => {
                         let status = file_like.poll()?;
                         if status.write || status.read || status.error {
-                            epollInstance.readyList.lock().push_back(*k);
+                            let mut readylist = epollInstance.readyList.lock();
+                            if !readylist.contains(k) {
+                                readylist.push_back(*k);
+                            }
                         }
                     }
                 }
-           // }
+            //}
         }
-
         drop(proc);
 
 
@@ -385,7 +391,9 @@ impl Syscall<'_> {
             let mut proc = self.process();
             match proc.files.get(&fd){
                 None => {
-                    return Err(SysError::EINVAL);
+//                    println!("error get file");
+
+                    //return Err(SysError::EINVAL);
                 },
                 Some(file_like) => {
                     match file_like{
@@ -1841,6 +1849,7 @@ impl EpollInstance {
                     let evs = unsafe { vm.check_read_array(event, 1)? };
                     for ev in evs.iter() {
                         self.events.insert(fd, ev.clone());
+                        self.readyList.lock().push_back(fd);
                     }
                 } else {
                     return Err(SysError::EPERM);
