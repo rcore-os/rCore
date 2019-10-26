@@ -12,8 +12,7 @@ impl AcpiHandler for Handler {
     ) -> PhysicalMapping<T> {
         PhysicalMapping {
             physical_start: physical_address,
-            virtual_start: NonNull::new(phys_to_virt(physical_address) as *mut T)
-                .unwrap(),
+            virtual_start: NonNull::new(phys_to_virt(physical_address) as *mut T).unwrap(),
             region_length: size,
             mapped_length: size,
         }

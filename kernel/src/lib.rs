@@ -32,6 +32,7 @@ pub mod backtrace;
 pub mod consts;
 pub mod drivers;
 pub mod fs;
+pub mod ipc;
 pub mod lang;
 pub mod lkm;
 pub mod memory;

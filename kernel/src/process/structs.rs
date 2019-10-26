@@ -14,6 +14,7 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
+use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -64,6 +65,7 @@ pub struct Process {
     pub cwd: String,
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
+    pub semaphores: SemProc,
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
@@ -124,6 +126,7 @@ impl Thread {
                 files: BTreeMap::default(),
                 cwd: String::from("/"),
                 exec_path: String::new(),
+                semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -308,6 +311,7 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
+                semaphores: SemProc::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
                 children: Vec::new(),
@@ -334,6 +338,7 @@ impl Thread {
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
+            semaphores: proc.semaphores.clone(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
             children: Vec::new(),
@@ -409,6 +414,7 @@ impl Process {
         }
         self.futexes.get(&uaddr).unwrap().clone()
     }
+
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {

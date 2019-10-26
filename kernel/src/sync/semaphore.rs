@@ -61,6 +61,42 @@ impl Semaphore {
         self.acquire();
         SemaphoreGuard { sem: self }
     }
+
+    /// Get the current count
+    pub fn get(&self) -> isize {
+        let mut count = self.lock.lock();
+        *count
+    }
+
+    /// Set the current count
+    pub fn set(&self, value: isize) {
+        let mut count = self.lock.lock();
+        *count = value;
+    }
+
+    /// Modify by k atomically. when wait is false avoid waiting. unused
+    pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
+        if k > 0 {
+            *(self.lock.lock()) += k;
+            self.cvar.notify_one();
+        } else if k <= 0 {
+            let mut count = self.lock.lock();
+            let mut temp_k = k;
+            while *count + temp_k < 0 {
+                if wait == false {
+                    return Err(());
+                }
+                temp_k += *count;
+                *count = 0;
+                count = self.cvar.wait(count);
+            }
+            *count += temp_k;
+            if *count > 0 {
+                self.cvar.notify_one();
+            }
+        }
+        Ok(0)
+    }
 }
 
 impl<'a> Drop for SemaphoreGuard<'a> {
