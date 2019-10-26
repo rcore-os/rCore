@@ -262,14 +262,12 @@ impl Syscall<'_> {
             SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
 
             // sem
+            #[cfg(not(target_arch = "mips"))]
             SYS_SEMGET => self.sys_semget(args[0], args[1] as isize, args[2]),
+            #[cfg(not(target_arch = "mips"))]
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
-            SYS_SEMCTL => self.sys_semctl(
-                args[0],
-                args[1],
-                args[2],
-                args[3] as isize, /* as SemctlUnion*/
-            ),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
 
             // system
             SYS_GETPID => self.sys_getpid(),
@@ -410,6 +408,12 @@ impl Syscall<'_> {
                 }
                 Ok(0)
             }
+            SYS_IPC => match args[0] {
+                1 => self.sys_semop(args[1], args[2] as *const SemBuf, args[3]),
+                2 => self.sys_semget(args[1], args[2] as isize, args[3]),
+                3 => self.sys_semctl(args[1], args[2], args[3], args[4] as isize),
+                _ => return None,
+            },
             _ => return None,
         };
         Some(ret)
