@@ -159,7 +159,9 @@ impl Syscall<'_> {
             "select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}",
             nfds, read, write, err, timeout
         );
-
+        if nfds as u64 == 0 {
+            return Ok(0);
+        }
         let proc = self.process();
         let mut read_fds = FdSet::new(&self.vm(), read, nfds)?;
         let mut write_fds = FdSet::new(&self.vm(), write, nfds)?;

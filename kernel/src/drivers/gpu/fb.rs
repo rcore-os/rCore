@@ -246,22 +246,22 @@ impl Framebuffer {
         var_info.bits_per_pixel = self.fb_info.depth as u32;
         var_info.blue = vga::fb_bitfield {
             offset: 0 as u32,
-            length: 8 as u32,
+            length: self.fb_info.depth as u32 / 4,
             msb_right: 1 as u32,
         };
         var_info.green = vga::fb_bitfield {
-            offset: 8 as u32,
-            length: 8 as u32,
+            offset: self.fb_info.depth as u32 / 4,
+            length: self.fb_info.depth as u32 / 4,
             msb_right: 1 as u32,
         };
         var_info.red = vga::fb_bitfield {
-            offset: 16 as u32,
-            length: 8 as u32,
+            offset: self.fb_info.depth as u32  / 2,
+            length: self.fb_info.depth as u32 / 4,
             msb_right: 1 as u32,
         };
         var_info.transp = vga::fb_bitfield {
-            offset: 24 as u32,
-            length: 8 as u32,
+            offset: self.fb_info.depth as u32 * 3 / 4,
+            length: self.fb_info.depth as u32 / 4,
             msb_right: 1 as u32,
         };
     }
@@ -269,9 +269,7 @@ impl Framebuffer {
     pub fn fill_fix_screeninfo(&self, fix_info: &mut fb_fix_screeninfo) {
         // pub id: [u8; 16],    /* identification string eg "TT Builtin" */
 
-        // fix_info.smem_start = self.fb_info.vaddr as u64;
-
-        fix_info.smem_start = 0xC0000000 as u64;
+        fix_info.smem_start = self.fb_info.paddr as u64;
 
         /* (physical address) */
 
