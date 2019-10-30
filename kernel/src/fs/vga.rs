@@ -88,13 +88,30 @@ impl INode for Vga {
 const FBIOGET_FSCREENINFO: u32 = 0x4602;
 const FBIOGET_VSCREENINFO: u32 = 0x4600;
 
+pub const FB_TYPE_PACKED_PIXELS: u32 =          0;	/* Packed Pixels	*/
+pub const FB_TYPE_PLANES: u32 =                 1;	/* Non interleaved planes */
+pub const FB_TYPE_INTERLEAVED_PLANES: u32 =     2;	/* Interleaved planes	*/
+pub const FB_TYPE_TEXT: u32 =                   3;	/* Text/attributes	*/
+pub const FB_TYPE_VGA_PLANES: u32 =             4;	/* EGA/VGA planes	*/
+pub const FB_TYPE_FOURCC: u32 =                 5;	/* Type identified by a V4L2 FOURCC */
+
+pub const FB_VISUAL_MONO01: u32 =		        0;	/* Monochr. 1=Black 0=White */
+pub const FB_VISUAL_MONO10: u32 =		        1;	/* Monochr. 1=White 0=Black */
+pub const FB_VISUAL_TRUECOLOR: u32 =		    2;	/* True color	*/
+pub const FB_VISUAL_PSEUDOCOLOR: u32 =		    3;	/* Pseudo color (like atari) */
+pub const FB_VISUAL_DIRECTCOLOR: u32 =		    4;	/* Direct color */
+pub const FB_VISUAL_STATIC_PSEUDOCOLOR: u32 =   5;	/* Pseudo color readonly */
+pub const FB_VISUAL_FOURCC: u32 =		        6;	/* Visual identified by a V4L2 FOURCC */
+
+pub const FB_ACCEL_NONE: u32 =                  0;  /* no hardware accelerator */
+
 #[repr(C)]
 pub struct fb_fix_screeninfo {
     pub id: [u8; 16],    /* identification string eg "TT Builtin" */
     pub smem_start: u64, /* Start of frame buffer mem */
     /* (physical address) */
     pub smem_len: u32,    /* Length of frame buffer mem */
-    pub _type: u32,       /* see FB_TYPE_*		*/
+    pub type_: u32,       /* see FB_TYPE_*		*/
     pub type_aux: u32,    /* Interleave for interleaved Planes */
     pub visual: u32,      /* see FB_VISUAL_*		*/
     pub xpanstep: u16,    /* zero if no hardware panning  */
