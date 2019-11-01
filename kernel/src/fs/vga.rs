@@ -1,6 +1,6 @@
 use rcore_fs::vfs::*;
 
-use crate::drivers::gpu::fb::{FramebufferInfo, FRAME_BUFFER};
+use crate::drivers::gpu::fb::{ColorFormat, FramebufferInfo, FRAME_BUFFER};
 use crate::memory::phys_to_virt;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::any::Any;
@@ -244,24 +244,31 @@ impl FbVarScreeninfo {
         self.xoffset = fb_info.xoffset;
         self.yoffset = fb_info.yoffset;
         self.bits_per_pixel = fb_info.depth as u32;
+        let (rl, gl, bl, al, ro, go, bo, ao) = match fb_info.format {
+            ColorFormat::RGB332 => (3, 3, 2, 0, 5, 3, 0, 0),
+            ColorFormat::RGB565 => (5, 6, 5, 0, 11, 5, 0, 0),
+            ColorFormat::RGBA8888 => (8, 8, 8, 8, 16, 8, 0, 24),
+            ColorFormat::BGRA8888 => (8, 8, 8, 8, 0, 8, 16, 24),
+            ColorFormat::VgaPalette => unimplemented!(),
+        };
         self.blue = FbBitfield {
-            offset: 0,
-            length: fb_info.depth as u32 / 4,
+            offset: bo,
+            length: bl,
             msb_right: 1,
         };
         self.green = FbBitfield {
-            offset: fb_info.depth as u32 / 4,
-            length: fb_info.depth as u32 / 4,
+            offset: go,
+            length: gl,
             msb_right: 1,
         };
         self.red = FbBitfield {
-            offset: fb_info.depth as u32 / 2,
-            length: fb_info.depth as u32 / 4,
+            offset: ro,
+            length: rl,
             msb_right: 1,
         };
         self.transp = FbBitfield {
-            offset: fb_info.depth as u32 * 3 / 4,
-            length: fb_info.depth as u32 / 4,
+            offset: ao,
+            length: al,
             msb_right: 1,
         };
     }
