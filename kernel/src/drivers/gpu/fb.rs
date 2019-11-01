@@ -1,6 +1,5 @@
 //! Framebuffer
 
-use crate::fs::vga::{self, fb_fix_screeninfo, fb_var_screeninfo};
 use alloc::string::String;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -234,64 +233,6 @@ impl Framebuffer {
     /// Fill the entire buffer with `0`.
     pub fn clear(&mut self) {
         self.fill(0, self.fb_info.screen_size, 0);
-    }
-
-    pub fn fill_var_screeninfo(&self, var_info: &mut fb_var_screeninfo) {
-        var_info.xres = self.fb_info.xres;
-        var_info.yres = self.fb_info.yres;
-        var_info.xres_virtual = self.fb_info.xres_virtual;
-        var_info.yres_virtual = self.fb_info.yres_virtual;
-        var_info.xoffset = self.fb_info.xoffset;
-        var_info.yoffset = self.fb_info.yoffset;
-        var_info.bits_per_pixel = self.fb_info.depth as u32;
-        var_info.blue = vga::fb_bitfield {
-            offset: 0 as u32,
-            length: self.fb_info.depth as u32 / 4,
-            msb_right: 1 as u32,
-        };
-        var_info.green = vga::fb_bitfield {
-            offset: self.fb_info.depth as u32 / 4,
-            length: self.fb_info.depth as u32 / 4,
-            msb_right: 1 as u32,
-        };
-        var_info.red = vga::fb_bitfield {
-            offset: self.fb_info.depth as u32  / 2,
-            length: self.fb_info.depth as u32 / 4,
-            msb_right: 1 as u32,
-        };
-        var_info.transp = vga::fb_bitfield {
-            offset: self.fb_info.depth as u32 * 3 / 4,
-            length: self.fb_info.depth as u32 / 4,
-            msb_right: 1 as u32,
-        };
-    }
-
-    pub fn fill_fix_screeninfo(&self, fix_info: &mut fb_fix_screeninfo) {
-        // pub id: [u8; 16],    /* identification string eg "TT Builtin" */
-
-        fix_info.smem_start = self.fb_info.paddr as u64;
-
-        /* (physical address) */
-
-        fix_info.smem_len = self.fb_info.screen_size  as u32;
-
-        fix_info.type_ = vga::FB_TYPE_PACKED_PIXELS;
-        // fix_info.type_aux = self.fb_info.type_aux;
-        fix_info.visual = vga::FB_VISUAL_TRUECOLOR;
-
-        // fix_info.xpanstep = 0;
-        // fix_info.ypanstep = 0;
-        // fix_info.ywrapstep = 0;
-
-        fix_info.line_length = self.fb_info.xres * self.fb_info.depth as u32 / 8;
-
-        fix_info.mmio_start = 0 as u64;
-        /* (physical address) */
-        fix_info.mmio_len = 0 as u32;
-        fix_info.accel = vga::FB_ACCEL_NONE;
-        /*  specific chip/card we have	*/
-        // fix_info.capabilities = self.fb_info.capabilities;
-        // pub reserved: [u16; 2], /* Reserved for future compatibility */
     }
 }
 
