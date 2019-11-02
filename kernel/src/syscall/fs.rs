@@ -147,6 +147,18 @@ impl Syscall<'_> {
         })
     }
 
+    pub fn sys_pselect6(
+        &mut self,
+        nfds: usize,
+        read: *mut u32,
+        write: *mut u32,
+        err: *mut u32,
+        timeout: *const TimeVal,
+        _sigset: *const u32,
+    ) -> SysResult {
+        self.sys_select(nfds, read, write, err, timeout)
+    }
+
     pub fn sys_select(
         &mut self,
         nfds: usize,
@@ -159,7 +171,9 @@ impl Syscall<'_> {
             "select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}",
             nfds, read, write, err, timeout
         );
-
+        if nfds as u64 == 0 {
+            return Ok(0);
+        }
         let proc = self.process();
         let mut read_fds = FdSet::new(&self.vm(), read, nfds)?;
         let mut write_fds = FdSet::new(&self.vm(), write, nfds)?;

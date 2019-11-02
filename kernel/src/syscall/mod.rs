@@ -154,6 +154,14 @@ impl Syscall<'_> {
             ),
 
             // io multiplexing
+            SYS_PSELECT6 => self.sys_pselect6(
+                args[0],
+                args[1] as *mut u32,
+                args[2] as *mut u32,
+                args[3] as *mut u32,
+                args[4] as *const TimeVal,
+                args[5] as *const u32,
+            ),
             SYS_PPOLL => {
                 self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
             } // ignore sigmask
