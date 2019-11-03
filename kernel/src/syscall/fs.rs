@@ -124,8 +124,6 @@ impl Syscall<'_> {
         drop(proc);
 
         let begin_time_ms = crate::trap::uptime_msec();
-    //&[&STDIN.pushed, &(*SOCKET_ACTIVITY)] condvars.as_slice()
-//        println!("poll called {:?}", condvars.len());
         Condvar::wait_events(condvars.as_slice(),  move || {
             use PollEvents as PE;
             let proc = self.process();
@@ -215,7 +213,6 @@ impl Syscall<'_> {
         condvars.push(&(*TICK_ACTIVITY));
         condvars.push(&STDIN.pushed);
         condvars.push(&(*SOCKET_ACTIVITY));
-        println!("select used");
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -292,13 +289,9 @@ impl Syscall<'_> {
         flags: usize,
     ) -> SysResult {
         info!("epoll_create1: flags: {:?}", flags);
-
         let mut proc = self.process();
-
         let epollInstance = EpollInstance::new(flags);
         let fd = proc.add_file(FileLike::EpollInstance(epollInstance));
-
-        println!("kernel> epoll create ");
         Ok(fd)
     }
 
@@ -330,10 +323,7 @@ impl Syscall<'_> {
         };
 
         let ret = epollInstance.epoll_ctl(&self.vm(),op, fd, event)?;
-
-        println!("kernel> epoll ctl");
         return Ok(ret);
-
     }
 
     pub fn sys_epoll_wait(
@@ -360,15 +350,15 @@ impl Syscall<'_> {
         let writeslice = unsafe { self.vm().check_write_array(events,  maxevents)? };
         let epollInstance = proc.get_unmut_epoll_instance(epfd)?;
         let keys: Vec<_> = epollInstance.events.keys().cloned().collect();
+        let newCtlList = epollInstance.newCtlList.lock().clone();
+        epollInstance.readyList.lock().clear();
+        epollInstance.newCtlList.lock().clear();
+        epollInstance.readyList.lock().extend(newCtlList);
 
-        {
-            epollInstance.readyList.lock().clear();
-        }
         for (k, v) in epollInstance.events.iter(){
-          //  if !v.contains(EpollEvent::EPOLLET) {
+            if !v.contains(EpollEvent::EPOLLET) {
                 match &proc.files.get(k) {
                     None => {
-                    //    println!("error get file");
                   //      return Err(SysError::EINVAL);
                     },
                     Some(file_like) => {
@@ -381,7 +371,7 @@ impl Syscall<'_> {
                         }
                     }
                 }
-            //}
+            }
         }
         drop(proc);
 
@@ -391,9 +381,7 @@ impl Syscall<'_> {
             let mut proc = self.process();
             match proc.files.get(&fd){
                 None => {
-//                    println!("error get file");
-
-                    //return Err(SysError::EINVAL);
+                   //return Err(SysError::EINVAL);
                 },
                 Some(file_like) => {
                     match file_like{
@@ -434,7 +422,6 @@ impl Syscall<'_> {
                 }
             };
             let readylist = epollInstance.readyList.lock().clone();
-         //   println!("readylist : {:?}", readylist);
             let mut events_num = 0;
 
             for infd in readylist.iter() {
@@ -519,12 +506,10 @@ impl Syscall<'_> {
         for cb in callbacks.iter(){
             if cb.0 == 0 {
                 if !Condvar::remove_epoll_list( &crate::fs::STDIN.pushed, cb.1, cb.2, cb.3){
-                    println!("something goes wrong");
                 }
             }
             if cb.0 == 1 {
                 if !Condvar::remove_epoll_list( &(*crate::drivers::SOCKET_ACTIVITY), cb.1, cb.2, cb.3){
-                    println!("something goes wrong");
                 }
             }
         }
@@ -1826,6 +1811,7 @@ impl FdSet {
 pub struct EpollInstance {
     pub events: BTreeMap<usize, EpollEvent>,
     pub readyList: SpinNoIrqLock<VecDeque<usize>>,
+    pub newCtlList: SpinNoIrqLock<VecDeque<usize>>,
 }
 
 impl Clone for EpollInstance {
@@ -1839,21 +1825,26 @@ impl EpollInstance {
         return EpollInstance {
             events:  BTreeMap::new(),
             readyList: Default::default(),
+            newCtlList: Default::default(),
         }
     }
 
     pub fn epoll_ctl(&mut self, vm: &MemorySet, op: usize, fd: usize, event: *mut EpollEvent) -> SysResult {
         match (op as i32) {
             EPollCtlOp::EPOLLCTLADD => {
-                if self.events.get(&fd).is_none() {
+                //if self.events.get(&fd).is_none() {
                     let evs = unsafe { vm.check_read_array(event, 1)? };
                     for ev in evs.iter() {
                         self.events.insert(fd, ev.clone());
-                        self.readyList.lock().push_back(fd);
+                        let mut l = self.newCtlList.lock();
+                        if !l.contains(&fd) {
+                            l.push_back(fd);
+                        }
+
                     }
-                } else {
-                    return Err(SysError::EPERM);
-                }
+//                } else {
+//                    return Err(SysError::EPERM);
+//                }
 
             }
             EPollCtlOp::EPOLLCTLMOD => {
@@ -1862,6 +1853,11 @@ impl EpollInstance {
                     for ev in evs.iter() {
                         self.events.remove(&fd);
                         self.events.insert(fd, ev.clone());
+                        let mut l = self.newCtlList.lock();
+                        if !l.contains(&fd) {
+                            l.push_back(fd);
+                        }
+
                     }
                 } else {
                     return Err(SysError::EPERM);
