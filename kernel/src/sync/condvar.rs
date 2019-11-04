@@ -124,12 +124,12 @@ impl Condvar {
         count
     }
 
-    pub fn add_epoll_list(condvar: &Condvar, proc: Arc<SpinNoIrqLock<Process>>, tid :usize, epfd: usize, fd: usize){
-        condvar.epoll_queue.lock().push_back((proc, tid, epfd, fd));
+    pub fn register_epoll_list(&self, proc: Arc<SpinNoIrqLock<Process>>, tid :usize, epfd: usize, fd: usize){
+        self.epoll_queue.lock().push_back((proc, tid, epfd, fd));
     }
 
-    pub fn remove_epoll_list(condvar: &Condvar, tid :usize, epfd: usize, fd: usize) -> bool{
-        let mut epoll_list = condvar.epoll_queue.lock();
+    pub fn unregister_epoll_list(&self, tid :usize, epfd: usize, fd: usize) -> bool{
+        let mut epoll_list = self.epoll_queue.lock();
         for idx in 0..epoll_list.len(){
             if epoll_list[idx].1 == tid && epoll_list[idx].2 == epfd && epoll_list[idx].3 == fd{
                 epoll_list.remove(idx);
@@ -141,15 +141,7 @@ impl Condvar {
 
     fn epoll_callback(&self, thread: &Arc<Thread>) {
         let epoll_list = self.epoll_queue.lock();
-        if epoll_list.len() <= 0 {
-            return;
-        }
-        for idx in 0..epoll_list.len(){
-            let proc = &epoll_list[idx].0;
-            let tid = &epoll_list[idx].1;
-            let epfd = &epoll_list[idx].2;
-            let fd = &epoll_list[idx].3;
-
+        for (proc, tid, epfd, fd) in epoll_list.iter() {
             if thread.id() == *tid {
                 let mut proc = proc.lock();
                 match proc.get_epoll_instance(*epfd) {
@@ -159,7 +151,9 @@ impl Condvar {
                             readylist.push_back(*fd);
                         }
                     }
-                    Err(r) => {}
+                    Err(r) => {
+                        panic!("epoll instance not exist");
+                    }
                 }
             }
         }

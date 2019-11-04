@@ -54,7 +54,6 @@ pub struct Stdout;
 lazy_static! {
     pub static ref STDIN: Arc<Stdin> = Arc::new(Stdin::default());
     pub static ref STDOUT: Arc<Stdout> = Arc::new(Stdout::default());
-    pub static ref STDIN_EPOLL_LIST: Arc<VecDeque<(Arc<Process>, usize)>> = Arc::new(VecDeque::default());
 }
 
 impl INode for Stdin {

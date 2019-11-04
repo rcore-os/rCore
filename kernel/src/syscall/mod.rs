@@ -352,7 +352,6 @@ impl Syscall<'_> {
                 if let Some(ret) = ret {
                     ret
                 } else {
-                    println!("unknown syscall id: {}, args: {:x?}", id, args);
                     error!("unknown syscall id: {}, args: {:x?}", id, args);
                     crate::trap::error(self.tf);
                 }

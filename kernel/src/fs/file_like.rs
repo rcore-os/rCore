@@ -25,7 +25,7 @@ impl FileLike {
             FileLike::File(file) => file.read(buf)?,
             FileLike::Socket(socket) => socket.read(buf).0?,
             FileLike::EpollInstance(instance) => {
-                return Err(SysError::EPERM);
+                return Err(SysError::ENOSYS);
             }
         };
         Ok(len)
@@ -35,7 +35,7 @@ impl FileLike {
             FileLike::File(file) => file.write(buf)?,
             FileLike::Socket(socket) => socket.write(buf, None)?,
             FileLike::EpollInstance(instance) => {
-                return Err(SysError::EPERM);
+                return Err(SysError::ENOSYS);
             }
         };
         Ok(len)
@@ -52,7 +52,7 @@ impl FileLike {
                         socket.ioctl(request, arg1, arg2, arg3)?;
                     }
                     FileLike::EpollInstance(instance) => {
-
+						return Err(SysError::ENOSYS);
                     }
                 }
                 Ok(0)
@@ -67,24 +67,10 @@ impl FileLike {
                 PollStatus { read, write, error }
             }
             FileLike::EpollInstance(instance) => {
-                return Err(SysError::EPERM);
+                return Err(SysError::ENOSYS);
             }
         };
         Ok(status)
-    }
-
-    pub fn poll_condvar(&self, condvars: &mut Vec<&Condvar>) {
-        let condvar = match self {
-            FileLike::File(file) => {
-                condvars.push(&crate::fs::STDIN.pushed);
-            },
-            FileLike::Socket(socket) => {
-                condvars.push(&(*crate::drivers::SOCKET_ACTIVITY));
-            },
-            FileLike::EpollInstance(instance) => {
-
-            }
-        };
     }
 
     pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {

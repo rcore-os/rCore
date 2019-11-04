@@ -63,7 +63,7 @@ impl Driver for IXGBEInterface {
                 }
             }
         }
-        
+
         return handled;
     }
 

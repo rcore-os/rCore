@@ -105,10 +105,7 @@ impl Syscall<'_> {
         }
 
         // check whether the fds is valid and is owned by this process
-        let mut condvars = Vec::new();
-        condvars.push(&(*TICK_ACTIVITY));
-        condvars.push(&STDIN.pushed);
-        condvars.push(&(*SOCKET_ACTIVITY));
+        let mut condvars = Vec::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
 
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
         for poll in polls.iter() {
@@ -349,12 +346,14 @@ impl Syscall<'_> {
         let mut proc = self.process();
         let writeslice = unsafe { self.vm().check_write_array(events,  maxevents)? };
         let epollInstance = proc.get_unmut_epoll_instance(epfd)?;
-        let keys: Vec<_> = epollInstance.events.keys().cloned().collect();
-        let newCtlList = epollInstance.newCtlList.lock().clone();
-        epollInstance.readyList.lock().clear();
-        epollInstance.newCtlList.lock().clear();
-        epollInstance.readyList.lock().extend(newCtlList);
 
+        // add new fds which are registered by epoll_ctl after latest epoll_pwait
+        epollInstance.readyList.lock() = epollInstance.newCtlList.lock().clone();
+        epollInstance.newCtlList.lock().clear();
+
+        // if registered fd has data to handle and its mode isn't epollet, we need
+        // to add it to the list.
+        let keys: Vec<_> = epollInstance.events.keys().cloned().collect();
         for (k, v) in epollInstance.events.iter(){
             if !v.contains(EpollEvent::EPOLLET) {
                 match &proc.files.get(k) {
@@ -386,12 +385,12 @@ impl Syscall<'_> {
                 Some(file_like) => {
                     match file_like{
                         FileLike::File(file) => {
-                            Condvar::add_epoll_list( &crate::fs::STDIN.pushed, self.thread.proc.clone(),
+                            &crate::fs::STDIN.pushed.register_epoll_list(self.thread.proc.clone(),
                                                      thread::current().id(),  epfd, *fd);
                             callbacks.push((0, thread::current().id(),  epfd, *fd));
                         },
                         FileLike::Socket(socket) => {
-                            Condvar::add_epoll_list( &(*crate::drivers::SOCKET_ACTIVITY), self.thread.proc.clone(),
+                            &(*crate::drivers::SOCKET_ACTIVITY).register_epoll_list(self.thread.proc.clone(),
                                                      thread::current().id(),  epfd, *fd);
                             callbacks.push((1, thread::current().id(),  epfd, *fd));
                         },
@@ -505,12 +504,10 @@ impl Syscall<'_> {
 
         for cb in callbacks.iter(){
             if cb.0 == 0 {
-                if !Condvar::remove_epoll_list( &crate::fs::STDIN.pushed, cb.1, cb.2, cb.3){
-                }
+                &crate::fs::STDIN.pushed.unregister_epoll_list(cb.1, cb.2, cb.3);
             }
             if cb.0 == 1 {
-                if !Condvar::remove_epoll_list( &(*crate::drivers::SOCKET_ACTIVITY), cb.1, cb.2, cb.3){
-                }
+                &(*crate::drivers::SOCKET_ACTIVITY).unregister_epoll_list(cb.1, cb.2, cb.3);
             }
         }
         Ok(num)

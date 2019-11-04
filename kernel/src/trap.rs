@@ -3,7 +3,7 @@ use crate::arch::interrupt::TrapFrame;
 use crate::process::*;
 use log::*;
 use crate::sync::Condvar;
-
+use crate::consts::INFORM_PER_MSEC;
 
 pub static mut TICK: usize = 0;
 
@@ -20,7 +20,7 @@ pub fn timer() {
     if cpu::id() == 0 {
         unsafe {
             TICK += 1;
-            if uptime_msec() % 50 == 0 {
+            if uptime_msec() %  INFORM_PER_MSEC == 0 {
                 TICK_ACTIVITY.notify_all();
             }
         }
@@ -29,7 +29,6 @@ pub fn timer() {
 }
 
 pub fn error(tf: &TrapFrame) -> ! {
-    println!("kernel error");
     error!("{:#x?}", tf);
     unsafe {
         let mut proc = current_thread().proc.lock();
