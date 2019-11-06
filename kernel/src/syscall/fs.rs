@@ -105,7 +105,7 @@ impl Syscall<'_> {
         }
 
         // check whether the fds is valid and is owned by this process
-        let mut condvars = Vec::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let mut condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
 
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
         for poll in polls.iter() {
@@ -348,7 +348,8 @@ impl Syscall<'_> {
         let epollInstance = proc.get_unmut_epoll_instance(epfd)?;
 
         // add new fds which are registered by epoll_ctl after latest epoll_pwait
-        epollInstance.readyList.lock() = epollInstance.newCtlList.lock().clone();
+        epollInstance.readyList.lock().clear();
+        epollInstance.readyList.lock().extend(epollInstance.newCtlList.lock().clone());
         epollInstance.newCtlList.lock().clear();
 
         // if registered fd has data to handle and its mode isn't epollet, we need
