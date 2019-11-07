@@ -268,8 +268,18 @@ impl Syscall<'_> {
                 args[0],
                 args[1],
                 args[2],
-                args[3] as isize, /* as SemctlUnion*/
+                args[3] as isize, /* as SemctlUnion */
             ),
+
+            // shm
+            /*SYS_SHMGET => self.sys_shmget(args[0], args[1], args[2]),
+            SYS_SHMAT => self.sys_shmat(args[0], args[1], args[2]),
+            SYS_SHMDT => self.sys_shmdt(args[0], args[1], args[2]),
+            SYS_SHMCTL => self.sys_shmctl(
+                args[0],
+                args[1],
+                args[2] /* should be shmid_ds *buf */
+            ),*/
 
             // system
             SYS_GETPID => self.sys_getpid(),

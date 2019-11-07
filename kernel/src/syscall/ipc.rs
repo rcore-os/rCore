@@ -11,6 +11,10 @@ pub use crate::ipc::SemArray;
 pub use crate::ipc::SemBuf;
 pub use crate::ipc::SemctlUnion;
 
+use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
+use rcore_memory::memory_set::MemoryAttr;
+use rcore_memory::PAGE_SIZE;
+
 use super::*;
 
 impl Syscall<'_> {
@@ -98,6 +102,60 @@ impl Syscall<'_> {
             unimplemented!("Semaphore: Semctl.(Not setval)");
         }
     }
+
+    /*pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SysResult {
+        info!("sys_shmget: key: {}", key);
+
+        let mut size = size;
+
+        if ((size & (PAGE_SIZE - 1)) != 0) {
+            size = (size & !(PAGE_SIZE - 1)) + PAGE_SIZE;
+        }
+
+
+        let mut proc = self.process();
+
+        let mut key2shm_table = KEY2SHM.write();
+        let mut shmid_ref: shmid;
+        let mut shmid_local_ref: shmid_local;
+
+        let mut key_shmid_ref = key2shm_table.get(&key);
+        if (key_shmid_ref.is_none() || key_shmid_ref.unwrap().upgrade().is_none()) {
+            let addr = proc.vm().find_free_area(PAGE_SIZE, size);
+            proc.vm().push(
+                addr,
+                addr + size,
+                MemoryAttr {
+                    user: true,
+                    readonly: false,
+                    execute: true,
+                    mmio: 0
+                }
+                Shared::new(GlobalFrameAlloc),
+                "shmget",
+            );
+            let target = proc.vm().translate(addr);
+            shmid_ref = shmid::new(key, size, target);
+            shmid_local_ref = shmid_local::new(key, size, addr, target);
+        } else {
+            shmid_ref = key2shm_table.get(&key).unwrap().unwrap();
+
+        }
+
+        shmid_ref
+
+        /*let sem_id = (0..)
+            .find(|i| match semarray_table.get(i) {
+                Some(p) => false,
+                _ => true,
+            })
+            .unwrap();
+
+        let mut sem_array: Arc<SemArray> = new_semary(key, nsems, semflg);
+
+        semarray_table.insert(sem_id, sem_array);
+        Ok(sem_id)*/
+    }*/
 }
 
 bitflags! {

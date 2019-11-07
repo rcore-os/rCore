@@ -1,4 +1,4 @@
-use rcore_memory::memory_set::handler::{Delay, File, Linear};
+use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::PAGE_SIZE;
 
@@ -40,16 +40,25 @@ impl Syscall<'_> {
 
         if flags.contains(MmapFlags::ANONYMOUS) {
             if flags.contains(MmapFlags::SHARED) {
-                return Err(SysError::EINVAL);
+                self.vm().push(
+                    addr,
+                    addr + len,
+                    prot.to_attr(),
+                    Shared::new(GlobalFrameAlloc),
+                    "mmap_anon_shared",
+                );
+                return Ok(addr);
+            } else {
+                self.vm().push(
+                    addr,
+                    addr + len,
+                    prot.to_attr(),
+                    Delay::new(GlobalFrameAlloc),
+                    "mmap_anon",
+                );
+                return Ok(addr);
             }
-            self.vm().push(
-                addr,
-                addr + len,
-                prot.to_attr(),
-                Delay::new(GlobalFrameAlloc),
-                "mmap_anon",
-            );
-            return Ok(addr);
+            
         } else {
             let file = proc.get_file(fd)?;
             info!("mmap path is {} ", &*file.path);
