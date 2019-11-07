@@ -2,7 +2,7 @@ use core::fmt;
 
 use super::ioctl::*;
 use super::FileHandle;
-use crate::syscall::EpollInstance;
+use crate::fs::epoll::EpollInstance;
 use crate::net::Socket;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;

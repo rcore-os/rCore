@@ -7,11 +7,17 @@ use alloc::vec::Vec;
 use crate::process::Process;
 use rcore_thread::std_thread::Thread;
 
+pub struct RegisteredProcess {
+    proc: Arc<SpinNoIrqLock<Process>>,
+    tid: usize,
+    epfd: usize,
+    fd: usize,
+}
 
 #[derive(Default)]
 pub struct Condvar {
     wait_queue: SpinNoIrqLock<VecDeque<Arc<thread::Thread>>>,
-    pub epoll_queue: SpinNoIrqLock< VecDeque<(Arc<SpinNoIrqLock<Process>>, usize, usize, usize)> >,
+    pub epoll_queue: SpinNoIrqLock<VecDeque<RegisteredProcess>>,
 }
 
 impl Condvar {
@@ -125,13 +131,19 @@ impl Condvar {
     }
 
     pub fn register_epoll_list(&self, proc: Arc<SpinNoIrqLock<Process>>, tid :usize, epfd: usize, fd: usize){
-        self.epoll_queue.lock().push_back((proc, tid, epfd, fd));
+        self.epoll_queue.lock().push_back(RegisteredProcess{
+            proc: proc,
+            tid: tid,
+            epfd: epfd,
+            fd: fd,
+            }
+        );
     }
 
     pub fn unregister_epoll_list(&self, tid :usize, epfd: usize, fd: usize) -> bool{
         let mut epoll_list = self.epoll_queue.lock();
         for idx in 0..epoll_list.len(){
-            if epoll_list[idx].1 == tid && epoll_list[idx].2 == epfd && epoll_list[idx].3 == fd{
+            if epoll_list[idx].tid == tid && epoll_list[idx].epfd == epfd && epoll_list[idx].fd == fd{
                 epoll_list.remove(idx);
                 return true;
             }
@@ -141,15 +153,13 @@ impl Condvar {
 
     fn epoll_callback(&self, thread: &Arc<Thread>) {
         let epoll_list = self.epoll_queue.lock();
-        for (proc, tid, epfd, fd) in epoll_list.iter() {
-            if thread.id() == *tid {
-                let mut proc = proc.lock();
-                match proc.get_epoll_instance(*epfd) {
+        for ist in epoll_list.iter() {
+            if thread.id() == ist.tid {
+                let mut proc = ist.proc.lock();
+                match proc.get_epoll_instance(ist.epfd) {
                     Ok(instacne) => {
                         let mut readylist = instacne.readyList.lock();
-                        if !readylist.contains(fd) {
-                            readylist.push_back(*fd);
-                        }
+                        readylist.insert(ist.fd);
                     }
                     Err(r) => {
                         panic!("epoll instance not exist");

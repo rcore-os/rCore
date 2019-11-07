@@ -15,7 +15,7 @@ use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
-use crate::syscall::{EpollEvent};
+use crate::fs::epoll::EpollEvent;
 
 pub use self::custom::*;
 pub use self::fs::*;
