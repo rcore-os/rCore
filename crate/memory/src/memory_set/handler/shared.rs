@@ -28,7 +28,11 @@ impl<T: FrameAllocator> SharedGuard<T> {
         self.target.remove(&virtAddr);
     }
     pub fn get(&self, addr: usize) -> Option<usize> {
-        Some(self.target.get(&addr).unwrap().clone())
+        match self.target.get(&addr) {
+            Some(physAddr) => Some(physAddr.clone()),
+            None => None
+        }
+        //Some(self.target.get(&addr).unwrap().clone())
     }
 }
 
@@ -47,7 +51,7 @@ impl<T: FrameAllocator> Drop for SharedGuard<T> {
 #[derive(Debug, Clone)]
 pub struct Shared<T: FrameAllocator> {
     allocator: T,
-    guard: Option<Arc<Mutex<SharedGuard<T>>>>
+    guard: Arc<Mutex<SharedGuard<T>>>
 }
 
 impl<T: FrameAllocator> MemoryHandler for Shared<T> {
@@ -57,8 +61,7 @@ impl<T: FrameAllocator> MemoryHandler for Shared<T> {
 
     fn map(&self, pt: &mut dyn PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         //assert!(self.guard.is_some(), "remapping memory area")
-        let guard = self.guard.clone();
-        let physAddrOpt = guard.unwrap().lock().get(addr);
+        let physAddrOpt = self.guard.lock().get(addr);
         if physAddrOpt.is_none() { // not mapped yet
             let entry = pt.map(addr, 0);
             entry.set_present(false);
@@ -90,14 +93,13 @@ impl<T: FrameAllocator> MemoryHandler for Shared<T> {
 
     fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool {
         let entry = pt.get_entry(addr).expect("failed to get entry");
-        let guard = self.guard.clone();
-        let physAddrOpt = guard.clone().unwrap().lock().get(addr);
+        let physAddrOpt = self.guard.lock().get(addr);
         if entry.present() {
             // not a delay case
             return false;
         } else if physAddrOpt.is_none() {
             // physical memory not alloced.
-            let frame = guard.clone().unwrap().lock().alloc(addr).unwrap();
+            let frame = self.guard.lock().alloc(addr).unwrap();
             entry.set_target(frame);
             entry.set_present(true);
             entry.update();
@@ -124,7 +126,7 @@ impl<T: FrameAllocator> Shared<T> {
     pub fn new(allocator: T) -> Self {
         Shared {
             allocator: allocator.clone(),
-            guard: Some(Arc::new(Mutex::new(SharedGuard::new(allocator))))
+            guard: Arc::new(Mutex::new(SharedGuard::new(allocator)))
         }
     }
 }
