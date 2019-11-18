@@ -10,12 +10,12 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
+use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::thread;
 use crate::util;
-use crate::fs::epoll::EpollEvent;
 
 pub use self::custom::*;
 pub use self::fs::*;
@@ -166,11 +166,18 @@ impl Syscall<'_> {
             SYS_PPOLL => {
                 self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
             } // ignore sigmask
-            SYS_EPOLL_CREATE1 =>  self.sys_epoll_create1(args[0]),
-            SYS_EPOLL_CTL => self.sys_epoll_ctl(args[0], args[1], args[2], args[3] as *mut EpollEvent),
-            SYS_EPOLL_PWAIT => self.sys_epoll_pwait(args[0], args[1] as *mut EpollEvent,
-                                                    args[2], args[3], args[4]),
-            SYS_EVENTFD2=> self.unimplemented("eventfd2", Err(SysError::EACCES)),
+            SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
+            SYS_EPOLL_CTL => {
+                self.sys_epoll_ctl(args[0], args[1], args[2], args[3] as *mut EpollEvent)
+            }
+            SYS_EPOLL_PWAIT => self.sys_epoll_pwait(
+                args[0],
+                args[1] as *mut EpollEvent,
+                args[2],
+                args[3],
+                args[4],
+            ),
+            SYS_EVENTFD2 => self.unimplemented("eventfd2", Err(SysError::EACCES)),
 
             SYS_SOCKETPAIR => self.unimplemented("socketpair", Err(SysError::EACCES)),
             // file system
@@ -429,7 +436,9 @@ impl Syscall<'_> {
                 _ => return None,
             },
             SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
-            SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
+            SYS_EPOLL_WAIT => {
+                self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3])
+            }
 
             _ => return None,
         };
@@ -467,7 +476,9 @@ impl Syscall<'_> {
             SYS_ARCH_PRCTL => self.sys_arch_prctl(args[0] as i32, args[1]),
             SYS_TIME => self.sys_time(args[0] as *mut u64),
             SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
-            SYS_EPOLL_WAIT =>self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3]),
+            SYS_EPOLL_WAIT => {
+                self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3])
+            }
             _ => return None,
         };
         Some(ret)

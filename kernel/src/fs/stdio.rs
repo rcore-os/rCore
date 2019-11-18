@@ -6,9 +6,9 @@ use core::any::Any;
 use rcore_fs::vfs::*;
 
 use super::ioctl::*;
+use crate::process::Process;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::process::Process;
 
 #[derive(Default)]
 pub struct Stdin {
@@ -44,8 +44,6 @@ impl Stdin {
     pub fn can_read(&self) -> bool {
         return self.buf.lock().len() > 0;
     }
-
-
 }
 
 #[derive(Default)]

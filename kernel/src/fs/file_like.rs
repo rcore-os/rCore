@@ -4,11 +4,11 @@ use super::ioctl::*;
 use super::FileHandle;
 use crate::fs::epoll::EpollInstance;
 use crate::net::Socket;
+use crate::sync::Condvar;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
-use rcore_fs::vfs::PollStatus;
-use crate::sync::Condvar;
 use alloc::vec::Vec;
+use rcore_fs::vfs::PollStatus;
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -52,7 +52,7 @@ impl FileLike {
                         socket.ioctl(request, arg1, arg2, arg3)?;
                     }
                     FileLike::EpollInstance(instance) => {
-						return Err(SysError::ENOSYS);
+                        return Err(SysError::ENOSYS);
                     }
                 }
                 Ok(0)
@@ -79,14 +79,10 @@ impl FileLike {
             FileLike::Socket(socket) => {
                 //TODO
             }
-            FileLike::EpollInstance(instance) => {
-
-            }
+            FileLike::EpollInstance(instance) => {}
         }
         Ok(0)
     }
-
-
 }
 
 impl fmt::Debug for FileLike {

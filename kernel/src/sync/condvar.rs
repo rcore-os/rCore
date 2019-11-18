@@ -1,10 +1,10 @@
 use super::*;
-use crate::process::{processor, current_thread};
+use crate::process::Process;
+use crate::process::{current_thread, processor};
 use crate::thread;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use crate::process::Process;
 use rcore_thread::std_thread::Thread;
 
 pub struct RegisteredProcess {
@@ -106,7 +106,6 @@ impl Condvar {
         }
     }
 
-
     pub fn notify_all(&self) {
         let queue = self.wait_queue.lock();
         for t in queue.iter() {
@@ -130,20 +129,28 @@ impl Condvar {
         count
     }
 
-    pub fn register_epoll_list(&self, proc: Arc<SpinNoIrqLock<Process>>, tid :usize, epfd: usize, fd: usize){
-        self.epoll_queue.lock().push_back(RegisteredProcess{
+    pub fn register_epoll_list(
+        &self,
+        proc: Arc<SpinNoIrqLock<Process>>,
+        tid: usize,
+        epfd: usize,
+        fd: usize,
+    ) {
+        self.epoll_queue.lock().push_back(RegisteredProcess {
             proc: proc,
             tid: tid,
             epfd: epfd,
             fd: fd,
-            }
-        );
+        });
     }
 
-    pub fn unregister_epoll_list(&self, tid :usize, epfd: usize, fd: usize) -> bool{
+    pub fn unregister_epoll_list(&self, tid: usize, epfd: usize, fd: usize) -> bool {
         let mut epoll_list = self.epoll_queue.lock();
-        for idx in 0..epoll_list.len(){
-            if epoll_list[idx].tid == tid && epoll_list[idx].epfd == epfd && epoll_list[idx].fd == fd{
+        for idx in 0..epoll_list.len() {
+            if epoll_list[idx].tid == tid
+                && epoll_list[idx].epfd == epfd
+                && epoll_list[idx].fd == fd
+            {
                 epoll_list.remove(idx);
                 return true;
             }
@@ -168,5 +175,4 @@ impl Condvar {
             }
         }
     }
-
 }

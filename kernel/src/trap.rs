@@ -1,16 +1,15 @@
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
-use crate::process::*;
-use log::*;
-use crate::sync::Condvar;
 use crate::consts::INFORM_PER_MSEC;
+use crate::process::*;
+use crate::sync::Condvar;
+use log::*;
 
 pub static mut TICK: usize = 0;
 
 lazy_static! {
     pub static ref TICK_ACTIVITY: Condvar = Condvar::new();
 }
-
 
 pub fn uptime_msec() -> usize {
     unsafe { crate::trap::TICK * crate::consts::USEC_PER_TICK / 1000 }
@@ -20,7 +19,7 @@ pub fn timer() {
     if cpu::id() == 0 {
         unsafe {
             TICK += 1;
-            if uptime_msec() %  INFORM_PER_MSEC == 0 {
+            if uptime_msec() % INFORM_PER_MSEC == 0 {
                 TICK_ACTIVITY.notify_all();
             }
         }
