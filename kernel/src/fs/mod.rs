@@ -18,6 +18,7 @@ pub use self::stdio::{STDIN, STDOUT};
 pub use self::vga::*;
 
 mod device;
+pub mod epoll;
 mod file;
 mod file_like;
 mod ioctl;

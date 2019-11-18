@@ -175,7 +175,7 @@ impl Socket for TcpSocketState {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
-            if socket.is_open() {
+            if socket.may_recv() {
                 if let Ok(size) = socket.recv_slice(data) {
                     if size > 0 {
                         let endpoint = socket.remote_endpoint();
@@ -428,7 +428,7 @@ impl Socket for UdpSocketState {
             let mut sockets = SOCKETS.lock();
             let mut socket = sockets.get::<UdpSocket>(self.handle.0);
 
-            if socket.is_open() {
+            if socket.can_recv() {
                 if let Ok((size, remote_endpoint)) = socket.recv_slice(data) {
                     let endpoint = remote_endpoint;
                     // avoid deadlock
