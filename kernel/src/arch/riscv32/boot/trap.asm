@@ -2,7 +2,6 @@
 #   XLENB
 #   LOAD
 #   STORE
-#   TEST_BACK_TO_KERNEL
 
 .macro SAVE_ALL
     # If coming from userspace, preserve the user stack pointer and load

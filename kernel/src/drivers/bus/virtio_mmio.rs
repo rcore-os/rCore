@@ -126,7 +126,7 @@ impl VirtIOVirtqueue {
     // Add buffers to the virtqueue
     // Return true on success, false otherwise
     // ref. linux virtio_ring.c virtqueue_add
-    pub fn add(&mut self, input: &[&[u8]], output: &[&[u8]], user_data: usize) -> bool {
+    pub fn add(&mut self, input: &[&mut [u8]], output: &[&mut [u8]], user_data: usize) -> bool {
         assert!(input.len() + output.len() > 0);
         if !self.can_add(input.len(), output.len()) {
             return false;
@@ -180,7 +180,12 @@ impl VirtIOVirtqueue {
     }
 
     // Add buffers to the virtqueue and notify device about it
-    pub fn add_and_notify(&mut self, input: &[&[u8]], output: &[&[u8]], user_data: usize) -> bool {
+    pub fn add_and_notify(
+        &mut self,
+        input: &[&mut [u8]],
+        output: &[&mut [u8]],
+        user_data: usize,
+    ) -> bool {
         let res = self.add(input, output, user_data);
         if res {
             self.notify();
@@ -195,7 +200,9 @@ impl VirtIOVirtqueue {
 
     // Get device used buffers (input, output, length, user_data)
     // ref. linux virtio_ring.c virtqueue_get_buf_ctx
-    pub fn get(&mut self) -> Option<(Vec<&'static [u8]>, Vec<&'static [u8]>, usize, usize)> {
+    pub fn get(
+        &mut self,
+    ) -> Option<(Vec<&'static mut [u8]>, Vec<&'static mut [u8]>, usize, usize)> {
         let used = unsafe { &mut *(self.used as *mut VirtIOVirtqueueUsedRing) };
         if self.last_used_idx == used.idx.read() {
             return None;
@@ -219,8 +226,9 @@ impl VirtIOVirtqueue {
         loop {
             let flags = VirtIOVirtqueueFlag::from_bits_truncate(desc[cur].flags.read());
             let addr = phys_to_virt(desc[cur].addr.read() as usize);
-            let buffer =
-                unsafe { slice::from_raw_parts(addr as *const u8, desc[cur].len.read() as usize) };
+            let buffer = unsafe {
+                slice::from_raw_parts_mut(addr as *mut u8, desc[cur].len.read() as usize)
+            };
             if flags.contains(VirtIOVirtqueueFlag::WRITE) {
                 input.push(buffer);
             } else {
@@ -245,7 +253,7 @@ impl VirtIOVirtqueue {
 
     // Get device used buffers until succeed
     // See get() above
-    pub fn get_block(&mut self) -> (Vec<&'static [u8]>, Vec<&'static [u8]>, usize, usize) {
+    pub fn get_block(&mut self) -> (Vec<&'static mut [u8]>, Vec<&'static mut [u8]>, usize, usize) {
         loop {
             let res = self.get();
             if res.is_some() {
