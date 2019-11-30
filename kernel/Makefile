@@ -64,7 +64,7 @@ ifeq ($(arch), mipsel)
 dtb := src/arch/$(arch)/board/$(board)/device.dtb
 endif
 ifeq ($(board), rocket_chip)
-dtb := src/arch/riscv32/board/$(board)/device.dtb
+dtb := src/arch/riscv/board/$(board)/device.dtb
 endif
 
 # mipssim does not support SMP
@@ -305,15 +305,15 @@ ifeq ($(arch), x86_64)
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
-	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/k210/linker.ld src/arch/riscv/boot/linker64.ld
 else ifeq ($(board), rocket_chip)
-	@cp src/arch/riscv32/board/rocket_chip/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/rocket_chip/linker.ld src/arch/riscv/boot/linker64.ld
 else
-	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/u540/linker.ld src/arch/riscv/boot/linker64.ld
 endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
-		src/arch/riscv32/atomic.patch
+		src/arch/riscv/atomic.patch
 	@cargo xbuild $(build_args)
 else ifeq ($(arch), aarch64)
 	@cargo xbuild $(build_args)
