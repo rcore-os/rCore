@@ -3,7 +3,7 @@ use crate::arch::interrupt::TrapFrame;
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
 use crate::sync::Condvar;
-use log::*;
+use rcore_thread::std_thread as thread;
 
 pub static mut TICK: usize = 0;
 
@@ -33,7 +33,7 @@ pub fn error(tf: &TrapFrame) -> ! {
         let mut proc = current_thread().proc.lock();
         proc.exit(0x100);
     }
-    processor().yield_now();
+    thread::yield_now();
     unreachable!();
 }
 
