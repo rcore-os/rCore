@@ -10,6 +10,7 @@ use rcore_memory::VMError;
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
+use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
@@ -154,11 +155,31 @@ impl Syscall<'_> {
             ),
 
             // io multiplexing
+            SYS_PSELECT6 => self.sys_pselect6(
+                args[0],
+                args[1] as *mut u32,
+                args[2] as *mut u32,
+                args[3] as *mut u32,
+                args[4] as *const TimeVal,
+                args[5] as *const u32,
+            ),
             SYS_PPOLL => {
                 self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
             } // ignore sigmask
-            SYS_EPOLL_CREATE1 => self.unimplemented("epoll_create1", Err(SysError::ENOSYS)),
+            SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
+            SYS_EPOLL_CTL => {
+                self.sys_epoll_ctl(args[0], args[1], args[2], args[3] as *mut EpollEvent)
+            }
+            SYS_EPOLL_PWAIT => self.sys_epoll_pwait(
+                args[0],
+                args[1] as *mut EpollEvent,
+                args[2],
+                args[3],
+                args[4],
+            ),
+            SYS_EVENTFD2 => self.unimplemented("eventfd2", Err(SysError::EACCES)),
 
+            SYS_SOCKETPAIR => self.unimplemented("socketpair", Err(SysError::EACCES)),
             // file system
             SYS_STATFS => self.unimplemented("statfs", Err(SysError::EACCES)),
             SYS_FSTATFS => self.unimplemented("fstatfs", Err(SysError::EACCES)),
@@ -262,14 +283,12 @@ impl Syscall<'_> {
             SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
 
             // sem
-            SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SEMGET => self.sys_semget(args[0], args[1] as isize, args[2]),
+            #[cfg(not(target_arch = "mips"))]
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
-            SYS_SEMCTL => self.sys_semctl(
-                args[0],
-                args[1],
-                args[2],
-                args[3] as isize, /* as SemctlUnion */
-            ),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
 
             // shm
             /*SYS_SHMGET => self.sys_shmget(args[0], args[1], args[2]),
@@ -420,6 +439,17 @@ impl Syscall<'_> {
                 }
                 Ok(0)
             }
+            SYS_IPC => match args[0] {
+                1 => self.sys_semop(args[1], args[2] as *const SemBuf, args[3]),
+                2 => self.sys_semget(args[1], args[2] as isize, args[3]),
+                3 => self.sys_semctl(args[1], args[2], args[3], args[4] as isize),
+                _ => return None,
+            },
+            SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
+            SYS_EPOLL_WAIT => {
+                self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3])
+            }
+
             _ => return None,
         };
         Some(ret)
@@ -455,7 +485,10 @@ impl Syscall<'_> {
             SYS_CHOWN => self.unimplemented("chown", Ok(0)),
             SYS_ARCH_PRCTL => self.sys_arch_prctl(args[0] as i32, args[1]),
             SYS_TIME => self.sys_time(args[0] as *mut u64),
-            SYS_EPOLL_CREATE => self.unimplemented("epoll_create", Err(SysError::ENOSYS)),
+            SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),
+            SYS_EPOLL_WAIT => {
+                self.sys_epoll_wait(args[0], args[1] as *mut EpollEvent, args[2], args[3])
+            }
             _ => return None,
         };
         Some(ret)

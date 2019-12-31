@@ -1,77 +1,49 @@
 use crate::sync::Semaphore;
 use crate::sync::SpinLock as Mutex;
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
-use core::cell::UnsafeCell;
-use lazy_static::lazy_static;
+use core::ops::Index;
 use spin::RwLock;
 
-pub trait SemArrTrait {
-    fn get_x(&self, x: usize) -> &Semaphore;
-}
-
+/// A System V semaphore set
 pub struct SemArray {
-    pub key: usize,
-    pub sems: Vec<Semaphore>,
+    key: usize,
+    sems: Vec<Semaphore>,
 }
 
-unsafe impl Sync for SemArray {}
-unsafe impl Send for SemArray {}
-
-impl SemArray {
-    pub fn new(key: usize, sems: Vec<Semaphore>) -> SemArray {
-        SemArray {
-            key: key,
-            sems: sems,
-        }
+impl Index<usize> for SemArray {
+    type Output = Semaphore;
+    fn index(&self, idx: usize) -> &Semaphore {
+        &self.sems[idx]
     }
 }
-
-impl SemArrTrait for SemArray {
-    fn get_x(&self, x: usize) -> &Semaphore {
-        &self.sems[x]
-    }
-}
-
-pub struct SemBuf {
-    pub sem_num: i16,
-    pub sem_op: i16,
-    pub sem_flg: i16,
-}
-
-pub struct SemUndo {
-    pub sem_id: i16,
-    pub sem_num: i16,
-    pub sem_op: i16,
-}
-
-pub union SemctlUnion {
-    pub val: isize,
-    pub buf: usize,   // semid_ds*, unimplemented
-    pub array: usize, // short*, unimplemented
-} // unused
 
 lazy_static! {
-    pub static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<SemArray>>> =
-        RwLock::new(BTreeMap::new());                                                   // not mentioned.
+    static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<SemArray>>> = RwLock::new(BTreeMap::new());
 }
 
-pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<SemArray> {
-    let mut key2sem_table = KEY2SEM.write();
-    let mut sem_array_ref: Arc<SemArray>;
+impl SemArray {
+    /// Get the semaphore array with `key`.
+    /// If not exist, create a new one with `nsems` elements.
+    pub fn get_or_create(key: usize, nsems: usize, _flags: usize) -> Arc<Self> {
+        let mut key2sem = KEY2SEM.write();
 
-    let mut key_sem_array_ref = key2sem_table.get(&key);
-    if (key_sem_array_ref.is_none() || key_sem_array_ref.unwrap().upgrade().is_none()) {
-        let mut semaphores: Vec<Semaphore> = Vec::new();
+        // found in the map
+        if let Some(weak_array) = key2sem.get(&key) {
+            if let Some(array) = weak_array.upgrade() {
+                return array;
+            }
+        }
+        // not found, create one
+        let mut semaphores = Vec::new();
         for i in 0..nsems {
             semaphores.push(Semaphore::new(0));
         }
-
-        let mut sem_array = SemArray::new(key, semaphores);
-        sem_array_ref = Arc::new(sem_array);
-        key2sem_table.insert(key, Arc::downgrade(&sem_array_ref));
-    } else {
-        sem_array_ref = key2sem_table.get(&key).unwrap().upgrade().unwrap(); // no security check
+        // insert to global map
+        let array = Arc::new(SemArray {
+            key,
+            sems: semaphores,
+        });
+        key2sem.insert(key, Arc::downgrade(&array));
+        array
     }
-
-    sem_array_ref
 }

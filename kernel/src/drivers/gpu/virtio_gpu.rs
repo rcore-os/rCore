@@ -399,6 +399,21 @@ pub fn virtio_gpu_init(node: &Node) {
 
     setup_framebuffer(&mut driver);
 
+    use super::fb;
+    fb::init(fb::FramebufferInfo {
+        xres: driver.rect.width,
+        yres: driver.rect.height,
+        xres_virtual: driver.rect.width,
+        yres_virtual: driver.rect.height,
+        xoffset: 0,
+        yoffset: 0,
+        depth: fb::ColorDepth::ColorDepth32,
+        format: fb::ColorFormat::RGBA8888,
+        paddr: virt_to_phys(driver.frame_buffer),
+        vaddr: driver.frame_buffer,
+        screen_size: (driver.rect.width * driver.rect.height * 4) as usize,
+    });
+
     let driver = Arc::new(VirtIOGpuDriver(Mutex::new(driver)));
     IRQ_MANAGER.write().register_all(driver.clone());
     DRIVERS.write().push(driver);

@@ -6,6 +6,7 @@ use core::any::Any;
 use rcore_fs::vfs::*;
 
 use super::ioctl::*;
+use crate::process::Process;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 

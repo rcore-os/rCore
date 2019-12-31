@@ -7,6 +7,8 @@ pub const MAX_PROCESS_NUM: usize = 128;
 
 pub const USEC_PER_TICK: usize = 10000;
 
+pub const INFORM_PER_MSEC: usize = 50;
+
 lazy_static! {
     pub static ref SMP_CORES: usize = {
         if let Some(smp_str) = option_env!("SMP") {

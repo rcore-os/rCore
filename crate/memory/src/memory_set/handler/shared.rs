@@ -6,7 +6,7 @@ use spin::Mutex;
 #[derive(Debug)]
 struct SharedGuard<T: FrameAllocator> {
     allocator: T,
-    // direct mapping now. only work for mmap
+    // indirect mapping now. target: page_offset -> physAddr
     target: BTreeMap<usize, usize> 
 }
 
@@ -51,6 +51,8 @@ impl<T: FrameAllocator> Drop for SharedGuard<T> {
 #[derive(Debug, Clone)]
 pub struct Shared<T: FrameAllocator> {
     allocator: T,
+    // used as an indirection layer to hack rust "mut" protection
+    startVirtAddr: Arc<Mutex<Option<usize>>>,
     guard: Arc<Mutex<SharedGuard<T>>>
 }
 
@@ -61,7 +63,18 @@ impl<T: FrameAllocator> MemoryHandler for Shared<T> {
 
     fn map(&self, pt: &mut dyn PageTable, addr: VirtAddr, attr: &MemoryAttr) {
         //assert!(self.guard.is_some(), "remapping memory area")
-        let physAddrOpt = self.guard.lock().get(addr);
+        // you have to make sure that this function is called in a sequential order
+        // I assume that the first call of this function pass the startVirtualAddr of the MemoryArea
+        // TODO: Remove this potential bug
+        // Remember that pages can be randomly delayed allocated by all sharing threads
+        // Take care when to use "addrOffset" instead of "addr"
+        // Hack
+        if self.startVirtAddr.lock().is_none() {
+            let mut initStartVirtAddr = self.startVirtAddr.lock();
+            *initStartVirtAddr = Some(addr);
+        }
+        let addrOffset = addr - self.startVirtAddr.lock().unwrap();
+        let physAddrOpt = self.guard.lock().get(addrOffset);
         if physAddrOpt.is_none() { // not mapped yet
             let entry = pt.map(addr, 0);
             entry.set_present(false);
@@ -93,13 +106,14 @@ impl<T: FrameAllocator> MemoryHandler for Shared<T> {
 
     fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool {
         let entry = pt.get_entry(addr).expect("failed to get entry");
-        let physAddrOpt = self.guard.lock().get(addr);
+        let addrOffset = addr - self.startVirtAddr.lock().unwrap();
+        let physAddrOpt = self.guard.lock().get(addrOffset);
         if entry.present() {
             // not a delay case
             return false;
         } else if physAddrOpt.is_none() {
             // physical memory not alloced.
-            let frame = self.guard.lock().alloc(addr).unwrap();
+            let frame = self.guard.lock().alloc(addrOffset).unwrap();
             entry.set_target(frame);
             entry.set_present(true);
             entry.update();
@@ -126,6 +140,7 @@ impl<T: FrameAllocator> Shared<T> {
     pub fn new(allocator: T) -> Self {
         Shared {
             allocator: allocator.clone(),
+            startVirtAddr: Arc::new(Mutex::new(None)),
             guard: Arc::new(Mutex::new(SharedGuard::new(allocator)))
         }
     }
