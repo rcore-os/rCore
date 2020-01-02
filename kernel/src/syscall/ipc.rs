@@ -7,9 +7,10 @@ use spin::RwLock;
 
 pub use crate::ipc::*;
 
-use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
 use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::PAGE_SIZE;
+use rcore_memory::{PAGE_SIZE, VirtAddr, PhysAddr};
+use rcore_memory::memory_set::handler::{Shared, SharedGuard};
+use crate::memory::GlobalFrameAlloc;
 
 use super::*;
 
@@ -71,59 +72,51 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /*pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SysResult {
-        info!("sys_shmget: key: {}", key);
+    pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SysResult {
+        info!("shmget: key: {}", key);
 
-        let mut size = size;
+        let sharedGuard = ShmIdentifier::new_sharedGuard(key, size);
+        let id = self.process().shmIdentifiers.add(sharedGuard);
+        Ok(id)
+    }
 
-        if ((size & (PAGE_SIZE - 1)) != 0) {
-            size = (size & !(PAGE_SIZE - 1)) + PAGE_SIZE;
-        }
-
+    pub fn sys_shmat(&self, id: usize, mut addr: VirtAddr, shmflg: usize) -> SysResult {
+        
+        let mut shmIdentifier = self.process().shmIdentifiers.get(id).ok_or(SysError::EINVAL)?;
 
         let mut proc = self.process();
-
-        let mut key2shm_table = KEY2SHM.write();
-        let mut shmid_ref: shmid;
-        let mut shmid_local_ref: shmid_local;
-
-        let mut key_shmid_ref = key2shm_table.get(&key);
-        if (key_shmid_ref.is_none() || key_shmid_ref.unwrap().upgrade().is_none()) {
-            let addr = proc.vm().find_free_area(PAGE_SIZE, size);
-            proc.vm().push(
-                addr,
-                addr + size,
-                MemoryAttr {
-                    user: true,
-                    readonly: false,
-                    execute: true,
-                    mmio: 0
-                }
-                Shared::new(GlobalFrameAlloc),
-                "shmget",
-            );
-            let target = proc.vm().translate(addr);
-            shmid_ref = shmid::new(key, size, target);
-            shmid_local_ref = shmid_local::new(key, size, addr, target);
-        } else {
-            shmid_ref = key2shm_table.get(&key).unwrap().unwrap();
-
+        if addr == 0 {
+            // although NULL can be a valid address
+            // but in C, NULL is regarded as allocation failure
+            // so just skip it
+            addr = PAGE_SIZE;
         }
+        let size = shmIdentifier.sharedGuard.lock().size;
+        info!("shmat: id: {}, addr = {:#x}, size = {}", id, addr, size);
+        addr = self.vm().find_free_area(addr, size);
+        self.vm().push(
+            addr,
+            addr + size,
+            MemoryAttr::default().user().execute().writable(),
+            Shared::new_with_guard(GlobalFrameAlloc, shmIdentifier.sharedGuard.clone()),
+            "shmat",
+        );
+        shmIdentifier.addr = addr;
+        self.process().shmIdentifiers.set(id, shmIdentifier);
+        //self.process().shmIdentifiers.setVirtAddr(id, addr);
+        return Ok(addr);
+    }
 
-        shmid_ref
-
-        /*let sem_id = (0..)
-            .find(|i| match semarray_table.get(i) {
-                Some(p) => false,
-                _ => true,
-            })
-            .unwrap();
-
-        let mut sem_array: Arc<SemArray> = new_semary(key, nsems, semflg);
-
-        semarray_table.insert(sem_id, sem_array);
-        Ok(sem_id)*/
-    }*/
+    pub fn sys_shmdt(&self, id: usize, addr: VirtAddr, shmflg: usize) -> SysResult {
+        info!(
+            "shmdt: addr={:#x}", addr
+        );
+        let optId = self.process().shmIdentifiers.getId(addr);
+        if let Some(id) = optId {
+            self.process().shmIdentifiers.pop(id);
+        }
+        Ok(0)
+    }
 }
 
 /// An operation to be performed on a single semaphore

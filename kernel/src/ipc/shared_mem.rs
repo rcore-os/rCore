@@ -5,77 +5,38 @@ use core::cell::UnsafeCell;
 use lazy_static::lazy_static;
 use spin::RwLock;
 use rcore_memory::{VirtAddr, PhysAddr};
-
-pub struct shmid {
-    key: usize,
-    size: usize,
-    target: PhysAddr
-}
-
-pub struct shmid_local {
-    key: usize,
-    size: usize,
-    addr: VirtAddr,
-    target: PhysAddr
-}
-
-impl shmid {
-    pub fn new(key: usize, size: usize, target: PhysAddr) -> shmid {
-        shmid {
-            key,
-            size,
-            target
-        }
-    }
-}
-
-impl shmid_local {
-    pub fn new(key: usize, size: usize, addr: VirtAddr, target: PhysAddr) -> shmid {
-        shmid_local {
-            key,
-            size,
-            addr,
-            target
-        }
-    } 
-}
+use rcore_memory::memory_set::handler::{Shared, SharedGuard};
+use crate::memory::{GlobalFrameAlloc, FrameAllocator};
 
 lazy_static! {
-    pub static ref KEY2SHM: RwLock<BTreeMap<usize, Arc<shmid>>> =
-        RwLock::new(BTreeMap::new());                                                   // between ARC & WEAK
+    static ref KEY2SHM: RwLock<BTreeMap<usize, Weak<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>>> = RwLock::new(BTreeMap::new());
 }
 
-/*pub fn new_shm(key: usize, size: usize, shmflg: usize) -> shmid_local {
-    let mut key2shm_table = KEY2SHM.write();
-    let mut shmid_ref: shmid;
-    let mut key_shmid_ref = key2shm_table.get(&key);
-    if (key_shmid_ref.is_none() || key_shmid_ref.unwrap().upgrade().is_none()) {
-        proc.
-    } else {
-        shmid_ref = key2shm_table.get(&key).unwrap().unwrap();
 
+#[derive(Clone)]
+pub struct ShmIdentifier {
+    pub addr: VirtAddr,
+    pub sharedGuard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>
+}
+
+impl ShmIdentifier {
+    pub fn setAddr(&mut self, addr: VirtAddr) {
+        self.addr = addr;
     }
-
-    shmid_ref
-}
-
-pub fn new_semary(key: usize, nsems: usize, semflg: usize) -> Arc<SemArray> {
-    let mut key2sem_table = KEY2SEM.write();
-    let mut sem_array_ref: Arc<SemArray>;
-
-    let mut key_sem_array_ref = key2sem_table.get(&key);
-    if (key_sem_array_ref.is_none() || key_sem_array_ref.unwrap().upgrade().is_none()) {
-        let mut semaphores: Vec<Semaphore> = Vec::new();
-        for i in 0..nsems {
-            semaphores.push(Semaphore::new(0));
+    pub fn new_sharedGuard(key: usize, memsize: usize) -> Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>> {
+        let mut key2shm = KEY2SHM.write();
+    
+        // found in the map
+        if let Some(weak_guard) = key2shm.get(&key) {
+            if let Some(guard) = weak_guard.upgrade() {
+                return guard;
+            }
         }
-
-        let mut sem_array = SemArray::new(key, semaphores);
-        sem_array_ref = Arc::new(sem_array);
-        key2sem_table.insert(key, Arc::downgrade(&sem_array_ref));
-    } else {
-        sem_array_ref = key2sem_table.get(&key).unwrap().upgrade().unwrap(); // no security check
+        let mut sharedGuard = Arc::new(spin::Mutex::new(SharedGuard::new_with_size(GlobalFrameAlloc, memsize)));
+        // insert to global map
+        key2shm.insert(key, Arc::downgrade(&sharedGuard));
+        sharedGuard
     }
+}
 
-    sem_array_ref
-}*/
+

@@ -14,7 +14,7 @@ use xmas_elf::{
 
 use crate::arch::interrupt::{Context, TrapFrame};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::ipc::SemProc;
+use crate::ipc::{SemProc, ShmProc};
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -66,6 +66,7 @@ pub struct Process {
     pub exec_path: String,
     futexes: BTreeMap<usize, Arc<Condvar>>,
     pub semaphores: SemProc,
+    pub shmIdentifiers: ShmProc,
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
@@ -127,6 +128,7 @@ impl Thread {
                 cwd: String::from("/"),
                 exec_path: String::new(),
                 semaphores: SemProc::default(),
+                shmIdentifiers: ShmProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
@@ -312,6 +314,7 @@ impl Thread {
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
+                shmIdentifiers: ShmProc::default(),
                 pid: Pid(0),
                 parent: Weak::new(),
                 children: Vec::new(),
@@ -339,6 +342,7 @@ impl Thread {
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
+            shmIdentifiers: proc.shmIdentifiers.clone(),
             pid: Pid(0),
             parent: Arc::downgrade(&self.proc),
             children: Vec::new(),

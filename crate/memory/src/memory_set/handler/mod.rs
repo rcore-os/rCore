@@ -47,4 +47,4 @@ pub use self::byframe::ByFrame;
 pub use self::delay::Delay;
 pub use self::file::{File, Read};
 pub use self::linear::Linear;
-pub use self::shared::Shared;
+pub use self::shared::{Shared, SharedGuard};

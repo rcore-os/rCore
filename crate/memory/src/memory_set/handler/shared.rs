@@ -3,9 +3,11 @@ use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 use spin::Mutex;
 
+// represent physical memory area
 #[derive(Debug)]
-struct SharedGuard<T: FrameAllocator> {
+pub struct SharedGuard<T: FrameAllocator> {
     allocator: T,
+    pub size: usize,
     // indirect mapping now. target: page_offset -> physAddr
     target: BTreeMap<usize, usize> 
 }
@@ -14,8 +16,17 @@ impl<T: FrameAllocator> SharedGuard<T> {
     pub fn new(allocator: T) -> Self {
         SharedGuard { 
             allocator: allocator,
+            size: 0,
             target: BTreeMap::new()
-        } // delayed allocated now
+        } 
+        // size meaningful only for sys_shm
+    }
+    pub fn new_with_size(allocator: T, size: usize) -> Self {
+        SharedGuard {
+            allocator: allocator,
+            size: size,
+            target: BTreeMap::new()
+        }
     }
     pub fn alloc(&mut self, virtAddr: usize) -> Option<usize> {
         let physAddr = self.allocator.alloc().expect("failed to allocate frame");
@@ -142,6 +153,13 @@ impl<T: FrameAllocator> Shared<T> {
             allocator: allocator.clone(),
             startVirtAddr: Arc::new(Mutex::new(None)),
             guard: Arc::new(Mutex::new(SharedGuard::new(allocator)))
+        }
+    }
+    pub fn new_with_guard(allocator: T, guard: Arc<Mutex<SharedGuard<T>>>) -> Self {
+        Shared {
+            allocator: allocator.clone(),
+            startVirtAddr: Arc::new(Mutex::new(None)),
+            guard: guard.clone()
         }
     }
 }

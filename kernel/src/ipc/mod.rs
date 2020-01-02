@@ -1,8 +1,14 @@
 mod semary;
+mod shared_mem;
 
 pub use self::semary::*;
+pub use self::shared_mem::*;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use rcore_memory::memory_set::handler::{Shared, SharedGuard};
+use crate::memory::GlobalFrameAlloc;
+use crate::sync::SpinLock as Mutex;
+use rcore_memory::{PAGE_SIZE, VirtAddr, PhysAddr};
 
 /// Semaphore table in a process
 #[derive(Default)]
@@ -13,8 +19,16 @@ pub struct SemProc {
     undos: BTreeMap<(SemId, SemNum), SemOp>,
 }
 
+
+// TODO: Remove hack
+#[derive(Default)]
+pub struct ShmProc {
+    shmIdentifiers: BTreeMap<ShmId, ShmIdentifier>
+}
+
 /// Semaphore set identifier (in a process)
 type SemId = usize;
+type ShmId = usize;
 
 /// Semaphore number (in an array)
 type SemNum = u16;
@@ -67,6 +81,53 @@ impl Drop for SemProc {
                 0 => {}
                 _ => unimplemented!("Semaphore: semundo.(Not 1)"),
             }
+        }
+    }
+}
+
+impl ShmProc {
+    /// Insert the `SharedGuard` and return its ID
+    pub fn add(&mut self, sharedGuard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>) -> ShmId {
+        let id = self.get_free_id();
+        let shmIdentifier = ShmIdentifier {
+            addr: 0,
+            sharedGuard: sharedGuard
+        };
+        self.shmIdentifiers.insert(id, shmIdentifier);
+        id
+    }
+    /// Get a free ID
+    fn get_free_id(&self) -> ShmId {
+        (0..).find(|i| self.shmIdentifiers.get(i).is_none()).unwrap()
+    }
+    /// Get an semaphore set by `id`
+    pub fn get(&self, id: ShmId) -> Option<ShmIdentifier> {
+        self.shmIdentifiers.get(&id).map(|a| a.clone())
+    }
+    /// Used to set Virtual Addr
+    pub fn set(&mut self, id: ShmId, shmId: ShmIdentifier) {
+        self.shmIdentifiers.insert(id, shmId);
+    }
+    /// get id from virtaddr
+    pub fn getId(&self, addr: VirtAddr) -> Option<ShmId> {
+        for (key, value) in &self.shmIdentifiers {
+            if (value.addr == addr) {
+                return Some(*key);
+            }
+        }
+        None
+    }
+    /// Pop Shared Area
+    pub fn pop(&mut self, id: ShmId) {
+        self.shmIdentifiers.remove(&id);
+    }
+}
+
+/// Fork the semaphore table. Clear undo info.
+impl Clone for ShmProc {
+    fn clone(&self) -> Self {
+        ShmProc {
+            shmIdentifiers: self.shmIdentifiers.clone()
         }
     }
 }

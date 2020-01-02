@@ -291,10 +291,10 @@ impl Syscall<'_> {
             SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
 
             // shm
-            /*SYS_SHMGET => self.sys_shmget(args[0], args[1], args[2]),
+            SYS_SHMGET => self.sys_shmget(args[0], args[1], args[2]),
             SYS_SHMAT => self.sys_shmat(args[0], args[1], args[2]),
             SYS_SHMDT => self.sys_shmdt(args[0], args[1], args[2]),
-            SYS_SHMCTL => self.sys_shmctl(
+            /*SYS_SHMCTL => self.sys_shmctl(
                 args[0],
                 args[1],
                 args[2] /* should be shmid_ds *buf */
