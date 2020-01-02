@@ -102,7 +102,7 @@ impl Syscall<'_> {
             "shmat",
         );
         shmIdentifier.addr = addr;
-        self.process().shmIdentifiers.set(id, shmIdentifier);
+        proc.shmIdentifiers.set(id, shmIdentifier);
         //self.process().shmIdentifiers.setVirtAddr(id, addr);
         return Ok(addr);
     }
@@ -111,9 +111,10 @@ impl Syscall<'_> {
         info!(
             "shmdt: addr={:#x}", addr
         );
-        let optId = self.process().shmIdentifiers.getId(addr);
+        let mut proc = self.process();
+        let optId = proc.shmIdentifiers.getId(addr);
         if let Some(id) = optId {
-            self.process().shmIdentifiers.pop(id);
+            proc.shmIdentifiers.pop(id);
         }
         Ok(0)
     }
