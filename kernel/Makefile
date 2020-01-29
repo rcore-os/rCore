@@ -31,7 +31,6 @@
 # . extra_features = profile | ... Add additional features
 
 arch ?= riscv64
-board ?= none
 mode ?= release
 LOG  ?=
 graphic ?= off
@@ -56,7 +55,11 @@ export USER_IMG = $(user_dir)/build/$(arch).img
 export USER_QCOW2 = $(user_dir)/build/$(arch).qcow2
 
 ifeq ($(arch), aarch64)
-board := raspi3
+board ?= raspi3
+else ifeq ($(arch), mipsel)
+board ?= malta
+else
+board ?= none
 endif
 
 # currently only mipsel architecture and rocket-chip need DTB linked to the kernel

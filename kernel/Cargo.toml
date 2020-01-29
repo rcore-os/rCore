@@ -53,7 +53,7 @@ xmas-elf = "0.7"
 bitflags = "1.2"
 bit_field = "0.10"
 volatile = "0.2"
-bitvec = { version = "0.15", default-features = false, features = ["alloc"] }
+bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
 buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
