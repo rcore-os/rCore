@@ -69,10 +69,10 @@ impl Log for SimpleLogger {
         if let Some(tid) = processor().tid_option() {
             print_in_color(
                 format_args!(
-                    "[{:>5}][{}][{}] {}\n",
+                    "[{:>5}][{},{}] {}\n",
                     record.level(),
+                    crate::arch::cpu::id(),
                     tid,
-                    record.target(),
                     record.args()
                 ),
                 level_to_color_code(record.level()),
@@ -80,9 +80,9 @@ impl Log for SimpleLogger {
         } else {
             print_in_color(
                 format_args!(
-                    "[{:>5}][-][{}] {}\n",
+                    "[{:>5}][{},-] {}\n",
                     record.level(),
-                    record.target(),
+                    crate::arch::cpu::id(),
                     record.args()
                 ),
                 level_to_color_code(record.level()),

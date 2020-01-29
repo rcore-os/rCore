@@ -13,7 +13,7 @@
   "linker-flavor": "ld.lld",
   "pre-link-args": {
     "ld.lld": [
-      "-Tsrc/arch/riscv32/boot/linker.ld"
+      "-Tsrc/arch/riscv/boot/linker32.ld"
     ]
   },
   "executables": true,

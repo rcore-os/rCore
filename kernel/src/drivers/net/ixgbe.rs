@@ -158,11 +158,11 @@ impl<'a> phy::Device<'a> for IXGBEDriver {
 }
 
 impl phy::RxToken for IXGBERxToken {
-    fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
+    fn consume<R, F>(mut self, _timestamp: Instant, f: F) -> Result<R>
     where
-        F: FnOnce(&[u8]) -> Result<R>,
+        F: FnOnce(&mut [u8]) -> Result<R>,
     {
-        f(&self.0)
+        f(&mut self.0)
     }
 }
 

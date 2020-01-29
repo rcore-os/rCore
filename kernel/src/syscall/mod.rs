@@ -80,7 +80,7 @@ impl Syscall<'_> {
         let begin_time = unsafe { core::arch::x86_64::_rdtsc() };
         let cid = cpu::id();
         let pid = self.process().pid.clone();
-        let tid = processor().tid();
+        let tid = thread::current().id();
         if !pid.is_init() {
             // we trust pid 0 process
             debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);

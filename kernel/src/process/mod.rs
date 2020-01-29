@@ -90,22 +90,6 @@ static PROCESSORS: [Processor; MAX_CPU_NUM] = [
     Processor::new(),
     Processor::new(),
     Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
-    //    Processor::new(),    Processor::new(),    Processor::new(),    Processor::new(),
 ];
 
 /// Get current thread
@@ -116,6 +100,11 @@ pub unsafe fn current_thread() -> &'static mut Thread {
     // trick: force downcast from trait object
     let (process, _): (&mut Thread, *const ()) = core::mem::transmute(processor().context());
     process
+}
+
+/// Get global thread manager.
+pub fn thread_manager() -> &'static ThreadPool {
+    processor().manager()
 }
 
 // Implement dependencies for std::thread

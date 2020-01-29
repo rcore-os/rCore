@@ -104,11 +104,11 @@ impl<'a> phy::Device<'a> for RouterDriver {
 impl phy::RxToken for RouterRxToken {
     fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
     where
-        F: FnOnce(&[u8]) -> Result<R>,
+        F: FnOnce(&mut [u8]) -> Result<R>,
     {
         let mut router = (self.0).0.lock();
-        let buffer = router.buffer[(self.0).1 as usize].pop().unwrap();
-        f(&buffer)
+        let mut buffer = router.buffer[(self.0).1 as usize].pop().unwrap();
+        f(&mut buffer)
     }
 }
 

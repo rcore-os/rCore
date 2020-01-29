@@ -20,15 +20,15 @@ Supported architectures and boards:
 ### Environment
 
 * [Rust](https://www.rust-lang.org) toolchain
-* Cargo tools: [cargo-xbuild](https://github.com/rust-osdev/cargo-xbuild), [cargo-binutils](https://github.com/rust-embedded/cargo-binutils)
-* [QEMU](https://www.qemu.org) >= 3.1.0
+* Cargo tools: [cargo-binutils](https://github.com/rust-embedded/cargo-binutils)
+* [QEMU](https://www.qemu.org) >= 4.1.0
 * [musl-based GCC toolchains](https://musl.cc/) (only for building [user programs](https://github.com/rcore-os/rcore-user))
 
 Setup on Linux or macOS:
 
 ```bash
 $ rustup component add rust-src llvm-tools-preview
-$ cargo install cargo-binutils cargo-xbuild
+$ cargo install cargo-binutils
 ```
 
 Or use Docker container:

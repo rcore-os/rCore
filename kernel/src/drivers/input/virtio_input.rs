@@ -208,8 +208,8 @@ pub fn virtio_input_init(node: &Node) {
     let input_buffers: &mut [VirtIOInputEvent] = Box::leak(buffer.into_boxed_slice());
     for i in 0..queue_num {
         let buffer = unsafe {
-            slice::from_raw_parts(
-                (&input_buffers[i]) as *const VirtIOInputEvent as *const u8,
+            slice::from_raw_parts_mut(
+                (&mut input_buffers[i]) as *mut VirtIOInputEvent as *mut u8,
                 size_of::<VirtIOInputEvent>(),
             )
         };

@@ -2,7 +2,7 @@ sudo: false
 
 language: rust
 
-rust: nightly-2019-07-15
+rust: nightly-2019-11-28
 
 os:
   - linux

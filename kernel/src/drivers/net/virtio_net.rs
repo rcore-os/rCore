@@ -130,13 +130,13 @@ impl<'a> phy::Device<'a> for VirtIONetDriver {
 impl phy::RxToken for VirtIONetRxToken {
     fn consume<R, F>(self, _timestamp: Instant, f: F) -> Result<R>
     where
-        F: FnOnce(&[u8]) -> Result<R>,
+        F: FnOnce(&mut [u8]) -> Result<R>,
     {
-        let (input, output, _, user_data) = {
+        let (mut input, output, _, user_data) = {
             let mut driver = (self.0).0.lock();
             driver.queues[VIRTIO_QUEUE_RECEIVE].get().unwrap()
         };
-        let result = f(&input[0][size_of::<VirtIONetHeader>()..]);
+        let result = f(&mut input[0][size_of::<VirtIONetHeader>()..]);
 
         let mut driver = (self.0).0.lock();
         driver.queues[VIRTIO_QUEUE_RECEIVE].add_and_notify(&input, &output, user_data);
@@ -279,10 +279,10 @@ pub fn virtio_net_init(node: &Node) {
     };
 
     // allocate a page for buffer
-    let page = unsafe {
+    let buf_ptr = unsafe {
         HEAP_ALLOCATOR.alloc_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
-    } as usize;
-    let input = unsafe { slice::from_raw_parts(page as *const u8, PAGE_SIZE) };
+    };
+    let input = unsafe { slice::from_raw_parts_mut(buf_ptr, PAGE_SIZE) };
     driver.queues[VIRTIO_QUEUE_RECEIVE].add_and_notify(&[input], &[], 0);
 
     header.status.write(VirtIODeviceStatus::DRIVER_OK.bits());

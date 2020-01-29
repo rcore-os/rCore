@@ -64,7 +64,7 @@ ifeq ($(arch), mipsel)
 dtb := src/arch/$(arch)/board/$(board)/device.dtb
 endif
 ifeq ($(board), rocket_chip)
-dtb := src/arch/riscv32/board/$(board)/device.dtb
+dtb := src/arch/riscv/board/$(board)/device.dtb
 endif
 
 # mipssim does not support SMP
@@ -85,7 +85,7 @@ qemu_net_opts :=
 
 ifeq ($(arch), x86_64)
 qemu_opts += \
-	-drive if=pflash,format=raw,file=$(OVMF),readonly=on \
+	-bios $(OVMF) \
 	-drive format=raw,file=fat:rw:$(ESP) \
 	-serial mon:stdio \
 	-m 4G \
@@ -118,7 +118,7 @@ else ifeq ($(arch), riscv32)
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/virt_rv32.elf \
+	-bios default \
 	-device loader,addr=0x80400000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
@@ -133,13 +133,13 @@ ifeq ($(board), u540)
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/fu540.elf \
+	-bios ../tools/opensbi/fu540.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img)
 else
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-kernel ../tools/opensbi/virt_rv64.elf \
+	-bios default \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
@@ -205,7 +205,7 @@ endif
 
 features += $(extra_features)
 
-build_args := --target targets/$(target).json --features "$(features)"
+build_args := -Z build-std=core,alloc --target targets/$(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args += --release
@@ -302,27 +302,27 @@ endif
 kernel: $(dtb)
 	@echo Building $(arch) kernel
 ifeq ($(arch), x86_64)
-	@cargo xbuild $(build_args)
+	@cargo build $(build_args)
 else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
-	@cp src/arch/riscv32/board/k210/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/k210/linker.ld src/arch/riscv/boot/linker64.ld
 else ifeq ($(board), rocket_chip)
-	@cp src/arch/riscv32/board/rocket_chip/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/rocket_chip/linker.ld src/arch/riscv/boot/linker64.ld
 else
-	@cp src/arch/riscv32/board/u540/linker.ld src/arch/riscv32/boot/linker64.ld
+	@cp src/arch/riscv/board/u540/linker.ld src/arch/riscv/boot/linker64.ld
 endif
 	@-patch -p0 -N -b \
 		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
-		src/arch/riscv32/atomic.patch
-	@cargo xbuild $(build_args)
+		src/arch/riscv/atomic.patch
+	@cargo build $(build_args)
 else ifeq ($(arch), aarch64)
-	@cargo xbuild $(build_args)
+	@cargo build $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
 	    $(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
 	$(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/linker.ld.S -o src/arch/$(arch)/boot/linker.ld
-	@cargo xbuild $(build_args)
+	@cargo build $(build_args)
 endif
 
 
