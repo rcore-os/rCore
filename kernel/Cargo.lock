@@ -315,11 +315,11 @@ dependencies = [
 
 [[package]]
 name = "rboot"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "uefi 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uefi 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -348,7 +348,7 @@ dependencies = [
  "pc-keyboard 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pci 0.0.1 (git+https://github.com/rcore-os/pci-rs)",
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "rboot 0.1.1",
+ "rboot 0.1.2",
  "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=b7bacf9)",
  "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=d8d6119)",
  "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=d8d6119)",
@@ -550,17 +550,20 @@ dependencies = [
 
 [[package]]
 name = "ucs2"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "uefi"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "ucs2 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ucs2 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uefi-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -647,6 +650,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x86_64"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "xmas-elf"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -722,8 +735,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum tock-registers 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum uart_16550 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5b9392f60931fe3bf8f24e0a15ee4f51528770f1d64c48768ab66571334d95b0"
-"checksum ucs2 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "517566d61c8a1c347e75ef90f70099e27de717f931cc31119ad31544641aca64"
-"checksum uefi 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b8f9079624e954676c948c660b4f4e5a1cf57e7455036bbb27cb76a87e0d4f77"
+"checksum ucs2 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "85061f4e43545a613c0da6b87725bf23f8da8613cf2473719c4f71a270c4ce8a"
+"checksum uefi 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "36c63ddfef80d9e7f1318917f6c05135b3b98027e973a9e9f0a6aebe87b95934"
 "checksum uefi-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "111ba394b5fe37b5d80ccc224dec2d5f0cba33f962f236f66a9c536c5dd5d878"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 "checksum unicode-xid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
@@ -735,5 +748,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum x86 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f21eecbd666e3a8edbf0b26d36f270f7a613d8986ca0eafb8205e324f7336dab"
 "checksum x86_64 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "bb8f09c32a991cc758ebcb9b7984f530095d32578a4e7b85db6ee1f0bbe4c9c6"
 "checksum x86_64 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)" = "1ad37c1665071808d64e65f7cdae32afcdc90fd7ae7fa402bbda36b824f1add6"
+"checksum x86_64 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5d9e3e26fcb51976eafa310e8f2b7a5a83ae8c185443efe50cbc6534a4fffa0d"
 "checksum xmas-elf 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e74de9a366f6ab8c405fa6b371d9ac24943921fa14b3d64afcb202065c405f11"
 "checksum zero 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5f1bc8a6b2005884962297587045002d8cfb8dcec9db332f4ca216ddc5de82c5"

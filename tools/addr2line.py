@@ -15,6 +15,9 @@ for line in lines:
         addr = match.group(2)
         process = subprocess.run([addrline, '-e', 'target/{0}/{1}/rcore'.format(arch, mode), '-f', '-C', addr], capture_output=True)
         res = process.stdout.decode('utf-8')
+        stderr = process.stderr.decode('utf-8')
+        if stderr:
+            print(stderr)
         print('#{0} PC: {1} FP: {3} {2}'.format(match.group(1), match.group(2), res.strip(), match.group(3)))
     else:
         print(line, end='')
