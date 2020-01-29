@@ -1,7 +1,7 @@
-*** atomic.bak.rs	Sat Nov 30 14:46:53 2019
---- atomic.rs	Sat Nov 30 14:48:58 2019
+*** atomic.rs.orig	Fri Jan 17 23:48:15 2020
+--- atomic.rs	Wed Jan 29 11:49:55 2020
 ***************
-*** 164,171 ****
+*** 158,165 ****
   /// [`bool`]: ../../../std/primitive.bool.html
   #[cfg(target_has_atomic_load_store = "8")]
   #[stable(feature = "rust1", since = "1.0.0")]
@@ -10,7 +10,7 @@
       v: UnsafeCell<u8>,
   }
   
---- 164,175 ----
+--- 158,169 ----
   /// [`bool`]: ../../../std/primitive.bool.html
   #[cfg(target_has_atomic_load_store = "8")]
   #[stable(feature = "rust1", since = "1.0.0")]
@@ -24,8 +24,8 @@
   }
   
 ***************
-*** 318,323 ****
---- 322,380 ----
+*** 312,317 ****
+--- 316,375 ----
   pub const ATOMIC_BOOL_INIT: AtomicBool = AtomicBool::new(false);
   
   #[cfg(target_has_atomic_load_store = "8")]
@@ -34,6 +34,7 @@
 +     ///
 +     #[inline]
 +     #[stable(feature = "rust1", since = "1.0.0")]
++     #[rustc_const_stable(feature = "const_atomic_new", since = "1.32.0")]
 +     pub const fn new(v: bool) -> AtomicBool {
 +         AtomicBool { v: UnsafeCell::new(v as u32) }
 +     }

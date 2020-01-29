@@ -46,6 +46,7 @@ profile = []
 opt-level = 2
 
 [dependencies]
+rlibc = "1.0"
 log = "0.4"
 spin = "0.5"
 xmas-elf = "0.7"

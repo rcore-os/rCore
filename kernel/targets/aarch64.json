@@ -16,8 +16,7 @@
   "linker-is-gnu": true,
   "pre-link-args": {
     "ld.lld": [
-      "-Tsrc/arch/aarch64/boot/linker.ld",
-      "-export-dynamic"
+      "-Tsrc/arch/aarch64/boot/linker.ld"
     ]
   },
   "llvm-target": "aarch64-unknown-none",
