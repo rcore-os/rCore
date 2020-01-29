@@ -34,17 +34,15 @@ jobs:
         components: rust-src, llvm-tools-preview
 
     - name: Cache QEMU
-      id: cache-qemu
       if: runner.os == 'Linux'
       uses: actions/cache@v1
       with:
         path: qemu-4.2.0
-        key: ${{ runner.os }}-qemu
+        key: ${{ runner.os }}-${{ matrix.arch }}-qemu
     - name: Install QEMU
-      if: runner.os == 'Linux' && steps.cache-qemu.outputs.cache-hit != 'true'
+      if: runner.os == 'Linux'
       run: |
-        wget https://download.qemu.org/qemu-4.2.0.tar.xz
-        tar xJf qemu-4.2.0.tar.xz > /dev/null
+        [ ! -d qemu-4.2.0 ] && wget https://download.qemu.org/qemu-4.2.0.tar.xz && tar xJf qemu-4.2.0.tar.xz > /dev/null
         cd qemu-4.2.0 && ./configure --target-list=${{ matrix.arch }}-softmmu && sudo make install -j && cd ..
     - name: Install QEMU
       if: runner.os == 'macOS'
