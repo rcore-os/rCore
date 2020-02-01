@@ -58,4 +58,4 @@ jobs:
     - name: Download prebuilt user image
       run: cd user && make sfsimg arch=${{ matrix.arch }} prebuilt=1 && cd ..
     - name: Build kernel
-      run: cd kernel && make build arch=${{ matrix.arch }} && cd ..
+      run: cd kernel && make build ARCH=${{ matrix.arch }} && cd ..
