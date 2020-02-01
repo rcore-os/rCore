@@ -230,9 +230,10 @@ prefix ?= aarch64-linux-musl-
 endif
 
 gdb := gdb
-objdump := cargo objdump $(build_args) -- -print-imm-hex
-objcopy := cargo objcopy -- --binary-architecture=$(subst _,-,$(arch))
-strip := cargo strip --
+sysroot := $(shell rustc --print sysroot)
+objdump := $(shell find $(sysroot) -name llvm-objdump) -print-imm-hex
+objcopy := $(shell find $(sysroot) -name llvm-objcopy)
+strip := $(shell find $(sysroot) -name llvm-strip)
 dtc := dtc
 hostcc := gcc
 
@@ -245,7 +246,7 @@ clean:
 	@cd $(user_dir) && make clean
 
 doc:
-	@cargo rustdoc -- --document-private-items
+	@cargo doc $(build_args) --no-deps --document-private-items
 
 run: build justrun
 test: build justtest
@@ -304,9 +305,7 @@ endif
 
 kernel: $(dtb)
 	@echo Building $(arch) kernel
-ifeq ($(arch), x86_64)
-	@cargo build $(build_args)
-else ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
+ifeq ($(arch), $(filter $(arch), riscv32 riscv64))
 ifeq ($(board), k210)
 	@cp src/arch/riscv/board/k210/linker.ld src/arch/riscv/boot/linker64.ld
 else ifeq ($(board), rocket_chip)
@@ -315,18 +314,15 @@ else
 	@cp src/arch/riscv/board/u540/linker.ld src/arch/riscv/boot/linker64.ld
 endif
 	@-patch -p0 -N -b \
-		$(shell rustc --print sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
+		$(sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv/atomic.patch
-	@cargo build $(build_args)
-else ifeq ($(arch), aarch64)
-	@cargo build $(build_args)
 else ifeq ($(arch), mipsel)
 	@for file in context entry trap ; do \
 	    $(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/$${file}.S -o src/arch/$(arch)/boot/$${file}.gen.s ; \
 	done
 	$(hostcc) -Dboard_$(board) -E src/arch/$(arch)/boot/linker.ld.S -o src/arch/$(arch)/boot/linker.ld
-	@cargo build $(build_args)
 endif
+	@cargo build $(build_args)
 
 
 ### user programs ###

@@ -28,7 +28,6 @@ Setup on Linux or macOS:
 
 ```bash
 $ rustup component add rust-src llvm-tools-preview
-$ cargo install cargo-binutils
 ```
 
 Or use Docker container:
