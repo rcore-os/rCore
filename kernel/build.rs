@@ -10,7 +10,6 @@ fn main() {
     println!("cargo:rerun-if-env-changed=USER_IMG");
 
     let arch: String = std::env::var("ARCH").unwrap();
-    let _board: String = std::env::var("BOARD").unwrap();
     if let Ok(user_img) = std::env::var("USER_IMG") {
         println!("cargo:rerun-if-changed={}", user_img);
     }

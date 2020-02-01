@@ -20,7 +20,6 @@ Supported architectures and boards:
 ### Environment
 
 * [Rust](https://www.rust-lang.org) toolchain
-* Cargo tools: [cargo-binutils](https://github.com/rust-embedded/cargo-binutils)
 * [QEMU](https://www.qemu.org) >= 4.1.0
 * [musl-based GCC toolchains](https://musl.cc/) (only for building [user programs](https://github.com/rcore-os/rcore-user))
 
@@ -28,7 +27,6 @@ Setup on Linux or macOS:
 
 ```bash
 $ rustup component add rust-src llvm-tools-preview
-$ cargo install cargo-binutils
 ```
 
 Or use Docker container:
@@ -42,10 +40,12 @@ $ docker run -it -v $PWD:$PWD -w $PWD wangrunji0408/rcore
 ```bash
 $ git clone https://github.com/rcore-os/rCore.git --recursive
 $ cd rCore/user
-$ make sfsimg prebuilt=1 arch={riscv32,riscv64,x86_64,aarch64,mipsel}
+$ make sfsimg prebuilt=1 arch=x86_64
 $ cd ../kernel
-$ make run arch={riscv32,riscv64,x86_64,aarch64,mipsel}
+$ make run ARCH=x86_64 LOG=info
 ```
+
+See [Makefile](kernel/Makefile) for more usages.
 
 ## Maintainers
 

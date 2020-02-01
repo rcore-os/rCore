@@ -55,15 +55,7 @@ jobs:
       if: runner.os == 'macOS'
       run: brew install dtc
 
-    - name: Cache cargo bins
-      uses: actions/cache@v1
-      with:
-        path: ~/.cargo/bin
-        key: ${{ runner.os }}-cargo-bin
-    - name: Install cargo-binutils
-      run: test -x $HOME/.cargo/bin/cargo-objdump || cargo install cargo-binutils
-
     - name: Download prebuilt user image
       run: cd user && make sfsimg arch=${{ matrix.arch }} prebuilt=1 && cd ..
     - name: Build kernel
-      run: cd kernel && make build arch=${{ matrix.arch }} && cd ..
+      run: cd kernel && make build ARCH=${{ matrix.arch }} && cd ..
