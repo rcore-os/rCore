@@ -116,6 +116,7 @@ _to_kernel:
 .endm
 
     .section .text
+    .align 4
     .globl trap_entry
 trap_entry:
     SAVE_ALL
