@@ -19,6 +19,7 @@ extern crate alloc;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+extern crate rlibc;
 
 pub use crate::process::{new_kernel_context, processor};
 pub use buddy_system_allocator::LockedHeapWithRescue;
@@ -53,7 +54,7 @@ pub mod arch;
 pub mod arch;
 
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-#[path = "arch/riscv32/mod.rs"]
+#[path = "arch/riscv/mod.rs"]
 pub mod arch;
 
 #[cfg(target_arch = "aarch64")]

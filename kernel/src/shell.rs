@@ -38,7 +38,7 @@ pub fn add_user_shell() {
             .manager()
             .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
     } else {
-        processor().manager().add(Thread::new_kernel(shell, 0));
+        thread_manager().add(Thread::new_kernel(shell, 0));
     }
 }
 
@@ -47,7 +47,7 @@ pub fn add_user_shell() {
     use crate::drivers::CMDLINE;
     let cmdline = CMDLINE.read();
     let inode = ROOT_INODE.lookup(&cmdline).unwrap();
-    processor().manager().add(Thread::new_user(
+    thread_manager().add(Thread::new_user(
         &inode,
         &cmdline,
         cmdline.split(' ').map(|s| s.into()).collect(),
@@ -68,7 +68,7 @@ pub extern "C" fn shell(_arg: usize) -> ! {
         }
         let name = cmd.trim().split(' ').next().unwrap();
         if let Ok(inode) = ROOT_INODE.lookup(name) {
-            let _tid = processor().manager().add(Thread::new_user(
+            let _tid = thread_manager().add(Thread::new_user(
                 &inode,
                 &cmd,
                 cmd.split(' ').map(|s| s.into()).collect(),

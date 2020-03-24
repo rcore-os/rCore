@@ -217,14 +217,14 @@ impl Driver for VirtIOGpuDriver {
 
 fn request(driver: &mut VirtIOGpu) {
     let input = unsafe {
-        slice::from_raw_parts(
-            driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *const u8,
+        slice::from_raw_parts_mut(
+            driver.queue_buffer[VIRTIO_BUFFER_RECEIVE] as *mut u8,
             PAGE_SIZE,
         )
     };
     let output = unsafe {
-        slice::from_raw_parts(
-            driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *const u8,
+        slice::from_raw_parts_mut(
+            driver.queue_buffer[VIRTIO_BUFFER_TRANSMIT] as *mut u8,
             PAGE_SIZE,
         )
     };

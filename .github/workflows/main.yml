@@ -1,0 +1,61 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: rm rust-toolchain
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+        override: true
+        components: rustfmt, clippy
+    - name: Check code format
+      run: cd kernel && cargo fmt -- --check
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        arch: [x86_64, riscv32, riscv64, aarch64, mipsel]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2020-01-17
+        components: rust-src, llvm-tools-preview
+
+    - name: Cache QEMU
+      if: runner.os == 'Linux'
+      uses: actions/cache@v1
+      with:
+        path: qemu-4.2.0
+        key: ${{ runner.os }}-${{ matrix.arch }}-qemu
+    - name: Install QEMU
+      if: runner.os == 'Linux'
+      run: |
+        [ ! -d qemu-4.2.0 ] && wget https://download.qemu.org/qemu-4.2.0.tar.xz && tar xJf qemu-4.2.0.tar.xz > /dev/null
+        cd qemu-4.2.0 && ./configure --target-list=${{ matrix.arch }}-softmmu && sudo make install -j && cd ..
+    - name: Install QEMU
+      if: runner.os == 'macOS'
+      run: brew install qemu
+
+    - name: Install dependencies
+      if: runner.os == 'Linux'
+      run: sudo apt install -y device-tree-compiler
+    - name: Install dependencies
+      if: runner.os == 'macOS'
+      run: brew install dtc
+
+    - name: Download prebuilt user image
+      run: cd user && make sfsimg arch=${{ matrix.arch }} prebuilt=1 && cd ..
+    - name: Build kernel
+      run: cd kernel && make build ARCH=${{ matrix.arch }} && cd ..

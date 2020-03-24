@@ -21,7 +21,7 @@ use crate::memory::{
 use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
-use crate::processor;
+use crate::process::thread_manager;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 
@@ -424,7 +424,7 @@ impl Process {
     pub fn exit(&mut self, exit_code: usize) {
         // quit all threads
         for tid in self.threads.iter() {
-            processor().manager().exit(*tid, 1);
+            thread_manager().exit(*tid, 1);
         }
         // notify parent and fill exit code
         if let Some(parent) = self.parent.upgrade() {

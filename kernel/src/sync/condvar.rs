@@ -1,6 +1,6 @@
 use super::*;
 use crate::process::Process;
-use crate::process::{current_thread, processor};
+use crate::process::{current_thread, thread_manager};
 use crate::thread;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
@@ -63,19 +63,19 @@ impl Condvar {
                 let mut lock = condvar.wait_queue.lock();
                 locks.push(lock);
             }
-            processor().manager().sleep(tid, 0);
+            thread_manager().sleep(tid, 0);
             locks.clear();
 
             if let Some(res) = condition() {
                 let _ = FlagsGuard::no_irq_region();
-                processor().manager().cancel_sleeping(tid);
+                thread_manager().cancel_sleeping(tid);
                 for condvar in condvars {
                     let mut lock = condvar.wait_queue.lock();
                     lock.retain(|t| !Arc::ptr_eq(t, &token));
                 }
                 return res;
             }
-            processor().yield_now();
+            thread::yield_now();
         }
     }
 

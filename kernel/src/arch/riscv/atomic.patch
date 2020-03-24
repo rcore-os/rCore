@@ -1,0 +1,88 @@
+*** atomic.rs.orig	Fri Jan 17 23:48:15 2020
+--- atomic.rs	Wed Jan 29 11:49:55 2020
+***************
+*** 158,165 ****
+  /// [`bool`]: ../../../std/primitive.bool.html
+  #[cfg(target_has_atomic_load_store = "8")]
+  #[stable(feature = "rust1", since = "1.0.0")]
+! #[repr(C, align(1))]
+  pub struct AtomicBool {
+      v: UnsafeCell<u8>,
+  }
+  
+--- 158,169 ----
+  /// [`bool`]: ../../../std/primitive.bool.html
+  #[cfg(target_has_atomic_load_store = "8")]
+  #[stable(feature = "rust1", since = "1.0.0")]
+! #[cfg_attr(any(target_arch = "riscv32", target_arch = "riscv64"), repr(C, align(4)))]
+! #[cfg_attr(not(any(target_arch = "riscv32", target_arch = "riscv64")), repr(C, align(1)))]
+  pub struct AtomicBool {
++     #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
++     v: UnsafeCell<u32>,
++     #[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+      v: UnsafeCell<u8>,
+  }
+  
+***************
+*** 312,317 ****
+--- 316,375 ----
+  pub const ATOMIC_BOOL_INIT: AtomicBool = AtomicBool::new(false);
+  
+  #[cfg(target_has_atomic_load_store = "8")]
++ #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
++ impl AtomicBool {
++     ///
++     #[inline]
++     #[stable(feature = "rust1", since = "1.0.0")]
++     #[rustc_const_stable(feature = "const_atomic_new", since = "1.32.0")]
++     pub const fn new(v: bool) -> AtomicBool {
++         AtomicBool { v: UnsafeCell::new(v as u32) }
++     }
++ 
++     ///
++     #[inline]
++     #[stable(feature = "rust1", since = "1.0.0")]
++     pub fn load(&self, order: Ordering) -> bool {
++         unsafe { atomic_load(self.v.get(), order) != 0 }
++     }
++ 
++     ///
++     #[inline]
++     #[stable(feature = "rust1", since = "1.0.0")]
++     pub fn store(&self, val: bool, order: Ordering) {
++         unsafe { atomic_store(self.v.get(), val as u32, order); }
++     }
++ 
++     ///
++     #[inline]
++     #[stable(feature = "rust1", since = "1.0.0")]
++     pub fn compare_and_swap(&self, current: bool, new: bool, order: Ordering) -> bool {
++         match self.compare_exchange(current, new, order, strongest_failure_ordering(order)) {
++             Ok(x) => x,
++             Err(x) => x,
++         }
++     }
++ 
++     ///
++     #[inline]
++     #[stable(feature = "extended_compare_and_swap", since = "1.10.0")]
++     pub fn compare_exchange(&self,
++                             current: bool,
++                             new: bool,
++                             success: Ordering,
++                             failure: Ordering)
++                             -> Result<bool, bool> {
++         match unsafe {
++             atomic_compare_exchange(self.v.get(), current as u32, new as u32, success, failure)
++         } {
++             Ok(x) => Ok(x != 0),
++             Err(x) => Err(x != 0),
++         }
++     }
++ }
++ 
++ #[cfg(target_has_atomic_load_store = "8")]
++ #[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+  impl AtomicBool {
+      /// Creates a new `AtomicBool`.
+      ///

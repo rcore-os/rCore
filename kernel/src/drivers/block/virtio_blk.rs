@@ -127,14 +127,14 @@ impl Driver for VirtIOBlkDriver {
         req.req_type = VIRTIO_BLK_T_IN;
         req.reserved = 0;
         req.sector = block_id as u64;
-        let input = [0; size_of::<VirtIOBlkReadResp>()];
+        let mut input = [0; size_of::<VirtIOBlkReadResp>()];
         let output = unsafe {
-            slice::from_raw_parts(
-                &req as *const VirtIOBlkReadReq as *const u8,
+            slice::from_raw_parts_mut(
+                &mut req as *mut VirtIOBlkReadReq as *mut u8,
                 size_of::<VirtIOBlkReadReq>(),
             )
         };
-        driver.queue.add_and_notify(&[&input], &[output], 0);
+        driver.queue.add_and_notify(&[&mut input], &[output], 0);
         driver.queue.get_block();
         let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkReadResp) };
         if resp.status == VIRTIO_BLK_S_OK {
@@ -154,14 +154,14 @@ impl Driver for VirtIOBlkDriver {
         req.sector = block_id as u64;
         let len = min(buf.len(), VIRTIO_BLK_BLK_SIZE);
         req.data[..len].clone_from_slice(&buf[..len]);
-        let input = [0; size_of::<VirtIOBlkWriteResp>()];
+        let mut input = [0; size_of::<VirtIOBlkWriteResp>()];
         let output = unsafe {
-            slice::from_raw_parts(
-                &req as *const VirtIOBlkWriteReq as *const u8,
+            slice::from_raw_parts_mut(
+                &mut req as *mut VirtIOBlkWriteReq as *mut u8,
                 size_of::<VirtIOBlkWriteReq>(),
             )
         };
-        driver.queue.add_and_notify(&[&input], &[output], 0);
+        driver.queue.add_and_notify(&[&mut input], &[output], 0);
         driver.queue.get_block();
         let resp = unsafe { &*(&input as *const u8 as *const VirtIOBlkWriteResp) };
         if resp.status == VIRTIO_BLK_S_OK {

@@ -2,7 +2,6 @@
 #   XLENB
 #   LOAD
 #   STORE
-#   TEST_BACK_TO_KERNEL
 
 .macro SAVE_ALL
     # If coming from userspace, preserve the user stack pointer and load
@@ -117,6 +116,7 @@ _to_kernel:
 .endm
 
     .section .text
+    .align 4
     .globl trap_entry
 trap_entry:
     SAVE_ALL

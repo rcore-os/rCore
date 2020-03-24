@@ -7,8 +7,8 @@ impl Syscall<'_> {
     pub fn sys_fork(&mut self) -> SysResult {
         let new_thread = self.thread.fork(self.tf);
         let pid = new_thread.proc.lock().pid.get();
-        let tid = processor().manager().add(new_thread);
-        processor().manager().detach(tid);
+        let tid = thread_manager().add(new_thread);
+        thread_manager().detach(tid);
         info!("fork: {} -> {}", thread::current().id(), pid);
         Ok(pid)
     }
@@ -53,8 +53,8 @@ impl Syscall<'_> {
         let new_thread = self
             .thread
             .clone(self.tf, newsp, newtls, child_tid as usize);
-        let tid = processor().manager().add(new_thread);
-        processor().manager().detach(tid);
+        let tid = thread_manager().add(new_thread);
+        thread_manager().detach(tid);
         info!("clone: {} -> {}", thread::current().id(), tid);
         *parent_tid_ref = tid as u32;
         *child_tid_ref = tid as u32;
@@ -172,10 +172,10 @@ impl Syscall<'_> {
 
         // Kill other threads
         proc.threads.retain(|&tid| {
-            if tid != processor().tid() {
-                processor().manager().exit(tid, 1);
+            if tid != thread::current().id() {
+                thread_manager().exit(tid, 1);
             }
-            tid == processor().tid()
+            tid == thread::current().id()
         });
 
         // Read program file
@@ -280,8 +280,8 @@ impl Syscall<'_> {
 
         drop(proc);
 
-        processor().manager().exit(tid, exit_code as usize);
-        processor().yield_now();
+        thread_manager().exit(tid, exit_code as usize);
+        thread::yield_now();
         unreachable!();
     }
 
@@ -292,7 +292,7 @@ impl Syscall<'_> {
 
         proc.exit(exit_code);
 
-        processor().yield_now();
+        thread::yield_now();
         unreachable!();
     }
 
@@ -306,7 +306,7 @@ impl Syscall<'_> {
 
     pub fn sys_set_priority(&mut self, priority: usize) -> SysResult {
         let pid = thread::current().id();
-        processor().manager().set_priority(pid, priority as u8);
+        thread_manager().set_priority(pid, priority as u8);
         Ok(0)
     }
 

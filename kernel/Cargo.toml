@@ -20,6 +20,7 @@ authors = [
 
 [features]
 default = []
+board_qemu = []
 board_u540 = ["link_user"]
 board_k210 = ["link_user"]
 board_rocket_chip = ["link_user"]
@@ -46,33 +47,34 @@ profile = []
 opt-level = 2
 
 [dependencies]
+rlibc = "1.0"
 log = "0.4"
 spin = "0.5"
 xmas-elf = "0.7"
-bitflags = "1.1"
+bitflags = "1.2"
 bit_field = "0.10"
 volatile = "0.2"
-bitvec = { version = "0.14", default-features = false, features = ["alloc"] }
+bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
 buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
-smoltcp = { git = "https://github.com/rcore-os/smoltcp", default-features = false, features = ["alloc", "log", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
+smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
-rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "95e716a2" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "33f86c47" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "33f86c47" }
-rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "33f86c47" }
-rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "33f86c47" }
-rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "33f86c47" }
+rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "d727949b" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-rboot = { path = "../rboot" }
+rboot = { path = "../rboot", default-features = false }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.7"
 raw-cpuid = "7.0"
