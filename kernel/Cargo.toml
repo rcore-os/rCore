@@ -65,11 +65,11 @@ bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "d727949b" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "d8d6119" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "d8d6119" }
-rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "d8d6119" }
-rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "d8d6119" }
-rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "d8d6119" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 
 
