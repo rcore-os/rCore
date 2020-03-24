@@ -3,12 +3,12 @@ mod shared_mem;
 
 pub use self::semary::*;
 pub use self::shared_mem::*;
+use crate::memory::GlobalFrameAlloc;
+use crate::sync::SpinLock as Mutex;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use rcore_memory::memory_set::handler::{Shared, SharedGuard};
-use crate::memory::GlobalFrameAlloc;
-use crate::sync::SpinLock as Mutex;
-use rcore_memory::{PAGE_SIZE, VirtAddr, PhysAddr};
+use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
 
 /// Semaphore table in a process
 #[derive(Default)]
@@ -19,11 +19,10 @@ pub struct SemProc {
     undos: BTreeMap<(SemId, SemNum), SemOp>,
 }
 
-
 // TODO: Remove hack
 #[derive(Default)]
 pub struct ShmProc {
-    shmIdentifiers: BTreeMap<ShmId, ShmIdentifier>
+    shmIdentifiers: BTreeMap<ShmId, ShmIdentifier>,
 }
 
 /// Semaphore set identifier (in a process)
@@ -91,14 +90,16 @@ impl ShmProc {
         let id = self.get_free_id();
         let shmIdentifier = ShmIdentifier {
             addr: 0,
-            sharedGuard: sharedGuard
+            sharedGuard: sharedGuard,
         };
         self.shmIdentifiers.insert(id, shmIdentifier);
         id
     }
     /// Get a free ID
     fn get_free_id(&self) -> ShmId {
-        (0..).find(|i| self.shmIdentifiers.get(i).is_none()).unwrap()
+        (0..)
+            .find(|i| self.shmIdentifiers.get(i).is_none())
+            .unwrap()
     }
     /// Get an semaphore set by `id`
     pub fn get(&self, id: ShmId) -> Option<ShmIdentifier> {
@@ -127,7 +128,7 @@ impl ShmProc {
 impl Clone for ShmProc {
     fn clone(&self) -> Self {
         ShmProc {
-            shmIdentifiers: self.shmIdentifiers.clone()
+            shmIdentifiers: self.shmIdentifiers.clone(),
         }
     }
 }

@@ -58,7 +58,6 @@ impl Syscall<'_> {
                 );
                 return Ok(addr);
             }
-            
         } else {
             let file = proc.get_file(fd)?;
             info!("mmap path is {} ", &*file.path);

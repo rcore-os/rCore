@@ -7,10 +7,10 @@ use spin::RwLock;
 
 pub use crate::ipc::*;
 
-use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::{PAGE_SIZE, VirtAddr, PhysAddr};
-use rcore_memory::memory_set::handler::{Shared, SharedGuard};
 use crate::memory::GlobalFrameAlloc;
+use rcore_memory::memory_set::handler::{Shared, SharedGuard};
+use rcore_memory::memory_set::MemoryAttr;
+use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
 
 use super::*;
 
@@ -81,8 +81,11 @@ impl Syscall<'_> {
     }
 
     pub fn sys_shmat(&self, id: usize, mut addr: VirtAddr, shmflg: usize) -> SysResult {
-        
-        let mut shmIdentifier = self.process().shmIdentifiers.get(id).ok_or(SysError::EINVAL)?;
+        let mut shmIdentifier = self
+            .process()
+            .shmIdentifiers
+            .get(id)
+            .ok_or(SysError::EINVAL)?;
 
         let mut proc = self.process();
         if addr == 0 {
@@ -108,9 +111,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_shmdt(&self, id: usize, addr: VirtAddr, shmflg: usize) -> SysResult {
-        info!(
-            "shmdt: addr={:#x}", addr
-        );
+        info!("shmdt: addr={:#x}", addr);
         let mut proc = self.process();
         let optId = proc.shmIdentifiers.getId(addr);
         if let Some(id) = optId {
