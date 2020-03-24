@@ -302,7 +302,6 @@ impl Syscall<'_> {
                 args[1],
                 args[2] /* should be shmid_ds *buf */
             ),*/
-
             // system
             SYS_GETPID => self.sys_getpid(),
             SYS_GETTID => self.sys_gettid(),
