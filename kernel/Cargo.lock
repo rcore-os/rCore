@@ -320,7 +320,7 @@ version = "0.1.2"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "uefi 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.9.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -639,6 +639,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "x86_64"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "xmas-elf"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -726,5 +735,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum x86 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f21eecbd666e3a8edbf0b26d36f270f7a613d8986ca0eafb8205e324f7336dab"
 "checksum x86_64 0.7.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1f27d9168654aee1b0c1b73746caeb4aa33248f8b8c8f6e100e697fcc2a794b2"
 "checksum x86_64 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5d9e3e26fcb51976eafa310e8f2b7a5a83ae8c185443efe50cbc6534a4fffa0d"
+"checksum x86_64 0.9.6 (registry+https://github.com/rust-lang/crates.io-index)" = "4206b60c9f99766329b66962aa8ddc01df6c7edd02edc046b7a69d5df9fcdbcf"
 "checksum xmas-elf 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e74de9a366f6ab8c405fa6b371d9ac24943921fa14b3d64afcb202065c405f11"
 "checksum zero 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5f1bc8a6b2005884962297587045002d8cfb8dcec9db332f4ca216ddc5de82c5"

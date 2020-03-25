@@ -4,3 +4,8 @@ all:
 	make alpine arch=x86_64 && \
 	make test arch=x86_64 && \
 	make sfsimg arch=x86_64
+clean:
+	cd kernel && make clean
+	cd user && make clean
+run: all
+	cd kernel && make run ARCH=x86_64 mode=release
