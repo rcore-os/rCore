@@ -1,0 +1,8 @@
+*.aux
+*.log
+*.nav
+*.snm
+*.gz
+*.out
+*.toc
+_minted*

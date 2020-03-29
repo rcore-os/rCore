@@ -1,0 +1,83 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{minted}
+\usepackage{ctex}
+\usepackage{xeCJK}
+\usepackage{graphics}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\usepackage{authblk}
+\usepackage[colorlinks,linkcolor=blue]{hyperref}
+
+\pgfplotsset{compat=1.15}
+
+\setCJKmainfont[ItalicFont={楷体}, BoldFont={黑体}]{宋体}
+
+
+\title{rCore 中开发环境的搭建}
+\author{罗崚骁\quad 宋香君}
+\affil{\texttt {\{luolx17, songxj17\}@mails.tsinghua.edu.cn}}
+
+\begin{document}
+    \maketitle
+
+    \section{课程设计目标}
+    本组致力于为 rCore 增加相关的软件支持，使得 rCore 具有一定软件开发能力，为此需要对 rCore 的功能进行进一步完善，尤其是系统调用的完善。
+
+    设想的开发环境包含的软件工具有：
+    \begin{itemize}
+        \item C/C++ 开发：基于 musl libc 的 gcc 工具链
+        \item 工程构建：GNU make, CMake
+        \item Rust 开发：rust 工具链
+        \item 版本控制系统：git
+        \item 编辑器：vi, vim
+        \item 软件包管理器：cargo,apk
+    \end{itemize}
+
+    \section{课程设计背景}
+    随着 rCore 开发团队的不懈努力，rCore 已经具备了运行一些软件的能力。但是，rCore 的软件开发能力还稍显不足，比如：
+    \begin{itemize}
+        \item 编译器支持不足，目前仅支持 musl-gcc
+        \item C/C++，Rust 标准库实现支持不详，缺少测试，目前仅支持 musl-libc
+        \item 没有版本控制系统
+        \item 缺少项目构建工具
+        \item 编辑器只能勉强使用（vi）
+        \item 没有软件包管理器，甚至不太有从源码安装软件的能力
+    \end{itemize}
+
+    这些显然不是一个优秀的操作系统应该具有的状态，因此我们小组决定为 rCore 支持上述类型的软件使其具有软件开发的能力。
+
+    \section{已有相关工作}
+    \begin{itemize}
+        \item rCore 已经实现了相当数量的系统调用，能够支持 \href{https://github.com/rcore-os/rcore-user}{rcore-user} 中的软件，
+        \item 考虑到编译器是我们的课程设计中重要的一环，尤其可以参考此前 rCore 对 musl-gcc 的支持历程
+        \item 可以设法获取的各种满足我们需求的开源软件，这一点决定了我们的工作思路是对 rCore 针对软件进行完善，而非针对 rCore 开发软件
+    \end{itemize}
+
+    \section{工作计划及目前进展}
+
+    工作计划按如下顺序开展：
+
+    \begin{itemize}
+        \item 完善对 gcc 的支持，测试 C/C++ 标准库实现
+        \item 支持 make，使 rCore 具备从源码安装软件的能力（除此之外，还可考虑支持 CMake）
+        \item 支持 Git
+        \item 支持 Rust 工具链，主要包括：
+        \begin{itemize}
+            \item rustc
+            \item cargo
+            \item 测试 rust 标准库实现
+        \end{itemize}
+        \item 支持更多的编辑器（nano,vim 等）
+    \end{itemize}
+
+    \section{小组分工}
+    两人都需要对各种系统调用进行实现和完善。在具体支持的软件上分工如下：
+    \begin{itemize}
+        \item 罗崚骁：Git,Cargo 离线版, 测试 C++ 与 Rust 项目
+        \item 宋香君：make, CMake, 测试 C 项目
+    \end{itemize}
+
+\end{document}

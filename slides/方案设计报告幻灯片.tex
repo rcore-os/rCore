@@ -1,0 +1,703 @@
+\documentclass{beamer}
+
+\usepackage{amsmath}
+\usefonttheme{serif}
+
+\usepackage{ctex} 
+\usepackage{xeCJK}
+\setCJKmainfont[ItalicFont={楷体}, BoldFont={黑体}]{宋体}
+
+\usepackage{booktabs}
+
+\newcommand{\E}{\text{E}}
+\newcommand{\var}{\text{Var}}
+\newcommand{\cov}{\text{Cov}}
+\renewcommand{\d}{\text{d}}
+
+\setbeamertemplate{footline}[frame number]
+
+\title{概率论初步}
+
+\author{function2}
+
+\begin{document}
+    \begin{frame}
+        \titlepage
+    \end{frame}
+
+    \begin{frame}{样本与事件}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item \textbf{样本（点）}：一种可能的确定结果 $\omega$
+            \item \textbf{样本空间}：全体样本点构成的集合 $\Omega=\{\omega\}$
+            \item \textbf{事件域}：$\Omega$ 的幂集的一个子集 $F$
+            \item \textbf{事件}：事件域的元素 $ A \in F $，事件要么发生要么不发生。
+            \begin{itemize}
+                \item 若 $\omega \in A$，则在 $\omega$ 处发生了事件 $A$
+                \item 若 $\omega \notin A$，则在 $\omega$ 处没有发生事件 $A$
+                \item 事件的运算同集合的运算（交并补差），$A\cap B$ 通常简记为 $AB$
+            \end{itemize}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{概率的公理化定义}
+        {看看就好}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设有 $P:F \to \mathbb{R}$，如果 $P$ 满足以下几条性质：
+            \begin{itemize}
+                \item 非负性公理：$P(A) \ge 0$
+                \item 正则性条件：$P(\Omega) = 1$
+                \item 可列可加公理：设有一列互不相容（互斥）的事件 $\{A_n\}$，有
+                $$
+                    P\left(\bigcup_{n}{A_n}\right) = \sum_{n} P(A_n)
+                $$
+            \end{itemize}
+            \item 则称 $P(A)$ 为事件 $A$ 发生的\textbf{概率}。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{关于概率}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item $P(\emptyset)=0$
+            \item $P(\overline{A})=1-P(A)$
+            \item $P(A-B)=P(A)-P(AB)$
+        \end{itemize}
+    \end{frame}
+    \begin{frame}{关于概率的一些微小结论}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 简单来说：概率是描述事件发生的可能性大小的量。
+            \item 描述概率时，必须明确讨论的概率空间，否则对于看似相同的事件不同的概率空间会给出不同的结果。
+            \item 贝特朗奇论：在半径为 1 的圆中，随机取一根弦，长度超过 $\sqrt3$ 的概率是多少？
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{古典概型}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 样本空间有限，事件发生的概率为事件的样本点的数目占样本空间的比例。
+            $$P(A)=\frac{|A|}{|\Omega|}$$
+            \item 样本空间的大小往往较容易计算，关键在于统计所求事件包含的样本点数目，因此常常归约到某种计数问题。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{古典概型例题}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有 $n$ 张不同的信和 $n$ 个与之对应的信封，将每张信随机装入各个信封，使得每个信封恰好有一张信，问所有的信与信封都不匹配的概率。
+
+            \item 等价问题：随机一个长度为 $n$ 的排列，构成错排的概率。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{古典概型例题}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $A_i$ 表示第 $i$ 张信装对的事件，显然答案为 $1-P\left(\bigcup_{i=1}^{n}A_i\right)$。
+            由古典概型公式和容斥原理：
+            \begin{align*}
+                P\left(\bigcup_{i=1}^{n}A_i\right)
+                &= \frac{1}{n!} \left \lvert \bigcup_{i=1}^{n}A_i \right \rvert \\
+                &= \frac{1}{n!} \sum_{\emptyset \ne J \subseteq \{1,2,\dots,n\}} (-1)^{\lvert J \rvert + 1} \left \lvert \bigcap_{i\in J} A_i \right \rvert \\
+                &= \frac{1}{n!} \sum_{k=1}^{n} \binom{n}{k} (-1)^{k+1} k! \\
+                &= \sum_{k=1}^{n} \frac{(-1)^{k+1}}{(n-k)!}
+            \end{align*}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{几何概型}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 样本空间为一个具有某种度量（长度、面积、体积等）的区域，事件发生的概率为事件的度量与样本空间的度量的比值
+            \item 可以看作是“连续的”古典概型
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{小凸想跑步}{SCOI2015 BZOJ4445}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 给一个 $n$ 个点的凸多边形，所有顶点按照逆时针顺序编号为 $0$ 到 $n-1$。在多边形内部随机取一点 $P$，
+            则 $P$ 会与多边形的 $n$ 条边形成 $n$ 个三角形，问 $0,1,P$ 三点构成的三角形是所有三角形中面积最小的概率。
+            \item $n \le 10^5$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{小凸想跑步}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 思路是设法求出 $P$ 可行的区域的面积，与凸多边形的面积的比值即为答案
+            \item 约定 $n$ 号点就是 0 号点，设事件 $A_i(i=1,2,\dots,n-1)$ 表示点 $i,i+1,P$三点形成的三角形面积大于 $0,1,P$ 三点构成的三角形的面积的事件，现在需要求出
+            所有 $A_i$ 的交对应的区域
+            \item 如果不限制 $P$ 在多边形内部，用计算几何的知识可以推出每个 $A_i$ 对应的区域为一个半平面，将所有半平面和凸多边形一起求半平面交即可求出可行区域
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{条件概率}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 若 $(\Omega, F,P)$ 为概率空间，设 $A,B\in F$ 且 $P(B)>0$，定义
+            $$
+                P(A \mid B)=\frac{P(AB)}{P(B)}
+            $$
+            表示“在 $B$ 发生的情况下，$A$ 发生的概率”。
+
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{条件概率的三个重要公式}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 乘法公式
+            \item 全概率公式
+            \item Bayes 公式
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{乘法公式}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $A,B \in F$ 且 $P(B)>0$，则
+            $$
+                P(AB)=P(B)P(A\mid B)
+            $$
+            \item 设 $A_1,A_2,\dots, A_n \in F$，且 $P(A_1A_2\dots A_{n-1})>0$，则
+            \begin{gather*}
+                P(A_1A_2 \dots A_n)=P(A_1)P(A_2\mid A_1)P(A_3 \mid A_2A_1) \\ 
+                \cdots P(A_n \mid A_1A_2\dots A_n)
+            \end{gather*}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{全概率公式}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $B_1,B_2,\dots,B_n$ 为 $\Omega$ 的一个划分（互斥且并为 $\Omega$），且均满足 $P(B_i)>0$，则 $\forall A\in F$ 有
+            \begin{align*}
+                P(A)
+                &= P(A\Omega) = P\left(A \bigcup_{i=1}^{n}B_i\right) \\
+                &= P\left(\bigcup_{i=1}^{n} AB_i\right) \\
+                &= \sum_{i=1}^{n} P(AB_i) \\
+                &= \sum_{i=1}^{n} P(B_i)P(A \mid B_i)
+            \end{align*}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{全概率公式}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item “分类讨论，不重不漏”
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{Bayes(贝叶斯)公式}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $B_1,B_2,\dots,B_n$ 为 $\Omega$ 的划分，且 $P(A),P(B_i)>0$，由条件概率及全概率公式有：
+            \begin{align*}
+                P(B_i \mid A) 
+                &= \frac{P(AB_i)}{P(A)} \\
+                &= \frac{P(B_i)P(A \mid B_i)}{\sum_{j=1}^{n}P(B_j)P(A \mid B_j)}
+            \end{align*}
+            \item Bayes 公式给出了一种求条件概率的方法
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{事件的独立性}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 若 $A,B$ 事件满足 $P(AB)=P(A)P(B)$，则称 $A,B$ \textbf{独立}，此时有
+            $$
+                P(A\mid B) = \frac{P(AB)}{P(B)} = \frac{P(A)P(B)}{P(B)}=P(A)
+            $$
+            \item 即 $A$ 是否发生不受 $B$ 是否发生影响。$A$ 对 $B$ 也是同理
+            \item 独立性通常可以简化计算
+            \item 切忌想当然地钦定事件的独立性
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{随机变量}
+        {看看就好}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 随机变量是定义在样本空间上的函数：$X:\Omega \to \mathbb{R}$
+            \item 可以看作是为样本空间中的每一个样本点赋予了一个实数的权值。例如，考虑抛硬币的试验，记正面为 H，反面为 T，则
+            样本空间为 $\Omega=\{\text{H},\text{T}\}$，可以定义随机变量 $X$ 为 $X(\text{H})=1,X(\text{T})=-1$。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{离散型随机变量}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 随机变量有\textbf{离散}和\textbf{连续}两种类型（也有混合型），OI 中通常
+            只涉及离散型随机变量，这里也只讨论离散型，因此若无特
+            别说明，提到的随机变量都为离散型。
+            \item 离散型随机变量的取值一定是可列多个，可以写出其分布列：
+            \begin{table}
+                \begin{tabular}{cccccc}
+                    \toprule
+                    $X$ & $x_1$ & $x_2$ & $\dots$ & $x_n$ & $\dots$ \\
+                    \midrule
+                    $P$ & $p_1$ & $p_2$ & $\dots$ & $p_n$ & $\dots$ \\
+                    \bottomrule
+                \end{tabular}
+            \end{table}
+            其中 $p_n=P(X=x_n)$，表示 $X$ 取值为 $x_n$ 的概率
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{数学期望与方差}
+        \begin{itemize}
+            \item 离散型随机变量 $X$ 的（数学）期望定义为：
+            $$
+                \E(X) = \sum_{i} x_i p_i
+            $$
+            \item 可以看作一种加权平均
+            \item 方差定义为：
+            \begin{align*}
+                \var(X)
+                &= \sum_{i}\left(\E(X)-x_i\right)^2p_i \\
+                &= \E\left(X^2\right)-\E^2(X)
+            \end{align*}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{期望的性质}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item $\E(c)=c$
+            \item $\E(cX)=c\E(X)$
+            \item $\E(X+Y)=\E(X)+\E(Y)$
+            \item 线性性
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{全期望公式}
+        $$
+            \E(X) = \E(\E(X \mid Y))
+        $$
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item $\E(X\mid Y)$ 为条件期望，是一个关于 $Y$ 的随机变量，可以理解为固定 $Y$ 的取值时 $X$ 的期望值。
+            \item 全期望公式对离散、连续型随机变量都成立。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{单选错位}
+        {洛谷 1297}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 一次考试有 $n$ 道单选题，第 $i$ 道题有 $a_i$ 个选项，每个选项作为答案的概率相等。
+            \item 假设一个人每道题都做对了，但是填错位了（第 $i$ 题填到了第 $i+1$ 题上，第 $n$ 题填到了第一题的位置）
+            \item 求他最后期望正确的题数
+            \item $n,a_i\le 2\times 10^7$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{单选错位}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设随机变量 $X_i$ 当第 $i$ 题正确时取值为 1，否则为0，则答案为
+        \end{itemize}
+        \begin{align*}
+            \E(X)
+            &= \E\left(\sum_{i=1}^{n}X_i\right) \\
+            &= \sum_{i=1}^n\E(X_i) \\
+            &= \sum_{i=1}^n P(X_i=1)
+        \end{align*}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 古典概型：共 $a_{i-1}a_i$ 种情况，有 $\min\{a_{i-1},a_i\}$ 种情况撞对
+        \end{itemize}
+    \end{frame}
+    
+    \begin{frame}{非诚勿扰}
+        {JSOI2015 BZOJ4481}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有 $n$ 位男性和 $n$ 位女性，都依次编号为 $1\sim n$。
+            \item 每个女性有一个非空的（原题可空，但不知道有什么考察的
+            意义，为讨论方便设为非空）喜欢的男性的集合，她会按照
+            编号从小大到大的顺序循环查看这些男性，每次以概率 $p$ 接
+            受并停止查看，否则以 $1-p$ 的概率拒绝并继续查看。
+            \item 最后，所有女性都恰好接受了一个男性，这些男性编号形成了一个序列，求这个序列的期望逆序对数。注意一个男性可能被多个女性同时接受。
+            \item 设所有女性喜欢的集合大小的总和为 $m$，$n,m \le 5\times 10^5$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{非诚勿扰}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 同前面的题目，计数的期望可以转化为求每个计数对象（此时为逆序对）出现的概率
+            \item 对于某个女性，假设其喜欢的男性集合大小为 $k$，则不难求出按照编号大小排序后，
+            第 $i$（从 0 开始）个男性被接受的概率为：
+        \end{itemize}
+        \begin{equation*}
+            (1-p)^i \sum_{j=0}^{\infty} (1-p)^{jk}p = \frac{p(1-p)^i}{1-(1-p)^k}
+        \end{equation*}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 按照编号从大到小的顺序遍历所有女性，再按照编号从大到小的顺序遍历每个女性喜欢的男性（这一步有必要吗？），需要快速求出每个编号比她大的女性
+            也接受了比当前男性编号小的男性的概率之和。可以使用树状数组维护。
+            \item 时间复杂度 $O\left((n+m)\log n\right)$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{概率充电器}
+        {SHOI2014 luogu4284}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 给一棵树，每个点 $i$ 有 $q_i$ 的概率\textbf{直接}有电，每条边 $(u,v)$ 有 $p(u, v)$ 的概率导通，
+            若一个点和有电的点通过导通的边连通，则这个点也会变成\textbf{间接}有电的。
+            \item 求有电的点的期望数目。
+            \item $n\le 5\times 10^5$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{概率充电器}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 计数的期望转为概率，仍然是求出每个点有电的概率
+            \item 点 $i$ 无电，当且仅当：
+            \begin{itemize}
+                \item $i$ 不直接有电
+                \item $i$ 不间接有电，又可以分出两种情况：
+                \begin{itemize}
+                    \item 相邻的边不导通
+                    \item 相邻的边导通，但对面的点不是有电的
+                \end{itemize}
+            \end{itemize}
+            \item 由独立性，得到点 $i$ \textbf{充不上电}的概率 $f(i)$ 是：
+        \end{itemize}
+        $$
+            f(i)=(1-q_i)\prod_{j\in N(i)}\left(1-p(i,j)+p(i,j)f(j)\right)
+        $$
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 高斯消元？
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{概率充电器}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 考虑树形 dp：化为有根树后，设 $f(i)$ 表示 $i$ 没收到来自子树（包括自己）的电的概率，$p_i$ 表示非根结点 $i$ 到父亲的那条边的导通概率，不难写出：
+        \end{itemize}
+        $$
+            f(i) = (1-q(i))\prod_{j \in sons(i)}\left(1-p_j+p_jf(j)\right)
+        $$
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 此时根的答案是正确的（因为根的电不可能来自父亲），记 $g(j)=1-p_j+p_jf(j)$
+            考虑 dfs 换根：假设把根 $u$ 的一个儿子 $v$ 旋转到根，可以计算出新的$f$值：
+        \end{itemize}
+        \begin{gather*}
+            f'(u)=\frac{f(u)}{g(v)}\\
+            f'(v) = f(v)g'(u)
+        \end{gather*}
+    \end{frame}
+
+    \begin{frame}{常见离散型随机变量分布}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 两点分布
+            \item 二项分布
+            \item 几何分布
+            \item 负二项分布
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{Bernoulli 试验与二项分布}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item Bernoulli(伯努利）试验：只有成功和失败两种结果的随机试验。
+            \item 二项分布：进行 $n$ 次 成功概率为 $p$ 的 Bernoulli 试验的成功次数，记作 $X\sim b(n,p)$，分布列为：
+            $$
+                P(X=k)=\binom{n}{k}p^k(1-p)^{n-k}
+            $$
+            \item $\E(X)=np,\var(X)=np(1-p)$
+            \item 两点分布是 $n=1$ 的特殊情形。
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{几何分布与无记忆性}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 连续进行成功概率为 $p$ 的伯努利试验，称第一次成功时的实验次数 $X$ 服从几何分布，记作 $X\sim \text{Ge}(p)$
+            
+            $$
+                P(X=k)=p(1-p)^{k-1}
+            $$
+
+            \item 几何分布具有\textbf{无记忆性}：
+            $$
+                P(X=n \mid X > m) = P(X= n - m)
+            $$
+            \item 可以理解为：当前试验的结果和先前实验的结果没有关系
+            \item 常常可以利用无记忆性与期望的线性性进行动态规划
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{几何分布的期望}
+        \begin{itemize}
+            \item 方法一：按照期望的定义，有
+            \begin{gather*}
+                \E(X)=\sum_{k=1}^{\infty} kp(1-p)^{k-1} \\
+                f(x) = \sum_{k=1}^{\infty} kx^{k-1} \\
+                \int f(x) \d x = \sum_{k=1}^{\infty} x^k = \frac{x}{1-x} \\
+                \Rightarrow f(x) = \frac{\d}{\d x} \frac{x}{1-x} = \frac1{(1-x)^2} \\
+                \E(X) = pf(1-p) = \frac1p
+            \end{gather*}
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{几何分布的期望}
+        \begin{itemize}
+            \item 方法二：利用全期望公式以及几何分布的无记忆性：
+        \end{itemize}
+        \begin{align*}
+            \E(X) 
+            &= \E(X \mid X>1)P(X>1) + \E(X\mid X=1)P(X=1) \\
+            &= \E(X+1)(1-p)+p
+        \end{align*}
+        \begin{itemize}
+            \item 解方程可以得到 $\E(X)=\frac1p$，方差也可以类似地计算
+        \end{itemize}
+        \begin{align*}
+            \E(X^2) 
+            &= E(X^2 \mid X>1)P(X>1) + \E(X^2 \mid X=1)P(X=1) \\
+            &= \E\left((X+1)^2\right)(1-p)+p \\
+        \end{align*}
+    \end{frame}
+
+    \begin{frame}{Dice}
+        {hdu4652}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有一个 $m$ 面的均匀骰子，分别求第一次出现以下两种情况的期望掷骰次数：
+            \begin{enumerate}
+                \item 连续 $n$ 次掷出的结果都相同
+                \item 连续 $n$ 次掷出的结果都不同
+            \end{enumerate}
+            \item $n,m\le 10^6$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{Dice}
+        {最后 $n$ 次都相同}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $f(i)$ 表示已经掷出了连续 $i$ 个相同的结果的情况下，还需要掷多少次达到 $n$ 次。
+            考虑下一次掷骰的结果和当前是否一样，并根据无记忆性有：
+            \begin{gather*}
+                f(n)=0\\
+                f(i) = 1+\frac{1}{m}f(i+1)+f(1)
+            \end{gather*}
+            \item 最终答案为 $f(0)=f(1)+1$。
+            \item 其实可以用一定数列技巧推出通项为 $\frac{1-m^n}{1-m}$
+        \end{itemize}
+    \end{frame}
+    \begin{frame}{Dice}
+        {最后 $n$ 次互不相同}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $f(i)$ 表示当前已经掷出了 $i$ 个互不相同的结果，掷出 $n$ 个还需要的期望次数。当前已经使用了 $i$ 个值，还有 $m-i$ 个值没有使用，因此可以列出：
+        \end{itemize}
+        \begin{gather*}
+            f(n)=0\\
+            f(i) = 1+ \frac{m-i}{m}f(i+1) + \frac1m\sum_{j=1}^{i}f(j)
+        \end{gather*}
+        \begin{itemize}
+            \item 错位相减整理整理得到：
+        \end{itemize}
+        $$
+            f(i)-f(i-1) = \frac{m-i}{m}\left(f(i)-f(i+1)\right)
+        $$
+    \end{frame}
+
+    \begin{frame}{robot}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 给一个 DAG，一个机器人从 1 号点出发，每天它等概率地移向一个相邻的点或在原地不动。问移动到点 $n$ 时过去的期望天数。
+            \item 只有 1 号点入度为 $0$，只有 $n$ 号点出度为 $0$（保证解有限）
+            \item 要求线性时间复杂度
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{robot}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $f(u)$ 表示到达 $u$ 时移动到 $n$ 还需要花费的天数，有：
+        \end{itemize}
+        \begin{gather*}
+            f(n)=0 \\
+            f(u) = 1+\frac{1}{d(u)+1} \sum_{v\in N(u) \cup \{u\}}f(v)
+        \end{gather*}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 其中，$d(u)$ 表示 $u$ 的出度，$N(u)$ 表示 $u$ 的出点集合
+            \item 简单移项整理，把等式右边的 $u$ 项消除，得到：
+        \end{itemize}
+        $$
+            f(u)=\frac{1}{d(u)}\left(1+d(u)+\sum_{v\in N(u)}f(v)\right)
+        $$
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 再按照拓扑序递推即可
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{换教室}
+        {noip2016}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 你每天有 $n$ 节课要依次上。最开始，第 $i$ 节课被安排在 $c_i$，
+            你可以提出申请更换教室到 $d_i$，成功率为 $k_i$。你最多可以对 
+            $m$ 门课提交申请，申请只能一次性全部提交，然后接受结果。
+            \item 教室网络是一张无向图。求在教室间移动的最少期望时间。
+            \item $n,m\le 2000,v\le 300,e\le 9\times 10^4$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{换教室}
+        {NOIP2016}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 设 $f(i,j,0/1)$ 表示当前安排了前 $i$ 节课，已经使用了 $j$ 次申
+            请机会，且第 $i$ 次是否使用了申请机会时的期望时间，若用 $l(u,v)$ 表示图上任意两点的最短距离，
+            有转移为：
+        \end{itemize}
+        \begin{gather*}
+            f(i,j,0) = \min\begin{cases}
+                f(i-1,j,0)+l(c_{i-1},c_i) \\
+                f(i-1,j,1)+k_il(d_{i-1},c_i) + (1-k_i)l(c_{i-1},c_i)
+            \end{cases}
+        \end{gather*}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 为了排版好看 $f(i,j,1)$ 太长了就不写了，留给大家练习
+            \item 时间复杂度为 $O(nm+v^3)$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{有趣的游戏}
+        {JSOI2009 BZOJ1444}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有 $n$ 个字符串，每个字符串的长度为 $l$，字符集大小为 $m$
+            \item 生成随机字符串，生成方式是每次往当前字符串的末尾随机加上 $m$ 个字符中的一个；当第一次出现 $n$ 个字符串中的某个时停止
+            \item 对于每个字符串，求出其是第一个出现的字符串的概率
+            \item $n,m,l \le 10$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{有趣的游戏}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 首先建出输入字符串的 AC 自动机
+            \item 设出到达每个状态的概率？
+            \item 转换思路：在 AC 自动机上随机游走，求出每个结点被经过
+            的期望次数。对于终态结点，由于它要么被经过一次要么不经过，可用此期望步数作为所求概率
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{有趣的游戏}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 用 $\delta$ 表示 AC 自动机的转移函数，$p(c)$ 表示生成字符 $c$ 的概
+            率，$f(u)$ 表示一次随机游走经过状态 $u$ 的期望次数，转移方程为：
+        \end{itemize}
+        $$
+            f(u) = 1+\sum_{c} p(c)f\left(\delta(u,c)\right)
+        $$
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 用高斯消元解方程，注意还需要利用终态的 $f$ 值和为 1 代换掉一个方程（为什么？）
+            \item 时间复杂度为 $O(n^3l^3)$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{博物馆}
+        {BZOJ3270}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有一张无向图，两个人分别位于 $a,b$ 两点。
+            \item 每一步动作中，若人处于点 $i$，有 $p_i$ 的概率保持不动，有 $1-p_i$ 的概率随机等可能地选择一个相邻的点移动过去。
+            \item 两个人同步地进行上述动作，直到处于同一点。
+            \item 对于每个点，问在此相遇的概率
+            \item $n\le 20$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{博物馆}
+        {BZOJ3270}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 概率转期望
+            \item $f(u,v)$ 表示一次随机游走过程中，一个人在 $u$，一个人在 $v$ 的状态经过的期望次数
+            \item 高斯消元随便做做
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{硬币游戏}
+        {SDOI2017 luogu3706}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 有 $n$ 个长度均为 $m$ 的01序列，现在开始不断投掷一枚硬币，正面0反面记1，对每个
+            序列求出其最先出现的概率
+            \item $n,m\le 300$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{硬币游戏}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 做法一：建起所有01序列的 AC 自动机，其余同上题
+            \item 方程个数为 $nm$ 个
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{硬币游戏}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 做法二：之前的做法的问题在于有太多无用状态，设法将其压为一个状态。
+            \item 记所有非终态被经过步数的期望之和为 $E_0$，第 $i$ 个终态被经过的期望次数（即概率）为 $E_i$。
+            \item 处于任何一个非终态时，假设接下来刚好生成了第 $i$ 个串，如果不考虑经过其它串而停下来，则一定会到达第 $i$ 个终态，这部分对 $E_i$ 的贡献为 $\frac{1}{2^m}E_0$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{硬币游戏}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 接下来考虑多计算的部分。假设提前经过的串为串 $j$，假设从某个非终态走了 $k(k<m)$ 个字符后到达了终态 $j$，然后没有停下来继续走了 $m-k$ 个字符到达了终态 $i$，那么这部分被多计算了的贡献的大小即为 $\frac{1}{2^{m-k}}E_j$。
+            \item 只需要统计每对 $i,j$ 串完全相同的前缀与后缀即可计算出方程的系数，可以借助字符串哈希
+            \item 最终仍要加上 $\sum_{i=1}^{n}E_i=1$
+            \item 时间复杂度为 $O(n^3)$
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{协方差}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 两个随机变量 $X,Y$ 的协方差定义为 
+            $$
+                \cov(X,Y) = E(XY) - E(X)E(Y)
+            $$
+            \item 若 $\cov(X,Y)=0$，称 $X,Y$ \textbf{不相关}
+            \item 不相关是独立的\textbf{必要不充分条件}
+            \item 若 $X,Y$ 独立，有 $E(XY)=E(X)E(Y)$；反之不一定成立
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{协方差与内积}
+        \begin{itemize}
+            \setlength{\itemsep}{10pt}
+            \item 协方差在一定条件下可以看作是一种内积运算。不难验证：
+            \item 正定性：$\cov(X,X)=\var(X)$
+            \item 交换律：$\cov(X,Y)=\cov(Y,X)$
+            \item 线性性：$\cov(aX+bY,Z)=a\cov(X,Z)+b\cov(Y,Z)$
+            \item 标准正交化后有的问题可以转化为计算几何问题
+        \end{itemize}
+    \end{frame}
+\end{document}
