@@ -18,6 +18,8 @@
 
 \title{rCore 中开发环境的搭建}
 \author{罗崚骁\quad 宋香君}
+% \author[1]{罗崚骁}
+% \author[2] {宋香君}
 \affil{\texttt {\{luolx17, songxj17\}@mails.tsinghua.edu.cn}}
 
 \begin{document}
@@ -73,11 +75,56 @@
         \item 支持更多的编辑器（nano,vim 等）
     \end{itemize}
 
+    \section{软件支持流程}
+    \subsection{安装}
+
+    由于现在还不能使用包管理器，因此如何将软件安装到 rCore 中是一个值得拿出来考虑的问题。可能尝试的途径有：
+    \begin{itemize}
+        \item 寻找官方发布的预编译版本（比如 musl-rust），这种做法是最方便的
+        \item 下载软件源码，在外部操作系统编译好后复制到 rCore 的文件系统中
+        \item 当 rCore 支持 Make 后，也可以尝试直接在 rCore 中从源码安装软件（关于这一点，受制于编译器运行速度，虽然这是我们设想的软件开发环境应该具有的一个特质，但是目前这个想法看起来很难达到较好的效果）        
+    \end{itemize}
+
+    \subsection{测试}
+
+    软件测试似乎本来就是一个不可能做到完美的工作。受制于各方面因素，目前我们决定采用一些较为勉强的方法对 rCore 中的软件进行测试。
+
+    \begin{itemize}
+        \item 对于C/C++,Rust 标准库的测试，似乎没有找到官方公开的测例，我们决定测试以编译并运行一些具有一定规模的使用了大量标准库的工程的形式进行
+        \item 对于各种软件，决定选取其重要功能进行测试，例如：
+        \begin{itemize}
+            \item make 是否能顺利构建项目、是否支持增量构建等
+            \item Git 的 add,commit,log,status,branch 等功能
+            \item 当然如果能找到测例的话就最好了
+        \end{itemize}
+    \end{itemize}
+
+    需要指出的是，通常的软件测试是在给定的操作系统上测试其表现，是软件对操作系统的适应，
+    而本次课程设计中是针对软件完善操作系统使操作系统能适应软件的运行。
+    
+    \newpage
+    至于如何做到这一点，
+    可以利用 rCore 的记录功能查看哪些系统调用尚未实现或实现不完全，以此来补充和调试系统
+    调用的实现。
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{assets/syscall0.png}
+        % \caption{}
+        % \label{}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{assets/syscall1.png}
+        % \caption{}
+        % \label{}
+    \end{figure}
+
+
     \section{小组分工}
     两人都需要对各种系统调用进行实现和完善。在具体支持的软件上分工如下：
     \begin{itemize}
         \item 罗崚骁：Git,Cargo 离线版, 测试 C++ 与 Rust 项目
         \item 宋香君：make, CMake, 测试 C 项目
     \end{itemize}
-
 \end{document}
