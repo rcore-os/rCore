@@ -362,11 +362,11 @@ dependencies = [
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rboot 0.1.2",
  "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=b7bacf9)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
- "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
- "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
- "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
- "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
+ "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
+ "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
+ "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
+ "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
  "rcore-memory 0.1.0",
  "rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)",
  "riscv 0.5.0 (git+https://github.com/rcore-os/riscv)",
@@ -374,6 +374,7 @@ dependencies = [
  "smoltcp 0.5.0 (git+https://github.com/rcore-os/smoltcp?rev=5bd87c7c)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "uart_16550 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "virtio-drivers 0.1.0 (git+https://github.com/rcore-os/virtio-drivers?rev=dfa70e14)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.7.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -391,7 +392,7 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008#e17b27b3d257f23ed8ba43d902c909d23245a008"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b#e17b27b3d257f23ed8ba43d902c909d23245a008"
 dependencies = [
  "filetime 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -401,42 +402,42 @@ dependencies = [
 [[package]]
 name = "rcore-fs-devfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008#e17b27b3d257f23ed8ba43d902c909d23245a008"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b#e17b27b3d257f23ed8ba43d902c909d23245a008"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-mountfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008#e17b27b3d257f23ed8ba43d902c909d23245a008"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b#e17b27b3d257f23ed8ba43d902c909d23245a008"
 dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-ramfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008#e17b27b3d257f23ed8ba43d902c909d23245a008"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b#e17b27b3d257f23ed8ba43d902c909d23245a008"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008#e17b27b3d257f23ed8ba43d902c909d23245a008"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=e17b27b#e17b27b3d257f23ed8ba43d902c909d23245a008"
 dependencies = [
  "bitvec 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -608,6 +609,16 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "virtio-drivers"
+version = "0.1.0"
+source = "git+https://github.com/rcore-os/virtio-drivers?rev=dfa70e14#dfa70e1425c9eac1b30e671be61b557a3ce56e7e"
+dependencies = [
+ "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "volatile"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,11 +747,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 "checksum raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
 "checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=b7bacf9)" = "<none>"
-"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)" = "<none>"
-"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)" = "<none>"
-"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)" = "<none>"
-"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)" = "<none>"
-"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b3d257f23ed8ba43d902c909d23245a008)" = "<none>"
+"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)" = "<none>"
+"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)" = "<none>"
+"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)" = "<none>"
+"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)" = "<none>"
+"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=e17b27b)" = "<none>"
 "checksum rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)" = "<none>"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
@@ -763,6 +774,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum usize_conversions 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f70329e2cbe45d6c97a5112daad40c34cd9a4e18edb5a2a18fefeb584d8d25e5"
 "checksum utf8parse 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8772a4ccbb4e89959023bc5b7cb8623a795caa7092d99f3aa9501b9484d4557d"
 "checksum ux 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "88dfeb711b61ce620c0cb6fd9f8e3e678622f0c971da2a63c4b3e25e88ed012f"
+"checksum virtio-drivers 0.1.0 (git+https://github.com/rcore-os/virtio-drivers?rev=dfa70e14)" = "<none>"
 "checksum volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "6af0edf5b4faacc31fc51159244d78d65ec580f021afcef7bd53c04aeabc7f29"
 "checksum vte 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4f42f536e22f7fcbb407639765c8fd78707a33109301f834a594758bedd6e8cf"
 "checksum winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8093091eeb260906a183e6ae1abdba2ef5ef2257a21801128899c3fc699229c6"

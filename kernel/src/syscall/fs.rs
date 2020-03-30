@@ -1644,6 +1644,8 @@ impl IoVecs {
         readv: bool,
     ) -> Result<Self, SysError> {
         let iovs = vm.check_read_array(iov_ptr, iov_count)?.to_vec();
+        let mut slices = vec![];
+        slices.reserve(iovs.len());
         // check all bufs in iov
         for iov in iovs.iter() {
             // skip empty iov
@@ -1655,11 +1657,8 @@ impl IoVecs {
             } else {
                 vm.check_read_array(iov.base, iov.len)?;
             }
+            slices.push(slice::from_raw_parts_mut(iov.base, iov.len));
         }
-        let slices = iovs
-            .iter()
-            .map(|iov| slice::from_raw_parts_mut(iov.base, iov.len))
-            .collect();
         Ok(IoVecs(slices))
     }
 

@@ -59,17 +59,18 @@ buddy_system_allocator = "0.3"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "d727949b" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b3d257f23ed8ba43d902c909d23245a008" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b3d257f23ed8ba43d902c909d23245a008" }
-rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b3d257f23ed8ba43d902c909d23245a008" }
-rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b3d257f23ed8ba43d902c909d23245a008" }
-rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b3d257f23ed8ba43d902c909d23245a008" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 
 
