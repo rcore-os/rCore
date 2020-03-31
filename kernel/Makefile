@@ -252,9 +252,9 @@ justtest:
 	@#$(qemu) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(INIT) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
-	@$(qemu) $(qemu_opts) -s -S &
-	@sleep 1
-	@$(gdb) $(kernel) -x ../tools/gdbinit
+	$(qemu) $(qemu_opts) -s -S
+	# @sleep 1
+	# @$(gdb) $(kernel) -x ../tools/gdbinit
 
 build: $(kernel_img)
 
