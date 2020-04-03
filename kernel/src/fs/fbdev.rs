@@ -6,27 +6,60 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use core::any::Any;
 
 #[derive(Default)]
-pub struct Vga;
+pub struct Fbdev;
 
-impl INode for Vga {
+impl INode for Fbdev {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Err(FsError::NotSupported)
-    }
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
-        info!("the _offset is {} {}", _offset, _buf[0]);
-        let lock = FRAME_BUFFER.lock();
-        if let Some(ref frame_buffer) = *lock {
-            use core::slice;
+        info!(
+            "fbdev read_at: offset={:#x} buf_len={:#x}",
+            offset,
+            buf.len()
+        );
+        if let Some(mut frame_buffer) = FRAME_BUFFER.lock().as_ref() {
+            let mut count = buf.len();
+            if offset > frame_buffer.framebuffer_size() {
+                return Ok(0);
+            }
+            if offset + count > frame_buffer.framebuffer_size() {
+                count = frame_buffer.framebuffer_size() - offset;
+            }
             let frame_buffer_data = unsafe {
-                slice::from_raw_parts_mut(
-                    frame_buffer.base_addr() as *mut u8,
-                    frame_buffer.framebuffer_size(),
+                core::slice::from_raw_parts((frame_buffer.base_addr() + offset) as *const u8, count)
+            };
+            buf[..count].copy_from_slice(&frame_buffer_data);
+            Ok(count)
+        } else {
+            Err(FsError::NoDevice)
+        }
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        info!(
+            "fbdev write_at: offset={:#x} buf_len={:#x}",
+            offset,
+            buf.len()
+        );
+        if let Some(mut frame_buffer) = FRAME_BUFFER.lock().as_mut() {
+            let mut count = buf.len();
+            if offset > frame_buffer.framebuffer_size() {
+                return Ok(0);
+            }
+            if offset + count > frame_buffer.framebuffer_size() {
+                count = frame_buffer.framebuffer_size() - offset;
+            }
+            let frame_buffer_data = unsafe {
+                core::slice::from_raw_parts_mut(
+                    (frame_buffer.base_addr() + offset) as *mut u8,
+                    count,
                 )
             };
-            frame_buffer_data.copy_from_slice(&_buf);
-            Ok(frame_buffer.framebuffer_size())
+            frame_buffer_data.copy_from_slice(&buf[..count]);
+            if count == buf.len() {
+                Ok(count)
+            } else {
+                Err(FsError::NoDeviceSpace)
+            }
         } else {
-            Err(FsError::EntryNotFound)
+            Err(FsError::NoDevice)
         }
     }
     fn poll(&self) -> Result<PollStatus> {
@@ -41,18 +74,18 @@ impl INode for Vga {
         Ok(Metadata {
             dev: 0,
             inode: 0,
-            size: 0x24000,
+            size: 0,
             blk_size: 0,
             blocks: 0,
             atime: Timespec { sec: 0, nsec: 0 },
             mtime: Timespec { sec: 0, nsec: 0 },
             ctime: Timespec { sec: 0, nsec: 0 },
-            type_: FileType::SymLink,
-            mode: 0,
-            nlinks: 0,
+            type_: FileType::CharDevice,
+            mode: 0o660,
+            nlinks: 1,
             uid: 0,
             gid: 0,
-            rdev: 0,
+            rdev: make_rdev(29, 0),
         })
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
