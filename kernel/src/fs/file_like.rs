@@ -4,11 +4,9 @@ use super::ioctl::*;
 use super::FileHandle;
 use crate::fs::epoll::EpollInstance;
 use crate::net::Socket;
-use crate::sync::Condvar;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
-use rcore_fs::vfs::PollStatus;
+use rcore_fs::vfs::{MMapArea, PollStatus};
 
 // TODO: merge FileLike to FileHandle ?
 // TODO: fix dup and remove Clone
@@ -59,6 +57,13 @@ impl FileLike {
             }
         }
     }
+    pub fn mmap(&mut self, area: MMapArea) -> SysResult {
+        match self {
+            FileLike::File(file) => file.mmap(area)?,
+            _ => return Err(SysError::ENOSYS),
+        };
+        Ok(0)
+    }
     pub fn poll(&self) -> Result<PollStatus, SysError> {
         let status = match self {
             FileLike::File(file) => file.poll()?,
@@ -72,7 +77,6 @@ impl FileLike {
         };
         Ok(status)
     }
-
     pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {
         match self {
             FileLike::File(file) => file.fcntl(cmd, arg)?,

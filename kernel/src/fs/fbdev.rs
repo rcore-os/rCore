@@ -1,9 +1,9 @@
-use rcore_fs::vfs::*;
-
 use crate::drivers::gpu::fb::{ColorFormat, FramebufferInfo, FRAME_BUFFER};
-use crate::memory::phys_to_virt;
-use alloc::{string::String, sync::Arc, vec::Vec};
+use crate::syscall::MmapProt;
 use core::any::Any;
+
+use rcore_fs::vfs::*;
+use rcore_memory::memory_set::handler::Linear;
 
 #[derive(Default)]
 pub struct Fbdev;
@@ -111,6 +111,28 @@ impl INode for Fbdev {
                 warn!("use never support ioctl !");
                 Err(FsError::NotSupported)
             }
+        }
+    }
+    fn mmap(&self, area: MMapArea) -> Result<()> {
+        let attr = MmapProt::from_bits_truncate(area.prot).to_attr();
+        #[cfg(target_arch = "aarch64")]
+        let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
+
+        if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+            if area.offset + area.end_vaddr - area.start_vaddr > fb.framebuffer_size() {
+                return Err(FsError::NoDeviceSpace);
+            }
+            let thread = unsafe { crate::process::current_thread() };
+            thread.vm.lock().push(
+                area.start_vaddr,
+                area.end_vaddr,
+                attr,
+                Linear::new((fb.paddr() + area.offset - area.start_vaddr) as isize),
+                "mmap_file",
+            );
+            Ok(())
+        } else {
+            Err(FsError::NoDevice)
         }
     }
     fn as_any_ref(&self) -> &dyn Any {

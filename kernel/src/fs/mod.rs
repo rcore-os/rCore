@@ -17,6 +17,8 @@ pub use self::random::*;
 pub use self::stdio::{STDIN, STDOUT};
 
 mod device;
+pub mod epoll;
+pub mod fbdev;
 mod file;
 mod file_like;
 mod ioctl;
@@ -24,8 +26,6 @@ mod pipe;
 mod pseudo;
 mod random;
 mod stdio;
-pub mod epoll;
-pub mod fbdev;
 
 // Hard link user programs
 #[cfg(feature = "link_user")]
