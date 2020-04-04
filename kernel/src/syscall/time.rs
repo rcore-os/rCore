@@ -29,6 +29,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn sys_time(&mut self, time: *mut u64) -> SysResult {
         let sec = get_epoch_usec() / USEC_PER_SEC;
         if time as usize != 0 {

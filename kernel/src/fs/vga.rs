@@ -84,6 +84,7 @@ impl INode for Vga {
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum FbType {
     /// Packed Pixels
@@ -101,6 +102,7 @@ enum FbType {
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum FbVisual {
     /// Monochr. 1=Black 0=White

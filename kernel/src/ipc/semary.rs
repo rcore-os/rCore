@@ -5,7 +5,7 @@ use spin::RwLock;
 
 /// A System V semaphore set
 pub struct SemArray {
-    key: usize,
+    _key: usize,
     sems: Vec<Semaphore>,
 }
 
@@ -39,7 +39,7 @@ impl SemArray {
         }
         // insert to global map
         let array = Arc::new(SemArray {
-            key,
+            _key: key,
             sems: semaphores,
         });
         key2sem.insert(key, Arc::downgrade(&array));

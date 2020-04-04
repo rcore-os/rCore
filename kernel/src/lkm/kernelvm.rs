@@ -104,7 +104,7 @@ impl Drop for VirtualSpace {
 pub struct VirtualArea {
     start: usize,
     end: usize,
-    attr: MemoryAttr,
+    _attr: MemoryAttr,
 }
 
 impl VirtualArea {
@@ -128,7 +128,7 @@ impl VirtualArea {
         VirtualArea {
             start: aligned_start_addr,
             end: aligned_end,
-            attr: attr.clone(),
+            _attr: attr.clone(),
         }
     }
     pub fn unmap(&mut self, allocator: &LockedVMM, parent: &mut ByFrame<GlobalFrameAlloc>) {

@@ -1,5 +1,7 @@
 //! Implement Device
 
+#![allow(dead_code)]
+
 use rcore_fs::dev::*;
 use spin::RwLock;
 

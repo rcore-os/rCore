@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bitflags::*;
 
 pub use crate::ipc::*;

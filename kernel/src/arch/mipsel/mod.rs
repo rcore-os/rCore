@@ -61,12 +61,14 @@ pub extern "C" fn rust_main() -> ! {
     crate::kmain();
 }
 
+/*
 fn others_main() -> ! {
     interrupt::init();
     memory::init_other();
     timer::init();
     crate::kmain();
 }
+*/
 
 const BOOT_CPU_ID: u32 = 0;
 

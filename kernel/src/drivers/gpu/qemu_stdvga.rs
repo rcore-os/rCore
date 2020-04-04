@@ -1,5 +1,7 @@
 //! driver for qemu stdvga (Cirrus)
 
+#![allow(dead_code)]
+
 use crate::util::{read, write};
 
 const VGA_MMIO_OFFSET: usize = 0x400 - 0x3C0;

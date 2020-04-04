@@ -59,10 +59,9 @@ impl EpollInstance {
 
 #[derive(Clone, Copy)]
 pub struct EpollData {
-    ptr: u64,
+    _ptr: u64,
 }
 
-#[repr(packed)]
 #[derive(Clone)]
 pub struct EpollEvent {
     pub events: u32,     /* Epoll events */

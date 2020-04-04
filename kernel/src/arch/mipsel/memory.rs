@@ -44,10 +44,6 @@ fn init_frame_allocator() {
     }
 }
 
-// First core stores its SATP here.
-// Other cores load it later.
-static mut SATP: usize = 0;
-
 pub unsafe fn clear_bss() {
     let start = sbss as usize;
     let end = ebss as usize;

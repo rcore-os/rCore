@@ -1,4 +1,7 @@
 //! Syscalls for file system
+
+#![allow(dead_code)]
+
 use core::cell::UnsafeCell;
 use core::cmp::min;
 use core::mem::size_of;
