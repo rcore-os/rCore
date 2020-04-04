@@ -15,19 +15,8 @@ impl INode for Fbdev {
             offset,
             buf.len()
         );
-        if let Some(mut frame_buffer) = FRAME_BUFFER.lock().as_ref() {
-            let mut count = buf.len();
-            if offset > frame_buffer.framebuffer_size() {
-                return Ok(0);
-            }
-            if offset + count > frame_buffer.framebuffer_size() {
-                count = frame_buffer.framebuffer_size() - offset;
-            }
-            let frame_buffer_data = unsafe {
-                core::slice::from_raw_parts((frame_buffer.base_addr() + offset) as *const u8, count)
-            };
-            buf[..count].copy_from_slice(&frame_buffer_data);
-            Ok(count)
+        if let Some(fb) = FRAME_BUFFER.read().as_ref() {
+            Ok(fb.read_at(offset, buf))
         } else {
             Err(FsError::NoDevice)
         }
@@ -38,21 +27,8 @@ impl INode for Fbdev {
             offset,
             buf.len()
         );
-        if let Some(mut frame_buffer) = FRAME_BUFFER.lock().as_mut() {
-            let mut count = buf.len();
-            if offset > frame_buffer.framebuffer_size() {
-                return Ok(0);
-            }
-            if offset + count > frame_buffer.framebuffer_size() {
-                count = frame_buffer.framebuffer_size() - offset;
-            }
-            let frame_buffer_data = unsafe {
-                core::slice::from_raw_parts_mut(
-                    (frame_buffer.base_addr() + offset) as *mut u8,
-                    count,
-                )
-            };
-            frame_buffer_data.copy_from_slice(&buf[..count]);
+        if let Some(mut fb) = FRAME_BUFFER.write().as_mut() {
+            let count = fb.write_at(offset, buf);
             if count == buf.len() {
                 Ok(count)
             } else {
@@ -95,14 +71,14 @@ impl INode for Fbdev {
         match cmd {
             FBIOGET_FSCREENINFO => {
                 let fb_fix_info = unsafe { &mut *(data as *mut FbFixScreeninfo) };
-                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_fix_info.fill_from(&fb.fb_info);
                 }
                 Ok(())
             }
             FBIOGET_VSCREENINFO => {
                 let fb_var_info = unsafe { &mut *(data as *mut FbVarScreeninfo) };
-                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_var_info.fill_from(&fb.fb_info);
                 }
                 Ok(())
@@ -118,7 +94,7 @@ impl INode for Fbdev {
         #[cfg(target_arch = "aarch64")]
         let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
 
-        if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+        if let Some(fb) = FRAME_BUFFER.read().as_ref() {
             if area.offset + area.end_vaddr - area.start_vaddr > fb.framebuffer_size() {
                 return Err(FsError::NoDeviceSpace);
             }
