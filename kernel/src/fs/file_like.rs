@@ -4,10 +4,8 @@ use super::ioctl::*;
 use super::FileHandle;
 use crate::fs::epoll::EpollInstance;
 use crate::net::Socket;
-use crate::sync::Condvar;
 use crate::syscall::{SysError, SysResult};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use rcore_fs::vfs::PollStatus;
 
 // TODO: merge FileLike to FileHandle ?

@@ -1,6 +1,6 @@
 use super::*;
+use crate::process::thread_manager;
 use crate::process::Process;
-use crate::process::{current_thread, thread_manager};
 use crate::thread;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;

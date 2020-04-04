@@ -9,7 +9,6 @@ pub mod rand;
 pub mod syscall;
 pub mod timer;
 
-use log::*;
 use mips::registers::cp0;
 
 #[cfg(feature = "board_malta")]

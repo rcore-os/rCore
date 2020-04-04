@@ -8,6 +8,7 @@ use crate::arch::driver::ide;
 
 #[cfg(target_arch = "aarch64")]
 use crate::arch::board::emmc;
+#[cfg(target_arch = "aarch64")]
 use crate::sync::SpinNoIrqLock as Mutex;
 
 pub struct MemBuf(RwLock<&'static mut [u8]>);

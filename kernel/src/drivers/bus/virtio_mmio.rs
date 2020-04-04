@@ -8,7 +8,7 @@ use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
 use super::super::input::virtio_input;
 use super::super::net::virtio_net;
-use crate::memory::{phys_to_virt, virt_to_phys};
+use crate::memory::phys_to_virt;
 
 pub fn virtio_probe(node: &Node) {
     let reg = match node.prop_raw("reg") {

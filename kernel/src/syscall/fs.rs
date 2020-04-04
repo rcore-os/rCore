@@ -8,18 +8,14 @@ use rcore_fs::vfs::Timespec;
 use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::*;
 use crate::memory::MemorySet;
-use crate::sync::{Condvar, SpinNoIrqLock};
+use crate::sync::Condvar;
 use crate::trap::TICK_ACTIVITY;
-use alloc::{collections::BTreeMap, collections::BTreeSet};
 
 use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
-use crate::net::server;
 use crate::process::Process;
-use alloc::collections::VecDeque;
-use bitflags::_core::task::Poll;
 use rcore_fs::vfs::PollStatus;
 
 impl Syscall<'_> {
@@ -394,7 +390,6 @@ impl Syscall<'_> {
 
         let begin_time_ms = crate::trap::uptime_msec();
         let condition = move || {
-            use PollEvents as PE;
             let mut proc = self.process();
 
             let epollInstance = match proc.get_epoll_instance_mut(epfd) {

@@ -1,5 +1,5 @@
 pub use self::context::*;
-use crate::drivers::{DRIVERS, IRQ_MANAGER};
+use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
 

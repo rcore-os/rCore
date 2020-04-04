@@ -1,6 +1,5 @@
 use crate::drivers::bus::pci;
 use crate::drivers::gpu::fb::{self, FramebufferInfo};
-use alloc::string::String;
 use mips::registers::cp0;
 
 pub mod consts;

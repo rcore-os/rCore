@@ -1,10 +1,9 @@
-use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
-use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET};
+use crate::memory::{init_heap, MemorySet, FRAME_ALLOCATOR};
 use core::mem;
 use log::*;
 use rcore_memory::PAGE_SIZE;
-use riscv::register::satp;
-use riscv::{addr::*, register::sstatus};
+use riscv::register::sstatus;
 
 /// Initialize the memory management module
 pub fn init(dtb: usize) {

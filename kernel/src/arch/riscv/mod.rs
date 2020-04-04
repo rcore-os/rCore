@@ -22,7 +22,6 @@ pub mod timer;
 
 use crate::memory::phys_to_virt;
 use core::sync::atomic::{AtomicBool, Ordering};
-use log::*;
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
@@ -88,7 +87,7 @@ const BOOT_HART_ID: usize = 0;
 #[cfg(feature = "board_u540")]
 const BOOT_HART_ID: usize = 1;
 
-/// Constant & Macro for `trap.asm`
+// Constant & Macro for `trap.asm`
 #[cfg(target_arch = "riscv32")]
 global_asm!(
     r"

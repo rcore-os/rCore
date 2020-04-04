@@ -2,36 +2,26 @@ use super::api::*;
 use super::const_reloc as loader;
 use super::kernelvm::*;
 use super::structs::*;
-use crate::consts::*;
 use crate::lkm::structs::ModuleState::{Ready, Unloading};
-use crate::memory::GlobalFrameAlloc;
-use crate::sync::{Condvar, SpinLock as Mutex};
+use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::*;
 use crate::syscall::SysResult;
 use alloc::boxed::Box;
 use alloc::collections::btree_map::BTreeMap;
-use alloc::prelude::*;
 use alloc::string::*;
 use alloc::sync::Arc;
 use alloc::vec::*;
-use core::borrow::BorrowMut;
 use core::mem::transmute;
-use core::slice;
 use lazy_static::lazy_static;
-use rcore_memory::memory_set::handler::{ByFrame, MemoryHandler};
 use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::{Page, PAGE_SIZE};
+use rcore_memory::PAGE_SIZE;
 use xmas_elf::dynamic::Tag;
 use xmas_elf::program::Type::Load;
 use xmas_elf::sections::SectionData;
 use xmas_elf::sections::SectionData::{DynSymbolTable64, Dynamic64, Undefined};
 use xmas_elf::symbol_table::DynEntry64;
 use xmas_elf::symbol_table::Entry;
-use xmas_elf::{
-    header,
-    program::{Flags, Type},
-    ElfFile,
-};
+use xmas_elf::{header, ElfFile};
 // The symbol data table.
 global_asm!(include_str!("symbol_table.asm"));
 
@@ -96,15 +86,15 @@ impl ModuleManager {
             return;
         }
         use compression::prelude::*;
-        let zipped_symbols =
-            unsafe { slice::from_raw_parts(symbol_table_start as *const u8, symbol_table_len) }
-                .to_vec();
+        let zipped_symbols = unsafe {
+            core::slice::from_raw_parts(symbol_table_start as *const u8, symbol_table_len)
+        }
+        .to_vec();
 
         let real_symbols = zipped_symbols
             .decode(&mut GZipDecoder::new())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        use core::slice;
         use core::str::from_utf8;
         self.init_kernel_symbols(from_utf8(&real_symbols).unwrap());
     }

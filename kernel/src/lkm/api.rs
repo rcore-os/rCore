@@ -1,7 +1,5 @@
 use super::*;
-use crate::lkm::manager::ModuleManager;
 use crate::lkm::structs::LoadedModule;
-use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::alloc::{GlobalAlloc, Layout};
@@ -10,7 +8,7 @@ use core::slice::from_raw_parts;
 pub fn get_module(this_module: usize) -> &'static mut LoadedModule {
     unsafe {
         let ptr = this_module as *mut LoadedModule;
-        &mut (*ptr) as (&'static mut LoadedModule)
+        &mut (*ptr) as &'static mut LoadedModule
     }
 }
 

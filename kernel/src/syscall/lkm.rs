@@ -1,8 +1,5 @@
 use crate::lkm::manager::ModuleManager;
-use crate::sync::Mutex;
 use crate::syscall::{check_and_clone_cstr, SysResult, Syscall};
-use alloc::collections::btree_map::BTreeMap;
-use compression::prelude::Action;
 
 impl Syscall<'_> {
     pub fn sys_init_module(

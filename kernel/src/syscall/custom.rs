@@ -1,7 +1,5 @@
 //! Custom nonstandard syscalls
 use super::*;
-use rcore_memory::memory_set::handler::Linear;
-use rcore_memory::memory_set::MemoryAttr;
 
 impl Syscall<'_> {
     /// Allocate this PCI device to user space
@@ -9,6 +7,9 @@ impl Syscall<'_> {
     #[cfg(target_arch = "x86_64")]
     pub fn sys_map_pci_device(&mut self, vendor: usize, product: usize) -> SysResult {
         use crate::drivers::bus::pci;
+        use rcore_memory::memory_set::handler::Linear;
+        use rcore_memory::memory_set::MemoryAttr;
+
         info!(
             "map_pci_device: vendor: {:x}, product: {:x}",
             vendor, product

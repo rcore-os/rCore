@@ -1,13 +1,10 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs::vfs::*;
 use rcore_fs_devfs::{special::*, DevFS};
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sfs::SimpleFileSystem;
-
-use crate::drivers::BlockDriver;
 
 pub use self::file::*;
 pub use self::file_like::*;
@@ -50,6 +47,8 @@ lazy_static! {
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
             {
+                use crate::drivers::BlockDriver;
+                use rcore_fs::dev::block_cache::BlockCache;
                 let driver = BlockDriver(
                     crate::drivers::BLK_DRIVERS
                         .read().iter()

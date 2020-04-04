@@ -1,6 +1,5 @@
 use crate::sync::Semaphore;
-use crate::sync::SpinLock as Mutex;
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc, sync::Weak, vec::Vec};
 use core::ops::Index;
 use spin::RwLock;
 

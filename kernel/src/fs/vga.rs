@@ -1,8 +1,6 @@
 use rcore_fs::vfs::*;
 
 use crate::drivers::gpu::fb::{ColorFormat, FramebufferInfo, FRAME_BUFFER};
-use crate::memory::phys_to_virt;
-use alloc::{string::String, sync::Arc, vec::Vec};
 use core::any::Any;
 
 #[derive(Default)]

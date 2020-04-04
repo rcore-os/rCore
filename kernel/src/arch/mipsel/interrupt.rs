@@ -1,12 +1,10 @@
 pub use self::context::*;
 use crate::arch::paging::get_root_page_table_ptr;
-use crate::drivers::{DRIVERS, IRQ_MANAGER};
+use crate::drivers::IRQ_MANAGER;
 use log::*;
 use mips::addr::*;
 use mips::interrupts;
-use mips::paging::{
-    PageTable as MIPSPageTable, PageTableEntry, PageTableFlags as EF, TwoLevelPageTable,
-};
+use mips::paging::PageTable as MIPSPageTable;
 use mips::registers::cp0;
 use mips::tlb;
 
@@ -154,7 +152,7 @@ fn syscall(tf: &mut TrapFrame) {
     );
 
     // temporary solution for ThinPad
-    if (tf.v0 == 0) {
+    if tf.v0 == 0 {
         warn!("Syscall ID = 0");
         tf.v0 = unsafe { *((tf.sp + 28) as *const usize) };
     }
@@ -162,7 +160,7 @@ fn syscall(tf: &mut TrapFrame) {
     let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
     // comply with mips n32 abi, always return a positive value
     // https://git.musl-libc.org/cgit/musl/tree/arch/mipsn32/syscall_arch.h
-    if (ret < 0) {
+    if ret < 0 {
         tf.v0 = (-ret) as usize;
         tf.a3 = 1;
     } else {

@@ -2,7 +2,6 @@
 
 use alloc::string::String;
 use core::fmt;
-use lazy_static::lazy_static;
 use log::*;
 use spin::Mutex;
 

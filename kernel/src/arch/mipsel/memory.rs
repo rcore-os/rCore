@@ -1,8 +1,6 @@
 use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET};
-use crate::memory::{init_heap, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
-use core::mem;
-use log::*;
+use crate::memory::{init_heap, FRAME_ALLOCATOR};
 use rcore_memory::PAGE_SIZE;
 
 /// Initialize the memory management module

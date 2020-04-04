@@ -1,14 +1,10 @@
 // Simple kernel memory set for kernel virtual memory
 use crate::arch::paging::PageTableImpl;
-use crate::consts::*;
 use crate::memory::GlobalFrameAlloc;
 use crate::sync::SpinLock as Mutex;
 use alloc::vec::*;
-use buddy_system_allocator::*;
-use core::alloc::Layout;
 use core::mem::ManuallyDrop;
 use core::ops::DerefMut;
-use core::ptr::NonNull;
 use lazy_static::lazy_static;
 use rcore_memory::memory_set::handler::{ByFrame, MemoryHandler};
 use rcore_memory::memory_set::MemoryAttr;
@@ -119,7 +115,7 @@ impl VirtualArea {
         parent: &mut VirtualSpace,
     ) -> VirtualArea {
         let aligned_start_addr = page_addr - page_addr % PAGE_SIZE;
-        let mut aligned_end = (page_addr + size + PAGE_SIZE - 1);
+        let mut aligned_end = page_addr + size + PAGE_SIZE - 1;
         aligned_end = aligned_end - aligned_end % PAGE_SIZE;
         let lock = parent.allocator.lock();
         let mut active_pt = lock.kernel_table();

@@ -6,11 +6,7 @@ use rcore_memory::paging::*;
 use riscv::addr::*;
 use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
-use riscv::paging::{
-    Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF, PageTableType,
-    RecursivePageTable,
-};
-use riscv::register::satp;
+use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF};
 
 #[cfg(target_arch = "riscv32")]
 type TopLevelPageTable<'a> = riscv::paging::Rv32PageTable<'a>;
@@ -199,7 +195,7 @@ impl PageTableExt for PageTableImpl {
         }
         #[cfg(target_arch = "riscv64")]
         for i in 509..512 {
-            if (i == 510) {
+            if i == 510 {
                 // MMIO range 0x60000000 - 0x7FFFFFFF does not work as a large page, dunno why
                 continue;
             }

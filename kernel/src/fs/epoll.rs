@@ -1,11 +1,8 @@
 use crate::fs::FileLike;
-use crate::memory::MemorySet;
 use crate::process::Process;
-use crate::sync::{Condvar, SpinNoIrqLock};
+use crate::sync::SpinNoIrqLock;
 use crate::syscall::{SysError, SysResult};
 use alloc::{collections::BTreeMap, collections::BTreeSet};
-use core::mem::size_of;
-use core::slice;
 
 pub struct EpollInstance {
     pub events: BTreeMap<usize, EpollEvent>,
@@ -29,7 +26,7 @@ impl EpollInstance {
     }
 
     pub fn control(&mut self, op: usize, fd: usize, event: &EpollEvent) -> SysResult {
-        match (op as i32) {
+        match op as i32 {
             EPollCtlOp::ADD => {
                 self.events.insert(fd, event.clone());
                 self.newCtlList.lock().insert(fd);
