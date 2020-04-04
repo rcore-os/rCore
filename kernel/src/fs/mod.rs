@@ -2,30 +2,31 @@ use alloc::{sync::Arc, vec::Vec};
 
 use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs::vfs::*;
-use rcore_fs_devfs::{special::*, DevFS};
+use rcore_fs_devfs::{
+    special::{NullINode, ZeroINode},
+    DevFS,
+};
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sfs::SimpleFileSystem;
 
+use self::devfs::{Fbdev, RandomINode};
 use crate::drivers::BlockDriver;
 
+pub use self::devfs::{STDIN, STDOUT};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::pseudo::*;
-pub use self::random::*;
-pub use self::stdio::{STDIN, STDOUT};
 
+mod devfs;
 mod device;
 pub mod epoll;
-pub mod fbdev;
 mod file;
 mod file_like;
 mod ioctl;
 mod pipe;
 mod pseudo;
-mod random;
-mod stdio;
 
 // Hard link user programs
 #[cfg(feature = "link_user")]
@@ -85,7 +86,7 @@ lazy_static! {
         devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
         devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/random");
         devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/urandom");
-        devfs.add("fb0", Arc::new(fbdev::Fbdev::default())).expect("failed to mknod /dev/fb0");
+        devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
 
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {

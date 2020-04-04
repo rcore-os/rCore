@@ -1,3 +1,5 @@
+//! Implement INode for framebuffer
+
 use crate::drivers::gpu::fb::{ColorFormat, FramebufferInfo, FRAME_BUFFER};
 use crate::syscall::MmapProt;
 use core::any::Any;

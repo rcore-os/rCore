@@ -8,7 +8,7 @@ use rcore_fs::vfs::*;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-pub struct RandomINodeData {
+struct RandomINodeData {
     seed: u32,
 }
 
