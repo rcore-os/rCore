@@ -34,7 +34,7 @@ impl SemArray {
         }
         // not found, create one
         let mut semaphores = Vec::new();
-        for i in 0..nsems {
+        for _ in 0..nsems {
             semaphores.push(Semaphore::new(0));
         }
         // insert to global map

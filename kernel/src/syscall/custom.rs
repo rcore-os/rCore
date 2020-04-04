@@ -36,7 +36,7 @@ impl Syscall<'_> {
     }
 
     #[cfg(not(target_arch = "x86_64"))]
-    pub fn sys_map_pci_device(&mut self, vendor: usize, product: usize) -> SysResult {
+    pub fn sys_map_pci_device(&mut self, _vendor: usize, _product: usize) -> SysResult {
         Err(SysError::ENOSYS)
     }
 

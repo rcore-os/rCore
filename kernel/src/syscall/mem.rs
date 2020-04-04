@@ -101,7 +101,7 @@ impl Syscall<'_> {
             "mprotect: addr={:#x}, size={:#x}, prot={:?}",
             addr, len, prot
         );
-        let attr = prot.to_attr();
+        let _attr = prot.to_attr();
 
         // FIXME: properly set the attribute of the area
         //        now some mut ptr check is fault

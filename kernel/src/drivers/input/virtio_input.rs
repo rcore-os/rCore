@@ -31,7 +31,7 @@ impl Driver for VirtIOInputDriver {
 
 pub fn init(header: &'static mut VirtIOHeader) {
     let event_buf = Box::leak(Box::new([0u64; 32]));
-    let mut input = VirtIOInput::new(header, event_buf).expect("failed to create input driver");
+    let input = VirtIOInput::new(header, event_buf).expect("failed to create input driver");
 
     let driver = Arc::new(VirtIOInputDriver(Mutex::new(input)));
     IRQ_MANAGER.write().register_all(driver.clone());

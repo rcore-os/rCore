@@ -159,10 +159,10 @@ impl Driver for RouterInterface {
                 let rdfo = AXI_STREAM_FIFO_RDFO.read_volatile();
                 if rdfo > 0 {
                     let mut buffer = Vec::new();
-                    let rlr = AXI_STREAM_FIFO_RLR.read_volatile();
-                    let rdr = AXI_STREAM_FIFO_RDR.read_volatile();
+                    let _rlr = AXI_STREAM_FIFO_RLR.read_volatile();
+                    let _rdr = AXI_STREAM_FIFO_RDR.read_volatile();
                     let port = AXI_STREAM_FIFO_RDFD.read_volatile();
-                    for i in 1..rdfo {
+                    for _ in 1..rdfo {
                         buffer.push(AXI_STREAM_FIFO_RDFD.read_volatile() as u8);
                     }
                     debug!(

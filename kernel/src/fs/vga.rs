@@ -7,7 +7,7 @@ use core::any::Any;
 pub struct Vga;
 
 impl INode for Vga {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         Err(FsError::NotSupported)
     }
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {

@@ -50,7 +50,7 @@ fn init_frame_allocator() {
 
 /// Remap the kernel memory address with 4K page recorded in p1 page table
 fn remap_the_kernel(_dtb: usize) {
-    let mut ms = MemorySet::new();
+    let ms = MemorySet::new();
     unsafe {
         ms.activate();
     }

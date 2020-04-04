@@ -208,40 +208,40 @@ impl PageTableExt for PageTableImpl {
         }
 
         // MMIO range 0x60000000 - 0x7FFFFFFF does not work as a large page, dunno why
-        let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
         // map Uartlite for Rocket Chip
         #[cfg(feature = "board_rocket_chip")]
-        self.page_table
-            .map_to(
-                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6000_0000)),
-                Frame::of_addr(PhysAddr::new(0x6000_0000)),
-                flags,
-                &mut FrameAllocatorForRiscv,
-            )
-            .unwrap()
-            .flush();
-        // map AXI INTC for Rocket Chip
-        #[cfg(feature = "board_rocket_chip")]
-        self.page_table
-            .map_to(
-                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6120_0000)),
-                Frame::of_addr(PhysAddr::new(0x6120_0000)),
-                flags,
-                &mut FrameAllocatorForRiscv,
-            )
-            .unwrap()
-            .flush();
-        // map AXI4-Stream Data FIFO for Rocket Chip
-        #[cfg(feature = "board_rocket_chip")]
-        self.page_table
-            .map_to(
-                Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x64A0_0000)),
-                Frame::of_addr(PhysAddr::new(0x64A0_0000)),
-                flags,
-                &mut FrameAllocatorForRiscv,
-            )
-            .unwrap()
-            .flush();
+        {
+            let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
+            self.page_table
+                .map_to(
+                    Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6000_0000)),
+                    Frame::of_addr(PhysAddr::new(0x6000_0000)),
+                    flags,
+                    &mut FrameAllocatorForRiscv,
+                )
+                .unwrap()
+                .flush();
+            // map AXI INTC for Rocket Chip
+            self.page_table
+                .map_to(
+                    Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x6120_0000)),
+                    Frame::of_addr(PhysAddr::new(0x6120_0000)),
+                    flags,
+                    &mut FrameAllocatorForRiscv,
+                )
+                .unwrap()
+                .flush();
+            // map AXI4-Stream Data FIFO for Rocket Chip
+            self.page_table
+                .map_to(
+                    Page::of_addr(VirtAddr::new(PHYSICAL_MEMORY_OFFSET + 0x64A0_0000)),
+                    Frame::of_addr(PhysAddr::new(0x64A0_0000)),
+                    flags,
+                    &mut FrameAllocatorForRiscv,
+                )
+                .unwrap()
+                .flush();
+        }
     }
 
     fn token(&self) -> usize {
@@ -256,7 +256,7 @@ impl PageTableExt for PageTableImpl {
     }
 
     fn active_token() -> usize {
-        let mut token: usize = 0;
+        let mut token;
         unsafe {
             asm!("csrr $0, satp" : "=r"(token) ::: "volatile");
         }

@@ -73,7 +73,7 @@ pub extern "C" fn server(_arg: usize) -> ! {
 
                 if socket.can_recv() {
                     let mut data = [0u8; 2048];
-                    let size = socket.recv_slice(&mut data).unwrap();
+                    let _size = socket.recv_slice(&mut data).unwrap();
                 }
             }
         }

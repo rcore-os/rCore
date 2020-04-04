@@ -8,7 +8,7 @@ impl Syscall<'_> {
         len: usize,
         param_values: *const u8,
     ) -> SysResult {
-        let mut proc = self.process();
+        let _proc = self.process();
         let modimg = unsafe { self.vm().check_read_array(module_image, len)? };
         let copied_param_values = check_and_clone_cstr(param_values)?;
 
@@ -16,7 +16,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_delete_module(&mut self, module_name: *const u8, flags: u32) -> SysResult {
-        let mut proc = self.process();
+        let _proc = self.process();
         let copied_modname = check_and_clone_cstr(module_name)?;
         info!("[LKM] Removing module {:?}", copied_modname);
         let ret = ModuleManager::with(|kmm| kmm.delete_module(&copied_modname, flags));

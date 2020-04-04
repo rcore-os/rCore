@@ -50,14 +50,12 @@ impl FileHandle {
         if !self.options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        let mut len: usize = 0;
         if !self.options.nonblock {
             // block
             loop {
                 match self.inode.read_at(offset, buf) {
                     Ok(read_len) => {
-                        len = read_len;
-                        break;
+                        return Ok(read_len);
                     }
                     Err(FsError::Again) => {
                         thread::yield_now();
@@ -68,9 +66,9 @@ impl FileHandle {
                 }
             }
         } else {
-            len = self.inode.read_at(offset, buf)?;
+            let len = self.inode.read_at(offset, buf)?;
+            Ok(len)
         }
-        Ok(len)
     }
 
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {

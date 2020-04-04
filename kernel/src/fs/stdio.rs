@@ -54,7 +54,7 @@ lazy_static! {
 }
 
 impl INode for Stdin {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         if self.can_read() {
             buf[0] = self.pop() as u8;
             Ok(1)

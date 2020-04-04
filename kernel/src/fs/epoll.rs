@@ -6,8 +6,8 @@ use alloc::{collections::BTreeMap, collections::BTreeSet};
 
 pub struct EpollInstance {
     pub events: BTreeMap<usize, EpollEvent>,
-    pub readyList: SpinNoIrqLock<BTreeSet<usize>>,
-    pub newCtlList: SpinNoIrqLock<BTreeSet<usize>>,
+    pub ready_list: SpinNoIrqLock<BTreeSet<usize>>,
+    pub new_ctl_list: SpinNoIrqLock<BTreeSet<usize>>,
 }
 
 impl Clone for EpollInstance {
@@ -17,11 +17,11 @@ impl Clone for EpollInstance {
 }
 
 impl EpollInstance {
-    pub fn new(flags: usize) -> Self {
+    pub fn new(_flags: usize) -> Self {
         return EpollInstance {
             events: BTreeMap::new(),
-            readyList: Default::default(),
-            newCtlList: Default::default(),
+            ready_list: Default::default(),
+            new_ctl_list: Default::default(),
         };
     }
 
@@ -29,14 +29,14 @@ impl EpollInstance {
         match op as i32 {
             EPollCtlOp::ADD => {
                 self.events.insert(fd, event.clone());
-                self.newCtlList.lock().insert(fd);
+                self.new_ctl_list.lock().insert(fd);
             }
 
             EPollCtlOp::MOD => {
                 if self.events.get(&fd).is_some() {
                     self.events.remove(&fd);
                     self.events.insert(fd, event.clone());
-                    self.newCtlList.lock().insert(fd);
+                    self.new_ctl_list.lock().insert(fd);
                 } else {
                     return Err(SysError::EPERM);
                 }

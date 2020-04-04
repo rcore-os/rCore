@@ -49,7 +49,7 @@ impl phy::Device<'_> for VirtIONetDriver {
     type TxToken = VirtIONetDriver;
 
     fn receive(&mut self) -> Option<(Self::RxToken, Self::TxToken)> {
-        let mut net = self.0.lock();
+        let net = self.0.lock();
         if net.can_recv() {
             Some((self.clone(), self.clone()))
         } else {
@@ -58,7 +58,7 @@ impl phy::Device<'_> for VirtIONetDriver {
     }
 
     fn transmit(&mut self) -> Option<Self::TxToken> {
-        let mut net = self.0.lock();
+        let net = self.0.lock();
         if net.can_send() {
             Some(self.clone())
         } else {

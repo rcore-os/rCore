@@ -64,7 +64,7 @@ impl Syscall<'_> {
         info!("times: buf: {:?}", buf);
         let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
-        let tick_base = *TICK_BASE;
+        let _tick_base = *TICK_BASE;
         let tick = unsafe { crate::trap::TICK as u64 };
 
         let new_buf = Tms {

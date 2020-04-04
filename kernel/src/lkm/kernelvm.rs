@@ -34,14 +34,14 @@ impl MemorySpaceManager for LinearManager {
         LinearManager { last_page: 0 }
     }
     fn alloc(&mut self, size: usize) -> Option<(usize, usize)> {
-        let mut required_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+        let required_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
         let current = self.last_page * PAGE_SIZE + KSEG2_START;
         self.last_page += required_pages;
         Some((current, required_pages * PAGE_SIZE))
     }
 
-    fn free(&mut self, (addr, size): (usize, usize)) {
+    fn free(&mut self, (_addr, _size): (usize, usize)) {
         //Do nothing.
     }
 }
@@ -95,7 +95,7 @@ impl VirtualSpace {
 
 impl Drop for VirtualSpace {
     fn drop(&mut self) {
-        for mut v in self.areas.iter_mut() {
+        for v in self.areas.iter_mut() {
             v.unmap(self.allocator, &mut self.page_allocator);
         }
     }
