@@ -102,10 +102,11 @@ impl rcore_thread::Context for Thread {
 impl Thread {
     /// Make a struct for the init thread
     pub unsafe fn new_init() -> Box<Thread> {
+        let zero = MaybeUninit::<Thread>::zeroed();
         Box::new(Thread {
             context: Context::null(),
             // safety: other fields will never be used
-            ..core::mem::MaybeUninit::zeroed().assume_init()
+            ..zero.assume_init()
         })
     }
 

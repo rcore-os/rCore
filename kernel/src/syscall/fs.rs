@@ -14,7 +14,7 @@ use crate::memory::MemorySet;
 use crate::sync::Condvar;
 use crate::trap::TICK_ACTIVITY;
 
-use bitvec::prelude::{BitSlice, BitVec, LittleEndian};
+use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
@@ -1723,8 +1723,8 @@ const FD_PER_ITEM: usize = 8 * size_of::<u32>();
 const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
 
 struct FdSet {
-    bitset: &'static mut BitSlice<LittleEndian, u32>,
-    origin: BitVec<LittleEndian, u32>,
+    bitset: &'static mut BitSlice<Lsb0, u32>,
+    origin: BitVec<Lsb0, u32>,
 }
 
 impl FdSet {
@@ -1742,7 +1742,7 @@ impl FdSet {
                 return Err(SysError::EINVAL);
             }
             let slice = unsafe { vm.check_write_array(addr, len)? };
-            let bitset: &'static mut BitSlice<LittleEndian, u32> = slice.into();
+            let bitset: &'static mut BitSlice<Lsb0, u32> = slice.into();
             debug!("bitset {:?}", bitset);
 
             // save the fdset, and clear it

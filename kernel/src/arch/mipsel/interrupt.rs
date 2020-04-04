@@ -6,7 +6,6 @@ use mips::addr::*;
 use mips::interrupts;
 use mips::paging::PageTable as MIPSPageTable;
 use mips::registers::cp0;
-use mips::tlb;
 
 #[path = "context.rs"]
 mod context;
@@ -280,7 +279,7 @@ fn page_fault(tf: &mut TrapFrame) {
                 }
             }
 
-            tlb::write_tlb_random(tlb_entry)
+            tlb_entry.write_random()
         }
         Err(()) => {
             if !crate::memory::handle_page_fault(addr) {
