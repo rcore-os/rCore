@@ -1,32 +1,43 @@
-use rcore_fs::vfs::*;
+//! Implement INode for framebuffer
 
 use crate::drivers::gpu::fb::{ColorFormat, FramebufferInfo, FRAME_BUFFER};
-use crate::memory::phys_to_virt;
-use alloc::{string::String, sync::Arc, vec::Vec};
+use crate::syscall::MmapProt;
 use core::any::Any;
 
-#[derive(Default)]
-pub struct Vga;
+use rcore_fs::vfs::*;
+use rcore_memory::memory_set::handler::Linear;
 
-impl INode for Vga {
+#[derive(Default)]
+pub struct Fbdev;
+
+impl INode for Fbdev {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Err(FsError::NotSupported)
-    }
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
-        info!("the _offset is {} {}", _offset, _buf[0]);
-        let lock = FRAME_BUFFER.lock();
-        if let Some(ref frame_buffer) = *lock {
-            use core::slice;
-            let frame_buffer_data = unsafe {
-                slice::from_raw_parts_mut(
-                    frame_buffer.base_addr() as *mut u8,
-                    frame_buffer.framebuffer_size(),
-                )
-            };
-            frame_buffer_data.copy_from_slice(&_buf);
-            Ok(frame_buffer.framebuffer_size())
+        info!(
+            "fbdev read_at: offset={:#x} buf_len={:#x}",
+            offset,
+            buf.len()
+        );
+        if let Some(fb) = FRAME_BUFFER.read().as_ref() {
+            Ok(fb.read_at(offset, buf))
         } else {
-            Err(FsError::EntryNotFound)
+            Err(FsError::NoDevice)
+        }
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        info!(
+            "fbdev write_at: offset={:#x} buf_len={:#x}",
+            offset,
+            buf.len()
+        );
+        if let Some(mut fb) = FRAME_BUFFER.write().as_mut() {
+            let count = fb.write_at(offset, buf);
+            if count == buf.len() {
+                Ok(count)
+            } else {
+                Err(FsError::NoDeviceSpace)
+            }
+        } else {
+            Err(FsError::NoDevice)
         }
     }
     fn poll(&self) -> Result<PollStatus> {
@@ -41,18 +52,18 @@ impl INode for Vga {
         Ok(Metadata {
             dev: 0,
             inode: 0,
-            size: 0x24000,
+            size: 0,
             blk_size: 0,
             blocks: 0,
             atime: Timespec { sec: 0, nsec: 0 },
             mtime: Timespec { sec: 0, nsec: 0 },
             ctime: Timespec { sec: 0, nsec: 0 },
-            type_: FileType::SymLink,
-            mode: 0,
-            nlinks: 0,
+            type_: FileType::CharDevice,
+            mode: 0o660,
+            nlinks: 1,
             uid: 0,
             gid: 0,
-            rdev: 0,
+            rdev: make_rdev(29, 0),
         })
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
@@ -62,14 +73,14 @@ impl INode for Vga {
         match cmd {
             FBIOGET_FSCREENINFO => {
                 let fb_fix_info = unsafe { &mut *(data as *mut FbFixScreeninfo) };
-                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_fix_info.fill_from(&fb.fb_info);
                 }
                 Ok(())
             }
             FBIOGET_VSCREENINFO => {
                 let fb_var_info = unsafe { &mut *(data as *mut FbVarScreeninfo) };
-                if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
+                if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_var_info.fill_from(&fb.fb_info);
                 }
                 Ok(())
@@ -78,6 +89,28 @@ impl INode for Vga {
                 warn!("use never support ioctl !");
                 Err(FsError::NotSupported)
             }
+        }
+    }
+    fn mmap(&self, area: MMapArea) -> Result<()> {
+        let attr = MmapProt::from_bits_truncate(area.prot).to_attr();
+        #[cfg(target_arch = "aarch64")]
+        let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
+
+        if let Some(fb) = FRAME_BUFFER.read().as_ref() {
+            if area.offset + area.end_vaddr - area.start_vaddr > fb.framebuffer_size() {
+                return Err(FsError::NoDeviceSpace);
+            }
+            let thread = unsafe { crate::process::current_thread() };
+            thread.vm.lock().push(
+                area.start_vaddr,
+                area.end_vaddr,
+                attr,
+                Linear::new((fb.paddr() + area.offset - area.start_vaddr) as isize),
+                "mmap_file",
+            );
+            Ok(())
+        } else {
+            Err(FsError::NoDevice)
         }
     }
     fn as_any_ref(&self) -> &dyn Any {

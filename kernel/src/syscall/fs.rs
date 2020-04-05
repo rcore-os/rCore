@@ -1146,10 +1146,6 @@ impl Process {
             "/proc/self/exe" => {
                 return Ok(Arc::new(Pseudo::new(&self.exec_path, FileType::SymLink)));
             }
-            "/dev/fb0" => {
-                info!("/dev/fb0 will be opened");
-                return Ok(Arc::new(Vga::default()));
-            }
             _ => {}
         }
         let (fd_dir_path, fd_name) = split_path(&path);
@@ -1575,7 +1571,7 @@ impl From<Metadata> for Stat {
             nlink: info.nlinks as u32,
             uid: info.uid as u32,
             gid: info.gid as u32,
-            rdev: 0,
+            rdev: info.rdev as u64,
             size: info.size as u64,
             blksize: info.blk_size as u32,
             blocks: info.blocks as u64,
@@ -1606,7 +1602,7 @@ impl From<Metadata> for Stat {
             nlink: info.nlinks as u32,
             uid: info.uid as u32,
             gid: info.gid as u32,
-            rdev: 0,
+            rdev: info.rdev as u64,
             size: info.size as u64,
             blksize: info.blk_size as u32,
             blocks: info.blocks as u64,
