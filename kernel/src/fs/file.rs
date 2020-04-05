@@ -1,10 +1,14 @@
 //! File handle for process
 
+use crate::memory::GlobalFrameAlloc;
+use crate::process::{current_thread, INodeForMap};
+use crate::syscall::MmapProt;
 use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
-use rcore_fs::vfs::{FsError, INode, Metadata, PollStatus, Result};
+use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
+use rcore_memory::memory_set::handler::File;
 
 #[derive(Clone)]
 pub struct FileHandle {
@@ -137,6 +141,32 @@ impl FileHandle {
 
     pub fn io_control(&self, cmd: u32, arg: usize) -> Result<()> {
         self.inode.io_control(cmd, arg)
+    }
+
+    pub fn mmap(&mut self, area: MMapArea) -> Result<()> {
+        info!("mmap file path is {}", self.path);
+        match self.inode.metadata()?.type_ {
+            FileType::File => {
+                let prot = MmapProt::from_bits_truncate(area.prot);
+                let thread = unsafe { current_thread() };
+                thread.vm.lock().push(
+                    area.start_vaddr,
+                    area.end_vaddr,
+                    prot.to_attr(),
+                    File {
+                        file: INodeForMap(self.inode.clone()),
+                        mem_start: area.start_vaddr,
+                        file_start: area.offset,
+                        file_end: area.offset + area.end_vaddr - area.start_vaddr,
+                        allocator: GlobalFrameAlloc,
+                    },
+                    "mmap_file",
+                );
+                Ok(())
+            }
+            FileType::CharDevice => self.inode.mmap(area),
+            _ => Err(FsError::NotSupported),
+        }
     }
 
     pub fn inode(&self) -> Arc<dyn INode> {

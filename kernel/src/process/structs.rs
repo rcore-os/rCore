@@ -25,6 +25,7 @@ use crate::process::thread_manager;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 
+#[allow(dead_code)]
 pub struct Thread {
     context: Context,
     kstack: KernelStack,
