@@ -16,6 +16,7 @@ pub use self::pseudo::*;
 pub use self::random::*;
 pub use self::stdio::{STDIN, STDOUT};
 pub use self::vga::*;
+pub use self::tty::TtyINode;
 
 mod device;
 pub mod epoll;
@@ -27,6 +28,7 @@ mod pseudo;
 mod random;
 mod stdio;
 pub mod vga;
+pub mod tty;
 
 // Hard link user programs
 #[cfg(feature = "link_user")]
@@ -84,8 +86,9 @@ lazy_static! {
         let devfs = DevFS::new();
         devfs.add("null", Arc::new(NullINode::default())).expect("failed to mknod /dev/null");
         devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
-        devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/zero");
-        devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/zero");
+        devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/random");
+        devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/urandom");
+        devfs.add("tty", Arc::new(TtyINode::default())).expect("failed to mknod /dev/tty");
 
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {

@@ -8,6 +8,9 @@ pub const TCGETS: usize = 0x5401;
 pub const TCGETS: usize = 0x540D;
 
 #[cfg(not(target_arch = "mips"))]
+pub const TCSETS: usize = 0x5402;
+
+#[cfg(not(target_arch = "mips"))]
 pub const TIOCGPGRP: usize = 0x540F;
 // _IOR('t', 119, int)
 #[cfg(target_arch = "mips")]

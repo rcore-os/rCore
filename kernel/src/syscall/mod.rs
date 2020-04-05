@@ -108,7 +108,7 @@ impl Syscall<'_> {
             SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
             SYS_FCNTL => {
                 info!(
-                    "SYS_FCNTL : {} {} {} {}",
+                    "SYS_FCNTL : {} {:#x} {} {}",
                     args[0], args[1], args[2], args[3]
                 );
                 self.sys_fcntl(args[0], args[1], args[2])

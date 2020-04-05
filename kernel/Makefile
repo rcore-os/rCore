@@ -284,7 +284,7 @@ endif
 $(kernel_img): kernel bootloader
 ifeq ($(ARCH), x86_64)
 	@mkdir -p $(ESP)/EFI/rCore $(ESP)/EFI/Boot
-	@cp ../rboot/target/x86_64-unknown-uefi/release/rboot.efi $(ESP)/EFI/Boot/BootX64.efi
+	@cp ../rboot/target/x86_64-unknown-uefi/$(MODE)/rboot.efi $(ESP)/EFI/Boot/BootX64.efi
 	@cp ../rboot/rboot.conf $(ESP)/EFI/Boot/rboot.conf
 	@cp $(kernel) $(ESP)/EFI/rCore/kernel.elf
 else ifeq ($(ARCH), $(filter $(ARCH), riscv32 riscv64))

@@ -75,15 +75,25 @@ impl INode for Stdin {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
         match cmd as usize {
-            TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+            TCGETS | TCSETS | TIOCGWINSZ => {
                 // pretend to be tty
                 Ok(())
             }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
+                // Get the process group ID of the foreground process group on
+                // this terminal.
                 // TODO: verify pointer
                 unsafe { *(data as *mut u32) = 0 };
                 Ok(())
+            }
+            TIOCSPGRP => {
+                let gid = unsafe {
+                    *(data as *const i32)
+                };
+                info!("set foreground process group id to {}", gid);
+                Ok(())
+                // println!(pid)
             }
             _ => Err(FsError::NotSupported),
         }
@@ -113,7 +123,7 @@ impl INode for Stdout {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
         match cmd as usize {
-            TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+            TCSETS | TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                 // pretend to be tty
                 Ok(())
             }
