@@ -29,6 +29,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn sys_time(&mut self, time: *mut u64) -> SysResult {
         let sec = get_epoch_usec() / USEC_PER_SEC;
         if time as usize != 0 {
@@ -64,7 +65,7 @@ impl Syscall<'_> {
         info!("times: buf: {:?}", buf);
         let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
-        let tick_base = *TICK_BASE;
+        let _tick_base = *TICK_BASE;
         let tick = unsafe { crate::trap::TICK as u64 };
 
         let new_buf = Tms {

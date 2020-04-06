@@ -2,36 +2,26 @@ use super::api::*;
 use super::const_reloc as loader;
 use super::kernelvm::*;
 use super::structs::*;
-use crate::consts::*;
 use crate::lkm::structs::ModuleState::{Ready, Unloading};
-use crate::memory::GlobalFrameAlloc;
-use crate::sync::{Condvar, SpinLock as Mutex};
+use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::*;
 use crate::syscall::SysResult;
 use alloc::boxed::Box;
 use alloc::collections::btree_map::BTreeMap;
-use alloc::prelude::*;
 use alloc::string::*;
 use alloc::sync::Arc;
 use alloc::vec::*;
-use core::borrow::BorrowMut;
 use core::mem::transmute;
-use core::slice;
 use lazy_static::lazy_static;
-use rcore_memory::memory_set::handler::{ByFrame, MemoryHandler};
 use rcore_memory::memory_set::MemoryAttr;
-use rcore_memory::{Page, PAGE_SIZE};
+use rcore_memory::PAGE_SIZE;
 use xmas_elf::dynamic::Tag;
 use xmas_elf::program::Type::Load;
 use xmas_elf::sections::SectionData;
 use xmas_elf::sections::SectionData::{DynSymbolTable64, Dynamic64, Undefined};
 use xmas_elf::symbol_table::DynEntry64;
 use xmas_elf::symbol_table::Entry;
-use xmas_elf::{
-    header,
-    program::{Flags, Type},
-    ElfFile,
-};
+use xmas_elf::{header, ElfFile};
 // The symbol data table.
 global_asm!(include_str!("symbol_table.asm"));
 
@@ -96,15 +86,15 @@ impl ModuleManager {
             return;
         }
         use compression::prelude::*;
-        let zipped_symbols =
-            unsafe { slice::from_raw_parts(symbol_table_start as *const u8, symbol_table_len) }
-                .to_vec();
+        let zipped_symbols = unsafe {
+            core::slice::from_raw_parts(symbol_table_start as *const u8, symbol_table_len)
+        }
+        .to_vec();
 
         let real_symbols = zipped_symbols
             .decode(&mut GZipDecoder::new())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        use core::slice;
         use core::str::from_utf8;
         self.init_kernel_symbols(from_utf8(&real_symbols).unwrap());
     }
@@ -113,7 +103,7 @@ impl ModuleManager {
         for l in lines.into_iter() {
             let mut words = l.split_whitespace();
             let address = words.next().unwrap();
-            let stype = words.next().unwrap();
+            let _stype = words.next().unwrap();
             let name = words.next().unwrap();
             // Simply add the symbol into stub.
             self.stub_symbols.insert(
@@ -170,7 +160,7 @@ impl ModuleManager {
             Some(base + (selected_symbol.value() as usize))
         }
     }
-    pub fn init_module(&mut self, module_image: &[u8], param_values: &str) -> SysResult {
+    pub fn init_module(&mut self, module_image: &[u8], _param_values: &str) -> SysResult {
         let elf = ElfFile::new(module_image).expect("[LKM] failed to read elf");
         let is32 = match elf.header.pt2 {
             header::HeaderPt2::Header32(_) => true,
@@ -299,7 +289,7 @@ impl ModuleManager {
                         if flags.is_execute() {
                             attr = attr.execute();
                         }
-                        let area_ref = vspace_ref.add_area(prog_start_addr, prog_end_addr, &attr);
+                        let _area_ref = vspace_ref.add_area(prog_start_addr, prog_end_addr, &attr);
                         //self.vallocator.map_pages(prog_start_addr, prog_end_addr, &attr);
                         //No need to flush TLB.
                         let target = unsafe {
@@ -497,7 +487,7 @@ impl ModuleManager {
     fn reloc_symbols(
         &mut self,
         elf: &ElfFile,
-        (start, total_size, single_size): (usize, usize, usize),
+        (start, total_size, _single_size): (usize, usize, usize),
         base: usize,
         dynsym: &[DynEntry64],
         this_module: usize,
@@ -511,8 +501,8 @@ impl ModuleManager {
                     match s.get_data(elf).unwrap() {
                         SectionData::Rela64(rela_items) => {
                             for item in rela_items.iter() {
-                                let mut addend = item.get_addend() as usize;
-                                let mut reloc_addr = item.get_offset() as usize;
+                                let addend = item.get_addend() as usize;
+                                let reloc_addr = item.get_offset() as usize;
                                 let sti = item.get_symbol_table_index() as usize;
                                 let itype = item.get_type() as usize;
                                 self.relocate_single_symbol(
@@ -529,8 +519,8 @@ impl ModuleManager {
                         }
                         SectionData::Rel64(rel_items) => {
                             for item in rel_items.iter() {
-                                let mut addend = 0 as usize;
-                                let mut reloc_addr = item.get_offset() as usize;
+                                let addend = 0 as usize;
+                                let reloc_addr = item.get_offset() as usize;
                                 let sti = item.get_symbol_table_index() as usize;
                                 let itype = item.get_type() as usize;
                                 self.relocate_single_symbol(
@@ -554,7 +544,7 @@ impl ModuleManager {
             }
         }
     }
-    pub fn delete_module(&mut self, name: &str, flags: u32) -> SysResult {
+    pub fn delete_module(&mut self, name: &str, _flags: u32) -> SysResult {
         //unimplemented!("[LKM] You can't plug out what's INSIDE you, RIGHT?");
 
         info!("[LKM] now you can plug out a kernel module!");
@@ -589,7 +579,7 @@ impl ModuleManager {
                 }
                 drop(mod_lock);
 
-                let my_box = self.loaded_modules.remove(i);
+                let _my_box = self.loaded_modules.remove(i);
                 unsafe {
                     LKM_MANAGER.force_unlock();
                 }
@@ -607,7 +597,7 @@ impl ModuleManager {
     pub fn with<T>(f: impl FnOnce(&mut ModuleManager) -> T) -> T {
         let global_lkmm: &Mutex<Option<ModuleManager>> = &LKM_MANAGER;
         let mut locked_lkmm = global_lkmm.lock();
-        let mut lkmm = locked_lkmm.as_mut().unwrap();
+        let lkmm = locked_lkmm.as_mut().unwrap();
         f(lkmm)
     }
     pub fn init() {

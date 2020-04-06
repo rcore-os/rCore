@@ -1,9 +1,6 @@
-use crate::sync::Semaphore;
-use crate::sync::SpinLock as Mutex;
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+#![allow(dead_code)]
+
 use bitflags::*;
-use core::cell::UnsafeCell;
-use spin::RwLock;
 
 pub use crate::ipc::*;
 

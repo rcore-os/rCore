@@ -1,6 +1,6 @@
 //! Pseudo file system INode
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use core::any::Any;
 
 use rcore_fs::vfs::*;

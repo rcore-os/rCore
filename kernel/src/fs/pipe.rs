@@ -1,6 +1,6 @@
 //! Implement INode for Pipe
 
-use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use core::any::Any;
 
 use rcore_fs::vfs::*;

@@ -1,6 +1,7 @@
 // for IOR and IOW:
 // 32bits total, command in lower 16bits, size of the parameter structure in the lower 14 bits of the upper 16 bits
 // higher 2 bits: 01 = write, 10 = read
+#![allow(dead_code)]
 
 #[cfg(not(target_arch = "mips"))]
 pub const TCGETS: usize = 0x5401;

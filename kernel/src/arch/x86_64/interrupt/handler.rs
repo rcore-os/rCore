@@ -66,7 +66,7 @@
 
 use super::consts::*;
 use super::TrapFrame;
-use crate::drivers::{DRIVERS, IRQ_MANAGER};
+use crate::drivers::IRQ_MANAGER;
 use bitflags::*;
 use log::*;
 

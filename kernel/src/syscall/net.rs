@@ -519,15 +519,15 @@ enum_with_unknown! {
     }
 }
 
-const IPPROTO_IP: usize = 0;
-const IPPROTO_ICMP: usize = 1;
-const IPPROTO_TCP: usize = 6;
+pub const IPPROTO_IP: usize = 0;
+pub const IPPROTO_ICMP: usize = 1;
+pub const IPPROTO_TCP: usize = 6;
 
-const SOL_SOCKET: usize = 1;
-const SO_SNDBUF: usize = 7;
-const SO_RCVBUF: usize = 8;
-const SO_LINGER: usize = 13;
+pub const SOL_SOCKET: usize = 1;
+pub const SO_SNDBUF: usize = 7;
+pub const SO_RCVBUF: usize = 8;
+pub const SO_LINGER: usize = 13;
 
-const TCP_CONGESTION: usize = 13;
+pub const TCP_CONGESTION: usize = 13;
 
-const IP_HDRINCL: usize = 3;
+pub const IP_HDRINCL: usize = 3;

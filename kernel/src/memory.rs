@@ -155,7 +155,7 @@ pub fn enlarge_heap(heap: &mut Heap) {
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
     let va_offset = PHYSICAL_MEMORY_OFFSET;
-    for i in 0..16384 {
+    for _ in 0..16384 {
         let page = alloc_frame().unwrap();
         let va = va_offset + page;
         if addr_len > 0 {

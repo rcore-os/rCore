@@ -1,11 +1,9 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use log::*;
 use virtio_drivers::{VirtIOBlk, VirtIOHeader};
 
 use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS, IRQ_MANAGER};
-use crate::memory::phys_to_virt;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 struct VirtIOBlkDriver(Mutex<VirtIOBlk<'static>>);

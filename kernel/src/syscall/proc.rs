@@ -13,6 +13,7 @@ impl Syscall<'_> {
         Ok(pid)
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn sys_vfork(&mut self) -> SysResult {
         self.sys_fork()
     }

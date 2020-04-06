@@ -2,7 +2,6 @@ use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use log::*;
 use smoltcp::phy::{self, DeviceCapabilities};
 use smoltcp::time::Instant;
 use smoltcp::wire::{EthernetAddress, Ipv4Address};
@@ -10,7 +9,6 @@ use smoltcp::Result;
 use virtio_drivers::{VirtIOHeader, VirtIONet};
 
 use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS};
-use crate::memory::phys_to_virt;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 #[derive(Clone)]
@@ -51,7 +49,7 @@ impl phy::Device<'_> for VirtIONetDriver {
     type TxToken = VirtIONetDriver;
 
     fn receive(&mut self) -> Option<(Self::RxToken, Self::TxToken)> {
-        let mut net = self.0.lock();
+        let net = self.0.lock();
         if net.can_recv() {
             Some((self.clone(), self.clone()))
         } else {
@@ -60,7 +58,7 @@ impl phy::Device<'_> for VirtIONetDriver {
     }
 
     fn transmit(&mut self) -> Option<Self::TxToken> {
-        let mut net = self.0.lock();
+        let net = self.0.lock();
         if net.can_send() {
             Some(self.clone())
         } else {

@@ -1,7 +1,5 @@
-use crate::consts::KERNEL_OFFSET;
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo};
 use crate::memory::phys_to_virt;
-use core::mem::zeroed;
 use rboot::BootInfo;
 
 pub fn init_driver(boot_info: &BootInfo) {
@@ -17,7 +15,7 @@ pub fn init_driver(boot_info: &BootInfo) {
         xoffset: 0,
         yoffset: 0,
         depth: ColorDepth::ColorDepth32,
-        format: fb::ColorFormat::RGBA8888,
+        format: ColorFormat::RGBA8888,
         paddr: info.fb_addr as usize,
         vaddr: phys_to_virt(info.fb_addr as usize),
         screen_size: info.fb_size as usize,

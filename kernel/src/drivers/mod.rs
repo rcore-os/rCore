@@ -14,6 +14,7 @@ pub mod block;
 #[allow(dead_code)]
 pub mod bus;
 pub mod console;
+#[allow(dead_code)]
 mod device_tree;
 #[allow(dead_code)]
 pub mod gpu;

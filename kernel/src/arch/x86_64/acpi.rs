@@ -18,7 +18,7 @@ impl AcpiHandler for Handler {
         }
     }
 
-    fn unmap_physical_region<T>(&mut self, region: PhysicalMapping<T>) {
+    fn unmap_physical_region<T>(&mut self, _region: PhysicalMapping<T>) {
         // do nothing
     }
 }

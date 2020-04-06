@@ -29,7 +29,7 @@ impl INode for Fbdev {
             offset,
             buf.len()
         );
-        if let Some(mut fb) = FRAME_BUFFER.write().as_mut() {
+        if let Some(fb) = FRAME_BUFFER.write().as_mut() {
             let count = fb.write_at(offset, buf);
             if count == buf.len() {
                 Ok(count)
@@ -119,6 +119,7 @@ impl INode for Fbdev {
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum FbType {
     /// Packed Pixels
@@ -136,6 +137,7 @@ enum FbType {
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum FbVisual {
     /// Monochr. 1=Black 0=White

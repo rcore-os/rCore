@@ -406,7 +406,7 @@ impl Syscall<'_> {
             SYS_PIPE => {
                 let fd_ptr = args[0] as *mut u32;
                 match self.sys_pipe(fd_ptr) {
-                    Ok(code) => {
+                    Ok(_code) => {
                         unsafe {
                             self.tf.v0 = *fd_ptr as usize;
                             self.tf.v1 = *(fd_ptr.add(1)) as usize;

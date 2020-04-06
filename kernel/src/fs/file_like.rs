@@ -22,7 +22,7 @@ impl FileLike {
         let len = match self {
             FileLike::File(file) => file.read(buf)?,
             FileLike::Socket(socket) => socket.read(buf).0?,
-            FileLike::EpollInstance(instance) => {
+            FileLike::EpollInstance(_) => {
                 return Err(SysError::ENOSYS);
             }
         };
@@ -32,7 +32,7 @@ impl FileLike {
         let len = match self {
             FileLike::File(file) => file.write(buf)?,
             FileLike::Socket(socket) => socket.write(buf, None)?,
-            FileLike::EpollInstance(instance) => {
+            FileLike::EpollInstance(_) => {
                 return Err(SysError::ENOSYS);
             }
         };
@@ -49,7 +49,7 @@ impl FileLike {
                     FileLike::Socket(socket) => {
                         socket.ioctl(request, arg1, arg2, arg3)?;
                     }
-                    FileLike::EpollInstance(instance) => {
+                    FileLike::EpollInstance(_) => {
                         return Err(SysError::ENOSYS);
                     }
                 }
@@ -71,7 +71,7 @@ impl FileLike {
                 let (read, write, error) = socket.poll();
                 PollStatus { read, write, error }
             }
-            FileLike::EpollInstance(instance) => {
+            FileLike::EpollInstance(_) => {
                 return Err(SysError::ENOSYS);
             }
         };
@@ -80,10 +80,10 @@ impl FileLike {
     pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {
         match self {
             FileLike::File(file) => file.fcntl(cmd, arg)?,
-            FileLike::Socket(socket) => {
+            FileLike::Socket(_) => {
                 //TODO
             }
-            FileLike::EpollInstance(instance) => {}
+            FileLike::EpollInstance(_) => {}
         }
         Ok(0)
     }
@@ -94,7 +94,7 @@ impl fmt::Debug for FileLike {
         match self {
             FileLike::File(file) => write!(f, "File({:?})", file),
             FileLike::Socket(socket) => write!(f, "Socket({:?})", socket),
-            FileLike::EpollInstance(instance) => write!(f, "EpollInstance()"),
+            FileLike::EpollInstance(_) => write!(f, "EpollInstance()"),
         }
     }
 }

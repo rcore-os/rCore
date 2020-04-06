@@ -25,6 +25,7 @@ use crate::process::thread_manager;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 
+#[allow(dead_code)]
 pub struct Thread {
     context: Context,
     kstack: KernelStack,
@@ -102,10 +103,11 @@ impl rcore_thread::Context for Thread {
 impl Thread {
     /// Make a struct for the init thread
     pub unsafe fn new_init() -> Box<Thread> {
+        let zero = MaybeUninit::<Thread>::zeroed();
         Box::new(Thread {
             context: Context::null(),
             // safety: other fields will never be used
-            ..core::mem::MaybeUninit::zeroed().assume_init()
+            ..zero.assume_init()
         })
     }
 
@@ -143,8 +145,8 @@ impl Thread {
     /// Return `(MemorySet, entry_point, ustack_top)`
     pub fn new_user_vm(
         inode: &Arc<dyn INode>,
-        exec_path: &str,
-        mut args: Vec<String>,
+        _exec_path: &str,
+        args: Vec<String>,
         envs: Vec<String>,
     ) -> Result<(MemorySet, usize, usize), &'static str> {
         // Read ELF header
@@ -385,12 +387,7 @@ impl Process {
         let mut process_table = PROCESSES.write();
 
         // assign pid
-        let pid = (0..)
-            .find(|i| match process_table.get(i) {
-                Some(p) => false,
-                _ => true,
-            })
-            .unwrap();
+        let pid = (0..).find(|i| process_table.get(i).is_none()).unwrap();
         self.pid = Pid(pid);
 
         // put to process table

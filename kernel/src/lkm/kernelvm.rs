@@ -1,14 +1,10 @@
 // Simple kernel memory set for kernel virtual memory
 use crate::arch::paging::PageTableImpl;
-use crate::consts::*;
 use crate::memory::GlobalFrameAlloc;
 use crate::sync::SpinLock as Mutex;
 use alloc::vec::*;
-use buddy_system_allocator::*;
-use core::alloc::Layout;
 use core::mem::ManuallyDrop;
 use core::ops::DerefMut;
-use core::ptr::NonNull;
 use lazy_static::lazy_static;
 use rcore_memory::memory_set::handler::{ByFrame, MemoryHandler};
 use rcore_memory::memory_set::MemoryAttr;
@@ -38,14 +34,14 @@ impl MemorySpaceManager for LinearManager {
         LinearManager { last_page: 0 }
     }
     fn alloc(&mut self, size: usize) -> Option<(usize, usize)> {
-        let mut required_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+        let required_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
         let current = self.last_page * PAGE_SIZE + KSEG2_START;
         self.last_page += required_pages;
         Some((current, required_pages * PAGE_SIZE))
     }
 
-    fn free(&mut self, (addr, size): (usize, usize)) {
+    fn free(&mut self, (_addr, _size): (usize, usize)) {
         //Do nothing.
     }
 }
@@ -99,7 +95,7 @@ impl VirtualSpace {
 
 impl Drop for VirtualSpace {
     fn drop(&mut self) {
-        for mut v in self.areas.iter_mut() {
+        for v in self.areas.iter_mut() {
             v.unmap(self.allocator, &mut self.page_allocator);
         }
     }
@@ -108,7 +104,7 @@ impl Drop for VirtualSpace {
 pub struct VirtualArea {
     start: usize,
     end: usize,
-    attr: MemoryAttr,
+    _attr: MemoryAttr,
 }
 
 impl VirtualArea {
@@ -119,7 +115,7 @@ impl VirtualArea {
         parent: &mut VirtualSpace,
     ) -> VirtualArea {
         let aligned_start_addr = page_addr - page_addr % PAGE_SIZE;
-        let mut aligned_end = (page_addr + size + PAGE_SIZE - 1);
+        let mut aligned_end = page_addr + size + PAGE_SIZE - 1;
         aligned_end = aligned_end - aligned_end % PAGE_SIZE;
         let lock = parent.allocator.lock();
         let mut active_pt = lock.kernel_table();
@@ -132,7 +128,7 @@ impl VirtualArea {
         VirtualArea {
             start: aligned_start_addr,
             end: aligned_end,
-            attr: attr.clone(),
+            _attr: attr.clone(),
         }
     }
     pub fn unmap(&mut self, allocator: &LockedVMM, parent: &mut ByFrame<GlobalFrameAlloc>) {
