@@ -17,9 +17,6 @@
 //!     完全照搬`std::sync::Semaphore`，std中已经废弃。
 //!     貌似在Rust中并不常用，一般都用`Mutex`。
 //!
-//! * `mpsc`: 消息传递通道。
-//!     多生产者-单消费者的FIFO队列。用于在线程间传递数据。
-//!
 //! * `test`: 测试。
 //!     目前分别用`Mutex`和`Condvar`(Monitor)实现了哲学家就餐问题。
 //!
@@ -55,7 +52,6 @@ pub use self::mutex::*;
 pub use self::semaphore::*;
 
 mod condvar;
-pub mod mpsc;
 mod mutex;
 mod semaphore;
 pub mod test;
