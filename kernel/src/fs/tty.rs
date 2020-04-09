@@ -26,7 +26,6 @@ impl INode for TtyINode {
             error: false,
         })
     }
-    fn as_any_ref(&self) -> &dyn Any { self }
 
     /// Get metadata of the INode
     fn metadata(&self) -> Result<Metadata> {
@@ -47,4 +46,6 @@ impl INode for TtyINode {
             rdev: make_rdev(5, 0),
         })
     }
+
+    fn as_any_ref(&self) -> &dyn Any { self }
 }

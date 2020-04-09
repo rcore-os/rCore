@@ -1,12 +1,11 @@
 //! Implement INode for Stdin & Stdout
 
-use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use core::any::Any;
 
 use rcore_fs::vfs::*;
 
-use super::ioctl::*;
-use crate::process::Process;
+use crate::fs::ioctl::*;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 
@@ -55,7 +54,7 @@ lazy_static! {
 }
 
 impl INode for Stdin {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         if self.can_read() {
             buf[0] = self.pop() as u8;
             Ok(1)

@@ -1,14 +1,13 @@
 //! Implement INode for RandomINode
 
-use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc};
+use alloc::sync::Arc;
 use core::any::Any;
 
 use rcore_fs::vfs::*;
 
-use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-pub struct RandomINodeData {
+struct RandomINodeData {
     seed: u32,
 }
 

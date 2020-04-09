@@ -18,7 +18,7 @@ pub fn halt() {
     unsafe { riscv::asm::wfi() }
 }
 
-pub unsafe fn exit_in_qemu(error_code: u8) -> ! {
+pub unsafe fn exit_in_qemu(_error_code: u8) -> ! {
     super::sbi::shutdown()
 }
 

@@ -1,12 +1,11 @@
 use crate::sync::Semaphore;
-use crate::sync::SpinLock as Mutex;
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc, sync::Weak, vec::Vec};
 use core::ops::Index;
 use spin::RwLock;
 
 /// A System V semaphore set
 pub struct SemArray {
-    key: usize,
+    _key: usize,
     sems: Vec<Semaphore>,
 }
 
@@ -35,12 +34,12 @@ impl SemArray {
         }
         // not found, create one
         let mut semaphores = Vec::new();
-        for i in 0..nsems {
+        for _ in 0..nsems {
             semaphores.push(Semaphore::new(0));
         }
         // insert to global map
         let array = Arc::new(SemArray {
-            key,
+            _key: key,
             sems: semaphores,
         });
         key2sem.insert(key, Arc::downgrade(&array));

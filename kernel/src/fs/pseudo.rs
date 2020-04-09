@@ -1,6 +1,6 @@
 //! Pseudo file system INode
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use core::any::Any;
 
 use rcore_fs::vfs::*;
@@ -50,7 +50,7 @@ impl INode for Pseudo {
             ctime: Timespec { sec: 0, nsec: 0 },
             type_: self.type_,
             mode: 0,
-            nlinks: 0,
+            nlinks: 1,
             uid: 0,
             gid: 0,
             rdev: 0,

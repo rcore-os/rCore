@@ -1,14 +1,17 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use rcore_fs::dev::block_cache::BlockCache;
 use rcore_fs::vfs::*;
-use rcore_fs_devfs::{special::*, DevFS};
+use rcore_fs_devfs::{
+    special::{NullINode, ZeroINode},
+    DevFS,
+};
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sfs::SimpleFileSystem;
 
-use crate::drivers::BlockDriver;
+use self::devfs::{Fbdev, RandomINode};
 
+pub use self::devfs::{STDIN, STDOUT};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -18,6 +21,7 @@ pub use self::stdio::{STDIN, STDOUT};
 pub use self::vga::*;
 pub use self::tty::TtyINode;
 
+mod devfs;
 mod device;
 pub mod epoll;
 mod file;
@@ -52,6 +56,8 @@ lazy_static! {
         let device = {
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
             {
+                use crate::drivers::BlockDriver;
+                use rcore_fs::dev::block_cache::BlockCache;
                 let driver = BlockDriver(
                     crate::drivers::BLK_DRIVERS
                         .read().iter()
@@ -89,6 +95,7 @@ lazy_static! {
         devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/random");
         devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/urandom");
         devfs.add("tty", Arc::new(TtyINode::default())).expect("failed to mknod /dev/tty");
+        devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
 
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {

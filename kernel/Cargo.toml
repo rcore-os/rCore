@@ -55,7 +55,7 @@ bitflags = "1.2"
 bit_field = "0.10"
 volatile = "0.2"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
-buddy_system_allocator = "0.3"
+buddy_system_allocator = "0.3.9"
 pci = { git = "https://github.com/rcore-os/pci-rs" }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
@@ -66,11 +66,11 @@ bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "d727949b" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
-rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
-rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
-rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "e17b27b" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "7f5eeac" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "7f5eeac" }
+rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "7f5eeac" }
+rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "7f5eeac" }
+rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "7f5eeac" }
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 
 

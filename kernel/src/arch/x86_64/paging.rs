@@ -1,7 +1,6 @@
 use super::consts::*;
 use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
 use core::mem::ManuallyDrop;
-use core::sync::atomic::Ordering;
 use log::*;
 use rcore_memory::paging::*;
 use x86_64::instructions::tlb;
@@ -284,11 +283,11 @@ impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
 }
 
 /// Flush TLB for `vaddr` on all CPU
-fn flush_tlb_all(vaddr: usize) {
+fn flush_tlb_all(_vaddr: usize) {
     // FIXME: too slow, disable now.
     return;
-    if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
-        return;
-    }
-    super::ipi::invoke_on_allcpu(move || tlb::flush(VirtAddr::new(vaddr as u64)), false);
+    // if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
+    //     return;
+    // }
+    // super::ipi::invoke_on_allcpu(move || tlb::flush(VirtAddr::new(vaddr as u64)), false);
 }

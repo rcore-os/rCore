@@ -9,7 +9,6 @@ pub mod rand;
 pub mod syscall;
 pub mod timer;
 
-use log::*;
 use mips::registers::cp0;
 
 #[cfg(feature = "board_malta")]
@@ -62,12 +61,14 @@ pub extern "C" fn rust_main() -> ! {
     crate::kmain();
 }
 
+/*
 fn others_main() -> ! {
     interrupt::init();
     memory::init_other();
     timer::init();
     crate::kmain();
 }
+*/
 
 const BOOT_CPU_ID: u32 = 0;
 

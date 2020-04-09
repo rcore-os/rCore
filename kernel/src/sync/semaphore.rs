@@ -64,7 +64,7 @@ impl Semaphore {
 
     /// Get the current count
     pub fn get(&self) -> isize {
-        let mut count = self.lock.lock();
+        let count = self.lock.lock();
         *count
     }
 

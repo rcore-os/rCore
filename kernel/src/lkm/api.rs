@@ -1,7 +1,5 @@
 use super::*;
-use crate::lkm::manager::ModuleManager;
 use crate::lkm::structs::LoadedModule;
-use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::alloc::{GlobalAlloc, Layout};
@@ -10,7 +8,7 @@ use core::slice::from_raw_parts;
 pub fn get_module(this_module: usize) -> &'static mut LoadedModule {
     unsafe {
         let ptr = this_module as *mut LoadedModule;
-        &mut (*ptr) as (&'static mut LoadedModule)
+        &mut (*ptr) as &'static mut LoadedModule
     }
 }
 
@@ -81,6 +79,6 @@ pub extern "C" fn lkm_api_add_kernel_symbols(start: usize, end: usize) {
     let symbols = unsafe { from_utf8(from_raw_parts(start as *const u8, length)) }.unwrap();
     let global_lkmm = &LKM_MANAGER;
     let mut locked_lkmm = global_lkmm.lock();
-    let mut lkmm = locked_lkmm.as_mut().unwrap();
+    let lkmm = locked_lkmm.as_mut().unwrap();
     lkmm.init_kernel_symbols(symbols);
 }

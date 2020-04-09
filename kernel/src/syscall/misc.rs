@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::*;
 use crate::arch::cpu;
 use crate::consts::USER_STACK_SIZE;

@@ -1,6 +1,6 @@
 use super::*;
+use crate::process::thread_manager;
 use crate::process::Process;
-use crate::process::{current_thread, thread_manager};
 use crate::thread;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
@@ -44,7 +44,7 @@ impl Condvar {
     }
 
     /// Wait for condvar until condition() returns Some
-    pub fn wait_event<T>(condvar: &Condvar, mut condition: impl FnMut() -> Option<T>) -> T {
+    pub fn wait_event<T>(condvar: &Condvar, condition: impl FnMut() -> Option<T>) -> T {
         Self::wait_events(&[condvar], condition)
     }
 
@@ -60,7 +60,7 @@ impl Condvar {
         let mut locks = Vec::with_capacity(condvars.len());
         loop {
             for condvar in condvars {
-                let mut lock = condvar.wait_queue.lock();
+                let lock = condvar.wait_queue.lock();
                 locks.push(lock);
             }
             thread_manager().sleep(tid, 0);
@@ -162,13 +162,13 @@ impl Condvar {
         let epoll_list = self.epoll_queue.lock();
         for ist in epoll_list.iter() {
             if thread.id() == ist.tid {
-                let mut proc = ist.proc.lock();
+                let proc = ist.proc.lock();
                 match proc.get_epoll_instance(ist.epfd) {
                     Ok(instacne) => {
-                        let mut readylist = instacne.readyList.lock();
-                        readylist.insert(ist.fd);
+                        let mut ready_list = instacne.ready_list.lock();
+                        ready_list.insert(ist.fd);
                     }
-                    Err(r) => {
+                    Err(_) => {
                         panic!("epoll instance not exist");
                     }
                 }

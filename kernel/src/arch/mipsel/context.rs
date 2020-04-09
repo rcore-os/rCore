@@ -1,5 +1,5 @@
 use mips::registers::cp0;
-use mips::tlb;
+use mips::tlb::TLBEntry;
 
 /// Saved registers on a trap.
 #[derive(Clone)]
@@ -238,7 +238,7 @@ impl Context {
             fn switch_context(src: *mut Context, dst: *mut Context);
         }
 
-        tlb::clear_all_tlb();
+        TLBEntry::clear_all();
         switch_context(self as *mut Context, target as *mut Context);
     }
 

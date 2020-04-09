@@ -1,7 +1,6 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use log::*;
 use virtio_drivers::{VirtIOGpu, VirtIOHeader};
 
 use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER};

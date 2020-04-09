@@ -2,9 +2,8 @@
 
 use alloc::string::String;
 use core::fmt;
-use lazy_static::lazy_static;
 use log::*;
-use spin::Mutex;
+use spin::RwLock;
 
 /// Framebuffer information
 #[repr(C)]
@@ -195,23 +194,48 @@ impl Framebuffer {
         }
     }
 
-    /// Copy buffer `[src_off .. src_off + size]` to `[dst_off .. dst_off + size]`.
-    /// `dst_off`, `src_off` and `size` must be aligned with `usize`.
-    pub fn copy(&mut self, dst_off: usize, src_off: usize, size: usize) {
-        const USIZE: usize = core::mem::size_of::<usize>();
-        let mut dst = self.base_addr() + dst_off;
-        let mut src = self.base_addr() + src_off;
-        let src_end = src + size;
-        while src < src_end {
-            unsafe { *(dst as *mut usize) = *(src as *mut usize) }
-            dst += USIZE;
-            src += USIZE;
+    /// Read buffer data starts at `offset` to `buf`.
+    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        if offset >= self.fb_info.screen_size {
+            return 0;
         }
+        let count = buf.len().min(self.fb_info.screen_size - offset);
+        let data = unsafe {
+            core::slice::from_raw_parts((self.buf.base_addr + offset) as *const u8, count)
+        };
+        buf[..count].copy_from_slice(&data);
+        count
     }
 
-    /// Fill buffer `[offset .. offset + size]` with `pixel`.
-    /// `offset` and `size` must be aligned with `usize`.
-    pub fn fill(&mut self, offset: usize, size: usize, pixel: u32) {
+    /// Write buffer data starts at `offset` to `buf`.
+    pub fn write_at(&mut self, offset: usize, buf: &[u8]) -> usize {
+        if offset > self.fb_info.screen_size {
+            return 0;
+        }
+        let count = buf.len().min(self.fb_info.screen_size - offset);
+        let data = unsafe {
+            core::slice::from_raw_parts_mut((self.buf.base_addr + offset) as *mut u8, count)
+        };
+        data.copy_from_slice(&buf[..count]);
+        count
+    }
+
+    /// Copy buffer `[src_off .. src_off + count]` to `[dst_off .. dst_off + count]`.
+    pub fn copy(&mut self, dst_off: usize, src_off: usize, count: usize) {
+        let size = self.fb_info.screen_size;
+        if src_off >= size || dst_off >= size {
+            return;
+        }
+        let count = count.min(size - src_off).min(size - dst_off);
+        unsafe {
+            let buf = core::slice::from_raw_parts_mut(self.buf.base_addr as *mut u8, size);
+            buf.copy_within(src_off..src_off + count, dst_off)
+        };
+    }
+
+    /// Fill buffer `[offset .. offset + count]` with `pixel`.
+    /// `offset` and `count` must be aligned with `usize`.
+    pub fn fill(&mut self, offset: usize, count: usize, pixel: u32) {
         const USIZE: usize = core::mem::size_of::<usize>();
         let mut value: usize = 0;
         let depth = self.fb_info.depth as usize;
@@ -222,8 +246,13 @@ impl Framebuffer {
             value += pixel as usize & mask;
         }
 
+        let offset = offset & !(USIZE - 1);
+        if offset >= self.fb_info.screen_size {
+            return;
+        }
+        let count = (count & !(USIZE - 1)).min(self.fb_info.screen_size - offset);
         let mut start = self.base_addr() + offset;
-        let end = start + size;
+        let end = start + count;
         while start < end {
             unsafe { *(start as *mut usize) = value }
             start += USIZE;
@@ -280,7 +309,7 @@ impl ColorEncode for Rgb888 {
     }
 }
 
-pub static FRAME_BUFFER: Mutex<Option<Framebuffer>> = Mutex::new(None);
+pub static FRAME_BUFFER: RwLock<Option<Framebuffer>> = RwLock::new(None);
 
 /// Initialize framebuffer
 ///
@@ -288,5 +317,5 @@ pub static FRAME_BUFFER: Mutex<Option<Framebuffer>> = Mutex::new(None);
 pub fn init(info: FramebufferInfo) {
     let fb = Framebuffer::new(info);
     info!("framebuffer: init end\n{:#x?}", fb);
-    *FRAME_BUFFER.lock() = Some(fb);
+    *FRAME_BUFFER.write() = Some(fb);
 }
