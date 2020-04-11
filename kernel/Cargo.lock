@@ -369,7 +369,7 @@ dependencies = [
  "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
  "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
  "rcore-memory 0.1.0",
- "rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)",
+ "rcore-thread 0.1.0 (git+https://github.com/function2-llx/rcore-thread?rev=8c1022d)",
  "riscv 0.5.0 (git+https://github.com/rcore-os/riscv)",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "smoltcp 0.5.0 (git+https://github.com/rcore-os/smoltcp?rev=5bd87c7c)",
@@ -453,7 +453,7 @@ dependencies = [
 [[package]]
 name = "rcore-thread"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-thread?rev=d727949b#d727949b8ea20c2e3a94f8ba015652c9eff8b53c"
+source = "git+https://github.com/function2-llx/rcore-thread?rev=8c1022d#8c1022d95ce5868efa5d9fa93c8c098317df0714"
 dependencies = [
  "deque 0.3.2 (git+https://github.com/rcore-os/deque.git?branch=no_std)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -763,7 +763,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
 "checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
 "checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
-"checksum rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)" = "<none>"
+"checksum rcore-thread 0.1.0 (git+https://github.com/function2-llx/rcore-thread?rev=8c1022d)" = "<none>"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
 "checksum riscv 0.5.0 (git+https://github.com/rcore-os/riscv)" = "<none>"

@@ -11,15 +11,11 @@ use rcore_fs_sfs::SimpleFileSystem;
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{STDIN, STDOUT};
+pub use self::devfs::{STDIN, STDOUT, TtyINode};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::pseudo::*;
-pub use self::random::*;
-pub use self::stdio::{STDIN, STDOUT};
-pub use self::vga::*;
-pub use self::tty::TtyINode;
 
 mod devfs;
 mod device;
@@ -27,12 +23,9 @@ pub mod epoll;
 mod file;
 mod file_like;
 mod ioctl;
+pub mod fcntl;
 mod pipe;
 mod pseudo;
-mod random;
-mod stdio;
-pub mod vga;
-pub mod tty;
 
 // Hard link user programs
 #[cfg(feature = "link_user")]

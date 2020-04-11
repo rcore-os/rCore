@@ -2,20 +2,22 @@
 
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
-use crate::syscall::MmapProt;
-use crate::thread;
+use crate::syscall::{MmapProt, SysResult};
+use crate::{thread, processor};
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
 use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
 use rcore_memory::memory_set::handler::File;
+use rcore_fs::vfs::FsError::NotSupported;
 
 #[derive(Clone)]
 pub struct FileHandle {
     inode: Arc<dyn INode>,
     offset: u64,
-    options: OpenOptions,
+    pub options: OpenOptions,
     pub path: String,
+    pub fd_cloexec: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +43,7 @@ impl FileHandle {
             offset: 0,
             options,
             path,
+            fd_cloexec: false,
         };
     }
 
@@ -173,12 +176,32 @@ impl FileHandle {
         self.inode.clone()
     }
 
-    pub fn fcntl(&mut self, cmd: usize, arg: usize) -> Result<()> {
-        if arg & 0x800 > 0 && cmd == 4 {
-            self.options.nonblock = true;
-        }
-        Ok(())
-    }
+    // pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {
+    //     use super::fcntl::*;
+    //     match cmd {
+    //         F_SETFD => {
+    //             self.fd_cloexec = (arg & 1) as bool;
+    //             Ok(0)
+    //         }
+    //         F_GETFD => {
+    //             Ok(self.fd_cloexec as usize)
+    //         }
+    //         F_SETFL => {
+    //             if arg & 0x800 > 0 {
+    //                 self.options.nonblock = true;
+    //             }
+    //             Ok(0)
+    //         }
+    //         F_DUPFD_CLOEXEC => {
+    //             info!("dupfd_cloexec: arg: {:#x}", arg);
+    //             let proc = self
+    //             Ok(0)
+    //         }
+    //         _ => {
+    //             Ok(0)
+    //         }
+    //     }
+    // }
 }
 
 impl fmt::Debug for FileHandle {

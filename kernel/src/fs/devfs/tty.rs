@@ -1,7 +1,7 @@
 use rcore_fs::vfs::*;
 use core::any::Any;
 
-pub use super::stdio::{STDIN, STDOUT};
+pub use super::{STDIN, STDOUT};
 
 /// Ref: [https://linux.die.net/man/4/tty]
 #[derive(Default)]

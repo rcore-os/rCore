@@ -399,6 +399,11 @@ impl Process {
     fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
     }
+
+    // get the lowest available fd great than or equal to arg
+    pub fn get_free_fd_from(&self, arg: usize) -> usize {
+        (arg..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
     /// Add a file to the process, return its fd.
     pub fn add_file(&mut self, file_like: FileLike) -> usize {
         let fd = self.get_free_fd();

@@ -142,7 +142,7 @@ impl Syscall<'_> {
             SYS_FCHOWN => self.unimplemented("fchown", Ok(0)),
             SYS_FCHOWNAT => self.unimplemented("fchownat", Ok(0)),
             SYS_FACCESSAT => self.sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
-            SYS_DUP3 => self.sys_dup2(args[0], args[1]), // TODO: handle `flags`
+            SYS_DUP3 => self.sys_dup3(args[0], args[1], args[2]),
             SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
             SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
             SYS_COPY_FILE_RANGE => self.sys_copy_file_range(

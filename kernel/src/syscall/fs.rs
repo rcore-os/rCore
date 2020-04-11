@@ -20,6 +20,7 @@ use super::*;
 use crate::fs::epoll::EpollInstance;
 use crate::process::Process;
 use rcore_fs::vfs::PollStatus;
+use crate::fs::FileLike;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -31,10 +32,10 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.read(slice)?;
-        if !proc.pid.is_init() {
-            // we trust pid 0 process
-            info!("read result: {:?}", slice);
-        }
+        // if !proc.pid.is_init() {
+        //     // we trust pid 0 process
+        //     info!("read result: {:?}", slice);
+        // }
         Ok(len)
     }
 
@@ -777,9 +778,32 @@ impl Syscall<'_> {
         // close fd2 first if it is opened
         proc.files.remove(&fd2);
 
-        let file_like = proc.get_file_like(fd1)?.clone();
+        let mut file_like = proc.get_file_like(fd1)?.clone();
+        if let FileLike::File(file) = &mut file_like {
+            // The two file descriptors do not share file descriptor flags (the
+            // close-on-exec flag).
+            file.fd_cloexec = false;
+        }
         proc.files.insert(fd2, file_like);
         Ok(fd2)
+    }
+
+    // TODO: handle `flags`
+    pub fn sys_dup3(&mut self, fd1: usize, fd2: usize, flags: usize) -> SysResult {
+        info!("dup3: from {} to {}", fd1, fd2);
+        self.sys_dup2(fd1, fd2)
+        // let mut proc = self.process();
+        // // close fd2 first if it is opened
+        // proc.files.remove(&fd2);
+        //
+        // let mut file_like = proc.get_file_like(fd1)?.clone();
+        // if let FileLike::File(file) = &mut file_like {
+        //     // The two file descriptors do not share file descriptor flags (the
+        //     // close-on-exec flag).
+        //     file.fd_cloexec = false;
+        // }
+        // proc.files.insert(fd2, file_like);
+        // Ok(fd2)
     }
 
     pub fn sys_ioctl(
@@ -1102,7 +1126,43 @@ impl Syscall<'_> {
         info!("fcntl: fd: {}, cmd: {:#x}, arg: {}", fd, cmd, arg);
         let mut proc = self.process();
         let file_like = proc.get_file_like(fd)?;
-        file_like.fcntl(cmd, arg)
+        match file_like {
+            FileLike::File(file) => {
+                use crate::fs::fcntl::*;
+                match cmd {
+                    F_SETFD => {
+                        file.fd_cloexec = (arg & 1) != 0;
+                        Ok(0)
+                    }
+                    F_GETFD => {
+                        Ok(file.fd_cloexec as usize)
+                    }
+                    F_SETFL => {
+                        if arg & 0x800 > 0 {
+                            file.options.nonblock = true;
+                        }
+                        Ok(0)
+                    }
+                    F_DUPFD_CLOEXEC => {
+                        info!("dupfd_cloexec: arg: {:#x}", arg);
+                        // let file_like = proc.get_file_like(fd1)?.clone();
+                        let new_fd = proc.get_free_fd_from(arg);
+                        core::mem::drop(proc);
+                        self.sys_dup3(fd, new_fd, 1)
+                    }
+                    _ => {
+                        Ok(0)
+                    }
+                }
+            }
+            FileLike::Socket(_) => {
+                Ok(0)
+                //TODO
+            }
+            FileLike::EpollInstance(_) => {
+                Ok(0)
+            }
+        }
     }
 }
 
