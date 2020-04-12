@@ -11,13 +11,27 @@ use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Re
 use rcore_memory::memory_set::handler::File;
 use rcore_fs::vfs::FsError::NotSupported;
 
-#[derive(Clone)]
+use crate::sync::SpinLock as Mutex;
+
 pub struct FileHandle {
     inode: Arc<dyn INode>,
-    offset: u64,
+    offset: Arc<Mutex<u64>>,
     pub options: OpenOptions,
     pub path: String,
     pub fd_cloexec: bool,
+}
+
+impl Clone for FileHandle {
+    // do not share offset
+    fn clone(&self) -> Self {
+        FileHandle {
+            inode: self.inode.clone(),
+            offset: Arc::new(Mutex::new(*self.offset.lock())),
+            options: self.options.clone(),
+            path: self.path.clone(),
+            fd_cloexec: self.fd_cloexec,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,16 +54,29 @@ impl FileHandle {
     pub fn new(inode: Arc<dyn INode>, options: OpenOptions, path: String) -> Self {
         return FileHandle {
             inode,
-            offset: 0,
+            offset: Arc::new(Mutex::new(0)),
             options,
             path,
             fd_cloexec: false,
         };
     }
 
+    // do as default clone does, share the offset
+    pub fn dup(&self) -> Self {
+        FileHandle {
+            inode: self.inode.clone(),
+            offset: self.offset.clone(),
+            options: self.options.clone(),
+            path: self.path.clone(),
+            fd_cloexec: self.fd_cloexec,
+        }
+    }
+
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let len = self.read_at(self.offset as usize, buf)?;
-        self.offset += len as u64;
+        // let mut offset_inner = self.offset.lock();
+        let offset = *self.offset.lock() as usize;
+        let len = self.read_at(offset, buf)?;
+        *self.offset.lock() += len as u64;
         Ok(len)
     }
 
@@ -81,10 +108,10 @@ impl FileHandle {
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let offset = match self.options.append {
             true => self.inode.metadata()?.size as u64,
-            false => self.offset,
+            false => *self.offset.lock(),
         } as usize;
         let len = self.write_at(offset, buf)?;
-        self.offset = (offset + len) as u64;
+        *self.offset.lock() += len as u64;
         Ok(len)
     }
 
@@ -97,12 +124,13 @@ impl FileHandle {
     }
 
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        self.offset = match pos {
+        let mut offset_inner = self.offset.lock();
+        *offset_inner = match pos {
             SeekFrom::Start(offset) => offset,
             SeekFrom::End(offset) => (self.inode.metadata()?.size as i64 + offset) as u64,
-            SeekFrom::Current(offset) => (self.offset as i64 + offset) as u64,
+            SeekFrom::Current(offset) => (*offset_inner as i64 + offset) as u64,
         };
-        Ok(self.offset)
+        Ok(*offset_inner)
     }
 
     pub fn set_len(&mut self, len: u64) -> Result<()> {
@@ -133,8 +161,9 @@ impl FileHandle {
         if !self.options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        let name = self.inode.get_entry(self.offset as usize)?;
-        self.offset += 1;
+        let mut offset_inner = self.offset.lock();
+        let name = self.inode.get_entry(*offset_inner as usize)?;
+        *offset_inner += 1;
         Ok(name)
     }
 

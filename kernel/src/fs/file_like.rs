@@ -18,6 +18,15 @@ pub enum FileLike {
 }
 
 impl FileLike {
+    pub fn dup(&self) -> FileLike {
+        use FileLike::File;
+        if let File(file) = self {
+            File(file.dup())
+        } else {
+            self.clone()
+        }
+    }
+
     pub fn read(&mut self, buf: &mut [u8]) -> SysResult {
         let len = match self {
             FileLike::File(file) => file.read(buf)?,

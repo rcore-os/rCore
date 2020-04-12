@@ -41,10 +41,10 @@ impl Syscall<'_> {
 
     pub fn sys_write(&mut self, fd: usize, base: *const u8, len: usize) -> SysResult {
         let mut proc = self.process();
-        if !proc.pid.is_init() {
-            // we trust pid 0 process
-            info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
-        }
+        // if !proc.pid.is_init() {
+        //     we trust pid 0 process
+        info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+        // }
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
@@ -778,7 +778,7 @@ impl Syscall<'_> {
         // close fd2 first if it is opened
         proc.files.remove(&fd2);
 
-        let mut file_like = proc.get_file_like(fd1)?.clone();
+        let mut file_like = proc.get_file_like(fd1)?.dup();
         if let FileLike::File(file) = &mut file_like {
             // The two file descriptors do not share file descriptor flags (the
             // close-on-exec flag).
