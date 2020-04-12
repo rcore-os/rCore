@@ -85,6 +85,7 @@ impl Syscall<'_> {
         };
         loop {
             let mut proc = self.process();
+            debug!("exit codes: {:?}", proc.child_exit_code);
             // check child_exit_code
             let find = match target {
                 WaitFor::AnyChild | WaitFor::AnyChildInGroup => proc

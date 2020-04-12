@@ -33,6 +33,7 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
+use rcore_thread::std_thread::yield_now;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;

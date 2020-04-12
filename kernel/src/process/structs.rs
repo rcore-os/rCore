@@ -24,6 +24,7 @@ use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
+use rcore_thread::std_thread::yield_now;
 
 #[allow(dead_code)]
 pub struct Thread {
@@ -420,16 +421,37 @@ impl Process {
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {
+        // avoid some strange dead lock
+        // self.files.clear(); this does not work sometime, for unknown reason
+        // manually drop
+        let fds = self.files.iter().map(|(fd, _)| *fd ).collect::<Vec<_>>();
+        for fd in fds.iter() {
+            let file = self.files.remove(fd).unwrap();
+            drop(file);
+        }
+
+        // notify parent and fill exit code
+        if let Some(parent) = self.parent.upgrade() {
+            // spinlock between process is error-prone?
+            // busy waiting
+            loop {
+                if let Some(mut parent) = parent.try_lock() {
+                    parent.child_exit_code.insert(self.pid.get(), exit_code);
+                    parent.child_exit.notify_one();
+                    break;
+                } else {
+                    yield_now();
+                }
+            }
+        }
+
         // quit all threads
+        // this must be after setting the value of subprocess, or the threads will be treated exit before actually exits
         for tid in self.threads.iter() {
             thread_manager().exit(*tid, 1);
         }
-        // notify parent and fill exit code
-        if let Some(parent) = self.parent.upgrade() {
-            let mut parent = parent.lock();
-            parent.child_exit_code.insert(self.pid.get(), exit_code);
-            parent.child_exit.notify_one();
-        }
+
+        info!("process {} exist with {}", self.pid.get(), exit_code);
     }
 }
 

@@ -7,6 +7,10 @@ use rcore_fs::vfs::*;
 
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use core::cmp::min;
+use alloc::boxed::Box;
+use rcore_thread::std_thread::{yield_now, park};
+use rcore_fs::vfs::FsError::Again;
 
 #[derive(Clone)]
 pub enum PipeEnd {
@@ -16,7 +20,8 @@ pub enum PipeEnd {
 
 pub struct PipeData {
     buf: VecDeque<u8>,
-    new_data: Condvar,
+    new_data: Arc<Condvar>,
+    end_cnt: i32,
 }
 
 #[derive(Clone)]
@@ -25,12 +30,21 @@ pub struct Pipe {
     direction: PipeEnd,
 }
 
+impl Drop for Pipe {
+    fn drop(&mut self) {
+        let mut data = self.data.lock();
+        data.end_cnt -= 1;
+        data.new_data.notify_all();
+    }
+}
+
 impl Pipe {
     /// Create a pair of INode: (read, write)
     pub fn create_pair() -> (Pipe, Pipe) {
         let inner = PipeData {
             buf: VecDeque::new(),
-            new_data: Condvar::new(),
+            new_data: Arc::new(Condvar::new()),
+            end_cnt: 2,
         };
         let data = Arc::new(Mutex::new(inner));
         (
@@ -47,7 +61,8 @@ impl Pipe {
 
     fn can_read(&self) -> bool {
         if let PipeEnd::Read = self.direction {
-            self.data.lock().buf.len() > 0 || self.is_broken()
+            let data = self.data.lock();
+            data.buf.len() > 0 || data.end_cnt < 2
         } else {
             false
         }
@@ -55,27 +70,42 @@ impl Pipe {
 
     fn can_write(&self) -> bool {
         if let PipeEnd::Write = self.direction {
-            !self.is_broken()
+            self.data.lock().end_cnt == 2
         } else {
             false
         }
     }
 
-    fn is_broken(&self) -> bool {
-        Arc::strong_count(&self.data) < 2
-    }
+    // fn is_broken(&self) -> bool {
+    //     self.data.lock().end_cnt < 2
+    // }
 }
 
 impl INode for Pipe {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if buf.len() == 0 {
+            return Ok(0);
+        }
         if let PipeEnd::Read = self.direction {
+            // condvar is fake
             let mut data = self.data.lock();
-            if let Some(ch) = data.buf.pop_front() {
-                buf[0] = ch;
-                Ok(1)
-            } else {
-                Ok(0)
+            while data.buf.len() == 0 && data.end_cnt == 2 {
+                data = data.new_data.clone().wait(data);
             }
+            let len = min(buf.len(), data.buf.len());
+            for i in 0..len {
+                buf[i] = data.buf.pop_front().unwrap();
+            }
+            Ok(len)
+            // if data.buf.len() == 0 && data.end_cnt == 2 {
+            //     Err(Again)
+            // } else {
+            //     let len = min(buf.len(), data.buf.len());
+            //     for i in 0..len {
+            //         buf[i] = data.buf.pop_front().unwrap();
+            //     }
+            //     Ok(len)
+            // }
         } else {
             Ok(0)
         }
@@ -83,14 +113,13 @@ impl INode for Pipe {
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         if let PipeEnd::Write = self.direction {
-            if buf.len() > 0 {
-                let mut data = self.data.lock();
-                data.buf.push_back(buf[0]);
-                data.new_data.notify_all();
-                Ok(1)
-            } else {
-                Ok(0)
+            let mut data = self.data.lock();
+            // data.buf.push_back(buf[0]);
+            for c in buf {
+                data.buf.push_back(*c);
             }
+            data.new_data.notify_all();
+            Ok(buf.len())
         } else {
             Ok(0)
         }
