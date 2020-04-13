@@ -51,24 +51,24 @@ pub enum SeekFrom {
 }
 
 impl FileHandle {
-    pub fn new(inode: Arc<dyn INode>, options: OpenOptions, path: String) -> Self {
+    pub fn new(inode: Arc<dyn INode>, options: OpenOptions, path: String, fd_cloexec: bool) -> Self {
         return FileHandle {
             inode,
             offset: Arc::new(Mutex::new(0)),
             options,
             path,
-            fd_cloexec: false,
+            fd_cloexec
         };
     }
 
-    // do as default clone does, share the offset
+    // do almost as default clone does, share the offset
     pub fn dup(&self) -> Self {
         FileHandle {
             inode: self.inode.clone(),
             offset: self.offset.clone(),
             options: self.options.clone(),
             path: self.path.clone(),
-            fd_cloexec: self.fd_cloexec,
+            fd_cloexec: false,  // this field do not share
         }
     }
 

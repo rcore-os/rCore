@@ -140,6 +140,16 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
         }
     }
 
+    /// lock using busy waiting
+    pub fn busy_lock(&self) -> MutexGuard<T, S> {
+        loop {
+            if let Some(x) = self.try_lock() {
+                break x;
+            }
+            yield_now();
+        }
+    }
+
     /// Force unlock the spinlock.
     ///
     /// This is *extremely* unsafe if the lock is not held by the current

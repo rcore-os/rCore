@@ -85,7 +85,6 @@ impl Syscall<'_> {
         };
         loop {
             let mut proc = self.process();
-            debug!("exit codes: {:?}", proc.child_exit_code);
             // check child_exit_code
             let find = match target {
                 WaitFor::AnyChild | WaitFor::AnyChildInGroup => proc
@@ -109,16 +108,22 @@ impl Syscall<'_> {
             }
             // if not, check pid
             let invalid = {
-                let children: Vec<_> = proc
+                let children = proc
                     .children
                     .iter()
-                    .filter_map(|weak| weak.upgrade())
-                    .collect();
+                    .filter_map(|(pid, weak)| {
+                        if weak.upgrade().is_none() {
+                            None
+                        } else {
+                            Some(pid)
+                        }
+                    })
+                    .collect::<Vec<_>>();
                 match target {
                     WaitFor::AnyChild | WaitFor::AnyChildInGroup => children.len() == 0,
                     WaitFor::Pid(pid) => children
                         .iter()
-                        .find(|p| p.lock().pid.get() == pid)
+                        .find(|p| p.get() == pid)
                         .is_none(),
                 }
             };
@@ -187,6 +192,23 @@ impl Syscall<'_> {
         let (mut vm, entry_addr, ustack_top) =
             Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
 
+        // close file that FD_CLOEXEC is set
+        let close_fds = proc.files.iter().filter_map(|(fd, file_like)| {
+            use crate::fs::FileLike::File;
+            if let File(file) = file_like {
+                if file.fd_cloexec {
+                    Some(*fd)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+        for fd in close_fds {
+            proc.files.remove(&fd);
+        }
+
         // Activate new page table
         core::mem::swap(&mut *self.vm(), &mut vm);
         unsafe {
@@ -223,7 +245,7 @@ impl Syscall<'_> {
             self.sys_exit_group(sig);
         } else {
             if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
-                let mut proc = proc_arc.lock();
+                let mut proc = proc_arc.busy_lock();
                 proc.exit(sig);
                 Ok(0)
             } else {
@@ -248,7 +270,7 @@ impl Syscall<'_> {
     /// Get the parent process id
     pub fn sys_getppid(&mut self) -> SysResult {
         if let Some(parent) = self.process().parent.upgrade() {
-            Ok(parent.lock().pid.get())
+            Ok(parent.busy_lock().pid.get())
         } else {
             Ok(0)
         }

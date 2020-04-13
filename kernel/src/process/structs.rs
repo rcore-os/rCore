@@ -72,7 +72,7 @@ pub struct Process {
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
     pub parent: Weak<Mutex<Process>>,
-    pub children: Vec<Weak<Mutex<Process>>>,
+    pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
     pub threads: Vec<Tid>, // threads in the same process
 
     // for waiting child
@@ -272,6 +272,7 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stdin"),
+                false,
             )),
         );
         files.insert(
@@ -285,6 +286,7 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stdout"),
+                false,
             )),
         );
         files.insert(
@@ -298,6 +300,7 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stderr"),
+                false,
             )),
         );
 
@@ -351,7 +354,7 @@ impl Thread {
         }
         .add_to_table();
         // link to parent
-        proc.children.push(Arc::downgrade(&new_proc));
+        proc.children.push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
 
         Box::new(Thread {
             context,
@@ -432,17 +435,9 @@ impl Process {
 
         // notify parent and fill exit code
         if let Some(parent) = self.parent.upgrade() {
-            // spinlock between process is error-prone?
-            // busy waiting
-            loop {
-                if let Some(mut parent) = parent.try_lock() {
-                    parent.child_exit_code.insert(self.pid.get(), exit_code);
-                    parent.child_exit.notify_one();
-                    break;
-                } else {
-                    yield_now();
-                }
-            }
+            let mut parent = parent.busy_lock();
+            parent.child_exit_code.insert(self.pid.get(), exit_code);
+            parent.child_exit.notify_one();
         }
 
         // quit all threads

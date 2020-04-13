@@ -41,6 +41,7 @@ mod time;
 use alloc::collections::BTreeMap;
 #[cfg(feature = "profile")]
 use spin::Mutex;
+use rcore_thread::std_thread::yield_now;
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -62,8 +63,9 @@ struct Syscall<'a> {
 
 impl Syscall<'_> {
     /// Get current process
+    /// spinlock is tend to deadlock, use busy waiting
     pub fn process(&self) -> MutexGuard<'_, Process, SpinNoIrq> {
-        self.thread.proc.lock()
+        self.thread.proc.busy_lock()
     }
 
     /// Get current virtual memory

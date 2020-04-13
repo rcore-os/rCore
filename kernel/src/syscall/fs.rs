@@ -512,6 +512,11 @@ impl Syscall<'_> {
                 "writev: fd: {}, iov: {:?}, count: {}",
                 fd, iov_ptr, iov_count
             );
+        } else {
+            info!(
+                "writev: fd: {}, iov: {:?}, count: {}",
+                fd, iov_ptr, iov_count
+            );
         }
         let iovs = unsafe { IoVecs::check_and_new(iov_ptr, iov_count, &self.vm(), false)? };
 
@@ -560,7 +565,7 @@ impl Syscall<'_> {
             proc.lookup_inode_at(dir_fd, &path, true)?
         };
 
-        let file = FileHandle::new(inode, flags.to_options(), String::from(path));
+        let file = FileHandle::new(inode, flags.to_options(), String::from(path), flags.contains(OpenFlags::CLOEXEC));
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -787,19 +792,16 @@ impl Syscall<'_> {
     // TODO: handle `flags`
     pub fn sys_dup3(&mut self, fd1: usize, fd2: usize, flags: usize) -> SysResult {
         info!("dup3: from {} to {}", fd1, fd2);
-        self.sys_dup2(fd1, fd2)
-        // let mut proc = self.process();
-        // // close fd2 first if it is opened
-        // proc.files.remove(&fd2);
-        //
-        // let mut file_like = proc.get_file_like(fd1)?.clone();
-        // if let FileLike::File(file) = &mut file_like {
-        //     // The two file descriptors do not share file descriptor flags (the
-        //     // close-on-exec flag).
-        //     file.fd_cloexec = false;
-        // }
-        // proc.files.insert(fd2, file_like);
-        // Ok(fd2)
+        let mut proc = self.process();
+        // close fd2 first if it is opened
+        proc.files.remove(&fd2);
+
+        let mut file_like = proc.get_file_like(fd1)?.dup();
+        if let FileLike::File(file) = &mut file_like {
+            file.fd_cloexec = (flags & 1) != 0;
+        }
+        proc.files.insert(fd2, file_like);
+        Ok(fd2)
     }
 
     pub fn sys_ioctl(
@@ -993,6 +995,7 @@ impl Syscall<'_> {
                 nonblock: false,
             },
             String::from("pipe_r:[]"),
+            false,
         )));
 
         let write_fd = proc.add_file(FileLike::File(FileHandle::new(
@@ -1004,6 +1007,7 @@ impl Syscall<'_> {
                 nonblock: false,
             },
             String::from("pipe_w:[]"),
+            false,
         )));
 
         fds[0] = read_fd as u32;
@@ -1294,6 +1298,8 @@ bitflags! {
         const TRUNCATE = 1 << 9;
         /// append on each write
         const APPEND = 1 << 10;
+        /// close on exec
+        const CLOEXEC = 1 << 19;
     }
 }
 
