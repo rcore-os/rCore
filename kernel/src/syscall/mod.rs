@@ -39,9 +39,9 @@ mod time;
 
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
+use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
-use rcore_thread::std_thread::yield_now;
 
 #[cfg(feature = "profile")]
 lazy_static! {

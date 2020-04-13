@@ -3,13 +3,13 @@
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
 use crate::syscall::{MmapProt, SysResult};
-use crate::{thread, processor};
+use crate::{processor, thread};
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
+use rcore_fs::vfs::FsError::NotSupported;
 use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
 use rcore_memory::memory_set::handler::File;
-use rcore_fs::vfs::FsError::NotSupported;
 
 use crate::sync::SpinLock as Mutex;
 
@@ -51,13 +51,18 @@ pub enum SeekFrom {
 }
 
 impl FileHandle {
-    pub fn new(inode: Arc<dyn INode>, options: OpenOptions, path: String, fd_cloexec: bool) -> Self {
+    pub fn new(
+        inode: Arc<dyn INode>,
+        options: OpenOptions,
+        path: String,
+        fd_cloexec: bool,
+    ) -> Self {
         return FileHandle {
             inode,
             offset: Arc::new(Mutex::new(0)),
             options,
             path,
-            fd_cloexec
+            fd_cloexec,
         };
     }
 
@@ -68,7 +73,7 @@ impl FileHandle {
             offset: self.offset.clone(),
             options: self.options.clone(),
             path: self.path.clone(),
-            fd_cloexec: false,  // this field do not share
+            fd_cloexec: false, // this field do not share
         }
     }
 

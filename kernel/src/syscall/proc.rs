@@ -121,10 +121,7 @@ impl Syscall<'_> {
                     .collect::<Vec<_>>();
                 match target {
                     WaitFor::AnyChild | WaitFor::AnyChildInGroup => children.len() == 0,
-                    WaitFor::Pid(pid) => children
-                        .iter()
-                        .find(|p| p.get() == pid)
-                        .is_none(),
+                    WaitFor::Pid(pid) => children.iter().find(|p| p.get() == pid).is_none(),
                 }
             };
             if invalid {
@@ -193,18 +190,22 @@ impl Syscall<'_> {
             Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
 
         // close file that FD_CLOEXEC is set
-        let close_fds = proc.files.iter().filter_map(|(fd, file_like)| {
-            use crate::fs::FileLike::File;
-            if let File(file) = file_like {
-                if file.fd_cloexec {
-                    Some(*fd)
+        let close_fds = proc
+            .files
+            .iter()
+            .filter_map(|(fd, file_like)| {
+                use crate::fs::FileLike::File;
+                if let File(file) = file_like {
+                    if file.fd_cloexec {
+                        Some(*fd)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         for fd in close_fds {
             proc.files.remove(&fd);
         }

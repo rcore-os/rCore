@@ -1,5 +1,5 @@
-use rcore_fs::vfs::*;
 use core::any::Any;
+use rcore_fs::vfs::*;
 
 pub use super::{STDIN, STDOUT};
 
@@ -47,5 +47,7 @@ impl INode for TtyINode {
         })
     }
 
-    fn as_any_ref(&self) -> &dyn Any { self }
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }

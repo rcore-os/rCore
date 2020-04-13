@@ -18,9 +18,9 @@ use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
+use crate::fs::FileLike;
 use crate::process::Process;
 use rcore_fs::vfs::PollStatus;
-use crate::fs::FileLike;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -565,7 +565,12 @@ impl Syscall<'_> {
             proc.lookup_inode_at(dir_fd, &path, true)?
         };
 
-        let file = FileHandle::new(inode, flags.to_options(), String::from(path), flags.contains(OpenFlags::CLOEXEC));
+        let file = FileHandle::new(
+            inode,
+            flags.to_options(),
+            String::from(path),
+            flags.contains(OpenFlags::CLOEXEC),
+        );
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -1134,9 +1139,7 @@ impl Syscall<'_> {
                         file.fd_cloexec = (arg & 1) != 0;
                         Ok(0)
                     }
-                    F_GETFD => {
-                        Ok(file.fd_cloexec as usize)
-                    }
+                    F_GETFD => Ok(file.fd_cloexec as usize),
                     F_SETFL => {
                         if arg & 0x800 > 0 {
                             file.options.nonblock = true;
@@ -1150,18 +1153,14 @@ impl Syscall<'_> {
                         core::mem::drop(proc);
                         self.sys_dup3(fd, new_fd, 1)
                     }
-                    _ => {
-                        Ok(0)
-                    }
+                    _ => Ok(0),
                 }
             }
             FileLike::Socket(_) => {
                 Ok(0)
                 //TODO
             }
-            FileLike::EpollInstance(_) => {
-                Ok(0)
-            }
+            FileLike::EpollInstance(_) => Ok(0),
         }
     }
 }

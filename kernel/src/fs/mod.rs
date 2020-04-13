@@ -11,7 +11,7 @@ use rcore_fs_sfs::SimpleFileSystem;
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{STDIN, STDOUT, TtyINode};
+pub use self::devfs::{TtyINode, STDIN, STDOUT};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -20,10 +20,10 @@ pub use self::pseudo::*;
 mod devfs;
 mod device;
 pub mod epoll;
+pub mod fcntl;
 mod file;
 mod file_like;
 mod ioctl;
-pub mod fcntl;
 mod pipe;
 mod pseudo;
 

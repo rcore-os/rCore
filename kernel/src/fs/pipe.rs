@@ -7,10 +7,10 @@ use rcore_fs::vfs::*;
 
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
-use core::cmp::min;
 use alloc::boxed::Box;
-use rcore_thread::std_thread::{yield_now, park};
+use core::cmp::min;
 use rcore_fs::vfs::FsError::Again;
+use rcore_thread::std_thread::{park, yield_now};
 
 #[derive(Clone)]
 pub enum PipeEnd {
@@ -97,15 +97,15 @@ impl INode for Pipe {
                 buf[i] = data.buf.pop_front().unwrap();
             }
             Ok(len)
-            // if data.buf.len() == 0 && data.end_cnt == 2 {
-            //     Err(Again)
-            // } else {
-            //     let len = min(buf.len(), data.buf.len());
-            //     for i in 0..len {
-            //         buf[i] = data.buf.pop_front().unwrap();
-            //     }
-            //     Ok(len)
-            // }
+        // if data.buf.len() == 0 && data.end_cnt == 2 {
+        //     Err(Again)
+        // } else {
+        //     let len = min(buf.len(), data.buf.len());
+        //     for i in 0..len {
+        //         buf[i] = data.buf.pop_front().unwrap();
+        //     }
+        //     Ok(len)
+        // }
         } else {
             Ok(0)
         }

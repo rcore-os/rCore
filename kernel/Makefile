@@ -253,8 +253,11 @@ justtest:
 
 debug: $(kernel) $(kernel_img)
 	$(qemu) $(qemu_opts) -s -S
-	# @sleep 1
-	# @$(gdb) $(kernel) -x ../tools/gdbinit
+	@sleep 1
+	@$(gdb) $(kernel) -x ../tools/gdbinit
+
+clion_debug:
+	$(qemu) $(qemu_opts) -s -S
 
 build: $(kernel_img)
 

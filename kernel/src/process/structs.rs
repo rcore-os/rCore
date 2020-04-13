@@ -354,7 +354,8 @@ impl Thread {
         }
         .add_to_table();
         // link to parent
-        proc.children.push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
+        proc.children
+            .push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
 
         Box::new(Thread {
             context,
@@ -427,7 +428,7 @@ impl Process {
         // avoid some strange dead lock
         // self.files.clear(); this does not work sometime, for unknown reason
         // manually drop
-        let fds = self.files.iter().map(|(fd, _)| *fd ).collect::<Vec<_>>();
+        let fds = self.files.iter().map(|(fd, _)| *fd).collect::<Vec<_>>();
         for fd in fds.iter() {
             let file = self.files.remove(fd).unwrap();
             drop(file);
