@@ -43,18 +43,13 @@ impl FileLike {
             // TODO: place flags & path in FileLike instead of FileHandle/Socket
             FIOCLEX => Ok(0),
             FIONBIO => Ok(0),
-            _ => {
-                match self {
-                    FileLike::File(file) => file.io_control(request as u32, arg1)?,
-                    FileLike::Socket(socket) => {
-                        socket.ioctl(request, arg1, arg2, arg3)?;
-                    }
-                    FileLike::EpollInstance(_) => {
-                        return Err(SysError::ENOSYS);
-                    }
+            _ => match self {
+                FileLike::File(file) => file.io_control(request as u32, arg1).map_err(Into::into),
+                FileLike::Socket(socket) => socket.ioctl(request, arg1, arg2, arg3),
+                FileLike::EpollInstance(_) => {
+                    return Err(SysError::ENOSYS);
                 }
-                Ok(0)
-            }
+            },
         }
     }
     pub fn mmap(&mut self, area: MMapArea) -> SysResult {

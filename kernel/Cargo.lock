@@ -363,11 +363,11 @@ dependencies = [
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rboot 0.1.2",
  "rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=b7bacf9)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
- "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
- "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
- "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
- "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
+ "rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
+ "rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
+ "rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
+ "rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
  "rcore-memory 0.1.0",
  "rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)",
  "riscv 0.5.0 (git+https://github.com/rcore-os/riscv)",
@@ -393,7 +393,7 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac#7f5eeac8b77f6bab11f6f2ce631a194bee658555"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a#7e7c74a921803d6c8edc99b8ebb6fc85774819b9"
 dependencies = [
  "filetime 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -403,42 +403,42 @@ dependencies = [
 [[package]]
 name = "rcore-fs-devfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac#7f5eeac8b77f6bab11f6f2ce631a194bee658555"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a#7e7c74a921803d6c8edc99b8ebb6fc85774819b9"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-mountfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac#7f5eeac8b77f6bab11f6f2ce631a194bee658555"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a#7e7c74a921803d6c8edc99b8ebb6fc85774819b9"
 dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-ramfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac#7f5eeac8b77f6bab11f6f2ce631a194bee658555"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a#7e7c74a921803d6c8edc99b8ebb6fc85774819b9"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac#7f5eeac8b77f6bab11f6f2ce631a194bee658555"
+source = "git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a#7e7c74a921803d6c8edc99b8ebb6fc85774819b9"
 dependencies = [
  "bitvec 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)",
+ "rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)",
  "spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -758,11 +758,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 "checksum raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
 "checksum rcore-console 0.1.0 (git+https://github.com/rcore-os/rcore-console?rev=b7bacf9)" = "<none>"
-"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
-"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
-"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
-"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
-"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7f5eeac)" = "<none>"
+"checksum rcore-fs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)" = "<none>"
+"checksum rcore-fs-devfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)" = "<none>"
+"checksum rcore-fs-mountfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)" = "<none>"
+"checksum rcore-fs-ramfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)" = "<none>"
+"checksum rcore-fs-sfs 0.1.0 (git+https://github.com/rcore-os/rcore-fs?rev=7e7c74a)" = "<none>"
 "checksum rcore-thread 0.1.0 (git+https://github.com/rcore-os/rcore-thread?rev=d727949b)" = "<none>"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 "checksum register 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
