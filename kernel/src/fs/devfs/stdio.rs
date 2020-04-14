@@ -72,17 +72,17 @@ impl INode for Stdin {
             error: false,
         })
     }
-    fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+    fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
             TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                 // pretend to be tty
-                Ok(())
+                Ok(0)
             }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
                 // TODO: verify pointer
                 unsafe { *(data as *mut u32) = 0 };
-                Ok(())
+                Ok(0)
             }
             _ => Err(FsError::NotSupported),
         }
@@ -110,17 +110,17 @@ impl INode for Stdout {
             error: false,
         })
     }
-    fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+    fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
             TCGETS | TIOCGWINSZ | TIOCSPGRP => {
                 // pretend to be tty
-                Ok(())
+                Ok(0)
             }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
                 // TODO: verify pointer
                 unsafe { *(data as *mut u32) = 0 };
-                Ok(())
+                Ok(0)
             }
             _ => Err(FsError::NotSupported),
         }
