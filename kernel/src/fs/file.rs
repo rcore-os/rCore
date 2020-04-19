@@ -176,7 +176,7 @@ impl FileHandle {
         self.inode.poll()
     }
 
-    pub fn io_control(&self, cmd: u32, arg: usize) -> Result<()> {
+    pub fn io_control(&self, cmd: u32, arg: usize) -> Result<usize> {
         self.inode.io_control(cmd, arg)
     }
 

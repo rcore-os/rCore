@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec, collections::BTreeSet};
 use core::fmt;
 
 use core::str;
@@ -25,6 +25,7 @@ use crate::process::thread_manager;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 use rcore_thread::std_thread::yield_now;
+use bitflags::_core::cell::Ref;
 
 #[allow(dead_code)]
 pub struct Thread {
@@ -338,6 +339,16 @@ impl Thread {
         let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
 
         let mut proc = self.proc.lock();
+
+        let mut files = BTreeMap::new();
+        // let offsets = BTreeMap::new();
+
+        for (fd, file_like) in proc.files.iter() {
+            if let FileLike::File(file) = file_like {
+            } else {
+                files.insert(fd, file_like.clone());
+            }
+        }
         let new_proc = Process {
             vm: vm.clone(),
             files: proc.files.clone(),

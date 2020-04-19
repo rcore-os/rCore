@@ -66,7 +66,7 @@ impl INode for Fbdev {
             rdev: make_rdev(29, 0),
         })
     }
-    fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
+    fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         const FBIOGET_VSCREENINFO: u32 = 0x4600;
         const FBIOGET_FSCREENINFO: u32 = 0x4602;
 
@@ -76,14 +76,14 @@ impl INode for Fbdev {
                 if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_fix_info.fill_from(&fb.fb_info);
                 }
-                Ok(())
+                Ok(0)
             }
             FBIOGET_VSCREENINFO => {
                 let fb_var_info = unsafe { &mut *(data as *mut FbVarScreeninfo) };
                 if let Some(fb) = FRAME_BUFFER.read().as_ref() {
                     fb_var_info.fill_from(&fb.fb_info);
                 }
-                Ok(())
+                Ok(0)
             }
             _ => {
                 warn!("use never support ioctl !");
