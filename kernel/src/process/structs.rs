@@ -344,9 +344,9 @@ impl Thread {
         let mut offsets = BTreeSet::new();
         for (fd, file_like) in proc.files.iter() {
             if let FileLike::File(file) = file_like {
-                let addr = file.offset.as_ref() as *const _ as usize;
+                let addr = file.options.as_ref() as *const _ as usize;
                 if offsets.contains(&addr) {
-                    files.insert(*fd, FileLike::File(file.clone_with_offset_shared()));
+                    files.insert(*fd, FileLike::File(file.clone_shared()));
                 } else {
                     files.insert(*fd, FileLike::File(file.clone()));
                     offsets.insert(addr);

@@ -1134,7 +1134,7 @@ impl Syscall<'_> {
                     F_GETFD => Ok(file.fd_cloexec as usize),
                     F_SETFL => {
                         if arg & 0x800 > 0 {
-                            file.options.nonblock = true;
+                            file.options.lock().nonblock = true;
                         }
                         Ok(0)
                     }

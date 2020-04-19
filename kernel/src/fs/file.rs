@@ -15,8 +15,8 @@ use crate::sync::SpinLock as Mutex;
 
 pub struct FileHandle {
     inode: Arc<dyn INode>,
-    pub offset: Arc<Mutex<u64>>,
-    pub options: OpenOptions,
+    offset: Arc<Mutex<u64>>,
+    pub options: Arc<Mutex<OpenOptions>>,
     pub path: String,
     pub fd_cloexec: bool,
 }
@@ -27,14 +27,14 @@ impl Clone for FileHandle {
         FileHandle {
             inode: self.inode.clone(),
             offset: Arc::new(Mutex::new(*self.offset.lock())),
-            options: self.options.clone(),
+            options: Arc::new(Mutex::new(*self.options.lock())),
             path: self.path.clone(),
             fd_cloexec: self.fd_cloexec,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct OpenOptions {
     pub read: bool,
     pub write: bool,
@@ -60,13 +60,13 @@ impl FileHandle {
         return FileHandle {
             inode,
             offset: Arc::new(Mutex::new(0)),
-            options,
+            options: Arc::new(Mutex::new(options)),
             path,
             fd_cloexec,
         };
     }
 
-    pub fn clone_with_offset_shared(&self) -> Self {
+    pub fn clone_shared(&self) -> Self {
         FileHandle {
             inode: self.inode.clone(),
             offset: self.offset.clone(),
@@ -96,10 +96,10 @@ impl FileHandle {
     }
 
     pub fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if !self.options.read {
+        if !self.options.lock().read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        if !self.options.nonblock {
+        if !self.options.lock().nonblock {
             // block
             loop {
                 match self.inode.read_at(offset, buf) {
@@ -121,7 +121,7 @@ impl FileHandle {
     }
 
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        let offset = match self.options.append {
+        let offset = match self.options.lock().append {
             true => self.inode.metadata()?.size as u64,
             false => *self.offset.lock(),
         } as usize;
@@ -131,7 +131,7 @@ impl FileHandle {
     }
 
     pub fn write_at(&mut self, offset: usize, buf: &[u8]) -> Result<usize> {
-        if !self.options.write {
+        if !self.options.lock().write {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let len = self.inode.write_at(offset, buf)?;
@@ -149,7 +149,7 @@ impl FileHandle {
     }
 
     pub fn set_len(&mut self, len: u64) -> Result<()> {
-        if !self.options.write {
+        if !self.options.lock().write {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         self.inode.resize(len as usize)?;
@@ -173,7 +173,7 @@ impl FileHandle {
     }
 
     pub fn read_entry(&mut self) -> Result<String> {
-        if !self.options.read {
+        if !self.options.lock().read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let mut offset_inner = self.offset.lock();
