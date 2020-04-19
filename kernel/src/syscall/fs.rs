@@ -784,12 +784,7 @@ impl Syscall<'_> {
         // close fd2 first if it is opened
         proc.files.remove(&fd2);
 
-        let mut file_like = proc.get_file_like(fd1)?.dup();
-        if let FileLike::File(file) = &mut file_like {
-            // The two file descriptors do not share file descriptor flags (the
-            // close-on-exec flag).
-            file.fd_cloexec = false;
-        }
+        let mut file_like = proc.get_file_like(fd1)?.dup(false);
         proc.files.insert(fd2, file_like);
         Ok(fd2)
     }
@@ -801,10 +796,7 @@ impl Syscall<'_> {
         // close fd2 first if it is opened
         proc.files.remove(&fd2);
 
-        let mut file_like = proc.get_file_like(fd1)?.dup();
-        if let FileLike::File(file) = &mut file_like {
-            file.fd_cloexec = (flags & 1) != 0;
-        }
+        let mut file_like = proc.get_file_like(fd1)?.dup(flags != 0);
         proc.files.insert(fd2, file_like);
         Ok(fd2)
     }

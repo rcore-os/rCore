@@ -1,6 +1,7 @@
 //! Syscalls for process
 
 use super::*;
+use crate::fs::FileLike;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.

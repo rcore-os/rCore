@@ -256,7 +256,7 @@ debug: $(kernel) $(kernel_img)
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
-clion_debug:
+clion_debug: $(kernel) $(kernel_img)
 	$(qemu) $(qemu_opts) -s -S
 
 build: $(kernel_img)
@@ -286,7 +286,7 @@ endif
 
 $(kernel_img): kernel bootloader
 ifeq ($(ARCH), x86_64)
-	@mkdir -p $(ESP)/EFI/rCore $(ESP)/EFI/Boot
+	mkdir -p $(ESP)/EFI/rCore $(ESP)/EFI/Boot
 	@cp ../rboot/target/x86_64-unknown-uefi/$(MODE)/rboot.efi $(ESP)/EFI/Boot/BootX64.efi
 	@cp ../rboot/rboot.conf $(ESP)/EFI/Boot/rboot.conf
 	@cp $(kernel) $(ESP)/EFI/rCore/kernel.elf

@@ -18,7 +18,7 @@ use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
+use crate::sync::{Condvar, SpinNoIrqLock as Mutex, SpinLock};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
@@ -341,17 +341,23 @@ impl Thread {
         let mut proc = self.proc.lock();
 
         let mut files = BTreeMap::new();
-        // let offsets = BTreeMap::new();
-
+        let mut offsets = BTreeSet::new();
         for (fd, file_like) in proc.files.iter() {
             if let FileLike::File(file) = file_like {
+                let addr = file.offset.as_ref() as *const _ as usize;
+                if offsets.contains(&addr) {
+                    files.insert(*fd, FileLike::File(file.clone_with_offset_shared()));
+                } else {
+                    files.insert(*fd, FileLike::File(file.clone()));
+                    offsets.insert(addr);
+                }
             } else {
-                files.insert(fd, file_like.clone());
+                files.insert(*fd, file_like.clone());
             }
         }
         let new_proc = Process {
             vm: vm.clone(),
-            files: proc.files.clone(),
+            files,
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),

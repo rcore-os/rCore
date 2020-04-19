@@ -76,6 +76,7 @@ impl Pipe {
         }
     }
 
+    // deprecate because of deadlock
     // fn is_broken(&self) -> bool {
     //     self.data.lock().end_cnt < 2
     // }
@@ -97,15 +98,6 @@ impl INode for Pipe {
                 buf[i] = data.buf.pop_front().unwrap();
             }
             Ok(len)
-        // if data.buf.len() == 0 && data.end_cnt == 2 {
-        //     Err(Again)
-        // } else {
-        //     let len = min(buf.len(), data.buf.len());
-        //     for i in 0..len {
-        //         buf[i] = data.buf.pop_front().unwrap();
-        //     }
-        //     Ok(len)
-        // }
         } else {
             Ok(0)
         }

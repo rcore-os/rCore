@@ -15,7 +15,7 @@ use crate::sync::SpinLock as Mutex;
 
 pub struct FileHandle {
     inode: Arc<dyn INode>,
-    offset: Arc<Mutex<u64>>,
+    pub offset: Arc<Mutex<u64>>,
     pub options: OpenOptions,
     pub path: String,
     pub fd_cloexec: bool,
@@ -66,14 +66,24 @@ impl FileHandle {
         };
     }
 
-    // do almost as default clone does, share the offset
-    pub fn dup(&self) -> Self {
+    pub fn clone_with_offset_shared(&self) -> Self {
         FileHandle {
             inode: self.inode.clone(),
             offset: self.offset.clone(),
             options: self.options.clone(),
             path: self.path.clone(),
-            fd_cloexec: false, // this field do not share
+            fd_cloexec: self.fd_cloexec,
+        }
+    }
+
+    // do almost as default clone does, share the offset
+    pub fn dup(&self, fd_cloexec: bool) -> Self {
+        FileHandle {
+            inode: self.inode.clone(),
+            offset: self.offset.clone(),
+            options: self.options.clone(),
+            path: self.path.clone(),
+            fd_cloexec, // this field do not share
         }
     }
 

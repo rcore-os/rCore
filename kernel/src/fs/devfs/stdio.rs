@@ -89,7 +89,7 @@ impl INode for Stdin {
             TIOCSPGRP => {
                 let gid = unsafe { *(data as *const i32) };
                 info!("set foreground process group id to {}", gid);
-                Ok(())
+                Ok(0)
                 // println!(pid)
             }
             _ => Err(FsError::NotSupported),

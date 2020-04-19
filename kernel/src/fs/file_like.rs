@@ -18,10 +18,10 @@ pub enum FileLike {
 }
 
 impl FileLike {
-    pub fn dup(&self) -> FileLike {
+    pub fn dup(&self, fd_cloexec: bool) -> FileLike {
         use FileLike::File;
         if let File(file) = self {
-            File(file.dup())
+            File(file.dup(fd_cloexec))
         } else {
             self.clone()
         }
