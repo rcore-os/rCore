@@ -513,10 +513,10 @@ impl Syscall<'_> {
                 fd, iov_ptr, iov_count
             );
         } else {
-            info!(
-                "writev: fd: {}, iov: {:?}, count: {}",
-                fd, iov_ptr, iov_count
-            );
+            // info!(
+            //     "writev: fd: {}, iov: {:?}, count: {}",
+            //     fd, iov_ptr, iov_count
+            // );
         }
         let iovs = unsafe { IoVecs::check_and_new(iov_ptr, iov_count, &self.vm(), false)? };
 
@@ -553,6 +553,11 @@ impl Syscall<'_> {
                 Ok(file_inode) => {
                     if flags.contains(OpenFlags::EXCLUSIVE) {
                         return Err(SysError::EEXIST);
+                    }
+                    if flags.contains(OpenFlags::TRUNCATE) {
+                        if let Err(e) = file_inode.resize(0) {
+                            // TODO: do something? what about device file?
+                        }
                     }
                     file_inode
                 }
@@ -780,18 +785,10 @@ impl Syscall<'_> {
 
     pub fn sys_dup2(&mut self, fd1: usize, fd2: usize) -> SysResult {
         info!("dup2: from {} to {}", fd1, fd2);
-        let mut proc = self.process();
-        // close fd2 first if it is opened
-        proc.files.remove(&fd2);
-
-        let mut file_like = proc.get_file_like(fd1)?.dup(false);
-        proc.files.insert(fd2, file_like);
-        Ok(fd2)
+        self.dup_impl(fd1, fd2, 0)
     }
 
-    // TODO: handle `flags`
-    pub fn sys_dup3(&mut self, fd1: usize, fd2: usize, flags: usize) -> SysResult {
-        info!("dup3: from {} to {}", fd1, fd2);
+    fn dup_impl(&mut self, fd1: usize, fd2: usize, flags: usize) -> SysResult {
         let mut proc = self.process();
         // close fd2 first if it is opened
         proc.files.remove(&fd2);
@@ -799,6 +796,11 @@ impl Syscall<'_> {
         let mut file_like = proc.get_file_like(fd1)?.dup(flags != 0);
         proc.files.insert(fd2, file_like);
         Ok(fd2)
+    }
+
+    pub fn sys_dup3(&mut self, fd1: usize, fd2: usize, flags: usize) -> SysResult {
+        info!("dup3: from {} to {} with flags = {:#x}", fd1, fd2, flags);
+        self.dup_impl(fd1, fd2, flags)
     }
 
     pub fn sys_ioctl(
@@ -1139,11 +1141,11 @@ impl Syscall<'_> {
                         Ok(0)
                     }
                     F_DUPFD_CLOEXEC => {
-                        info!("dupfd_cloexec: arg: {:#x}", arg);
+                        info!("fcntl: dupfd_cloexec: arg: {:#x}", arg);
                         // let file_like = proc.get_file_like(fd1)?.clone();
                         let new_fd = proc.get_free_fd_from(arg);
                         core::mem::drop(proc);
-                        self.sys_dup3(fd, new_fd, 1)
+                        self.dup_impl(fd, new_fd, 1)
                     }
                     _ => Ok(0),
                 }
