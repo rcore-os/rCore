@@ -129,8 +129,8 @@ impl TimeVal {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TimeSpec {
-    sec: usize,
-    nsec: usize,
+    pub sec: usize,
+    pub nsec: usize,
 }
 
 impl TimeSpec {

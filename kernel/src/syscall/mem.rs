@@ -20,7 +20,7 @@ impl Syscall<'_> {
         let flags = MmapFlags::from_bits_truncate(flags);
         info!(
             "mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}",
-            addr, len, prot, flags, fd, offset
+            addr, len, prot, flags, fd as isize, offset
         );
 
         let mut proc = self.process();

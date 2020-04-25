@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec, collections::BTreeSet};
+use alloc::{
+    boxed::Box, collections::BTreeMap, collections::BTreeSet, string::String, sync::Arc,
+    sync::Weak, vec::Vec,
+};
 use core::fmt;
 
 use core::str;
@@ -18,14 +21,14 @@ use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, SpinNoIrqLock as Mutex, SpinLock};
+use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
+use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
 use rcore_thread::std_thread::yield_now;
-use bitflags::_core::cell::Ref;
 
 #[allow(dead_code)]
 pub struct Thread {

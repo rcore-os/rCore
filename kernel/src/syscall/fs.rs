@@ -20,6 +20,7 @@ use super::*;
 use crate::fs::epoll::EpollInstance;
 use crate::fs::FileLike;
 use crate::process::Process;
+use crate::syscall::SysError::EINVAL;
 use rcore_fs::vfs::PollStatus;
 
 impl Syscall<'_> {
@@ -963,7 +964,12 @@ impl Syscall<'_> {
         self.sys_symlinkat(target, AT_FDCWD, linkpath)
     }
 
-    pub fn sys_symlinkat(&mut self, target: *const u8, newdirfd: usize, linkpath: *const u8) -> SysResult {
+    pub fn sys_symlinkat(
+        &mut self,
+        target: *const u8,
+        newdirfd: usize,
+        linkpath: *const u8,
+    ) -> SysResult {
         let proc = self.process();
         let target = check_and_clone_cstr(target)?;
         let linkpath = check_and_clone_cstr(linkpath)?;
@@ -976,19 +982,15 @@ impl Syscall<'_> {
 
         // If linkpath exists, it will not be overwritten.
         match dir_inode.find(filename) {
-            Ok(_) => {
-                Err(SysError::EEXIST)
-            }
-            Err(e) => {
-                match e {
-                    FsError::EntryNotFound => {
-                        let symlink = dir_inode.create(filename, FileType::SymLink, 0o777)?;
-                        symlink.write_at(0, target.as_bytes())?;
-                        Ok(0)
-                    },
-                    _ => Err(e.into())
+            Ok(_) => Err(SysError::EEXIST),
+            Err(e) => match e {
+                FsError::EntryNotFound => {
+                    let symlink = dir_inode.create(filename, FileType::SymLink, 0o777)?;
+                    symlink.write_at(0, target.as_bytes())?;
+                    Ok(0)
                 }
-            }
+                _ => Err(e.into()),
+            },
         }
     }
 
@@ -1047,6 +1049,48 @@ impl Syscall<'_> {
 
         info!("pipe: created rfd: {} wfd: {}", read_fd, write_fd);
 
+        Ok(0)
+    }
+
+    pub fn sys_utimensat(
+        &mut self,
+        dirfd: usize,
+        pathname: *const u8,
+        times: *const TimeSpec,
+        flags: usize,
+    ) -> SysResult {
+        info!(
+            "utimensat(raw): dirfd: {}, pathname: {}, times: {}, flags: {:#x}",
+            dirfd as i64, pathname as usize, times as usize, flags
+        );
+        let pathname = check_and_clone_cstr(pathname)?;
+        let proc = self.process();
+        let times = if times.is_null() {
+            [TimeSpec::get_epoch(), TimeSpec::get_epoch()]
+        } else {
+            let times = unsafe { self.vm().check_read_array(times, 2)? };
+            [times[0], times[1]]
+        };
+        info!(
+            "utimensat: dirfd: {}, pathname: {}, times: {:?}, flags: {:#x}",
+            dirfd as i64, pathname, times, flags
+        );
+        let follow = match flags {
+            0 => true,
+            fcntl::AT_SYMLINK_NOFOLLOW => false,
+            _ => return Err(EINVAL),
+        };
+        let inode = proc.lookup_inode_at(dirfd, &pathname, follow)?;
+        let mut metadata = inode.metadata()?;
+        metadata.atime = Timespec {
+            sec: times[0].sec as i64,
+            nsec: times[0].nsec as i32,
+        };
+        metadata.mtime = Timespec {
+            sec: times[1].sec as i64,
+            nsec: times[1].nsec as i32,
+        };
+        inode.set_metadata(&metadata)?;
         Ok(0)
     }
 

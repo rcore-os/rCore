@@ -12,3 +12,5 @@ const F_LINUX_SPECIFIC_BASE: usize = 1024;
 pub const F_DUPFD_CLOEXEC: usize = F_LINUX_SPECIFIC_BASE + 6;
 
 pub const O_CLOEXEC: usize = 02000000; /* set close_on_exec */
+
+pub const AT_SYMLINK_NOFOLLOW: usize = 0x100;

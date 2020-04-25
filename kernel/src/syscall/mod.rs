@@ -135,7 +135,9 @@ impl Syscall<'_> {
                 args[4],
             ),
             SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1] as *const u8, args[2]),
-            SYS_SYMLINKAT => self.sys_symlinkat(args[0] as *const u8, args[1] as usize, args[2] as *const u8),
+            SYS_SYMLINKAT => {
+                self.sys_symlinkat(args[0] as *const u8, args[1] as usize, args[2] as *const u8)
+            }
             SYS_READLINKAT => {
                 self.sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
             }
@@ -146,7 +148,12 @@ impl Syscall<'_> {
             SYS_FACCESSAT => self.sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_DUP3 => self.sys_dup3(args[0], args[1], args[2]),
             SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
-            SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
+            SYS_UTIMENSAT => self.sys_utimensat(
+                args[0],
+                args[1] as *const u8,
+                args[2] as *const TimeSpec,
+                args[3],
+            ),
             SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
                 args[0],
                 args[1] as *mut usize,
