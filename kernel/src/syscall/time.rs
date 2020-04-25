@@ -4,6 +4,7 @@ use super::*;
 use crate::consts::USEC_PER_TICK;
 use core::time::Duration;
 use lazy_static::lazy_static;
+use rcore_fs::vfs::Timespec;
 
 impl Syscall<'_> {
     pub fn sys_gettimeofday(&mut self, tv: *mut TimeVal, tz: *const u8) -> SysResult {
@@ -147,6 +148,15 @@ impl TimeSpec {
         TimeSpec {
             sec: (usec / USEC_PER_SEC) as usize,
             nsec: (usec % USEC_PER_SEC * NSEC_PER_USEC) as usize,
+        }
+    }
+}
+
+impl Into<Timespec> for TimeSpec {
+    fn into(self) -> Timespec {
+        Timespec {
+            sec: self.sec as i64,
+            nsec: self.nsec as i32,
         }
     }
 }

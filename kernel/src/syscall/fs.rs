@@ -563,7 +563,14 @@ impl Syscall<'_> {
                     file_inode
                 }
                 Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode as u32)?
+                    let inode = dir_inode.create(file_name, FileType::File, mode as u32)?;
+                    let mut metadata = inode.metadata()?;
+                    let now = TimeSpec::get_epoch().into();
+                    metadata.atime = now;
+                    metadata.mtime = now;
+                    metadata.ctime = now;
+                    inode.set_metadata(&metadata)?;
+                    inode
                 }
                 Err(e) => return Err(SysError::from(e)),
             }
@@ -650,7 +657,8 @@ impl Syscall<'_> {
         let mut proc = self.process();
         let stat_ref = unsafe { self.vm().check_write_ptr(stat_ptr)? };
         let file = proc.get_file(fd)?;
-        let stat = Stat::from(file.metadata()?);
+        let metadata = file.metadata()?;
+        let stat = Stat::from(metadata);
         *stat_ref = stat;
         Ok(0)
     }
