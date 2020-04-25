@@ -959,6 +959,39 @@ impl Syscall<'_> {
         self.sys_unlinkat(AT_FDCWD, path, 0)
     }
 
+    pub fn sys_symlink(&mut self, target: *const u8, linkpath: *const u8) -> SysResult {
+        self.sys_symlinkat(target, AT_FDCWD, linkpath)
+    }
+
+    pub fn sys_symlinkat(&mut self, target: *const u8, newdirfd: usize, linkpath: *const u8) -> SysResult {
+        let proc = self.process();
+        let target = check_and_clone_cstr(target)?;
+        let linkpath = check_and_clone_cstr(linkpath)?;
+        info!(
+            "symlinkat: target: {} , newdirfd: {}, linkpath: {}",
+            target, newdirfd as isize, linkpath,
+        );
+        let (dir_path, filename) = split_path(&linkpath);
+        let dir_inode = proc.lookup_inode_at(newdirfd, dir_path, true)?;
+
+        // If linkpath exists, it will not be overwritten.
+        match dir_inode.find(filename) {
+            Ok(_) => {
+                Err(SysError::EEXIST)
+            }
+            Err(e) => {
+                match e {
+                    FsError::EntryNotFound => {
+                        let symlink = dir_inode.create(filename, FileType::SymLink, 0o777)?;
+                        symlink.write_at(0, target.as_bytes())?;
+                        Ok(0)
+                    },
+                    _ => Err(e.into())
+                }
+            }
+        }
+    }
+
     pub fn sys_unlinkat(&mut self, dirfd: usize, path: *const u8, flags: usize) -> SysResult {
         let proc = self.process();
         let path = check_and_clone_cstr(path)?;

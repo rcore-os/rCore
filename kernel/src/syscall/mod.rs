@@ -135,7 +135,7 @@ impl Syscall<'_> {
                 args[4],
             ),
             SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1] as *const u8, args[2]),
-            SYS_SYMLINKAT => self.unimplemented("symlinkat", Err(SysError::EACCES)),
+            SYS_SYMLINKAT => self.sys_symlinkat(args[0] as *const u8, args[1] as usize, args[2] as *const u8),
             SYS_READLINKAT => {
                 self.sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
             }
@@ -472,6 +472,7 @@ impl Syscall<'_> {
             SYS_RMDIR => self.sys_rmdir(args[0] as *const u8),
             SYS_LINK => self.sys_link(args[0] as *const u8, args[1] as *const u8),
             SYS_UNLINK => self.sys_unlink(args[0] as *const u8),
+            SYS_SYMLINK => self.sys_symlink(args[0] as *const u8, args[1] as *const u8),
             SYS_READLINK => self.sys_readlink(args[0] as *const u8, args[1] as *mut u8, args[2]),
             SYS_CHMOD => self.unimplemented("chmod", Ok(0)),
             SYS_CHOWN => self.unimplemented("chown", Ok(0)),
