@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::arch::cpu;
-use crate::consts::USER_STACK_SIZE;
+use crate::consts::{USER_STACK_SIZE, ARCH};
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
 
@@ -24,7 +24,7 @@ impl Syscall<'_> {
         info!("uname: buf: {:?}", buf);
 
         let offset = 65;
-        let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
+        let strings = ["Linux", "orz", "0.1.0", "1", ARCH, "domain"];
         let buf = unsafe { self.vm().check_write_array(buf, strings.len() * offset)? };
 
         for i in 0..strings.len() {

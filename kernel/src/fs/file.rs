@@ -2,7 +2,7 @@
 
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
-use crate::syscall::{MmapProt, SysResult};
+use crate::syscall::{MmapProt, SysResult, TimeSpec};
 use crate::{processor, thread};
 use alloc::{string::String, sync::Arc};
 use core::fmt;
@@ -135,6 +135,7 @@ impl FileHandle {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let len = self.inode.write_at(offset, buf)?;
+        TimeSpec::update(&self.inode);
         Ok(len)
     }
 
