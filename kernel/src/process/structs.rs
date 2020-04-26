@@ -75,7 +75,8 @@ pub struct Process {
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
-    pub parent: Weak<Mutex<Process>>,
+    // avoid deadlock, put pid out
+    pub parent: (Pid, Weak<Mutex<Process>>),
     pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
     pub threads: Vec<Tid>, // threads in the same process
 
@@ -136,7 +137,7 @@ impl Thread {
                 semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
-                parent: Weak::new(),
+                parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
@@ -323,7 +324,7 @@ impl Thread {
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
                 pid: Pid(0),
-                parent: Weak::new(),
+                parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
@@ -366,7 +367,7 @@ impl Thread {
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
             pid: Pid(0),
-            parent: Arc::downgrade(&self.proc),
+            parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
@@ -455,7 +456,7 @@ impl Process {
         }
 
         // notify parent and fill exit code
-        if let Some(parent) = self.parent.upgrade() {
+        if let Some(parent) = self.parent.1.upgrade() {
             let mut parent = parent.busy_lock();
             parent.child_exit_code.insert(self.pid.get(), exit_code);
             parent.child_exit.notify_one();

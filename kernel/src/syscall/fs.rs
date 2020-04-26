@@ -564,12 +564,8 @@ impl Syscall<'_> {
                 }
                 Err(FsError::EntryNotFound) => {
                     let inode = dir_inode.create(file_name, FileType::File, mode as u32)?;
-                    let mut metadata = inode.metadata()?;
-                    let now = TimeSpec::get_epoch().into();
-                    metadata.atime = now;
-                    metadata.mtime = now;
-                    metadata.ctime = now;
-                    inode.set_metadata(&metadata)?;
+                    TimeSpec::update(&inode);
+                    TimeSpec::update(&dir_inode);
                     inode
                 }
                 Err(e) => return Err(SysError::from(e)),
@@ -913,11 +909,13 @@ impl Syscall<'_> {
         );
 
         let (dir_path, file_name) = split_path(&path);
-        let inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
-        if inode.find(file_name).is_ok() {
+        let dir_inode = proc.lookup_inode_at(dirfd, dir_path, true)?;
+        if dir_inode.find(file_name).is_ok() {
             return Err(SysError::EEXIST);
         }
-        inode.create(file_name, FileType::Dir, mode as u32)?;
+        let inode = dir_inode.create(file_name, FileType::Dir, mode as u32)?;
+        TimeSpec::update(&inode);
+        TimeSpec::update(&dir_inode);
         Ok(0)
     }
 
@@ -995,6 +993,8 @@ impl Syscall<'_> {
                 FsError::EntryNotFound => {
                     let symlink = dir_inode.create(filename, FileType::SymLink, 0o777)?;
                     symlink.write_at(0, target.as_bytes())?;
+                    TimeSpec::update(&symlink);
+                    TimeSpec::update(&dir_inode);
                     Ok(0)
                 }
                 _ => Err(e.into()),

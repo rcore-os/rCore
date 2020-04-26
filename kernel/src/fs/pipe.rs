@@ -89,6 +89,7 @@ impl INode for Pipe {
         }
         if let PipeEnd::Read = self.direction {
             // condvar is fake
+            // TODO: release on process lock?
             let mut data = self.data.lock();
             while data.buf.len() == 0 && data.end_cnt == 2 {
                 data = data.new_data.clone().wait(data);

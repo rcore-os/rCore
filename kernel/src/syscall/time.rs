@@ -150,6 +150,16 @@ impl TimeSpec {
             nsec: (usec % USEC_PER_SEC * NSEC_PER_USEC) as usize,
         }
     }
+
+    // TODO: more precise; update when write
+    pub fn update(inode: &Arc<dyn INode>) {
+        let now = TimeSpec::get_epoch().into();
+        let mut metadata = inode.metadata().unwrap();
+        metadata.atime = now;
+        metadata.mtime = now;
+        metadata.ctime = now;
+        inode.set_metadata(&metadata).expect("set metadata failed");
+    }
 }
 
 impl Into<Timespec> for TimeSpec {

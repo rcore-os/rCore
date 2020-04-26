@@ -271,8 +271,10 @@ impl Syscall<'_> {
 
     /// Get the parent process id
     pub fn sys_getppid(&mut self) -> SysResult {
-        if let Some(parent) = self.process().parent.upgrade() {
-            Ok(parent.busy_lock().pid.get())
+        info!("getppid");
+        let (pid, parent) = self.process().parent.clone();
+        if parent.upgrade().is_some() {
+            Ok(pid.get())
         } else {
             Ok(0)
         }
