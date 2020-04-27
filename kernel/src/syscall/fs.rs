@@ -1097,8 +1097,22 @@ impl Syscall<'_> {
     pub fn sys_fcntl(&mut self, fd: usize, cmd: usize, arg: usize) -> SysResult {
         info!("fcntl: fd: {}, cmd: {:x}, arg: {}", fd, cmd, arg);
         let mut proc = self.process();
-        let file_like = proc.get_file_like(fd)?;
-        file_like.fcntl(cmd, arg)
+        const F_DUPFD_CLOEXEC: usize = 1030;
+        if cmd == F_DUPFD_CLOEXEC {
+            // dupfd with close on exec
+            // TODO: close on exec
+            let file_like = proc.get_file_like(fd)?.clone();
+            for new_fd in arg.. {
+                if proc.files.get(&new_fd).is_none() {
+                    proc.files.insert(new_fd, file_like);
+                    return Ok(new_fd);
+                }
+            }
+            panic!("no available fd found")
+        } else {
+            let file_like = proc.get_file_like(fd)?;
+            file_like.fcntl(cmd, arg)
+        }
     }
 }
 
