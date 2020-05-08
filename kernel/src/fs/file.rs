@@ -13,25 +13,22 @@ use rcore_memory::memory_set::handler::File;
 
 use crate::sync::SpinLock as Mutex;
 
+/* Operations for the `flock' call.  */
+pub const LOCK_SH: usize = 1;	/* Shared lock.  */
+pub const LOCK_EX: usize = 2; 	/* Exclusive lock.  */
+pub const LOCK_UN: usize = 8;	/* Unlock.  */
+pub const __LOCK_ATOMIC: usize = 16;	/* Atomic update.  */
+
+/* Can be OR'd in to one of the above.  */
+pub const LOCK_NB: usize = 4;	/* Don't block when locking.  */
+
+#[derive(Clone)]
 pub struct FileHandle {
     inode: Arc<dyn INode>,
     offset: Arc<Mutex<u64>>,
     pub options: Arc<Mutex<OpenOptions>>,
     pub path: String,
     pub fd_cloexec: bool,
-}
-
-impl Clone for FileHandle {
-    // do not share offset
-    fn clone(&self) -> Self {
-        FileHandle {
-            inode: self.inode.clone(),
-            offset: Arc::new(Mutex::new(*self.offset.lock())),
-            options: Arc::new(Mutex::new(*self.options.lock())),
-            path: self.path.clone(),
-            fd_cloexec: self.fd_cloexec,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -66,17 +63,7 @@ impl FileHandle {
         };
     }
 
-    pub fn clone_shared(&self) -> Self {
-        FileHandle {
-            inode: self.inode.clone(),
-            offset: self.offset.clone(),
-            options: self.options.clone(),
-            path: self.path.clone(),
-            fd_cloexec: self.fd_cloexec,
-        }
-    }
-
-    // do almost as default clone does, share the offset
+    // do almost as default clone does, but with fd_cloexec specified
     pub fn dup(&self, fd_cloexec: bool) -> Self {
         FileHandle {
             inode: self.inode.clone(),

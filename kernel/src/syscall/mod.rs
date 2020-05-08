@@ -115,7 +115,7 @@ impl Syscall<'_> {
                 );
                 self.sys_fcntl(args[0], args[1], args[2])
             }
-            SYS_FLOCK => self.unimplemented("flock", Ok(0)),
+            SYS_FLOCK => self.sys_flock(args[0], args[1]),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
             SYS_TRUNCATE => self.sys_truncate(args[0] as *const u8, args[1]),
@@ -147,7 +147,7 @@ impl Syscall<'_> {
             SYS_FCHOWNAT => self.unimplemented("fchownat", Ok(0)),
             SYS_FACCESSAT => self.sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_DUP3 => self.sys_dup3(args[0], args[1], args[2]),
-            SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
+            SYS_PIPE2 => self.sys_pipe2(args[0] as *mut u32, args[1]), // TODO: handle `flags`
             SYS_UTIMENSAT => self.sys_utimensat(
                 args[0],
                 args[1] as *const u8,

@@ -185,7 +185,8 @@ impl Syscall<'_> {
         let mut i = 0;
         for elm in slice {
             unsafe {
-                *elm = i + crate::trap::TICK as u8;
+                // to prevent overflow
+                *elm = (i + crate::trap::TICK as u8 as u16) as u8;
             }
             i += 1;
         }

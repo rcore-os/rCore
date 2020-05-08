@@ -344,24 +344,9 @@ impl Thread {
 
         let mut proc = self.proc.lock();
 
-        let mut files = BTreeMap::new();
-        let mut offsets = BTreeSet::new();
-        for (fd, file_like) in proc.files.iter() {
-            if let FileLike::File(file) = file_like {
-                let addr = file.options.as_ref() as *const _ as usize;
-                if offsets.contains(&addr) {
-                    files.insert(*fd, FileLike::File(file.clone_shared()));
-                } else {
-                    files.insert(*fd, FileLike::File(file.clone()));
-                    offsets.insert(addr);
-                }
-            } else {
-                files.insert(*fd, file_like.clone());
-            }
-        }
         let new_proc = Process {
             vm: vm.clone(),
-            files,
+            files: proc.files.clone(),  // share open file descriptions
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),

@@ -22,6 +22,7 @@ use crate::fs::FileLike;
 use crate::process::Process;
 use crate::syscall::SysError::EINVAL;
 use rcore_fs::vfs::PollStatus;
+use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -33,18 +34,24 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.read(slice)?;
+        if len == 1 && !proc.pid.is_init(){
+            println!("write content: {}", slice[0] as char);
+        }
         Ok(len)
     }
 
     pub fn sys_write(&mut self, fd: usize, base: *const u8, len: usize) -> SysResult {
         let mut proc = self.process();
-        // if !proc.pid.is_init() {
-        //     we trust pid 0 process
-        info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
-        // }
+        if !proc.pid.is_init() {
+            //we trust pid 0 process
+            info!("write: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
+        }
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
+        if len == 1 && !proc.pid.is_init(){
+            println!("write content: {}", slice[0] as char);
+        }
         Ok(len)
     }
 
@@ -85,6 +92,9 @@ impl Syscall<'_> {
         timeout: *const TimeSpec,
     ) -> SysResult {
         let proc = self.process();
+        if !proc.pid.is_init() {
+            info!("ppoll: ufds: {:#x}, nfds: {}, timeout: {:#x}", ufds as usize, nfds, timeout as usize);
+        }
         let timeout_msecs = if timeout.is_null() {
             1 << 31 // infinity
         } else {
@@ -110,6 +120,12 @@ impl Syscall<'_> {
         let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
 
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
+
+        if !proc.pid.is_init() {
+            info!(
+                "poll: fds: {:?}", polls
+            );
+        }
 
         drop(proc);
 
@@ -736,6 +752,16 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    pub fn sys_flock(&mut self, fd: usize, operation: usize) -> SysResult {
+        info!("flock: fd: {}, operation: {}", fd, operation);
+        let mut proc = self.process();
+        // let file_like = proc.get_file_like(fd)?;
+        let file = proc.get_file(fd)?;
+
+
+        Ok(0)
+    }
+
     pub fn sys_fdatasync(&mut self, fd: usize) -> SysResult {
         info!("fdatasync: fd: {}", fd);
         self.process().get_file(fd)?.sync_data()?;
@@ -1021,8 +1047,10 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_pipe(&mut self, fds: *mut u32) -> SysResult {
-        info!("pipe: fds: {:?}", fds);
+    pub fn sys_pipe(&mut self, fds: *mut u32) -> SysResult { self.sys_pipe2(fds, 0) }
+
+    pub fn sys_pipe2(&mut self, fds: *mut u32, flags: usize) -> SysResult {
+        info!("pipe2: fds: {:?}, flags: {:#x}", fds, flags);
 
         let mut proc = self.process();
         let fds = unsafe { self.vm().check_write_array(fds, 2)? };
@@ -1034,10 +1062,10 @@ impl Syscall<'_> {
                 read: true,
                 write: false,
                 append: false,
-                nonblock: false,
+                nonblock: (flags & O_NONBLOCK) != 0,
             },
             String::from("pipe_r:[]"),
-            false,
+            (flags & O_CLOEXEC) != 0
         )));
 
         let write_fd = proc.add_file(FileLike::File(FileHandle::new(

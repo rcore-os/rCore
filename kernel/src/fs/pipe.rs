@@ -61,6 +61,7 @@ impl Pipe {
 
     fn can_read(&self) -> bool {
         if let PipeEnd::Read = self.direction {
+            // true
             let data = self.data.lock();
             data.buf.len() > 0 || data.end_cnt < 2
         } else {

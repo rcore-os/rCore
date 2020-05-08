@@ -9,7 +9,6 @@ use alloc::boxed::Box;
 use rcore_fs::vfs::{MMapArea, PollStatus};
 
 // TODO: merge FileLike to FileHandle ?
-// TODO: fix dup and remove Clone
 #[derive(Clone)]
 pub enum FileLike {
     File(FileHandle),
@@ -19,11 +18,11 @@ pub enum FileLike {
 
 impl FileLike {
     pub fn dup(&self, fd_cloexec: bool) -> FileLike {
-        use FileLike::File;
-        if let File(file) = self {
-            File(file.dup(fd_cloexec))
-        } else {
-            self.clone()
+        use FileLike::*;
+        match self {
+            File(file) => File(file.dup(fd_cloexec)),
+            Socket(s) => Socket(s.clone()),
+            EpollInstance(e) => EpollInstance(e.clone()),
         }
     }
 
