@@ -346,7 +346,7 @@ impl Thread {
 
         let new_proc = Process {
             vm: vm.clone(),
-            files: proc.files.clone(),  // share open file descriptions
+            files: proc.files.clone(), // share open file descriptions
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),

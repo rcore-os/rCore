@@ -18,11 +18,11 @@ use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
+use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
 use crate::syscall::SysError::EINVAL;
 use rcore_fs::vfs::PollStatus;
-use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -34,7 +34,7 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.read(slice)?;
-        if len == 1 && !proc.pid.is_init(){
+        if len == 1 && !proc.pid.is_init() {
             println!("write content: {}", slice[0] as char);
         }
         Ok(len)
@@ -49,7 +49,7 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
-        if len == 1 && !proc.pid.is_init(){
+        if len == 1 && !proc.pid.is_init() {
             println!("write content: {}", slice[0] as char);
         }
         Ok(len)
@@ -93,7 +93,10 @@ impl Syscall<'_> {
     ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
-            info!("ppoll: ufds: {:#x}, nfds: {}, timeout: {:#x}", ufds as usize, nfds, timeout as usize);
+            info!(
+                "ppoll: ufds: {:#x}, nfds: {}, timeout: {:#x}",
+                ufds as usize, nfds, timeout as usize
+            );
         }
         let timeout_msecs = if timeout.is_null() {
             1 << 31 // infinity
@@ -122,9 +125,7 @@ impl Syscall<'_> {
         let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
 
         if !proc.pid.is_init() {
-            info!(
-                "poll: fds: {:?}", polls
-            );
+            info!("poll: fds: {:?}", polls);
         }
 
         drop(proc);
@@ -758,7 +759,6 @@ impl Syscall<'_> {
         // let file_like = proc.get_file_like(fd)?;
         let file = proc.get_file(fd)?;
 
-
         Ok(0)
     }
 
@@ -1047,7 +1047,9 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_pipe(&mut self, fds: *mut u32) -> SysResult { self.sys_pipe2(fds, 0) }
+    pub fn sys_pipe(&mut self, fds: *mut u32) -> SysResult {
+        self.sys_pipe2(fds, 0)
+    }
 
     pub fn sys_pipe2(&mut self, fds: *mut u32, flags: usize) -> SysResult {
         info!("pipe2: fds: {:?}, flags: {:#x}", fds, flags);
@@ -1065,7 +1067,7 @@ impl Syscall<'_> {
                 nonblock: (flags & O_NONBLOCK) != 0,
             },
             String::from("pipe_r:[]"),
-            (flags & O_CLOEXEC) != 0
+            (flags & O_CLOEXEC) != 0,
         )));
 
         let write_fd = proc.add_file(FileLike::File(FileHandle::new(

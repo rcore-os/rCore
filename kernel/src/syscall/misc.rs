@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::arch::cpu;
-use crate::consts::{USER_STACK_SIZE, ARCH};
+use crate::consts::{ARCH, USER_STACK_SIZE};
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
 

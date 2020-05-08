@@ -25,6 +25,8 @@ impl Condvar {
         Condvar::default()
     }
 
+    pub fn wait_queue_len(&self) -> usize { self.wait_queue.lock().len() }
+
     /// Park current thread and wait for this condvar to be notified.
     #[deprecated(note = "this may leads to lost wakeup problem. please use `wait` instead.")]
     pub fn _wait(&self) {

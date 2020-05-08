@@ -14,13 +14,13 @@ use rcore_memory::memory_set::handler::File;
 use crate::sync::SpinLock as Mutex;
 
 /* Operations for the `flock' call.  */
-pub const LOCK_SH: usize = 1;	/* Shared lock.  */
-pub const LOCK_EX: usize = 2; 	/* Exclusive lock.  */
-pub const LOCK_UN: usize = 8;	/* Unlock.  */
-pub const __LOCK_ATOMIC: usize = 16;	/* Atomic update.  */
+pub const LOCK_SH: usize = 1; /* Shared lock.  */
+pub const LOCK_EX: usize = 2; /* Exclusive lock.  */
+pub const LOCK_UN: usize = 8; /* Unlock.  */
+pub const __LOCK_ATOMIC: usize = 16; /* Atomic update.  */
 
 /* Can be OR'd in to one of the above.  */
-pub const LOCK_NB: usize = 4;	/* Don't block when locking.  */
+pub const LOCK_NB: usize = 4; /* Don't block when locking.  */
 
 #[derive(Clone)]
 pub struct FileHandle {
