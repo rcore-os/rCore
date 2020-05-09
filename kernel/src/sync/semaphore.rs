@@ -7,7 +7,6 @@ use super::SpinNoIrqLock as Mutex;
 use crate::syscall::SysError;
 use core::cell::Cell;
 use core::ops::Deref;
-use crate::process::Pid;
 
 struct SemaphoreInner {
     pub count: isize,
@@ -95,8 +94,12 @@ impl Semaphore {
         self.cvar.wait_queue_len()
     }
 
-    pub fn get_pid(&self) -> usize { self.lock.lock().pid }
-    pub fn set_pid(&self, pid: usize) { self.lock.lock().pid = pid; }
+    pub fn get_pid(&self) -> usize {
+        self.lock.lock().pid
+    }
+    pub fn set_pid(&self, pid: usize) {
+        self.lock.lock().pid = pid;
+    }
 
     /// Set the current count
     pub fn set(&self, value: isize) {

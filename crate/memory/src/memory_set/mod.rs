@@ -252,7 +252,7 @@ impl<T: PageTableExt> MemorySet<T> {
                     // subset
                     let area = self.areas.remove(i);
                     area.unmap(&mut self.page_table);
-                    i -= 1;
+                    i = i.wrapping_sub(1);
                 } else if self.areas[i].start_addr >= start_addr
                     && self.areas[i].start_addr < end_addr
                 {
@@ -324,7 +324,7 @@ impl<T: PageTableExt> MemorySet<T> {
                     i += 1;
                 }
             }
-            i += 1;
+            i = i.wrapping_add(1);
         }
     }
 

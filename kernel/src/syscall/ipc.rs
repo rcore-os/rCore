@@ -74,7 +74,8 @@ impl Syscall<'_> {
                 Ok(0)
             }
             IPC_STAT => {
-                *unsafe { self.vm().check_write_ptr(arg as *mut SemidDs)? } = *sem_array.semid_ds.lock();
+                *unsafe { self.vm().check_write_ptr(arg as *mut SemidDs)? } =
+                    *sem_array.semid_ds.lock();
                 Ok(0)
             }
             _ => {
