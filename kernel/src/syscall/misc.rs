@@ -122,7 +122,7 @@ impl Syscall<'_> {
         // we will skip verifying magic
         if cmd == LINUX_REBOOT_CMD_HALT {
             unsafe {
-                cpu::exit_in_qemu(1);
+                cpu::exit_in_qemu(0);
             }
         } else if cmd == LINUX_REBOOT_CMD_RESTART {
             unsafe {
