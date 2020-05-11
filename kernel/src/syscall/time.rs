@@ -149,6 +149,10 @@ impl TimeSpec {
             nsec: (usec % USEC_PER_SEC * NSEC_PER_USEC) as usize,
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.sec == 0 && self.nsec == 0
+    }
 }
 
 // ignore other fields for now
