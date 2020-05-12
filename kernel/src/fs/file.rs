@@ -160,14 +160,14 @@ impl FileHandle {
         self.inode.lookup_follow(path, max_follow)
     }
 
-    pub fn read_entry(&mut self) -> Result<String> {
+    pub fn read_entry(&mut self) -> Result<(usize, FileType, String)> {
         if !self.options.lock().read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let mut offset_inner = self.offset.lock();
-        let name = self.inode.get_entry(*offset_inner as usize)?;
+        let entry = self.inode.get_entry(*offset_inner as usize)?;
         *offset_inner += 1;
-        Ok(name)
+        Ok(entry)
     }
 
     pub fn poll(&self) -> Result<PollStatus> {
@@ -207,33 +207,6 @@ impl FileHandle {
     pub fn inode(&self) -> Arc<dyn INode> {
         self.inode.clone()
     }
-
-    // pub fn fcntl(&mut self, cmd: usize, arg: usize) -> SysResult {
-    //     use super::fcntl::*;
-    //     match cmd {
-    //         F_SETFD => {
-    //             self.fd_cloexec = (arg & 1) as bool;
-    //             Ok(0)
-    //         }
-    //         F_GETFD => {
-    //             Ok(self.fd_cloexec as usize)
-    //         }
-    //         F_SETFL => {
-    //             if arg & 0x800 > 0 {
-    //                 self.options.nonblock = true;
-    //             }
-    //             Ok(0)
-    //         }
-    //         F_DUPFD_CLOEXEC => {
-    //             info!("dupfd_cloexec: arg: {:#x}", arg);
-    //             let proc = self
-    //             Ok(0)
-    //         }
-    //         _ => {
-    //             Ok(0)
-    //         }
-    //     }
-    // }
 }
 
 impl fmt::Debug for FileHandle {

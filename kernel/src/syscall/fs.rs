@@ -801,12 +801,11 @@ impl Syscall<'_> {
         }
         let mut writer = DirentBufWriter::new(buf);
         loop {
-            let name = match file.read_entry() {
+            let (ino, file_type, name) = match file.read_entry() {
                 Err(FsError::EntryNotFound) => break,
                 r => r,
             }?;
-            // TODO: get ino from dirent
-            let ok = writer.try_write(0, DirentType::from_type(&info.type_).bits(), &name);
+            let ok = writer.try_write(ino as u64, DirentType::from_type(&file_type).bits(), &name);
             if !ok {
                 file.seek(SeekFrom::Current(-1))?;
                 break;
@@ -1435,7 +1434,7 @@ impl OpenFlags {
 pub struct LinuxDirent64 {
     /// Inode number
     ino: u64,
-    /// Offset to next structure
+    /// Offset to next structure, an opaque value
     offset: u64,
     /// Size of this dirent
     reclen: u16,

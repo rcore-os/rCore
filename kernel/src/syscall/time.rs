@@ -161,6 +161,10 @@ impl TimeSpec {
             inode.set_metadata(&metadata).expect("set metadata failed");
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.sec == 0 && self.nsec == 0
+    }
 }
 
 impl Into<Timespec> for TimeSpec {
@@ -169,8 +173,6 @@ impl Into<Timespec> for TimeSpec {
             sec: self.sec as i64,
             nsec: self.nsec as i32,
         }
-    pub fn is_zero(&self) -> bool {
-        self.sec == 0 && self.nsec == 0
     }
 }
 
