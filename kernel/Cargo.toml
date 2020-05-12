@@ -62,7 +62,7 @@ isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", f
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
-bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
+bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator", rev="03bd990" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "d727949b" }
