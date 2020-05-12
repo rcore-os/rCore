@@ -327,8 +327,10 @@ impl Syscall<'_> {
     pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {
         let time = unsafe { *self.vm().check_read_ptr(req)? };
         info!("nanosleep: time: {:#?}", time);
-        // TODO: handle spurious wakeup
-        thread::sleep(time.to_duration());
+        if !time.is_zero() {
+            // TODO: handle spurious wakeup
+            thread::sleep(time.to_duration());
+        }
         Ok(0)
     }
 
