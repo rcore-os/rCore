@@ -808,6 +808,7 @@ impl Syscall<'_> {
             // TODO: get ino from dirent
             let ok = writer.try_write(0, DirentType::from_type(&info.type_).bits(), &name);
             if !ok {
+                file.seek(SeekFrom::Current(-1))?;
                 break;
             }
         }
