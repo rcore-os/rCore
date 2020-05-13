@@ -160,14 +160,24 @@ impl FileHandle {
         self.inode.lookup_follow(path, max_follow)
     }
 
-    pub fn read_entry(&mut self) -> Result<(usize, FileType, String)> {
+    pub fn read_entry(&mut self) -> Result<String> {
         if !self.options.lock().read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let mut offset_inner = self.offset.lock();
-        let entry = self.inode.get_entry(*offset_inner as usize)?;
+        let name = self.inode.get_entry(*offset_inner as usize)?;
         *offset_inner += 1;
-        Ok(entry)
+        Ok(name)
+    }
+
+    pub fn read_entry_with_metadata(&mut self) -> Result<(Metadata, String)> {
+        if !self.options.lock().read {
+            return Err(FsError::InvalidParam); // FIXME: => EBADF
+        }
+        let mut offset_inner = self.offset.lock();
+        let ret = self.inode.get_entry_with_metadata(*offset_inner as usize)?;
+        *offset_inner += 1;
+        Ok(ret)
     }
 
     pub fn poll(&self) -> Result<PollStatus> {

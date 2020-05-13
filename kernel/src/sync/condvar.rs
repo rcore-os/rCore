@@ -1,11 +1,13 @@
 use super::*;
+use crate::consts::{INFORM_PER_MSEC, USEC_PER_TICK};
 use crate::process::thread_manager;
 use crate::process::Process;
-use crate::thread;
+use crate::syscall::TimeSpec;
+use crate::{processor, thread};
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use rcore_thread::std_thread::Thread;
+use rcore_thread::std_thread::{sleep, Thread};
 
 pub struct RegisteredProcess {
     proc: Arc<SpinNoIrqLock<Process>>,
@@ -97,10 +99,46 @@ impl Condvar {
             drop(lock);
             drop(guard);
         });
+        // Doubt: Is removing the thread from the waiting queue first more reasonable?
+        // Since it is already woke up.
         let ret = mutex.lock();
         let mut lock = self.wait_queue.lock();
         lock.retain(|t| !Arc::ptr_eq(&t, &token));
         ret
+    }
+
+    /// Park current thread and wait for this condvar to be notified or timeout.
+    pub fn wait_timeout<'a, T, S>(
+        &self,
+        guard: MutexGuard<'a, T, S>,
+        timeout: TimeSpec,
+    ) -> Option<MutexGuard<'a, T, S>>
+    where
+        S: MutexSupport,
+    {
+        let mutex = guard.mutex;
+        let token = Arc::new(thread::current());
+        let mut lock = self.wait_queue.lock();
+        lock.push_back(token.clone());
+        drop(lock);
+        drop(guard);
+
+        let timeout = core::time::Duration::new(timeout.sec as u64, timeout.nsec as u32);
+        let begin = crate::trap::uptime_msec();
+        if timeout.as_millis() != 0 {
+            sleep(timeout);
+        }
+        let end = crate::trap::uptime_msec();
+        if end - begin >= timeout.as_millis() as usize {
+            let mut lock = self.wait_queue.lock();
+            lock.retain(|t| !Arc::ptr_eq(&t, &token));
+            None
+        } else {
+            let ret = mutex.lock();
+            let mut lock = self.wait_queue.lock();
+            lock.retain(|t| !Arc::ptr_eq(&t, &token));
+            Some(ret)
+        }
     }
 
     pub fn notify_one(&self) {

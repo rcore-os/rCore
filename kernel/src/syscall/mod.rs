@@ -148,6 +148,8 @@ impl Syscall<'_> {
             SYS_FACCESSAT => self.sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_DUP3 => self.sys_dup3(args[0], args[1], args[2]),
             SYS_PIPE2 => self.sys_pipe2(args[0] as *mut u32, args[1]), // TODO: handle `flags`
+            SYS_SET_ROBUST_LIST => self.unimplemented("set_robuts_list", Ok(0)),
+            SYS_GET_ROBUST_LIST => self.unimplemented("get_robust_list", Ok(0)),
             SYS_UTIMENSAT => self.sys_utimensat(
                 args[0],
                 args[1] as *const u8,
@@ -554,6 +556,7 @@ pub enum SysError {
     ENOBUFS = 105,
     EISCONN = 106,
     ENOTCONN = 107,
+    ETIMEDOUT = 110,
     ECONNREFUSED = 111,
 }
 

@@ -77,7 +77,7 @@ impl Pipe {
         }
     }
 
-    // deprecate because of deadlock
+    // deprecate because of deadlock, use this inline instead
     // fn is_broken(&self) -> bool {
     //     self.data.lock().end_cnt < 2
     // }
@@ -89,8 +89,7 @@ impl INode for Pipe {
             return Ok(0);
         }
         if let PipeEnd::Read = self.direction {
-            // condvar is fake
-            // TODO: release on process lock?
+            // TODO: release on process lock? Or maybe remove the condvar
             let mut data = self.data.lock();
             while data.buf.len() == 0 && data.end_cnt == 2 {
                 data = data.new_data.clone().wait(data);

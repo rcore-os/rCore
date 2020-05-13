@@ -3,6 +3,8 @@
 use super::*;
 use crate::arch::cpu;
 use crate::consts::{ARCH, USER_STACK_SIZE};
+use crate::syscall::SysError::ETIMEDOUT;
+use crate::trap::TICK_ACTIVITY;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
 
@@ -88,18 +90,21 @@ impl Syscall<'_> {
 
         match op & 0xf {
             OP_WAIT => {
-                let _timeout = if timeout.is_null() {
-                    None
-                } else {
-                    Some(unsafe { *self.vm().check_read_ptr(timeout)? })
-                };
-
                 if atomic.load(Ordering::Acquire) != val {
                     return Err(SysError::EAGAIN);
                 }
-                // FIXME: support timeout
-                queue.wait(proc);
-                Ok(0)
+                if timeout.is_null() {
+                    queue.wait(proc);
+                    Ok(0)
+                } else {
+                    let timeout = unsafe { *self.vm().check_read_ptr(timeout)? };
+                    info!("futex wait timeout: {:?}", timeout);
+                    if queue.wait_timeout(proc, timeout).is_some() {
+                        Ok(0)
+                    } else {
+                        Err(ETIMEDOUT)
+                    }
+                }
             }
             OP_WAKE => {
                 let woken_up_count = queue.notify_n(val as usize);
