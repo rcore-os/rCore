@@ -91,7 +91,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "bitmap-allocator"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/bitmap-allocator?rev=03bd990#03bd9909d0dc85e99f5559b97a163ab81073df83"
+source = "git+https://github.com/rcore-os/bitmap-allocator#03bd9909d0dc85e99f5559b97a163ab81073df83"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -347,7 +347,7 @@ dependencies = [
  "bcm2837 2.5.1 (git+https://github.com/rcore-os/bcm2837)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator?rev=03bd990)",
+ "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
  "bitvec 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "buddy_system_allocator 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -717,7 +717,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
-"checksum bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator?rev=03bd990)" = "<none>"
+"checksum bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)" = "<none>"
 "checksum bitvec 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1fe4300c1d7a9ea6f3e3f39c10b39862bb79e1175c0572b6b49539a30e5562f5"
 "checksum buddy_system_allocator 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "9e953b958d83e13a44b1ead5b6aaa2a5f854bd5170239a66b606e030a14d018f"
 "checksum byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a7c3dd8985a7111efc5c80b44e23ecdd8c007de8ade3b96595387e812b957cf5"
