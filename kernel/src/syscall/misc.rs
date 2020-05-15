@@ -58,6 +58,11 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    pub fn sys_tkill(&mut self, tgid: i32, tid: i32, sig: i32) -> SysResult {
+        info!("tkill: [{}] tgid: {}, tid: {}, sig: {}", thread::current().id(), tgid, tid, sig);
+        self.unimplemented("tkill", Ok(0))
+    }
+
     pub fn sys_futex(
         &mut self,
         uaddr: usize,

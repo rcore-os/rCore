@@ -283,7 +283,7 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
-            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
+            SYS_TKILL => self.sys_tkill(args[0] as i32, args[1] as i32, args[2] as i32),
 
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),

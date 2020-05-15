@@ -142,32 +142,40 @@ impl Condvar {
     }
 
     pub fn notify_one(&self) {
-        if let Some(t) = self.wait_queue.lock().front() {
+        let mut queue = self.wait_queue.lock();
+        if let Some(t) = queue.front() {
             self.epoll_callback(t);
             t.unpark();
+            queue.pop_front();
         }
+
     }
 
     pub fn notify_all(&self) {
-        let queue = self.wait_queue.lock();
+        let mut queue = self.wait_queue.lock();
         for t in queue.iter() {
             self.epoll_callback(t);
             t.unpark();
         }
+        queue.clear();
     }
+
     /// Notify up to `n` waiters.
     /// Return the number of waiters that were woken up.
     pub fn notify_n(&self, n: usize) -> usize {
         let mut count = 0;
-        let queue = self.wait_queue.lock();
+        let mut queue = self.wait_queue.lock();
         for t in queue.iter() {
             if count >= n {
                 break;
             }
+            self.epoll_callback(t);
             t.unpark();
             count += 1;
         }
-
+        for _ in 0..count {
+            queue.pop_front();
+        }
         count
     }
 
