@@ -11,8 +11,10 @@ use alloc::boxed::Box;
 use core::cmp::min;
 use rcore_fs::vfs::FsError::Again;
 use rcore_thread::std_thread::{park, yield_now};
+use alloc::collections::BTreeSet;
+use crate::syscall::SysError::EAGAIN;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum PipeEnd {
     Read,
     Write,
@@ -91,14 +93,18 @@ impl INode for Pipe {
         if let PipeEnd::Read = self.direction {
             // TODO: release on process lock? Or maybe remove the condvar
             let mut data = self.data.lock();
-            while data.buf.len() == 0 && data.end_cnt == 2 {
-                data = data.new_data.clone().wait(data);
+            // while data.buf.len() == 0 && data.end_cnt == 2 {
+            //     data = data.new_data.clone().wait(data);
+            // }
+            if data.buf.len() == 0 && data.end_cnt == 2 {
+                Err(Again)
+            } else {
+                let len = min(buf.len(), data.buf.len());
+                for i in 0..len {
+                    buf[i] = data.buf.pop_front().unwrap();
+                }
+                Ok(len)
             }
-            let len = min(buf.len(), data.buf.len());
-            for i in 0..len {
-                buf[i] = data.buf.pop_front().unwrap();
-            }
-            Ok(len)
         } else {
             Ok(0)
         }

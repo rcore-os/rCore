@@ -7,11 +7,11 @@ use rcore_fs_devfs::{
 };
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
-use rcore_fs_sfs::SimpleFileSystem;
+use rcore_fs_sfs::{SimpleFileSystem, INodeImpl};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{TtyINode, STDIN, STDOUT};
+pub use self::devfs::{TtyINode, STDIN, STDOUT, ShmINode};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -89,12 +89,18 @@ lazy_static! {
         devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/urandom");
         devfs.add("tty", Arc::new(TtyINode::default())).expect("failed to mknod /dev/tty");
         devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
+        devfs.add("shm", Arc::new(ShmINode::default())).expect("failed to mkdir shm");
 
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {
             root.create("dev", FileType::Dir, 0o666).expect("failed to mkdir /dev")
         });
-        dev.mount(devfs).expect("failed to mount DevFS");
+        let devfs = dev.mount(devfs).expect("failed to mount DevFS");
+
+        let shm = devfs.root_inode().find(true, "shm").expect("cannot find shm");
+        // mount RamFS at /dev/shm
+        let shmfs = RamFS::new();
+        shm.mount(shmfs).expect("failed to mount /dev/shm");
 
         // mount RamFS at /tmp
         let ramfs = RamFS::new();
@@ -115,6 +121,7 @@ pub trait INodeExt {
 
 impl INodeExt for dyn INode {
     fn read_as_vec(&self) -> Result<Vec<u8>> {
+
         let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);
         unsafe {

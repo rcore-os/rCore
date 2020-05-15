@@ -34,9 +34,7 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_write_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.read(slice)?;
-        if len == 1 && !proc.pid.is_init() {
-            println!("write content: {}", slice[0] as char);
-        }
+
         Ok(len)
     }
 
@@ -49,9 +47,9 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
-        if len == 1 && !proc.pid.is_init() {
-            println!("write content: {}", slice[0] as char);
-        }
+        // if len == 1 && !proc.pid.is_init() {
+        //     println!("write content: {}", slice[0] as char);
+        // }
         Ok(len)
     }
 
