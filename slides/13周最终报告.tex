@@ -1,0 +1,80 @@
+\documentclass{beamer}
+
+\usepackage{amsmath}
+\usefonttheme{serif}
+
+\usepackage{ctex} 
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{minted}
+\usepackage{graphics}
+\usepackage{booktabs}
+\usepackage{xeCJK}
+\setCJKmainfont[ItalicFont={楷体}, BoldFont={黑体}]{宋体}
+
+\usepackage{booktabs}
+
+\newcommand{\E}{\text{E}}
+\newcommand{\var}{\text{Var}}
+\newcommand{\cov}{\text{Cov}}
+\renewcommand{\d}{\text{d}}
+
+\setbeamertemplate{footline}[frame number]
+
+\title{rCore 的基本开发环境的搭建}
+
+\author{罗崚骁 \quad 宋香君}
+
+\begin{document}
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{课程设计目标}
+    \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item \textbf{C/C++ 开发}：基于 musl libc 的 gcc 工具链
+        \item \textbf{工程构建}：GNU make, CMake
+        \item \textbf{Rust 开发}：Rust 工具链
+        \item \textbf{版本控制系统}：git
+        \item \textbf{编辑器}：vi, vim
+        \item \textbf{软件包管理器}：cargo
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{目前进展}
+    \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item 在 rCore 中支持了 Make
+        \begin{itemize}
+            \item 用 3.78.1 的 Make 编译出了 3.79 的 Make
+        \end{itemize}
+        \item 使用 libc-test 作为测例测试了 musl-libc
+        \begin{itemize}
+            \item 258 个测例成功
+            \item 215 个测例失败，其中 18 个测例出现严重错误
+            \begin{itemize}
+                \item 失败的测例主要是 pthread、math 相关
+            \end{itemize}
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{目前进展}
+    \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item Cargo
+        \begin{itemize}
+            \item Command Substution
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}{结束}
+    谢谢观看
+\end{frame}
+
+\end{document}
