@@ -48,10 +48,7 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 #[cfg(feature = "board_k210")]
 pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
-lazy_static! {
-    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
-        SpinNoIrqLock::new(FrameAlloc::default());
-}
+pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::DEFAULT);
 
 /// Convert physical address to virtual address
 #[inline]
