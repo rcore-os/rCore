@@ -47,6 +47,9 @@ impl Syscall<'_> {
         // we only have 4 cpu at most.
         // so just set it.
         mask[0] = 0b1111;
+        mask[1] = 0;
+        mask[2] = 0;
+        mask[3] = 0;
         Ok(0)
     }
 

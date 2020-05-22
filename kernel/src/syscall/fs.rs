@@ -21,7 +21,7 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::syscall::SysError::EINVAL;
+use crate::syscall::SysError::{EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
 
 impl Syscall<'_> {
@@ -593,6 +593,7 @@ impl Syscall<'_> {
             inode,
             flags.to_options(),
             String::from(path),
+            false,
             flags.contains(OpenFlags::CLOEXEC),
         );
 
@@ -741,8 +742,12 @@ impl Syscall<'_> {
 
         let mut proc = self.process();
         let file = proc.get_file(fd)?;
-        let offset = file.seek(pos)?;
-        Ok(offset as usize)
+        if file.pipe {
+            Err(ESPIPE)
+        } else {
+            let offset = file.seek(pos)?;
+            Ok(offset as usize)
+        }
     }
 
     pub fn sys_fsync(&mut self, fd: usize) -> SysResult {
@@ -1069,6 +1074,7 @@ impl Syscall<'_> {
                 nonblock: (flags & O_NONBLOCK) != 0,
             },
             String::from("pipe_r:[]"),
+            true,
             (flags & O_CLOEXEC) != 0,
         )));
 
@@ -1081,7 +1087,8 @@ impl Syscall<'_> {
                 nonblock: false,
             },
             String::from("pipe_w:[]"),
-            false,
+            true,
+            (flags & O_CLOEXEC) != 0,
         )));
 
         fds[0] = read_fd as u32;
