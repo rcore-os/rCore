@@ -31,8 +31,9 @@ use crate::arch::interrupt;
 use crate::processor;
 use core::cell::UnsafeCell;
 use core::fmt;
+use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use rcore_thread::std_thread::yield_now;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
@@ -41,7 +42,8 @@ pub type SleepLock<T> = Mutex<T, Condvar>;
 
 pub struct Mutex<T: ?Sized, S: MutexSupport> {
     lock: AtomicBool,
-    support: S,
+    support: MaybeUninit<S>,
+    support_initialization: AtomicU8, // 0 = uninitialized, 1 = initializing, 2 = initialized
     user: UnsafeCell<(usize, usize)>, // (cid, tid)
     data: UnsafeCell<T>,
 }
@@ -76,11 +78,12 @@ impl<T, S: MutexSupport> Mutex<T, S> {
     ///     drop(lock);
     /// }
     /// ```
-    pub fn new(user_data: T) -> Mutex<T, S> {
+    pub const fn new(user_data: T) -> Mutex<T, S> {
         Mutex {
             lock: AtomicBool::new(false),
             data: UnsafeCell::new(user_data),
-            support: S::new(),
+            support: MaybeUninit::uninit(),
+            support_initialization: AtomicU8::new(0),
             user: UnsafeCell::new((0, 0)),
         }
     }
@@ -100,7 +103,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
             let mut try_count = 0;
             // Wait until the lock looks unlocked before retrying
             while self.lock.load(Ordering::Relaxed) {
-                self.support.cpu_relax();
+                unsafe { &*self.support.as_ptr() }.cpu_relax();
                 try_count += 1;
                 if try_count == 0x100000 {
                     let (cid, tid) = unsafe { *self.user.get() };
@@ -133,6 +136,9 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
     /// ```
     pub fn lock(&self) -> MutexGuard<T, S> {
         let support_guard = S::before_lock();
+
+        self.ensure_support();
+
         self.obtain_lock();
         MutexGuard {
             mutex: self,
@@ -147,6 +153,28 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
                 break x;
             }
             yield_now();
+        }
+    } 
+
+    pub fn ensure_support(&self) {
+        let initialization = self.support_initialization.load(Ordering::Relaxed);
+        if (initialization == 2) {
+            return;
+        };
+        if (initialization == 1
+            || self
+                .support_initialization
+                .compare_and_swap(0, 1, Ordering::Acquire)
+                != 0)
+        {
+            // Wait for another thread to initialize
+            while self.support_initialization.load(Ordering::Acquire) == 1 {
+                core::sync::atomic::spin_loop_hint();
+            }
+        } else {
+            // My turn to initialize
+            (unsafe { core::ptr::write(self.support.as_ptr() as *mut _, S::new()) });
+            self.support_initialization.store(2, Ordering::Release);
         }
     }
 
@@ -212,7 +240,7 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S> {
     /// The dropping of the MutexGuard will release the lock it was created from.
     fn drop(&mut self) {
         self.mutex.lock.store(false, Ordering::Release);
-        self.mutex.support.after_unlock();
+        unsafe { &*self.mutex.support.as_ptr() }.after_unlock();
     }
 }
 

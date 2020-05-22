@@ -1,5 +1,5 @@
 pub use crate::arch::paging::PageTableImpl;
-use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt, virt_to_phys};
+use crate::memory::{alloc_frame_contiguous, dealloc_frame, phys_to_virt, virt_to_phys};
 use isomorphic_drivers::provider;
 use rcore_memory::PAGE_SIZE;
 
@@ -24,13 +24,7 @@ impl provider::Provider for Provider {
 
 #[no_mangle]
 extern "C" fn virtio_dma_alloc(pages: usize) -> PhysAddr {
-    // TODO: allocate continuous pages
-    let mut paddr = alloc_frame().unwrap();
-    for _ in 1..pages {
-        let paddr_new = alloc_frame().unwrap();
-        assert_eq!(paddr - PAGE_SIZE, paddr_new);
-        paddr = paddr_new;
-    }
+    let paddr = alloc_frame_contiguous(pages, 0).unwrap();
     trace!("alloc DMA: paddr={:#x}, pages={}", paddr, pages);
     paddr
 }

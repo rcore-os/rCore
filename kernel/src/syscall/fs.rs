@@ -47,9 +47,9 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
-        // if len == 1 && !proc.pid.is_init() {
-        //     println!("write content: {}", slice[0] as char);
-        // }
+        if len == 1 && !proc.pid.is_init() {
+            println!("write content: {}", slice[0] as char);
+        }
         Ok(len)
     }
 
@@ -1825,6 +1825,8 @@ impl IoVecs {
             if readv {
                 vm.check_write_array(iov.base, iov.len)?;
             } else {
+
+
                 vm.check_read_array(iov.base, iov.len)?;
             }
             slices.push(slice::from_raw_parts_mut(iov.base, iov.len));

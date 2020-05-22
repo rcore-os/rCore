@@ -48,10 +48,7 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 #[cfg(feature = "board_k210")]
 pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
-lazy_static! {
-    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
-        SpinNoIrqLock::new(FrameAlloc::default());
-}
+pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::DEFAULT);
 
 /// Convert physical address to virtual address
 #[inline]
@@ -85,6 +82,16 @@ impl FrameAllocator for GlobalFrameAlloc {
         ret
         // TODO: try to swap out when alloc failed
     }
+    fn alloc_contiguous(&self, size: usize, align_log2: usize) -> Option<PhysAddr> {
+        // get the real address of the alloc frame
+        let ret = FRAME_ALLOCATOR
+            .lock()
+            .alloc_contiguous(size, align_log2)
+            .map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+        trace!("Allocate frame: {:x?}", ret);
+        ret
+        // TODO: try to swap out when alloc failed
+    }
     fn dealloc(&self, target: usize) {
         trace!("Deallocate frame: {:x}", target);
         FRAME_ALLOCATOR
@@ -98,6 +105,9 @@ pub fn alloc_frame() -> Option<usize> {
 }
 pub fn dealloc_frame(target: usize) {
     GlobalFrameAlloc.dealloc(target);
+}
+pub fn alloc_frame_contiguous(size: usize, align_log2: usize) -> Option<usize> {
+    GlobalFrameAlloc.alloc_contiguous(size, align_log2)
 }
 
 pub struct KernelStack(usize);
