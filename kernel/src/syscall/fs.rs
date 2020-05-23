@@ -757,11 +757,20 @@ impl Syscall<'_> {
     }
 
     pub fn sys_flock(&mut self, fd: usize, operation: usize) -> SysResult {
-        info!("flock: fd: {}, operation: {}", fd, operation);
+        bitflags! {
+            struct Operation: u8 {
+                const LOCK_SH = 1;
+                const LOCK_EX = 2;
+                const LOCK_NB = 4;
+                const LOCK_UN = 8;
+            }
+        }
+        let operation = Operation::from_bits(operation as u8).unwrap();
+        info!("flock: fd: {}, operation: {:?}", fd, operation);
         let mut proc = self.process();
         // let file_like = proc.get_file_like(fd)?;
         let file = proc.get_file(fd)?;
-
+        
         Ok(0)
     }
 

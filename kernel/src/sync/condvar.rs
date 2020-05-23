@@ -75,11 +75,16 @@ impl Condvar {
             if let Some(res) = condition() {
                 let _ = FlagsGuard::no_irq_region();
                 thread_manager().cancel_sleeping(tid);
-                for condvar in condvars {
-                    let mut lock = condvar.wait_queue.lock();
-                    lock.retain(|t| !Arc::ptr_eq(t, &token));
-                }
                 return res;
+            } else {
+                for condvar in condvars {
+                    let mut queue = condvar.wait_queue.lock();
+                    if queue.iter().find(|&t| {
+                        Arc::ptr_eq(t, &token)
+                    }).is_none() {
+                        queue.push_front(token.clone());
+                    }
+                }
             }
             thread::yield_now();
         }
@@ -99,12 +104,9 @@ impl Condvar {
             drop(lock);
             drop(guard);
         });
-        // Doubt: Is removing the thread from the waiting queue first more reasonable?
-        // Since it is already woke up.
-        let ret = mutex.lock();
-        let mut lock = self.wait_queue.lock();
-        lock.retain(|t| !Arc::ptr_eq(&t, &token));
-        ret
+        // let mut lock = self.wait_queue.lock();
+        // lock.retain(|t| !Arc::ptr_eq(&t, &token));
+        mutex.lock()
     }
 
     /// Park current thread and wait for this condvar to be notified or timeout.
@@ -128,16 +130,13 @@ impl Condvar {
         if timeout.as_millis() != 0 {
             sleep(timeout);
         }
+        // let mut lock = self.wait_queue.lock();
+        // lock.retain(|t| !Arc::ptr_eq(&t, &token));
         let end = crate::trap::uptime_msec();
         if end - begin >= timeout.as_millis() as usize {
-            let mut lock = self.wait_queue.lock();
-            lock.retain(|t| !Arc::ptr_eq(&t, &token));
             None
         } else {
-            let ret = mutex.lock();
-            let mut lock = self.wait_queue.lock();
-            lock.retain(|t| !Arc::ptr_eq(&t, &token));
-            Some(ret)
+            Some(mutex.lock())
         }
     }
 
@@ -148,7 +147,6 @@ impl Condvar {
             t.unpark();
             queue.pop_front();
         }
-
     }
 
     pub fn notify_all(&self) {
