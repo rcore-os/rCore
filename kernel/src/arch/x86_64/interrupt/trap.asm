@@ -19,6 +19,8 @@ __alltraps:
     push r13
     push r14
     push r15
+    sub rsp, 8
+    stmxcsr -8(rsp)
 
     # push fs.base
     xor rax, rax
@@ -73,6 +75,8 @@ skip_fxrstor:
     mov ecx, 0xC0000100
     wrmsr # msr[ecx] <= edx:eax
 
+    LDMXCSR rsp
+    add rsp, 8
     pop r15
     pop r14
     pop r13
