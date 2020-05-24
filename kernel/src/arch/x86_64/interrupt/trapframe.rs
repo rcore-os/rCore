@@ -28,7 +28,7 @@ pub struct TrapFrame {
     // Pushed by __alltraps at 'trap.asm'
     pub fsbase: usize,
 
-    pub mxcsr: u32,
+    pub mxcsr: usize,
     pub r15: usize,
     pub r14: usize,
     pub r13: usize,

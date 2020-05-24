@@ -7,12 +7,12 @@ use rcore_fs::vfs::*;
 
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::syscall::SysError::EAGAIN;
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use core::cmp::min;
 use rcore_fs::vfs::FsError::Again;
 use rcore_thread::std_thread::{park, yield_now};
-use alloc::collections::BTreeSet;
-use crate::syscall::SysError::EAGAIN;
 
 #[derive(Clone, PartialEq)]
 pub enum PipeEnd {

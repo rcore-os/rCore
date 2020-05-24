@@ -13,12 +13,35 @@ use rcore_memory::memory_set::handler::File;
 
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
+use bitflags::_core::cell::Cell;
+use spin::RwLock;
+
+enum Flock {
+    None = 0,
+    Shared = 1,
+    Exclusive = 2,
+}
+
+struct OpenFileDescription {
+    offset: u64,
+    options: OpenOptions,
+    flock: Flock,
+}
+
+impl OpenFileDescription {
+    fn create(options: OpenOptions) -> Arc<RwLock<Self>> {
+        Arc::new(RwLock::new(OpenFileDescription {
+            offset: 0,
+            options,
+            flock: Flock::None,
+        }))
+    }
+}
 
 #[derive(Clone)]
 pub struct FileHandle {
     inode: Arc<dyn INode>,
-    offset: Arc<Mutex<u64>>,
-    pub options: Arc<Mutex<OpenOptions>>,
+    description: Arc<RwLock<OpenFileDescription>>,
     pub path: String,
     pub pipe: bool, // specify if this is pipe, socket, or FIFO
     pub fd_cloexec: bool,
@@ -50,8 +73,7 @@ impl FileHandle {
     ) -> Self {
         return FileHandle {
             inode,
-            offset: Arc::new(Mutex::new(0)),
-            options: Arc::new(Mutex::new(options)),
+            description: OpenFileDescription::create(options),
             path,
             pipe,
             fd_cloexec,
@@ -62,27 +84,31 @@ impl FileHandle {
     pub fn dup(&self, fd_cloexec: bool) -> Self {
         FileHandle {
             inode: self.inode.clone(),
-            offset: self.offset.clone(),
-            options: self.options.clone(),
+            description: self.description.clone(),
             path: self.path.clone(),
             pipe: self.pipe,
             fd_cloexec, // this field do not share
         }
     }
 
+    pub fn set_options(&self, arg: usize) {
+        if arg & 0x800 > 0 {
+            self.description.write().options.nonblock = true;
+        }
+    }
+
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        // let mut offset_inner = self.offset.lock();
-        let offset = *self.offset.lock() as usize;
-        let len = self.read_at(offset, buf)?;
-        *self.offset.lock() += len as u64;
+        let len = self.read_at(self.description.read().offset as usize, buf)?;
+        self.description.write().offset += len as u64;
         Ok(len)
     }
 
-    pub fn read_at(&mut self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if !self.options.lock().read {
+    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        let options = &self.description.read().options;
+        if !options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        if !self.options.lock().nonblock {
+        if !options.nonblock {
             // block
             loop {
                 match self.inode.read_at(offset, buf) {
@@ -104,17 +130,19 @@ impl FileHandle {
     }
 
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        let offset = match self.options.lock().append {
+        let description = self.description.read();
+        let offset  = match description.options.append {
             true => self.inode.metadata()?.size as u64,
-            false => *self.offset.lock(),
+            false => description.offset
         } as usize;
+        drop(description);
         let len = self.write_at(offset, buf)?;
-        *self.offset.lock() += len as u64;
+        self.description.write().offset += len as u64;
         Ok(len)
     }
 
-    pub fn write_at(&mut self, offset: usize, buf: &[u8]) -> Result<usize> {
-        if !self.options.lock().write {
+    pub fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if !self.description.read().options.write {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         let len = self.inode.write_at(offset, buf)?;
@@ -123,17 +151,17 @@ impl FileHandle {
     }
 
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        let mut offset_inner = self.offset.lock();
-        *offset_inner = match pos {
+        let mut description = self.description.write();
+        description.offset = match pos {
             SeekFrom::Start(offset) => offset,
             SeekFrom::End(offset) => (self.inode.metadata()?.size as i64 + offset) as u64,
-            SeekFrom::Current(offset) => (*offset_inner as i64 + offset) as u64,
+            SeekFrom::Current(offset) => (description.offset as i64 + offset) as u64,
         };
-        Ok(*offset_inner)
+        Ok(description.offset)
     }
 
     pub fn set_len(&mut self, len: u64) -> Result<()> {
-        if !self.options.lock().write {
+        if !self.description.read().options.write {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
         self.inode.resize(len as usize)?;
@@ -157,22 +185,24 @@ impl FileHandle {
     }
 
     pub fn read_entry(&mut self) -> Result<String> {
-        if !self.options.lock().read {
+        let mut description = self.description.write();
+        if !description.options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        let mut offset_inner = self.offset.lock();
-        let name = self.inode.get_entry(*offset_inner as usize)?;
-        *offset_inner += 1;
+        let mut offset = &mut description.offset;
+        let name = self.inode.get_entry(*offset as usize)?;
+        *offset += 1;
         Ok(name)
     }
 
     pub fn read_entry_with_metadata(&mut self) -> Result<(Metadata, String)> {
-        if !self.options.lock().read {
+        let mut description = self.description.write();
+        if !description.options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        let mut offset_inner = self.offset.lock();
-        let ret = self.inode.get_entry_with_metadata(*offset_inner as usize)?;
-        *offset_inner += 1;
+        let mut offset = &mut description.offset;
+        let ret = self.inode.get_entry_with_metadata(*offset as usize)?;
+        *offset += 1;
         Ok(ret)
     }
 
@@ -217,10 +247,11 @@ impl FileHandle {
 
 impl fmt::Debug for FileHandle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let description = self.description.read();
         return f
             .debug_struct("FileHandle")
-            .field("offset", &self.offset)
-            .field("options", &self.options)
+            .field("offset", &description.offset)
+            .field("options", &description.options)
             .field("path", &self.path)
             .finish();
     }

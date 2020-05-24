@@ -7,11 +7,11 @@ use rcore_fs_devfs::{
 };
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
-use rcore_fs_sfs::{SimpleFileSystem, INodeImpl};
+use rcore_fs_sfs::{INodeImpl, SimpleFileSystem};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{TtyINode, STDIN, STDOUT, ShmINode};
+pub use self::devfs::{ShmINode, TtyINode, STDIN, STDOUT};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -121,7 +121,6 @@ pub trait INodeExt {
 
 impl INodeExt for dyn INode {
     fn read_as_vec(&self) -> Result<Vec<u8>> {
-
         let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);
         unsafe {

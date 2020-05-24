@@ -19,9 +19,12 @@ __alltraps:
     push r13
     push r14
     push r15
-    sub rsp, 8
-    stmxcsr -8(rsp)
 
+.att_syntax
+    subq $0x8, %rsp
+    stmxcsr 0(%rsp)
+
+.intel_syntax noprefix
     # push fs.base
     xor rax, rax
     mov ecx, 0xC0000100
@@ -75,8 +78,11 @@ skip_fxrstor:
     mov ecx, 0xC0000100
     wrmsr # msr[ecx] <= edx:eax
 
-    LDMXCSR rsp
-    add rsp, 8
+.att_syntax
+    ldmxcsr 0(%rsp)
+    addq $0x8, %rsp
+
+.intel_syntax noprefix
     pop r15
     pop r14
     pop r13
@@ -146,6 +152,11 @@ syscall_entry:
     push r14
     push r15
 
+.att_syntax
+    subq $0x8, %rsp
+    stmxcsr 0(%rsp)
+
+.intel_syntax noprefix
     # push fs.base
     xor rax, rax
     mov ecx, 0xC0000100
@@ -201,6 +212,11 @@ skip_fxrstor1:
     mov ecx, 0xC0000100
     wrmsr # msr[ecx] <= edx:eax
 
+.att_syntax
+    ldmxcsr 0(%rsp)
+    addq $0x8, %rsp
+
+.intel_syntax noprefix
     pop r15
     pop r14
     pop r13

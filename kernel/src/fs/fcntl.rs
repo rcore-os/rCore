@@ -1,14 +1,14 @@
 // currently support x86_64 only
 // copy from fcntl.h
 
-pub const F_DUPFD: usize = 0;   /* dup */
-pub const F_GETFD: usize = 1;   /* get close_on_exec */
-pub const F_SETFD: usize = 2;   /* set/clear close_on_exec */
-pub const F_GETFL: usize = 3;   /* get file->f_flags */
-pub const F_SETFL: usize = 4;   /* set file->f_flags */
-pub const F_GETLK: usize = 5;   /* Get record locking info.  */
-pub const F_SETLK: usize = 6;   /* Set record locking info (non-blocking).  */
-pub const F_SETLKW: usize = 7;  /* Set record locking info (blocking).  */
+pub const F_DUPFD: usize = 0; /* dup */
+pub const F_GETFD: usize = 1; /* get close_on_exec */
+pub const F_SETFD: usize = 2; /* set/clear close_on_exec */
+pub const F_GETFL: usize = 3; /* get file->f_flags */
+pub const F_SETFL: usize = 4; /* set file->f_flags */
+pub const F_GETLK: usize = 5; /* Get record locking info.  */
+pub const F_SETLK: usize = 6; /* Set record locking info (non-blocking).  */
+pub const F_SETLKW: usize = 7; /* Set record locking info (blocking).  */
 
 const F_LINUX_SPECIFIC_BASE: usize = 1024;
 

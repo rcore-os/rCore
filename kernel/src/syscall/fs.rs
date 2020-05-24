@@ -770,7 +770,6 @@ impl Syscall<'_> {
         let mut proc = self.process();
         // let file_like = proc.get_file_like(fd)?;
         let file = proc.get_file(fd)?;
-        
         Ok(0)
     }
 
@@ -1268,9 +1267,7 @@ impl Syscall<'_> {
                     }
                     F_GETFD => Ok(file.fd_cloexec as usize),
                     F_SETFL => {
-                        if arg & 0x800 > 0 {
-                            file.options.lock().nonblock = true;
-                        }
+                        file.set_options(arg);
                         Ok(0)
                     }
                     F_DUPFD_CLOEXEC => {
@@ -1841,8 +1838,6 @@ impl IoVecs {
             if readv {
                 vm.check_write_array(iov.base, iov.len)?;
             } else {
-
-
                 vm.check_read_array(iov.base, iov.len)?;
             }
             slices.push(slice::from_raw_parts_mut(iov.base, iov.len));

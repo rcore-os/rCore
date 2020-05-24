@@ -154,7 +154,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
             }
             yield_now();
         }
-    } 
+    }
 
     pub fn ensure_support(&self) {
         let initialization = self.support_initialization.load(Ordering::Relaxed);

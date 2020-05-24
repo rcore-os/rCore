@@ -79,9 +79,7 @@ impl Condvar {
             } else {
                 for condvar in condvars {
                     let mut queue = condvar.wait_queue.lock();
-                    if queue.iter().find(|&t| {
-                        Arc::ptr_eq(t, &token)
-                    }).is_none() {
+                    if queue.iter().find(|&t| Arc::ptr_eq(t, &token)).is_none() {
                         queue.push_front(token.clone());
                     }
                 }
