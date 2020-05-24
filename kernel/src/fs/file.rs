@@ -12,15 +12,7 @@ use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Re
 use rcore_memory::memory_set::handler::File;
 
 use crate::sync::SpinLock as Mutex;
-
-/* Operations for the `flock' call.  */
-pub const LOCK_SH: usize = 1; /* Shared lock.  */
-pub const LOCK_EX: usize = 2; /* Exclusive lock.  */
-pub const LOCK_UN: usize = 8; /* Unlock.  */
-pub const __LOCK_ATOMIC: usize = 16; /* Atomic update.  */
-
-/* Can be OR'd in to one of the above.  */
-pub const LOCK_NB: usize = 4; /* Don't block when locking.  */
+use crate::syscall::SysError::{EAGAIN, ESPIPE};
 
 #[derive(Clone)]
 pub struct FileHandle {
@@ -28,6 +20,7 @@ pub struct FileHandle {
     offset: Arc<Mutex<u64>>,
     pub options: Arc<Mutex<OpenOptions>>,
     pub path: String,
+    pub pipe: bool, // specify if this is pipe, socket, or FIFO
     pub fd_cloexec: bool,
 }
 
@@ -52,6 +45,7 @@ impl FileHandle {
         inode: Arc<dyn INode>,
         options: OpenOptions,
         path: String,
+        pipe: bool,
         fd_cloexec: bool,
     ) -> Self {
         return FileHandle {
@@ -59,6 +53,7 @@ impl FileHandle {
             offset: Arc::new(Mutex::new(0)),
             options: Arc::new(Mutex::new(options)),
             path,
+            pipe,
             fd_cloexec,
         };
     }
@@ -70,6 +65,7 @@ impl FileHandle {
             offset: self.offset.clone(),
             options: self.options.clone(),
             path: self.path.clone(),
+            pipe: self.pipe,
             fd_cloexec, // this field do not share
         }
     }

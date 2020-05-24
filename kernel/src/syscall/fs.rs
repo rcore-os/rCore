@@ -21,7 +21,7 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::syscall::SysError::EINVAL;
+use crate::syscall::SysError::{EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
 
 impl Syscall<'_> {
@@ -47,9 +47,9 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
-        // if len == 1 && !proc.pid.is_init() {
-        //     println!("write content: {}", slice[0] as char);
-        // }
+        if len == 1 && !proc.pid.is_init() {
+            println!("write content: {}", slice[0] as char);
+        }
         Ok(len)
     }
 
@@ -593,6 +593,7 @@ impl Syscall<'_> {
             inode,
             flags.to_options(),
             String::from(path),
+            false,
             flags.contains(OpenFlags::CLOEXEC),
         );
 
@@ -741,8 +742,12 @@ impl Syscall<'_> {
 
         let mut proc = self.process();
         let file = proc.get_file(fd)?;
-        let offset = file.seek(pos)?;
-        Ok(offset as usize)
+        if file.pipe {
+            Err(ESPIPE)
+        } else {
+            let offset = file.seek(pos)?;
+            Ok(offset as usize)
+        }
     }
 
     pub fn sys_fsync(&mut self, fd: usize) -> SysResult {
@@ -752,11 +757,20 @@ impl Syscall<'_> {
     }
 
     pub fn sys_flock(&mut self, fd: usize, operation: usize) -> SysResult {
-        info!("flock: fd: {}, operation: {}", fd, operation);
+        bitflags! {
+            struct Operation: u8 {
+                const LOCK_SH = 1;
+                const LOCK_EX = 2;
+                const LOCK_NB = 4;
+                const LOCK_UN = 8;
+            }
+        }
+        let operation = Operation::from_bits(operation as u8).unwrap();
+        info!("flock: fd: {}, operation: {:?}", fd, operation);
         let mut proc = self.process();
         // let file_like = proc.get_file_like(fd)?;
         let file = proc.get_file(fd)?;
-
+        
         Ok(0)
     }
 
@@ -1069,6 +1083,7 @@ impl Syscall<'_> {
                 nonblock: (flags & O_NONBLOCK) != 0,
             },
             String::from("pipe_r:[]"),
+            true,
             (flags & O_CLOEXEC) != 0,
         )));
 
@@ -1081,7 +1096,8 @@ impl Syscall<'_> {
                 nonblock: false,
             },
             String::from("pipe_w:[]"),
-            false,
+            true,
+            (flags & O_CLOEXEC) != 0,
         )));
 
         fds[0] = read_fd as u32;
@@ -1825,6 +1841,8 @@ impl IoVecs {
             if readv {
                 vm.check_write_array(iov.base, iov.len)?;
             } else {
+
+
                 vm.check_read_array(iov.base, iov.len)?;
             }
             slices.push(slice::from_raw_parts_mut(iov.base, iov.len));

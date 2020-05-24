@@ -33,6 +33,7 @@ impl Clone for Box<dyn MemoryHandler> {
 
 pub trait FrameAllocator: Debug + Clone + Send + Sync + 'static {
     fn alloc(&self) -> Option<PhysAddr>;
+    fn alloc_contiguous(&self, size: usize, align_log2: usize) -> Option<PhysAddr>;
     fn dealloc(&self, target: PhysAddr);
 }
 
