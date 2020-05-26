@@ -81,27 +81,28 @@ The source code is dual-licensed under MIT or the Apache License (Version 2.0).
 
 ### 安装
 
-在 `user` 目录下执行
+直接使用我们的 `user` 子模块即可。如果要自己设置，在 `user` 目录下执行
 
 ```bash
 $ git clone git://repo.or.cz/libc-test
+$ rm -r libc-test/.git
 ```
 
 ### 编译
 
-考虑到在 rCore 中编译所有测例耗费时间过长，所以选择在本机用 musl-gcc 编译。
-在本机执行
+考虑到在 rCore 中编译所有测例耗费时间过长，所以选择在本机用 musl-gcc 编译。请确保自己已经安装好了`x86_64-linux-musl-gcc` 工具链，且在 path 中，在 `config.make` 制定了 `CC` 的值。 
+在本机执行：
 
 ```bash
 $ make
 $ rm src/*/*.err
 ```
 
-随后修改 `user` 目录下的 `Makefile` 文件，将 `libc-test\`打包进入文件系统。
+随后修改 `user` 目录下的 `Makefile` 文件，将 `libc-test`打包进入文件系统。
 
 ### 在 rCore 中测试
 
-进入 `libc\` 目录，执行脚本
+进入 `libc-test` 目录，执行脚本
 
 ```bash
 $ ash runtest.sh
@@ -116,7 +117,7 @@ sqrt failed
 
 在结束后，可前往对应测例所在目录下，通过查看测例所对应的 `.err` 文件查看失败的原因。
 
-当遇到使得 rCore 崩溃的测例时，手动记录当前测例在 `runtest.sh` 中的位置，手动更新 `user\` 中的文件，使其从下一个测例开始测试，并记录中间若干测例的测试结果。如此反复，直到测试过所有测例。
+当遇到使得 rCore 崩溃的测例时，手动记录当前测例在 `runtest.sh` 中的位置，手动更新 `user` 中的文件，使其从下一个测例开始测试，并记录中间若干测例的测试结果。如此反复，直到测试过所有测例。
 
 ### 目前测试的结果
 
