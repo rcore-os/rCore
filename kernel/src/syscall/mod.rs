@@ -25,6 +25,7 @@ pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
+pub use self::signal::*;
 pub use self::time::*;
 
 mod custom;
@@ -35,8 +36,10 @@ mod mem;
 mod misc;
 mod net;
 mod proc;
+mod signal;
 mod time;
 
+use crate::signal::action::{SigAction, Sigset};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
@@ -206,8 +209,18 @@ impl Syscall<'_> {
             SYS_MADVISE => self.unimplemented("madvise", Ok(0)),
 
             // signal
-            SYS_RT_SIGACTION => self.unimplemented("sigaction", Ok(0)),
-            SYS_RT_SIGPROCMASK => self.unimplemented("sigprocmask", Ok(0)),
+            SYS_RT_SIGACTION => self.sys_rt_sigaction(
+                args[0],
+                args[1] as *const SigAction,
+                args[2] as *mut SigAction,
+                args[3],
+            ),
+            SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
+                args[0],
+                args[1] as *const Sigset,
+                args[2] as *mut Sigset,
+                args[3],
+            ),
             SYS_SIGALTSTACK => self.unimplemented("sigaltstack", Ok(0)),
             SYS_KILL => self.sys_kill(args[0], args[1]),
 

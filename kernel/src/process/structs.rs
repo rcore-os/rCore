@@ -25,6 +25,7 @@ use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
+use crate::signal::action::{SigAction, Sigset};
 use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
 use rcore_fs::vfs::INode;
@@ -40,6 +41,7 @@ pub struct Thread {
     // This is same as `proc.vm`
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
+    pub sig_mask: Sigset,
 }
 
 /// Pid type
@@ -83,6 +85,8 @@ pub struct Process {
     // for waiting child
     pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
     pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
+
+    pub dispositions: [SigAction; 32],
 }
 
 lazy_static! {
@@ -142,8 +146,10 @@ impl Thread {
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
+                dispositions: [SigAction::default(); 32],
             }
             .add_to_table(),
+            sig_mask: Sigset::default(),
         })
     }
 
@@ -332,8 +338,10 @@ impl Thread {
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
+                dispositions: [SigAction::default(); 32],
             }
             .add_to_table(),
+            sig_mask: Sigset::default(),
         })
     }
 
@@ -360,18 +368,24 @@ impl Thread {
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
             child_exit_code: BTreeMap::new(),
+            dispositions: proc.dispositions.clone(),
         }
         .add_to_table();
         // link to parent
         proc.children
             .push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
 
+        // this part in linux manpage seems ambiguous:
+        // Each of the threads in a process has its own signal mask.
+        // A child created via fork(2) inherits a copy of its parent's signal
+        // mask; the signal mask is preserved across execve(2).
         Box::new(Thread {
             context,
             kstack,
             clear_child_tid: 0,
             vm,
             proc: new_proc,
+            sig_mask: self.sig_mask,
         })
     }
 
@@ -391,6 +405,7 @@ impl Thread {
             clear_child_tid,
             vm: self.vm.clone(),
             proc: self.proc.clone(),
+            sig_mask: self.sig_mask,
         })
     }
 }

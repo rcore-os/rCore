@@ -131,9 +131,9 @@ impl FileHandle {
 
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let description = self.description.read();
-        let offset  = match description.options.append {
+        let offset = match description.options.append {
             true => self.inode.metadata()?.size as u64,
-            false => description.offset
+            false => description.offset,
         } as usize;
         drop(description);
         let len = self.write_at(offset, buf)?;
