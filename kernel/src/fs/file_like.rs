@@ -47,17 +47,12 @@ impl FileLike {
         Ok(len)
     }
     pub fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
-        match request {
-            // TODO: place flags & path in FileLike instead of FileHandle/Socket
-            FIOCLEX => Ok(0),
-            FIONBIO => Ok(0),
-            _ => match self {
-                FileLike::File(file) => file.io_control(request as u32, arg1).map_err(Into::into),
-                FileLike::Socket(socket) => socket.ioctl(request, arg1, arg2, arg3),
-                FileLike::EpollInstance(_) => {
-                    return Err(SysError::ENOSYS);
-                }
-            },
+        match self {
+            FileLike::File(file) => file.io_control(request as u32, arg1).map_err(Into::into),
+            FileLike::Socket(socket) => socket.ioctl(request, arg1, arg2, arg3),
+            FileLike::EpollInstance(_) => {
+                return Err(SysError::ENOSYS);
+            }
         }
     }
     pub fn mmap(&mut self, area: MMapArea) -> SysResult {

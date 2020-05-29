@@ -18,7 +18,7 @@ use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
-use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK};
+use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK, F_SETFD, FD_CLOEXEC};
 use crate::fs::FileLike;
 use crate::process::Process;
 use crate::syscall::SysError::{EINVAL, ESPIPE};
@@ -861,9 +861,25 @@ impl Syscall<'_> {
             "ioctl: fd: {}, request: {:#x}, args: {:#x} {:#x} {:#x}",
             fd, request, arg1, arg2, arg3
         );
-        let mut proc = self.process();
-        let file_like = proc.get_file_like(fd)?;
-        file_like.ioctl(request, arg1, arg2, arg3)
+        use crate::fs::ioctl::*;
+        match request {
+            FIOCLEX => self.sys_fcntl(fd, F_SETFD, FD_CLOEXEC),
+            FIONCLEX => self.sys_fcntl(fd, F_SETFD, 0),
+            FIONBIO => {
+                let data = arg1 as *const i32;
+                let val = unsafe { *data };
+                if val == 0 {
+                    self.sys_fcntl(fd, F_SETFD, 0)
+                } else {
+                    self.sys_fcntl(fd, F_SETFD, O_NONBLOCK)
+                }
+            }
+            _ => {
+                let mut proc = self.process();
+                let file_like = proc.get_file_like(fd)?;
+                file_like.ioctl(request, arg1, arg2, arg3)
+            }
+        }
     }
 
     pub fn sys_chdir(&mut self, path: *const u8) -> SysResult {
@@ -1269,6 +1285,9 @@ impl Syscall<'_> {
                     F_SETFL => {
                         file.set_options(arg);
                         Ok(0)
+                    }
+                    F_GETFL => {
+                        self.unimplemented("F_GETFL", Ok(0))
                     }
                     F_DUPFD_CLOEXEC => {
                         info!("fcntl: dupfd_cloexec: arg: {:#x}", arg);

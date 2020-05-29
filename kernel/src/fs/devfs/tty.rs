@@ -2,10 +2,19 @@ use core::any::Any;
 use rcore_fs::vfs::*;
 
 pub use super::{STDIN, STDOUT};
+use crate::syscall::SysError;
+use rcore_fs::vfs::FsError::NotSupported;
+use rcore_thread::std_thread::current;
+use crate::processor;
+use crate::process::current_thread;
+use spin::RwLock;
+use crate::fs::ioctl::*;
 
-/// Ref: [https://linux.die.net/man/4/tty]
+// Ref: [https://linux.die.net/man/4/tty]
 #[derive(Default)]
-pub struct TtyINode;
+pub struct TtyINode {
+    foreground_pgid: RwLock<i32>,
+}
 
 impl INode for TtyINode {
     /// Read bytes at `offset` into `buf`, return the number of bytes read.
@@ -25,6 +34,25 @@ impl INode for TtyINode {
             write: true,
             error: false,
         })
+    }
+
+    fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
+        let cmd = cmd as usize;
+        match cmd {
+            TIOCGPGRP => {
+                // TODO: check the pointer?
+                let argp = data as *mut i32;    // pid_t
+                unsafe { *argp = *self.foreground_pgid.read() };
+                Ok(0)
+            }
+            TIOCSPGRP => {
+                let fpgid = unsafe { *(data as *const i32) };
+                *self.foreground_pgid.write() = fpgid;
+                info!("tty: set foreground process group to {}", fpgid);
+                Ok(0)
+            }
+            _ => Err(NotSupported)
+        }
     }
 
     /// Get metadata of the INode

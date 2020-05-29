@@ -12,9 +12,11 @@ pub const F_SETLKW: usize = 7; /* Set record locking info (blocking).  */
 
 const F_LINUX_SPECIFIC_BASE: usize = 1024;
 
+pub const FD_CLOEXEC: usize = 1;
 pub const F_DUPFD_CLOEXEC: usize = F_LINUX_SPECIFIC_BASE + 6;
 
-pub const O_NONBLOCK: usize = 04000;
-pub const O_CLOEXEC: usize = 02000000; /* set close_on_exec */
+pub const O_NONBLOCK: usize = 0o4000;
+pub const O_APPEND: usize = 0o2000;
+pub const O_CLOEXEC: usize = 0o2000000; /* set close_on_exec */
 
 pub const AT_SYMLINK_NOFOLLOW: usize = 0x100;

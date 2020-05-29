@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::fs::FileLike;
+use alloc::sync::Weak;
+use crate::syscall::SysError::ESRCH;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -10,7 +12,7 @@ impl Syscall<'_> {
         let pid = new_thread.proc.lock().pid.get();
         let tid = thread_manager().add(new_thread);
         thread_manager().detach(tid);
-        info!("fork: {} -> {}", thread::current().id(), pid);
+        info!("fork: {} -> {}", self.thread.proc.lock().pid, pid);
         Ok(pid)
     }
 
@@ -264,6 +266,43 @@ impl Syscall<'_> {
     pub fn sys_getpid(&mut self) -> SysResult {
         info!("getpid");
         Ok(self.process().pid.get())
+    }
+
+    pub fn sys_getpgid(&self, mut pid: usize) -> SysResult {
+        if pid == 0 {
+            pid = self.process().pid.get();
+        }
+        info!("getpgid: get pgid of process {}", pid);
+        let process_table = PROCESSES.read();
+        // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
+        let proc = process_table.get(&pid);
+        if (proc.is_some()) {
+            let lock = proc.unwrap().upgrade().unwrap();
+            let proc = lock.lock();
+            // let proc = proc.unwrap().upgrade().unwrap().lock();
+            Ok(proc.pgid as usize)
+        } else {
+            Err(ESRCH)
+        }
+    }
+
+    pub fn sys_setpgid(&self, mut pid: usize, pgid: usize) -> SysResult {
+        if pid == 0 {
+            pid = self.process().pid.get();
+        }
+        info!("setpgid: set pgid of process {} to {}", pid, pgid);
+        let process_table = PROCESSES.read();
+        // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
+        let proc = process_table.get(&pid);
+        if (proc.is_some()) {
+            // TODO: check process pid is the child of calling process
+            let lock = proc.unwrap().upgrade().unwrap();
+            let mut proc = lock.lock();
+            proc.pgid = pgid as i32;
+            Ok(0)
+        } else {
+            Err(ESRCH)
+        }
     }
 
     /// Get the current thread id

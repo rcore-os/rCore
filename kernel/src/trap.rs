@@ -1,9 +1,10 @@
 use crate::arch::cpu;
-use crate::arch::interrupt::TrapFrame;
+use crate::arch::interrupt::{TrapFrame, syscall};
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
 use crate::sync::Condvar;
 use rcore_thread::std_thread as thread;
+use rcore_thread::std_thread::current;
 
 pub static mut TICK: usize = 0;
 

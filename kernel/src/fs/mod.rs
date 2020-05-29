@@ -23,7 +23,7 @@ pub mod epoll;
 pub mod fcntl;
 mod file;
 mod file_like;
-mod ioctl;
+pub mod ioctl;
 mod pipe;
 mod pseudo;
 

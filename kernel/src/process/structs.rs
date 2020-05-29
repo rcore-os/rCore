@@ -56,7 +56,7 @@ impl Pid {
 
     /// Return whether this pid represents the init process
     pub fn is_init(&self) -> bool {
-        self.0 == 0
+        self.0 == 1
     }
 }
 
@@ -77,6 +77,7 @@ pub struct Process {
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
+    pub pgid: i32,
     // avoid deadlock, put pid out
     pub parent: (Pid, Weak<Mutex<Process>>),
     pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
@@ -141,6 +142,7 @@ impl Thread {
                 semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
+                pgid: -1,   // kernel thread do not have a process?
                 parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
@@ -333,6 +335,7 @@ impl Thread {
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
                 pid: Pid(0),
+                pgid: 0,
                 parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
@@ -363,6 +366,7 @@ impl Thread {
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
             pid: Pid(0),
+            pgid: proc.pgid,
             parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
             threads: Vec::new(),
@@ -415,8 +419,8 @@ impl Process {
     fn add_to_table(mut self) -> Arc<Mutex<Self>> {
         let mut process_table = PROCESSES.write();
 
-        // assign pid
-        let pid = (0..).find(|i| process_table.get(i).is_none()).unwrap();
+        // assign pid, do not start from 0
+        let pid = (1..).find(|i| process_table.get(i).is_none()).unwrap();
         self.pid = Pid(pid);
 
         // put to process table

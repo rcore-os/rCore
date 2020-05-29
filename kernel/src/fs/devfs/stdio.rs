@@ -8,17 +8,25 @@ use rcore_fs::vfs::*;
 use crate::fs::ioctl::*;
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use spin::RwLock;
 
 #[derive(Default)]
 pub struct Stdin {
     buf: Mutex<VecDeque<char>>,
     pub pushed: Condvar,
+    winsize: RwLock<Winsize>,
+    termios: RwLock<Termois>,
 }
 
 impl Stdin {
     pub fn push(&self, c: char) {
-        self.buf.lock().push_back(c);
-        self.pushed.notify_one();
+        let lflag = LocalModes::from_bits_truncate(self.termios.read().lflag);
+        if lflag.contains(LocalModes::ISIG) && [0x3, 0o34, 0o32, 0o31].contains(&(c as i32)) {
+
+        } else {
+            self.buf.lock().push_back(c);
+            self.pushed.notify_one();
+        }
     }
     pub fn pop(&self) -> char {
         #[cfg(feature = "board_k210")]
@@ -46,7 +54,9 @@ impl Stdin {
 }
 
 #[derive(Default)]
-pub struct Stdout;
+pub struct Stdout {
+    winsize: RwLock<Winsize>,
+}
 
 lazy_static! {
     pub static ref STDIN: Arc<Stdin> = Arc::new(Stdin::default());
@@ -74,8 +84,19 @@ impl INode for Stdin {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
-            TCGETS | TCSETS | TIOCGWINSZ => {
-                // pretend to be tty
+            TIOCGWINSZ => {
+                let winsize = data as *mut Winsize;
+                unsafe { *winsize = *self.winsize.read(); }
+                Ok(0)
+            }
+            TCGETS => {
+                let termois = data as *mut Termois;
+                unsafe { *termois = *self.termios.read(); }
+                Ok(0)
+            }
+            TCSETS => {
+                let termois = data as *const Termois;
+                unsafe { *self.termios.write() = *termois; }
                 Ok(0)
             }
             TIOCGPGRP => {
@@ -120,7 +141,12 @@ impl INode for Stdout {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
-            TCSETS | TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+            TIOCGWINSZ => {
+                let winsize = data as *mut Winsize;
+                unsafe { *winsize = *self.winsize.read(); }
+                Ok(0)
+            }
+            TCSETS | TCGETS | TIOCSPGRP => {
                 // pretend to be tty
                 Ok(0)
             }

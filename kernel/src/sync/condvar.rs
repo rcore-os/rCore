@@ -142,6 +142,7 @@ impl Condvar {
         let mut queue = self.wait_queue.lock();
         if let Some(t) = queue.front() {
             self.epoll_callback(t);
+            // info!("nofity thread: {}", t.id());
             t.unpark();
             queue.pop_front();
         }

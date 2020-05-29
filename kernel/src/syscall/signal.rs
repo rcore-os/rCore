@@ -50,7 +50,9 @@ impl Syscall<'_> {
             *oldset = self.thread.sig_mask;
         }
         if !set.is_null() {
-            let set = *unsafe { self.vm().check_read_ptr(set)? };
+            // let set = *unsafe { self.vm().check_read_ptr(set)? };
+            let set = unsafe { self.vm().check_read_ptr(set)? };
+            let set = *set; // prevent deadlock when page fault
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;

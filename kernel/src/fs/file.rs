@@ -15,6 +15,7 @@ use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
 use spin::RwLock;
+use crate::fs::fcntl::{O_NONBLOCK, O_APPEND};
 
 enum Flock {
     None = 0,
@@ -92,10 +93,16 @@ impl FileHandle {
     }
 
     pub fn set_options(&self, arg: usize) {
-        if arg & 0x800 > 0 {
-            self.description.write().options.nonblock = true;
-        }
+        let options = &mut self.description.write().options;
+        options.nonblock = (arg & O_NONBLOCK) != 0;
+        // TODO: handle append
+        // options.append = (arg & O_APPEND) != 0;
     }
+
+    // pub fn get_options(&self) -> usize {
+        // let options = self.description.read().options;
+        // let mut ret = 0 as usize;
+    // }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let len = self.read_at(self.description.read().offset as usize, buf)?;
