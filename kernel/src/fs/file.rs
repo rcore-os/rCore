@@ -3,7 +3,7 @@
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
 use crate::syscall::{MmapProt, SysResult, TimeSpec};
-use crate::{processor, thread};
+use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
@@ -111,11 +111,11 @@ impl FileHandle {
     }
 
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let options = &self.description.read().options;
-        if !options.read {
+        // let options = &self.description.read().options;
+        if !self.description.read().options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
         }
-        if !options.nonblock {
+        if !self.description.read().options.nonblock {
             // block
             loop {
                 match self.inode.read_at(offset, buf) {

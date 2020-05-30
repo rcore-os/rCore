@@ -39,12 +39,12 @@ mod proc;
 mod signal;
 mod time;
 
-use crate::signal::action::{SigAction, Sigset};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
+use crate::signal::{SigAction, Sigset};
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -296,7 +296,7 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
-            SYS_TKILL => self.sys_tkill(args[0] as i32, args[1] as i32, args[2] as i32),
+            SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),

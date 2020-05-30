@@ -32,7 +32,7 @@ impl Stdin {
                 // INTR
                 0o3 => {
                     for proc in foregroud_processes.iter() {
-                        send_signal(proc.clone(), SIGINT, -1);
+                        send_signal(proc.lock(), SIGINT, -1);
                     }
                 }
                 _ => warn!("special char {} is unimplented", c),

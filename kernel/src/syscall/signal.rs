@@ -1,8 +1,7 @@
-use crate::process::PROCESSES;
+use crate::process::{PROCESSES, thread_manager, process_of};
 use crate::process::{process, process_group};
-use crate::signal::action::*;
 use crate::signal::*;
-use crate::syscall::SysError::EINVAL;
+use crate::syscall::SysError::{EINVAL, ESRCH};
 use crate::syscall::{SysResult, Syscall};
 use crate::thread;
 use num::FromPrimitive;
@@ -15,8 +14,6 @@ impl Syscall<'_> {
         oldact: *mut SigAction,
         sigsetsize: usize,
     ) -> SysResult {
-        // TODO: better syntax?
-        // let signal = ;
         if let Some(signal) = <Signal as FromPrimitive>::from_usize(signum) {
             info!(
                 "rt_sigaction: signum: {:?}, act: {:?}, oldact: {:?}, sigsetsize: {}",
@@ -89,13 +86,13 @@ impl Syscall<'_> {
             match pid {
                 pid if pid > 0 => {
                     if let Some(process) = process(pid as usize) {
-                        send_signal(process.clone(), sig, -1);
+                        send_signal(process.lock(), sig, -1);
                     }
                 }
                 0 => {
                     let pgid = self.process().pgid;
                     for process in process_group(pgid).iter() {
-                        send_signal(process.clone(), sig, -1);
+                        send_signal(process.lock(), sig, -1);
                     }
                 }
                 -1 => {
@@ -103,19 +100,35 @@ impl Syscall<'_> {
                     // has permission to send signals, except for process 1 (init)
                     for process in PROCESSES.read().values() {
                         if let Some(process) = process.upgrade() {
-                            send_signal(process.clone(), sig, -1);
+                            send_signal(process.lock(), sig, -1);
                         }
                     }
                 }
                 _ => {
                     let pgid = -pid;
                     for process in process_group(pgid as i32).iter() {
-                        send_signal(process.clone(), sig, -1);
+                        send_signal(process.lock(), sig, -1);
                     }
                 }
             }
             Ok(0)
         } else {
+            Err(EINVAL)
+        }
+    }
+
+    pub fn sys_tkill(&mut self, tid: usize, signum: usize) -> SysResult {
+        let signal = FromPrimitive::from_usize(signum);
+        if let Some(signal) = signal {
+            info!("tkill: tid: {}, signal: {:?}", tid, signal);
+            if let Some(process) = process_of(tid) {
+                send_signal(process.lock(), signal, tid as isize);
+                Ok(0)
+            } else {
+                Err(ESRCH)
+            }
+        } else {
+            info!("tkill: tid: {}, signal: UNKNOWN", tid, );
             Err(EINVAL)
         }
     }

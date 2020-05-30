@@ -339,7 +339,7 @@ impl Syscall<'_> {
         info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
         proc.exit(exit_code);
-
+        drop(proc);
         thread::yield_now();
         unreachable!();
     }

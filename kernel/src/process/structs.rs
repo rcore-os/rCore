@@ -25,8 +25,7 @@ use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
-use crate::signal::action::{SigAction, Sigset};
-use crate::signal::SIGRTMAX;
+use crate::signal::{SIGRTMAX, SigAction, Sigset};
 use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
 use pc_keyboard::KeyCode::BackTick;
@@ -102,9 +101,25 @@ lazy_static! {
         RwLock::new(BTreeMap::new());
 }
 
+/// return the process which thread tid is in
+pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
+    PROCESSES.read().iter().find_map(|(pid, weak)| {
+        if let Some(process) = weak.upgrade() {
+            if process.lock().threads.contains(&tid) {
+                Some(process)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    })
+}
+
 pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
     PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade())
 }
+
 pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
@@ -506,9 +521,12 @@ impl Process {
         for tid in self.threads.iter() {
             thread_manager().exit(*tid, 1);
         }
+        self.threads.clear();
 
         info!("process {} exist with {}", self.pid.get(), exit_code);
     }
+
+    pub fn exited(&self) -> bool { self.threads.is_empty() }
 }
 
 trait ToMemoryAttr {
