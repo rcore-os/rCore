@@ -11,11 +11,11 @@ use rcore_fs::vfs::FsError::NotSupported;
 use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
 use rcore_memory::memory_set::handler::File;
 
+use crate::fs::fcntl::{O_APPEND, O_NONBLOCK};
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
 use spin::RwLock;
-use crate::fs::fcntl::{O_NONBLOCK, O_APPEND};
 
 enum Flock {
     None = 0,
@@ -100,8 +100,8 @@ impl FileHandle {
     }
 
     // pub fn get_options(&self) -> usize {
-        // let options = self.description.read().options;
-        // let mut ret = 0 as usize;
+    // let options = self.description.read().options;
+    // let mut ret = 0 as usize;
     // }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {

@@ -2,8 +2,9 @@
 
 use super::*;
 use crate::fs::FileLike;
-use alloc::sync::Weak;
+use crate::signal::{send_signal, Signal};
 use crate::syscall::SysError::ESRCH;
+use alloc::sync::Weak;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -239,29 +240,6 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// Kill the process
-    pub fn sys_kill(&mut self, pid: usize, sig: usize) -> SysResult {
-        info!(
-            "kill: thread {} kill process {} with signal {}",
-            thread::current().id(),
-            pid,
-            sig
-        );
-        let current_pid = self.process().pid.get().clone();
-        if current_pid == pid {
-            // killing myself
-            self.sys_exit_group(sig);
-        } else {
-            if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
-                let mut proc = proc_arc.busy_lock();
-                proc.exit(sig);
-                Ok(0)
-            } else {
-                Err(SysError::EINVAL)
-            }
-        }
-    }
-
     /// Get the current process id
     pub fn sys_getpid(&mut self) -> SysResult {
         info!("getpid");
@@ -279,7 +257,6 @@ impl Syscall<'_> {
         if (proc.is_some()) {
             let lock = proc.unwrap().upgrade().unwrap();
             let proc = lock.lock();
-            // let proc = proc.unwrap().upgrade().unwrap().lock();
             Ok(proc.pgid as usize)
         } else {
             Err(ESRCH)

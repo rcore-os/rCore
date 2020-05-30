@@ -18,7 +18,7 @@ use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
 use super::*;
 use crate::fs::epoll::EpollInstance;
-use crate::fs::fcntl::{O_CLOEXEC, O_NONBLOCK, F_SETFD, FD_CLOEXEC};
+use crate::fs::fcntl::{FD_CLOEXEC, F_SETFD, O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
 use crate::syscall::SysError::{EINVAL, ESPIPE};
@@ -1198,6 +1198,7 @@ impl Syscall<'_> {
         let proc_cell = UnsafeCell::new(proc);
         let in_file = unsafe { (*proc_cell.get()).get_file(in_fd)? };
         let out_file = unsafe { (*proc_cell.get()).get_file(out_fd)? };
+        drop(proc_cell);
         let mut buffer = [0u8; 1024];
 
         // for in_offset and out_offset
@@ -1286,9 +1287,7 @@ impl Syscall<'_> {
                         file.set_options(arg);
                         Ok(0)
                     }
-                    F_GETFL => {
-                        self.unimplemented("F_GETFL", Ok(0))
-                    }
+                    F_GETFL => self.unimplemented("F_GETFL", Ok(0)),
                     F_DUPFD_CLOEXEC => {
                         info!("fcntl: dupfd_cloexec: arg: {:#x}", arg);
                         // let file_like = proc.get_file_like(fd1)?.clone();

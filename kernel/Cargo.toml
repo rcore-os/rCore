@@ -72,7 +72,9 @@ rcore-fs-ramfs = { git = "https://github.com/function2-llx/rcore-fs", rev = "d38
 rcore-fs-mountfs = { git = "https://github.com/function2-llx/rcore-fs", rev = "d386ad7" }
 rcore-fs-devfs = { git = "https://github.com/function2-llx/rcore-fs", rev = "d386ad7" }
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
-
+num = { version = "0.2.1", default-features = false }
+num-traits = { version = "0.2.11", default-features = false }
+num-derive = "0.3"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rboot = { path = "../rboot", default-features = false }

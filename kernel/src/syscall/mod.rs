@@ -222,7 +222,7 @@ impl Syscall<'_> {
                 args[3],
             ),
             SYS_SIGALTSTACK => self.unimplemented("sigaltstack", Ok(0)),
-            SYS_KILL => self.sys_kill(args[0], args[1]),
+            SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
             SYS_SCHED_YIELD => self.sys_yield(),
@@ -320,7 +320,7 @@ impl Syscall<'_> {
             SYS_UNAME => self.sys_uname(args[0] as *mut u8),
             SYS_UMASK => self.unimplemented("umask", Ok(0o777)),
             //        SYS_GETRLIMIT => self.sys_getrlimit(),
-            //        SYS_SETRLIMIT => self.sys_setrlimit(),
+            SYS_SETRLIMIT => self.unimplemented("setrlimit", Ok(0)),
             SYS_GETRUSAGE => self.sys_getrusage(args[0], args[1] as *mut RUsage),
             SYS_SYSINFO => self.sys_sysinfo(args[0] as *mut SysInfo),
             SYS_TIMES => self.sys_times(args[0] as *mut Tms),

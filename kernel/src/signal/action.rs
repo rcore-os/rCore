@@ -4,11 +4,7 @@ pub const SIG_ERR: usize = usize::max_value() - 1;
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
 
-// #[repr(C)]
-// union SigHandler {
-//     handler: usize,
-//     sigaction: usize,
-// }
+// yet there's a bug because of mismatching bits: https://sourceware.org/bugzilla/show_bug.cgi?id=25657
 pub type Sigset = u64; // just support 64bits size sigset
 
 #[repr(C)]
@@ -16,7 +12,7 @@ pub type Sigset = u64; // just support 64bits size sigset
 pub struct SigAction {
     pub handler: usize, // this field may be an union
     pub mask: Sigset,
-    pub flags: i32,
+    pub flags: u32,
     pub _restorer: usize,
 }
 

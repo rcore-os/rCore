@@ -26,8 +26,10 @@ use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
 use crate::signal::action::{SigAction, Sigset};
+use crate::signal::SIGRTMAX;
 use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
+use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
 use rcore_thread::std_thread::yield_now;
 
@@ -50,13 +52,15 @@ pub struct Thread {
 pub struct Pid(usize);
 
 impl Pid {
+    pub const INIT: usize = 1;
+
     pub fn get(&self) -> usize {
         self.0
     }
 
     /// Return whether this pid represents the init process
     pub fn is_init(&self) -> bool {
-        self.0 == 1
+        self.0 == Self::INIT
     }
 }
 
@@ -87,13 +91,36 @@ pub struct Process {
     pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
     pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
 
-    pub dispositions: [SigAction; 32],
+    // delivered signals, tid specified thread, -1 stands for any thread
+    pub signals: [Option<isize>; SIGRTMAX + 1],
+    pub dispositions: [SigAction; SIGRTMAX + 1],
 }
 
 lazy_static! {
     /// Records the mapping between pid and Process struct.
     pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> =
         RwLock::new(BTreeMap::new());
+}
+
+pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
+    PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade())
+}
+pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
+    PROCESSES
+        .read()
+        .iter()
+        .filter_map(|(pid, proc)| {
+            if let Some(proc) = proc.upgrade() {
+                if proc.lock().pgid == pgid {
+                    Some(proc)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -142,13 +169,14 @@ impl Thread {
                 semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
-                pgid: -1,   // kernel thread do not have a process?
+                pgid: -1, // kernel thread do not have a process?
                 parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-                dispositions: [SigAction::default(); 32],
+                signals: [None; SIGRTMAX + 1],
+                dispositions: [SigAction::default(); SIGRTMAX + 1],
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
@@ -341,7 +369,8 @@ impl Thread {
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-                dispositions: [SigAction::default(); 32],
+                signals: [None; SIGRTMAX + 1],
+                dispositions: [SigAction::default(); SIGRTMAX + 1],
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
@@ -372,6 +401,7 @@ impl Thread {
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
             child_exit_code: BTreeMap::new(),
+            signals: [None; SIGRTMAX + 1],
             dispositions: proc.dispositions.clone(),
         }
         .add_to_table();
@@ -420,7 +450,9 @@ impl Process {
         let mut process_table = PROCESSES.write();
 
         // assign pid, do not start from 0
-        let pid = (1..).find(|i| process_table.get(i).is_none()).unwrap();
+        let pid = (Pid::INIT..)
+            .find(|i| process_table.get(i).is_none())
+            .unwrap();
         self.pid = Pid(pid);
 
         // put to process table

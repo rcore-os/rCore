@@ -5,7 +5,6 @@
 
 use bitflags::*;
 
-
 #[cfg(not(target_arch = "mips"))]
 pub const TCGETS: usize = 0x5401;
 #[cfg(target_arch = "mips")]
@@ -91,7 +90,10 @@ impl Default for Termois {
             cflag: 1215,
             lflag: 35387,
             line: 0,
-            cc: [3, 28, 127, 21, 4, 0, 1, 0, 17, 19, 26, 255, 18, 15, 23, 22, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            cc: [
+                3, 28, 127, 21, 4, 0, 1, 0, 17, 19, 26, 255, 18, 15, 23, 22, 255, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
             ispeed: 0,
             ospeed: 0,
         }

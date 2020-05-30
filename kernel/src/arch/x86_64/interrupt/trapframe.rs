@@ -1,5 +1,11 @@
 use core::default::Default;
 use core::fmt;
+use crate::process::{current_thread, thread_manager};
+use num::FromPrimitive;
+use rcore_thread::std_thread::current;
+use crate::signal::Signal;
+use alloc::vec::Vec;
+use crate::signal::action::*;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -133,6 +139,51 @@ extern "C" {
 #[derive(Debug)]
 pub struct Context(usize);
 
+#[inline(never)]
+unsafe fn handle_signal() {
+    let thread = current_thread();
+    let mut process = thread.proc.lock();
+    let signals = process.signals.iter().enumerate().filter_map(|(signum, tid)| {
+        if let &Some(tid) = tid {
+            if tid == -1 || tid as usize == current().id() {
+                Some(signum)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }).collect::<Vec<_>>();
+    for signum in signals {
+        use Signal::*;
+        let signal = <Signal as num::FromPrimitive>::from_usize(signum).unwrap();
+        info!("received signal: {:?}", signal);
+        let action = &process.dispositions[signum];
+        match action.handler {
+            x if x == SIG_DFL => {
+                match signal {
+                    SIGALRM | SIGHUP | SIGINT => {
+                        info!("default action: Term");
+                        // FIXME: ref please?
+                        process.exit(signum + 128);
+                    }
+                    _ => (),
+                }
+            }
+            x if x == SIG_IGN => {
+                info!("ignore");
+            }
+            x if x == SIG_ERR => {
+                // TODO
+            }
+            _ => {
+                // TODO: custom signal handler
+            }
+        }
+        process.signals[signum as usize] = None;
+    }
+}
+
 impl Context {
     /// Switch to another kernel thread.
     ///
@@ -157,12 +208,15 @@ impl Context {
         push r15
         mov r15, cr3
         push r15
-
         // Switch stacks
         mov [rdi], rsp      // rdi = from_rsp
         mov rsp, [rsi]      // rsi = to_rsp
+        ": : : : "intel" "volatile");
 
-        // Save old callee-save registers
+        handle_signal();
+
+        asm!("
+        // restore old callee-save registers
         pop r15
         mov cr3, r15
         pop r15
@@ -171,7 +225,6 @@ impl Context {
         pop r12
         pop rbp
         pop rbx
-
         // pop rip
         ret"
         : : : : "intel" "volatile" )

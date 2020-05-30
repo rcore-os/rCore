@@ -11,7 +11,7 @@ use rcore_fs_sfs::{INodeImpl, SimpleFileSystem};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{ShmINode, TtyINode, STDIN, STDOUT};
+pub use self::devfs::{ShmINode, STDIN, STDOUT, TTY};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -87,7 +87,7 @@ lazy_static! {
         devfs.add("zero", Arc::new(ZeroINode::default())).expect("failed to mknod /dev/zero");
         devfs.add("random", Arc::new(RandomINode::new(false))).expect("failed to mknod /dev/random");
         devfs.add("urandom", Arc::new(RandomINode::new(true))).expect("failed to mknod /dev/urandom");
-        devfs.add("tty", Arc::new(TtyINode::default())).expect("failed to mknod /dev/tty");
+        devfs.add("tty", TTY.clone()).expect("failed to mknod /dev/tty");
         devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
         devfs.add("shm", Arc::new(ShmINode::default())).expect("failed to mkdir shm");
 

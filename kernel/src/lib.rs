@@ -21,7 +21,10 @@ extern crate alloc;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+extern crate num;
 extern crate rlibc;
+#[macro_use]
+extern crate num_derive;
 
 pub use crate::process::{new_kernel_context, processor};
 pub use buddy_system_allocator::LockedHeapWithRescue;
