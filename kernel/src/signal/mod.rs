@@ -7,10 +7,10 @@ use num::FromPrimitive;
 mod action;
 
 pub use self::action::*;
-use rcore_thread::std_thread::current;
+use rcore_thread::std_thread::{current, yield_now};
 use alloc::vec::Vec;
-use crate::arch::interrupt::goto_signal_handler;
 use crate::processor;
+use crate::syscall::{SysError, SysResult};
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -81,16 +81,18 @@ pub enum Signal {
 pub const SIGRTMIN: usize = 35;
 pub const SIGRTMAX: usize = 64;
 
-pub fn send_signal(mut process: MutexGuard<Process, SpinNoIrq>, signal: Signal, tid: isize) {
-    process.signals[signal as usize] = Some(tid);
+// process and tid must be checked
+pub fn send_signal(process: Arc<Mutex<Process>>,  tid: isize, signal: Signal) {
+    process.lock().signals[signal as usize] = Some(tid);
     if tid == -1 {
-        info!("send {:?} to process {}", signal, process.pid);
+        info!("send {:?} to process {}", signal, process.lock().pid.get());
         if let Some(current_tid) = processor().tid_option() {
-            if process.threads.contains(&current_tid) {
+            if process.lock().threads.contains(&current_tid) {
                 drop(process);
                 handle_signal();
             }
         } else {
+            let process = process.lock();
             for &tid in process.threads.iter() {
                 thread_manager().wakeup(tid);
             }
@@ -108,9 +110,7 @@ pub fn send_signal(mut process: MutexGuard<Process, SpinNoIrq>, signal: Signal, 
 
 #[inline(never)]
 pub(crate) fn handle_signal() {
-    let mut process = unsafe { current_thread().proc.lock() };
-    let pid = process.pid.get();
-    let signals = process.signals.iter().enumerate().filter_map(|(signum, tid)| {
+    let signals = unsafe { current_thread() }.proc.lock().signals.iter().enumerate().filter_map(|(signum, tid)| {
         // TODO: handle mask
         if let &Some(tid) = tid {
             if tid == -1 || tid as usize == current().id() {
@@ -122,20 +122,20 @@ pub(crate) fn handle_signal() {
             None
         }
     }).collect::<Vec<_>>();
-    drop(process);
 
+    unsafe { current_thread() }.int = false;
     for signum in signals {
         use crate::signal::Flags;
         use Signal::*;
 
         let signal = <Signal as num::FromPrimitive>::from_usize(signum).unwrap();
         info!("received signal: {:?}", signal);
-        let process = crate::process::process(pid).unwrap();
-        let mut process = process.lock();
-        process.signals[signum as usize] = None;
-        let action = process.dispositions[signum];
+        let action = {
+            let mut process = unsafe { current_thread() }.proc.lock();
+            process.signals[signum] = None;
+            process.dispositions[signum]
+        };
         let flags = Flags::from_bits_truncate(action.flags);
-        drop(process);
 
         // enter signal handler
         match action.handler {
@@ -143,8 +143,9 @@ pub(crate) fn handle_signal() {
                 match signal {
                     SIGALRM | SIGHUP | SIGINT => {
                         info!("default action: Term");
-                        // FIXME: ref please?
-                        crate::process::process(pid).unwrap().lock().exit(signum + 128);
+                        // FIXME: exit code ref please?
+                        unsafe { current_thread() }.proc.lock().exit(signum + 128);
+                        yield_now();
                     }
                     _ => (),
                 }
@@ -155,27 +156,21 @@ pub(crate) fn handle_signal() {
                 unimplemented!();
             }
             _ => {
+                unsafe { current_thread() }.int = true;
                 if flags.contains(Flags::SA_SIGINFO) {
                     // TODO
                     unimplemented!();
                 } else {
                     unsafe {
-                        goto_signal_handler(signum as i32, action.handler);
+                        let handler: extern "C" fn(i32) = core::mem::transmute(action.handler);
+                        handler(signum as i32);
                     }
                 }
             }
         }
-
-        // process may exit during signal handling
-        if crate::process::process(pid).unwrap().lock().exited() {
-            break;
-        }
-
         if flags.contains(Flags::SA_RESTART) {
             // TODO: restart the syscall
-            unimplemented!();
-        } else {
-            // TODO: set error for interrupted syscall
+            warn!("unsupported flag: {:?}", Flags::SA_RESTART);
         }
     }
 }

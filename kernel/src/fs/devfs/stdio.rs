@@ -31,8 +31,8 @@ impl Stdin {
             match c as i32 {
                 // INTR
                 0o3 => {
-                    for proc in foregroud_processes.iter() {
-                        send_signal(proc.lock(), SIGINT, -1);
+                    for proc in foregroud_processes {
+                        send_signal(proc, -1, SIGINT);
                     }
                 }
                 _ => warn!("special char {} is unimplented", c),

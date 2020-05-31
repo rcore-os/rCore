@@ -53,14 +53,14 @@ lazy_static! {
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
-    let thread = unsafe { current_thread() };
-    let mut syscall = Syscall { thread, tf };
+    // let thread = unsafe { current_thread() };
+    let mut syscall = Syscall { tf };
     syscall.syscall(id, args)
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
-    thread: &'a mut Thread,
+    // thread: &'a mut Thread,
     tf: &'a mut TrapFrame,
 }
 
@@ -68,12 +68,14 @@ impl Syscall<'_> {
     /// Get current process
     /// spinlock is tend to deadlock, use busy waiting
     pub fn process(&self) -> MutexGuard<'_, Process, SpinNoIrq> {
-        self.thread.proc.busy_lock()
+        unsafe { current_thread() }.proc.busy_lock()
+        // self.thread.proc.busy_lock()
     }
 
     /// Get current virtual memory
     pub fn vm(&self) -> MutexGuard<'_, MemorySet, SpinNoIrq> {
-        self.thread.vm.lock()
+        // self.thread.vm.lock()
+        unsafe { current_thread() }.vm.lock()
     }
 
     /// System call dispatcher

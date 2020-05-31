@@ -9,11 +9,11 @@ use alloc::sync::Weak;
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
     pub fn sys_fork(&mut self) -> SysResult {
-        let new_thread = self.thread.fork(self.tf);
+        let new_thread = unsafe { current_thread() }.fork(self.tf);
         let pid = new_thread.proc.lock().pid.get();
         let tid = thread_manager().add(new_thread);
         thread_manager().detach(tid);
-        info!("fork: {} -> {}", self.thread.proc.lock().pid, pid);
+        info!("fork: {} -> {}", self.process().pid, pid);
         Ok(pid)
     }
 
@@ -56,9 +56,7 @@ impl Syscall<'_> {
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
         // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
-        let mut new_thread = self
-            .thread
-            .clone(self.tf, newsp, newtls, child_tid as usize);
+        let mut new_thread = unsafe { current_thread() }.clone(self.tf, newsp, newtls, child_tid as usize);
         if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
             new_thread.clear_child_tid = child_tid as usize;
         }
@@ -316,7 +314,8 @@ impl Syscall<'_> {
         // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
         // FIXME: do it in all possible ways a thread can exit
         //        it has memory access so we can't move it to Thread::drop?
-        let clear_child_tid = self.thread.clear_child_tid as *mut u32;
+        let thread = unsafe { current_thread() };
+        let clear_child_tid = thread.clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
             if let Ok(clear_child_tid_ref) = unsafe { self.vm().check_write_ptr(clear_child_tid) } {
@@ -362,7 +361,7 @@ impl Syscall<'_> {
 
     pub fn sys_set_tid_address(&mut self, tidptr: *mut u32) -> SysResult {
         info!("set_tid_address: {:?}", tidptr);
-        self.thread.clear_child_tid = tidptr as usize;
+        unsafe { current_thread() }.clear_child_tid = tidptr as usize;
         Ok(thread::current().id())
     }
 }

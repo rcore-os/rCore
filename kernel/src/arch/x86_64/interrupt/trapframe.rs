@@ -133,17 +133,7 @@ impl InitStack {
 
 extern "C" {
     fn trap_ret();
-    pub fn goto_signal_handler(sig: i32, addr: usize);
 }
-
-global_asm!(
-    r#"
-.intel_syntax noprefix
-.global goto_signal_handler
-goto_signal_handler:
-    jmp rsi
-"#
-);
 
 #[derive(Debug)]
 pub struct Context(usize);

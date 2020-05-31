@@ -43,6 +43,8 @@ pub struct Thread {
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
     pub sig_mask: Sigset,
+    // if syscall or library function was interrupted by a signal
+    pub int: bool,
 }
 
 /// Pid type
@@ -195,6 +197,7 @@ impl Thread {
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
+            int: false,
         })
     }
 
@@ -389,6 +392,7 @@ impl Thread {
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
+            int: false,
         })
     }
 
@@ -435,6 +439,7 @@ impl Thread {
             vm,
             proc: new_proc,
             sig_mask: self.sig_mask,
+            int: false,
         })
     }
 
@@ -455,6 +460,7 @@ impl Thread {
             vm: self.vm.clone(),
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,
+            int: false,
         })
     }
 }

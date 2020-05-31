@@ -7,7 +7,7 @@ use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
-use rcore_fs::vfs::FsError::NotSupported;
+use rcore_fs::vfs::FsError::{NotSupported, Interrupted};
 use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
 use rcore_memory::memory_set::handler::File;
 
@@ -123,6 +123,11 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
+                        let thread = unsafe { current_thread() };
+                        if thread.int && thread.int{
+                            thread.int = false;
+                            return Err(FsError::Interrupted)
+                        }
                         thread::yield_now();
                     }
                     Err(err) => {

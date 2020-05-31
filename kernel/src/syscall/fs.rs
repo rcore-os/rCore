@@ -23,6 +23,7 @@ use crate::fs::FileLike;
 use crate::process::Process;
 use crate::syscall::SysError::{EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
+use rcore_thread::std_thread::current;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -32,9 +33,9 @@ impl Syscall<'_> {
             info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
         }
         let slice = unsafe { self.vm().check_write_array(base, len)? };
-        let file_like = proc.get_file_like(fd)?;
-        let len = file_like.read(slice)?;
 
+        let file_like = unsafe { (*UnsafeCell::new(proc).get()).get_file_like(fd)? };
+        let len = file_like.read(slice)?;
         Ok(len)
     }
 
@@ -380,7 +381,7 @@ impl Syscall<'_> {
                     match file_like {
                         FileLike::File(_file) => {
                             &crate::fs::STDIN.pushed.register_epoll_list(
-                                self.thread.proc.clone(),
+                                unsafe { current_thread() }.proc.clone(),
                                 thread::current().id(),
                                 epfd,
                                 *fd,
@@ -389,7 +390,7 @@ impl Syscall<'_> {
                         }
                         FileLike::Socket(_socket) => {
                             &(*crate::drivers::SOCKET_ACTIVITY).register_epoll_list(
-                                self.thread.proc.clone(),
+                                unsafe { current_thread() }.proc.clone(),
                                 thread::current().id(),
                                 epfd,
                                 *fd,
@@ -1412,6 +1413,7 @@ impl From<FsError> for SysError {
             FsError::Again => SysError::EAGAIN,
             FsError::SymLoop => SysError::ELOOP,
             FsError::Busy => SysError::EBUSY,
+            FsError::Interrupted => SysError::EINTR,
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::process::{PROCESSES, thread_manager, process_of};
+use crate::process::{PROCESSES, thread_manager, process_of, current_thread};
 use crate::process::{process, process_group};
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ESRCH};
@@ -60,7 +60,7 @@ impl Syscall<'_> {
         }
         if !oldset.is_null() {
             let oldset = unsafe { self.vm().check_write_ptr(oldset)? };
-            *oldset = self.thread.sig_mask;
+            *oldset = unsafe { current_thread() }.sig_mask;
         }
         if !set.is_null() {
             // let set = *unsafe { self.vm().check_read_ptr(set)? };
@@ -69,10 +69,11 @@ impl Syscall<'_> {
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
+            let thread = unsafe { current_thread() };
             match how {
-                BLOCK => self.thread.sig_mask |= set,
-                UNBLOCK => self.thread.sig_mask ^= self.thread.sig_mask & set,
-                SETMASK => self.thread.sig_mask = set,
+                BLOCK => thread.sig_mask |= set,
+                UNBLOCK => thread.sig_mask ^= thread.sig_mask & set,
+                SETMASK => thread.sig_mask = set,
                 _ => return Err(EINVAL),
             }
         }
@@ -81,38 +82,49 @@ impl Syscall<'_> {
 
     /// sending signal sig to process pid
     pub fn sys_kill(&mut self, pid: isize, signum: usize) -> SysResult {
-        info!("kill: pid: {}, signum: {}", pid, signum);
-        if let Some(sig) = num::FromPrimitive::from_usize(signum) {
+        if let Some(signal) = num::FromPrimitive::from_usize(signum) {
+            info!("kill: pid: {}, signal: {:?}", pid, signal);
             match pid {
                 pid if pid > 0 => {
                     if let Some(process) = process(pid as usize) {
-                        send_signal(process.lock(), sig, -1);
+                        send_signal(process, -1, signal);
+                        Ok(0)
+                    } else {
+                        Err(ESRCH)
                     }
                 }
                 0 => {
                     let pgid = self.process().pgid;
-                    for process in process_group(pgid).iter() {
-                        send_signal(process.lock(), sig, -1);
+                    for process in process_group(pgid) {
+                        send_signal(process, -1, signal);
                     }
+                    Ok(0)
                 }
                 -1 => {
+                    // TODO: check permissions
                     // sig is sent to every process for which the calling process
                     // has permission to send signals, except for process 1 (init)
                     for process in PROCESSES.read().values() {
                         if let Some(process) = process.upgrade() {
-                            send_signal(process.lock(), sig, -1);
+                            send_signal(process, -1, signal);
                         }
                     }
+                    Ok(0)
                 }
                 _ => {
-                    let pgid = -pid;
-                    for process in process_group(pgid as i32).iter() {
-                        send_signal(process.lock(), sig, -1);
+                    let process_group = process_group((-pid) as i32);
+                    if process_group.is_empty() {
+                        Err(ESRCH)
+                    } else {
+                        for process in process_group {
+                            send_signal(process, -1, signal);
+                        }
+                        Ok(0)
                     }
                 }
             }
-            Ok(0)
         } else {
+            info!("kill: pid: {}, signal: UNKNOWN", pid);
             Err(EINVAL)
         }
     }
@@ -122,13 +134,13 @@ impl Syscall<'_> {
         if let Some(signal) = signal {
             info!("tkill: tid: {}, signal: {:?}", tid, signal);
             if let Some(process) = process_of(tid) {
-                send_signal(process.lock(), signal, tid as isize);
+                send_signal(process, tid as isize, signal);
                 Ok(0)
             } else {
                 Err(ESRCH)
             }
         } else {
-            info!("tkill: tid: {}, signal: UNKNOWN", tid, );
+            info!("tkill: tid: {}, signal: UNKNOWN", tid);
             Err(EINVAL)
         }
     }
