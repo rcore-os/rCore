@@ -11,6 +11,9 @@ use rcore_thread::std_thread::{current, yield_now};
 use alloc::vec::Vec;
 use crate::processor;
 use crate::syscall::{SysError, SysResult};
+use crate::arch::{get_sp, set_sp};
+use crate::signal::SigInfo;
+use alloc::alloc::handle_alloc_error;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -108,6 +111,8 @@ pub fn send_signal(process: Arc<Mutex<Process>>,  tid: isize, signal: Signal) {
     }
 }
 
+// must be called with = user stack
+// FIXME: set user mode?
 #[inline(never)]
 pub(crate) fn handle_signal() {
     let signals = unsafe { current_thread() }.proc.lock().signals.iter().enumerate().filter_map(|(signum, tid)| {
@@ -123,28 +128,29 @@ pub(crate) fn handle_signal() {
         }
     }).collect::<Vec<_>>();
 
-    unsafe { current_thread() }.int = false;
+    unsafe { current_thread().int = false; }
     for signum in signals {
-        use crate::signal::Flags;
+        use crate::signal::SignalActionFlags;
         use Signal::*;
 
         let signal = <Signal as num::FromPrimitive>::from_usize(signum).unwrap();
         info!("received signal: {:?}", signal);
         let action = {
-            let mut process = unsafe { current_thread() }.proc.lock();
+            let mut process = unsafe { current_thread().proc.lock() };
             process.signals[signum] = None;
             process.dispositions[signum]
         };
-        let flags = Flags::from_bits_truncate(action.flags);
+        let action_flags = SignalActionFlags::from_bits_truncate(action.flags);
 
         // enter signal handler
         match action.handler {
+            // TODO: complete default actions
             x if x == SIG_DFL => {
                 match signal {
                     SIGALRM | SIGHUP | SIGINT => {
                         info!("default action: Term");
                         // FIXME: exit code ref please?
-                        unsafe { current_thread() }.proc.lock().exit(signum + 128);
+                        unsafe { current_thread().proc.lock().exit(signum + 128); }
                         yield_now();
                     }
                     _ => (),
@@ -156,21 +162,82 @@ pub(crate) fn handle_signal() {
                 unimplemented!();
             }
             _ => {
-                unsafe { current_thread() }.int = true;
-                if flags.contains(Flags::SA_SIGINFO) {
-                    // TODO
-                    unimplemented!();
+                unsafe { current_thread().int = true; }
+                let sig_sp = {
+                    if action_flags.contains(SignalActionFlags::ONSTACK) {
+                        let stack = unsafe { current_thread().proc.lock().sigaltstack };
+                        let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
+                        if !stack_flags.contains(SignalStackFlags::DISABLE) {
+                            stack.sp + stack.size
+                        } else {
+                            unsafe {
+                                current_thread().ustack_top
+                            }
+                        }
+                    } else {
+                        unsafe {
+                            current_thread().ustack_top
+                        }
+                    }
+                };
+                if action_flags.contains(SignalActionFlags::SIGINFO) {
+                    unsafe {
+                        let action: extern "C" fn(i32, *mut SigInfo, usize) = core::mem::transmute(action.handler);
+                        // TODO: complete info
+                        let mut info = SigInfo {
+                            signo: signum as i32,
+                            errno: 0,
+                            code: 0,
+                            field: Default::default(),
+                        };
+                        // TODO: complete ucontext
+                        // let mut sp = get_sp();
+                        // sp = get_sp();
+                        // set_sp(sig_sp);
+                        action(signum as i32, &mut info as *mut SigInfo, 0);
+                        // set_sp(sp);
+                    }
                 } else {
                     unsafe {
                         let handler: extern "C" fn(i32) = core::mem::transmute(action.handler);
+                        let mut sp = get_sp();
+                        sp = get_sp();  // get stack pointer after local variable `sp` is allocated
+                        set_sp(sig_sp);
                         handler(signum as i32);
+                        set_sp(sp);
                     }
                 }
             }
         }
-        if flags.contains(Flags::SA_RESTART) {
+        if action_flags.contains(SignalActionFlags::RESTART) {
             // TODO: restart the syscall
-            warn!("unsupported flag: {:?}", Flags::SA_RESTART);
+            warn!("unsupported flag: {:?}", SignalActionFlags::RESTART);
+        }
+    }
+}
+
+bitflags! {
+    pub struct SignalStackFlags : u32 {
+        const ONSTACK = 1;
+        const DISABLE = 2;
+        const AUTODISARM = 0x80000000;
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct SignalStack {
+    pub sp: usize,
+    pub flags: u32,
+    pub size: usize,
+}
+
+impl Default for SignalStack {
+    fn default() -> Self {
+        SignalStack {
+            sp: 0,
+            flags: SignalStackFlags::DISABLE.bits,
+            size: 0,
         }
     }
 }

@@ -13,6 +13,7 @@ use crate::signal::{send_signal, Signal};
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 use spin::RwLock;
+use crate::processor;
 
 #[derive(Default)]
 pub struct Stdin {
@@ -31,8 +32,12 @@ impl Stdin {
             match c as i32 {
                 // INTR
                 0o3 => {
-                    for proc in foregroud_processes {
-                        send_signal(proc, -1, SIGINT);
+                    if processor().tid_option().is_none() {
+                        for proc in foregroud_processes {
+                            send_signal(proc, -1, SIGINT);
+                        }
+                    } else {
+                        info!("ignored");
                     }
                 }
                 _ => warn!("special char {} is unimplented", c),

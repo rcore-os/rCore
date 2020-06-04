@@ -5,6 +5,7 @@ use num::FromPrimitive;
 use rcore_thread::std_thread::current;
 use crate::signal::*;
 use alloc::vec::Vec;
+use crate::arch::get_sp;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -160,27 +161,44 @@ impl Context {
         push r13
         push r14
         push r15
+        "::::"intel" "volatile");
 
+        asm!("
         // save page table
         mov r15, cr3
-        push r15
+        push r15"::::"intel" "volatile"
+        );
 
+        asm!(
+        "
         // Switch stacks
         mov [rdi], rsp      // rdi = from_rsp
         mov rsp, [rsi]      // rsi = to_rsp
+        "::::"intel" "volatile");
 
+        asm!("mov r15, cr3"::::"intel" "volatile"); // debug
+
+        asm!(
+        "
         // restore page table
         pop r15
         mov cr3, r15
+        "::::"intel" "volatile");
 
+        asm!("
         // restore old callee-save registers
         pop r15
+        ": : : : "intel" "volatile"
+        );
+        asm!("
         pop r14
         pop r13
-        pop r12
+        pop r12": : : : "intel" "volatile");
+        asm!("
         pop rbp
         pop rbx
         ": : : : "intel" "volatile");
+        // info!("wang!");
 
         handle_signal();
     }

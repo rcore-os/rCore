@@ -69,6 +69,8 @@ use super::TrapFrame;
 use crate::drivers::IRQ_MANAGER;
 use bitflags::*;
 use log::*;
+use crate::process::current_thread;
+use crate::processor;
 
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
@@ -81,6 +83,9 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         tf.trap_num,
         super::super::cpu::id()
     );
+    if processor().tid_option().is_some() {
+        unsafe { current_thread().ustack_top = tf.rsp; }
+    }
     // Dispatch
     match tf.trap_num as u8 {
         Breakpoint => breakpoint(),

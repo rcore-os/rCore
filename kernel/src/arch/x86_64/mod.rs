@@ -92,3 +92,19 @@ fn other_start() -> ! {
     // call the first main function in kernel.
     crate::kmain();
 }
+
+pub fn get_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        asm!("mov %rsp, $0" : "=r"(sp));
+    }
+    sp
+}
+
+pub fn set_sp(sp: usize) {
+    unsafe {
+        asm!("mov $0, %rsp" :: "r" (sp) : "memory");
+    }
+}
+
+

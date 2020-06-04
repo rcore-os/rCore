@@ -25,7 +25,7 @@ use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
-use crate::signal::{SIGRTMAX, SigAction, Sigset};
+use crate::signal::{SIGRTMAX, SignalAction, SigSet, SignalStack};
 use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
 use pc_keyboard::KeyCode::BackTick;
@@ -42,9 +42,11 @@ pub struct Thread {
     // This is same as `proc.vm`
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
-    pub sig_mask: Sigset,
+    pub sig_mask: SigSet,
     // if syscall or library function was interrupted by a signal
     pub int: bool,
+    // this field is set from trap for convenience
+    pub ustack_top: usize,
 }
 
 /// Pid type
@@ -94,7 +96,8 @@ pub struct Process {
 
     // delivered signals, tid specified thread, -1 stands for any thread
     pub signals: [Option<isize>; SIGRTMAX + 1],
-    pub dispositions: [SigAction; SIGRTMAX + 1],
+    pub dispositions: [SignalAction; SIGRTMAX + 1],
+    pub sigaltstack: SignalStack,
 }
 
 lazy_static! {
@@ -193,11 +196,13 @@ impl Thread {
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
                 signals: [None; SIGRTMAX + 1],
-                dispositions: [SigAction::default(); SIGRTMAX + 1],
+                dispositions: [SignalAction::default(); SIGRTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
-            sig_mask: Sigset::default(),
+            sig_mask: SigSet::default(),
             int: false,
+            ustack_top: 0,
         })
     }
 
@@ -388,11 +393,13 @@ impl Thread {
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
                 signals: [None; SIGRTMAX + 1],
-                dispositions: [SigAction::default(); SIGRTMAX + 1],
+                dispositions: [SignalAction::default(); SIGRTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
-            sig_mask: Sigset::default(),
+            sig_mask: SigSet::default(),
             int: false,
+            ustack_top: 0,
         })
     }
 
@@ -422,6 +429,7 @@ impl Thread {
             child_exit_code: BTreeMap::new(),
             signals: [None; SIGRTMAX + 1],
             dispositions: proc.dispositions.clone(),
+            sigaltstack: SignalStack::default(),
         }
         .add_to_table();
         // link to parent
@@ -440,6 +448,7 @@ impl Thread {
             proc: new_proc,
             sig_mask: self.sig_mask,
             int: false,
+            ustack_top: 0,
         })
     }
 
@@ -461,6 +470,7 @@ impl Thread {
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,
             int: false,
+            ustack_top: 0,
         })
     }
 }
