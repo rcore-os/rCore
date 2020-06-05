@@ -39,12 +39,12 @@ mod proc;
 mod signal;
 mod time;
 
+use crate::signal::{Signal, SignalAction, SignalStack, Sigset, SignalFrame};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
-use crate::signal::{SigAction, Sigset};
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -53,14 +53,15 @@ lazy_static! {
 
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
-    // let thread = unsafe { current_thread() };
-    let mut syscall = Syscall { tf };
-    syscall.syscall(id, args)
+    let thread = unsafe { current_thread() };
+    let mut syscall = Syscall { thread, tf };
+    let ret = syscall.syscall(id, args);
+    ret
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
-    // thread: &'a mut Thread,
+    thread: &'a mut Thread,
     tf: &'a mut TrapFrame,
 }
 
@@ -68,14 +69,12 @@ impl Syscall<'_> {
     /// Get current process
     /// spinlock is tend to deadlock, use busy waiting
     pub fn process(&self) -> MutexGuard<'_, Process, SpinNoIrq> {
-        unsafe { current_thread() }.proc.busy_lock()
-        // self.thread.proc.busy_lock()
+        self.thread.proc.busy_lock()
     }
 
     /// Get current virtual memory
     pub fn vm(&self) -> MutexGuard<'_, MemorySet, SpinNoIrq> {
-        // self.thread.vm.lock()
-        unsafe { current_thread() }.vm.lock()
+        self.thread.vm.lock()
     }
 
     /// System call dispatcher
@@ -213,17 +212,20 @@ impl Syscall<'_> {
             // signal
             SYS_RT_SIGACTION => self.sys_rt_sigaction(
                 args[0],
-                args[1] as *const SigAction,
-                args[2] as *mut SigAction,
+                args[1] as *const SignalAction,
+                args[2] as *mut SignalAction,
                 args[3],
             ),
+            SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
                 args[1] as *const Sigset,
                 args[2] as *mut Sigset,
                 args[3],
             ),
-            SYS_SIGALTSTACK => self.unimplemented("sigaltstack", Ok(0)),
+            SYS_SIGALTSTACK => {
+                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+            }
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
@@ -518,9 +520,11 @@ impl Syscall<'_> {
 
 pub type SysResult = Result<usize, SysError>;
 
+use num::FromPrimitive;
+
 #[allow(dead_code)]
 #[repr(isize)]
-#[derive(Debug)]
+#[derive(Debug, FromPrimitive)]
 pub enum SysError {
     EUNDEF = 0,
     EPERM = 1,

@@ -1,5 +1,5 @@
 use alloc::{
-    boxed::Box, collections::BTreeMap, collections::BTreeSet, string::String, sync::Arc,
+    boxed::Box, collections::BTreeMap, collections::VecDeque, string::String, sync::Arc,
     sync::Weak, vec::Vec,
 };
 use core::fmt;
@@ -25,7 +25,7 @@ use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
-use crate::signal::{SIGRTMAX, SigAction, Sigset};
+use crate::signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset};
 use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
 use pc_keyboard::KeyCode::BackTick;
@@ -43,8 +43,10 @@ pub struct Thread {
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
     pub sig_mask: Sigset,
-    // if syscall or library function was interrupted by a signal
-    pub int: bool,
+    // set tf every time enter trap to access current trap frame everywhere when the thread is in the kernel
+    // using pointer to circumvent lifetime check, probably safe（确信）
+    // TODO: better implementation?
+    pub tf: *mut TrapFrame,
 }
 
 /// Pid type
@@ -93,8 +95,12 @@ pub struct Process {
     pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
 
     // delivered signals, tid specified thread, -1 stands for any thread
-    pub signals: [Option<isize>; SIGRTMAX + 1],
-    pub dispositions: [SigAction; SIGRTMAX + 1],
+    // TODO: implement with doubly linked list, but how to do it in rust safely? [doggy]
+    pub sig_queue: VecDeque<(Siginfo, isize)>,
+    pub pending_sigset: Sigset,
+
+    pub dispositions: [SignalAction; Signal::RTMAX + 1],
+    pub sigaltstack: SignalStack,
 }
 
 lazy_static! {
@@ -192,12 +198,14 @@ impl Thread {
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-                signals: [None; SIGRTMAX + 1],
-                dispositions: [SigAction::default(); SIGRTMAX + 1],
+                sig_queue: VecDeque::new(),
+                pending_sigset: Sigset::empty(),
+                dispositions: [SignalAction::default(); Signal::RTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
-            sig_mask: Sigset::default(),
-            int: false,
+            sig_mask: Sigset::empty(),
+            tf: 0 as _,
         })
     }
 
@@ -282,7 +290,7 @@ impl Thread {
             vm.push(
                 ustack_buttom,
                 ustack_top - PAGE_SIZE * 4,
-                MemoryAttr::default().user(),
+                MemoryAttr::default().user().execute(),
                 Delay::new(GlobalFrameAlloc),
                 "user_stack_delay",
             );
@@ -290,7 +298,7 @@ impl Thread {
             vm.push(
                 ustack_top - PAGE_SIZE * 4,
                 ustack_top,
-                MemoryAttr::default().user(),
+                MemoryAttr::default().user().execute(), // feature
                 ByFrame::new(GlobalFrameAlloc),
                 "user_stack",
             );
@@ -387,12 +395,14 @@ impl Thread {
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
-                signals: [None; SIGRTMAX + 1],
-                dispositions: [SigAction::default(); SIGRTMAX + 1],
+                pending_sigset: Sigset::empty(),
+                sig_queue: VecDeque::new(),
+                dispositions: [SignalAction::default(); Signal::RTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
-            int: false,
+            tf: 0 as _,
         })
     }
 
@@ -420,8 +430,10 @@ impl Thread {
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
             child_exit_code: BTreeMap::new(),
-            signals: [None; SIGRTMAX + 1],
+            pending_sigset: Sigset::empty(),
+            sig_queue: VecDeque::new(),
             dispositions: proc.dispositions.clone(),
+            sigaltstack: Default::default(),
         }
         .add_to_table();
         // link to parent
@@ -439,7 +451,7 @@ impl Thread {
             vm,
             proc: new_proc,
             sig_mask: self.sig_mask,
-            int: false,
+            tf: 0 as _,
         })
     }
 
@@ -460,7 +472,7 @@ impl Thread {
             vm: self.vm.clone(),
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,
-            int: false,
+            tf: 0 as _,
         })
     }
 }
@@ -532,7 +544,9 @@ impl Process {
         info!("process {} exist with {}", self.pid.get(), exit_code);
     }
 
-    pub fn exited(&self) -> bool { self.threads.is_empty() }
+    pub fn exited(&self) -> bool {
+        self.threads.is_empty()
+    }
 }
 
 trait ToMemoryAttr {

@@ -21,9 +21,10 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{FD_CLOEXEC, F_SETFD, O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::syscall::SysError::{EINVAL, ESPIPE};
+use crate::syscall::SysError::{EINVAL, ESPIPE, EINTR};
 use rcore_fs::vfs::PollStatus;
 use rcore_thread::std_thread::current;
+use crate::signal::has_signal_to_do;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -48,9 +49,6 @@ impl Syscall<'_> {
         let slice = unsafe { self.vm().check_read_array(base, len)? };
         let file_like = proc.get_file_like(fd)?;
         let len = file_like.write(slice)?;
-        if len == 1 && !proc.pid.is_init() {
-            println!("write content: {}", slice[0] as char);
-        }
         Ok(len)
     }
 
@@ -131,6 +129,10 @@ impl Syscall<'_> {
 
         let begin_time_ms = crate::trap::uptime_msec();
         Condvar::wait_events(condvars.as_slice(), move || {
+            if has_signal_to_do() {
+                return Some(Err(EINTR));
+            }
+
             use PollEvents as PE;
             let proc = self.process();
             let mut events = 0;

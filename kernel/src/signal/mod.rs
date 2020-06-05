@@ -1,5 +1,5 @@
-use crate::process::{thread_manager, Process, current_thread, process_of, process};
-use crate::sync::{SpinNoIrqLock as Mutex, MutexGuard, SpinNoIrq};
+use crate::process::{current_thread, process, process_of, thread_manager, Process};
+use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
 use bitflags::*;
 use num::FromPrimitive;
@@ -7,10 +7,13 @@ use num::FromPrimitive;
 mod action;
 
 pub use self::action::*;
-use rcore_thread::std_thread::{current, yield_now};
-use alloc::vec::Vec;
+use crate::arch::interrupt::TrapFrame;
+use crate::arch::{get_sp, set_sp};
 use crate::processor;
 use crate::syscall::{SysError, SysResult};
+use alloc::vec::Vec;
+use rcore_thread::std_thread::{current, yield_now};
+use crate::arch::syscall::SYS_RT_SIGRETURN;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -78,99 +81,196 @@ pub enum Signal {
     SIGRT64 = 64,
 }
 
-pub const SIGRTMIN: usize = 35;
-pub const SIGRTMAX: usize = 64;
+impl Signal {
+    pub const RTMIN: usize = 35;
+    pub const RTMAX: usize = 64;
 
-// process and tid must be checked
-pub fn send_signal(process: Arc<Mutex<Process>>,  tid: isize, signal: Signal) {
-    process.lock().signals[signal as usize] = Some(tid);
-    if tid == -1 {
-        info!("send {:?} to process {}", signal, process.lock().pid.get());
-        if let Some(current_tid) = processor().tid_option() {
-            if process.lock().threads.contains(&current_tid) {
-                drop(process);
-                handle_signal();
-            }
-        } else {
-            let process = process.lock();
-            for &tid in process.threads.iter() {
-                thread_manager().wakeup(tid);
-            }
-        }
-    } else {
-        info!("send {:?} to thread {}", signal, tid);
-        if let Some(current_tid) = processor().tid_option() {
-            drop(process);
-            handle_signal();
-        } else {
-            thread_manager().wakeup(tid as usize);
-        }
+    pub fn is_standard(self) -> bool {
+        (self as usize) < Self::RTMIN
     }
 }
 
-#[inline(never)]
-pub(crate) fn handle_signal() {
-    let signals = unsafe { current_thread() }.proc.lock().signals.iter().enumerate().filter_map(|(signum, tid)| {
-        // TODO: handle mask
-        if let &Some(tid) = tid {
-            if tid == -1 || tid as usize == current().id() {
-                Some(signum)
-            } else {
-                None
-            }
-        } else {
-            None
+// process and tid must be checked
+pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
+    let signal: Signal = <Signal as FromPrimitive>::from_i32(info.signo).unwrap();
+    let mut process = process.lock();
+    if signal.is_standard() && process.pending_sigset.contains(signal) {
+        return;
+    }
+    process.sig_queue.push_back((info, tid));
+    process.pending_sigset.add(signal);
+    if tid == -1 {
+        info!("send {:?} to process {}", signal, process.pid.get());
+        for &tid in process.threads.iter() {
+            // TODO: check mask here
+            thread_manager().wakeup(tid);
         }
-    }).collect::<Vec<_>>();
+    } else {
+        info!("send {:?} to thread {}", signal, tid);
+        // TODO: check mask here
+        thread_manager().wakeup(tid as usize);
+    }
+}
 
-    unsafe { current_thread() }.int = false;
-    for signum in signals {
-        use crate::signal::Flags;
+#[repr(C)]
+pub struct SignalFrame {
+    pub ret_code_addr: usize, // point to ret_code
+    pub tf: TrapFrame,
+    pub info: Siginfo,
+    pub ret_code: [u8; 7], // call sys_sigreturn
+}
+
+pub fn has_signal_to_do() -> bool {
+    let thread = unsafe { current_thread() };
+    unsafe {
+        current_thread()
+            .proc
+            .lock()
+            .sig_queue
+            .iter()
+            .find(|(info, tid)| {
+                let tid = *tid;
+                (tid == -1 || tid as usize == current().id())
+                    && !thread
+                        .sig_mask
+                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
+            })
+            .is_some()
+    }
+}
+
+pub fn do_signal(tf: &mut TrapFrame) {
+    let thread = unsafe { current_thread() };
+    let mut process = unsafe { current_thread().proc.lock() };
+    while let Some((idx, info)) =
+        process
+            .sig_queue
+            .iter()
+            .enumerate()
+            .find_map(|(idx, &(info, tid))| {
+                if (tid == -1 || tid as usize == current().id())
+                    && !thread
+                        .sig_mask
+                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
+                {
+                    Some((idx, info))
+                } else {
+                    None
+                }
+            })
+    {
+        use crate::signal::SignalActionFlags;
         use Signal::*;
 
-        let signal = <Signal as num::FromPrimitive>::from_usize(signum).unwrap();
+        let signal: Signal = <Signal as FromPrimitive>::from_i32(info.signo).unwrap();
         info!("received signal: {:?}", signal);
-        let action = {
-            let mut process = unsafe { current_thread() }.proc.lock();
-            process.signals[signum] = None;
-            process.dispositions[signum]
-        };
-        let flags = Flags::from_bits_truncate(action.flags);
+
+        process.sig_queue.remove(idx);
+        process.pending_sigset.remove(signal);
+
+        let action = process.dispositions[info.signo as usize];
+        let action_flags = SignalActionFlags::from_bits_truncate(action.flags);
 
         // enter signal handler
         match action.handler {
+            // TODO: complete default actions
             x if x == SIG_DFL => {
                 match signal {
                     SIGALRM | SIGHUP | SIGINT => {
                         info!("default action: Term");
                         // FIXME: exit code ref please?
-                        unsafe { current_thread() }.proc.lock().exit(signum + 128);
+                        process.exit(info.signo as usize + 128);
                         yield_now();
+                        unreachable!()
                     }
                     _ => (),
                 }
             }
-            x if x == SIG_IGN => info!("ignore"),
+            x if x == SIG_IGN => {
+                // TODO: handle SIGCHLD
+                info!("ignore");
+            }
             x if x == SIG_ERR => {
                 // TODO
                 unimplemented!();
             }
             _ => {
-                unsafe { current_thread() }.int = true;
-                if flags.contains(Flags::SA_SIGINFO) {
-                    // TODO
-                    unimplemented!();
-                } else {
-                    unsafe {
-                        let handler: extern "C" fn(i32) = core::mem::transmute(action.handler);
-                        handler(signum as i32);
+                info!("goto handler at {:#x}", action.handler);
+                let sig_sp = {
+                    if action_flags.contains(SignalActionFlags::ONSTACK) {
+                        let stack = process.sigaltstack;
+                        let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
+                        if !stack_flags.contains(SignalStackFlags::DISABLE) {
+                            tf.get_sp()
+                        } else {
+                            stack.sp + stack.size
+                        }
+                    } else {
+                        tf.get_sp()
                     }
+                } - core::mem::size_of::<SignalFrame>();
+                let frame = if let Ok(frame) = unsafe {
+                    process
+                        .vm
+                        .lock()
+                        .check_write_ptr(sig_sp as *mut SignalFrame)
+                } {
+                    frame
+                } else {
+                    unimplemented!()
+                };
+                frame.tf = tf.clone();
+                frame.info = info;
+                if action_flags.contains(SignalActionFlags::RESTORER) {
+                    frame.ret_code_addr = action.restorer;  // legacy
+                } else {
+                    frame.ret_code_addr = frame.ret_code.as_ptr() as usize;
+                    // mov SYS_RT_SIGRETURN, %eax
+                    frame.ret_code[0] = 0xb8;
+                    unsafe { *(frame.ret_code.as_ptr().add(1) as *mut u32) = SYS_RT_SIGRETURN as u32; }
+                    // syscall
+                    frame.ret_code[5] = 0x0f;
+                    frame.ret_code[6] = 0x05;
                 }
+                #[cfg(target_arch = "x86_64")]
+                {
+                    tf.rsp = sig_sp;
+                    tf.rip = action.handler;
+
+                    // pass handler argument
+                    tf.rdi = info.signo as usize;
+                    tf.rsi = &frame.info as *const Siginfo as usize;
+                    // TODO: complete context
+                    tf.rdx = 0;
+                }
+                return;
             }
         }
-        if flags.contains(Flags::SA_RESTART) {
-            // TODO: restart the syscall
-            warn!("unsupported flag: {:?}", Flags::SA_RESTART);
+    }
+}
+
+bitflags! {
+    pub struct SignalStackFlags : u32 {
+        const ONSTACK = 1;
+        const DISABLE = 2;
+        const AUTODISARM = 0x80000000;
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct SignalStack {
+    pub sp: usize,
+    pub flags: u32,
+    pub size: usize,
+}
+
+impl Default for SignalStack {
+    fn default() -> Self {
+        SignalStack {
+            sp: 0,
+            flags: SignalStackFlags::DISABLE.bits,
+            size: 0,
         }
     }
 }
