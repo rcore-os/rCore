@@ -223,9 +223,7 @@ impl Syscall<'_> {
                 args[2] as *mut Sigset,
                 args[3],
             ),
-            SYS_SIGALTSTACK => {
-                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
-            }
+            SYS_SIGALTSTACK => self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack),
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule

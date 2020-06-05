@@ -20,6 +20,7 @@ pub const SI_KERNEL: i32 = 128;
 // yet there's a bug because of mismatching bits: https://sourceware.org/bugzilla/show_bug.cgi?id=25657
 // just support 64bits size sigset
 #[derive(Default, Clone, Copy, Debug)]
+#[repr(C)]
 pub struct Sigset(u64);
 
 impl Sigset {
@@ -49,9 +50,9 @@ impl Sigset {
 #[derive(Clone, Copy, Default)]
 pub struct SignalAction {
     pub handler: usize, // this field may be an union
-    pub mask: Sigset,
-    pub flags: u32,
+    pub flags: usize,
     pub restorer: usize,
+    pub mask: Sigset,
 }
 
 impl Debug for SignalAction {
@@ -95,7 +96,7 @@ pub struct Siginfo {
 }
 
 bitflags! {
-    pub struct SignalActionFlags : u32 {
+    pub struct SignalActionFlags : usize {
         const NOCLDSTOP = 1;
         const NOCLDWAIT = 2;
         const SIGINFO = 4;

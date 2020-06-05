@@ -22,7 +22,7 @@ impl Syscall<'_> {
                 signal, act, oldact, sigsetsize
             );
             use Signal::*;
-            if signal == SIGKILL || signal == SIGSTOP || sigsetsize != 8 {
+            if signal == SIGKILL || signal == SIGSTOP || sigsetsize != core::mem::size_of::<Sigset>() {
                 Err(EINVAL)
             } else {
                 let mut proc = self.process();
@@ -50,6 +50,11 @@ impl Syscall<'_> {
         info!("rt_sigreturn");
         // FIXME: adapt arch
         let frame = unsafe { (&*((self.tf.get_sp() - 8) as *mut SignalFrame)) };
+        // frame.info.signo
+        {
+            let mut process = self.process();
+            process.sigaltstack.flags ^= process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
+        }
 
         // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
         *self.tf = frame.tf.clone();
@@ -193,6 +198,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_sigaltstack(&self, ss: *const SignalStack, old_ss: *mut SignalStack) -> SysResult {
+        info!("sigaltstack: ss: {:?}, old_ss: {:?}", ss, old_ss);
         const MINSIGSTKSZ: usize = 2048;
         if !old_ss.is_null() {
             let old_ss = unsafe { self.vm().check_write_ptr(old_ss)? };
@@ -200,6 +206,7 @@ impl Syscall<'_> {
         }
         if !ss.is_null() {
             let ss = unsafe { self.vm().check_read_ptr(ss)? };
+            info!("new stack: {:?}", ss);
 
             if ss.flags & 2 != 0 && ss.size < MINSIGSTKSZ {
                 return Err(ENOMEM);
