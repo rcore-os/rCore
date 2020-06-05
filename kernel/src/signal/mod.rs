@@ -8,13 +8,13 @@ mod action;
 
 pub use self::action::*;
 use crate::arch::interrupt::TrapFrame;
+use crate::arch::signal::MachineContext;
+use crate::arch::syscall::SYS_RT_SIGRETURN;
 use crate::arch::{get_sp, set_sp};
 use crate::processor;
 use crate::syscall::{SysError, SysResult};
 use alloc::vec::Vec;
 use rcore_thread::std_thread::{current, yield_now};
-use crate::arch::syscall::SYS_RT_SIGRETURN;
-use crate::arch::signal::MachineContext;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -133,8 +133,8 @@ pub struct SignalFrame {
     pub ret_code_addr: usize, // point to ret_code
     pub tf: TrapFrame,
     pub info: Siginfo,
-    pub ucontext: UserContext,  // adapt interface, a little bit waste
-    pub ret_code: [u8; 7], // call sys_sigreturn
+    pub ucontext: UserContext, // adapt interface, a little bit waste
+    pub ret_code: [u8; 7],     // call sys_sigreturn
 }
 
 pub fn has_signal_to_do() -> bool {
@@ -248,13 +248,15 @@ pub fn do_signal(tf: &mut TrapFrame) {
                     _fpregs_mem: [0; 64],
                 };
                 if action_flags.contains(SignalActionFlags::RESTORER) {
-                    frame.ret_code_addr = action.restorer;  // legacy
+                    frame.ret_code_addr = action.restorer; // legacy
                 } else {
                     frame.ret_code_addr = frame.ret_code.as_ptr() as usize;
                     // mov SYS_RT_SIGRETURN, %eax
                     frame.ret_code[0] = 0xb8;
                     // TODO: ref plz
-                    unsafe { *(frame.ret_code.as_ptr().add(1) as *mut u32) = SYS_RT_SIGRETURN as u32; }
+                    unsafe {
+                        *(frame.ret_code.as_ptr().add(1) as *mut u32) = SYS_RT_SIGRETURN as u32;
+                    }
                     // syscall
                     frame.ret_code[5] = 0x0f;
                     frame.ret_code[6] = 0x05;

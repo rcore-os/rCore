@@ -1,3 +1,4 @@
+use crate::arch::interrupt::TrapFrame;
 use crate::process::{current_thread, process_of, thread_manager, PROCESSES};
 use crate::process::{process, process_group};
 use crate::signal::Signal::SIGINT;
@@ -6,7 +7,6 @@ use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
 use crate::thread;
 use num::FromPrimitive;
-use crate::arch::interrupt::TrapFrame;
 
 impl Syscall<'_> {
     pub fn sys_rt_sigaction(
@@ -22,7 +22,10 @@ impl Syscall<'_> {
                 signal, act, oldact, sigsetsize
             );
             use Signal::*;
-            if signal == SIGKILL || signal == SIGSTOP || sigsetsize != core::mem::size_of::<Sigset>() {
+            if signal == SIGKILL
+                || signal == SIGSTOP
+                || sigsetsize != core::mem::size_of::<Sigset>()
+            {
                 Err(EINVAL)
             } else {
                 let mut proc = self.process();
@@ -53,7 +56,8 @@ impl Syscall<'_> {
         // frame.info.signo
         {
             let mut process = self.process();
-            process.sigaltstack.flags ^= process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
+            process.sigaltstack.flags ^=
+                process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
         }
 
         // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);

@@ -39,7 +39,7 @@ mod proc;
 mod signal;
 mod time;
 
-use crate::signal::{Signal, SignalAction, SignalStack, Sigset, SignalFrame};
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
@@ -223,7 +223,9 @@ impl Syscall<'_> {
                 args[2] as *mut Sigset,
                 args[3],
             ),
-            SYS_SIGALTSTACK => self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack),
+            SYS_SIGALTSTACK => {
+                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+            }
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule

@@ -1,4 +1,5 @@
 use crate::arch::get_sp;
+use crate::arch::signal::MachineContext;
 use crate::process::{current_thread, thread_manager};
 use crate::signal::*;
 use alloc::vec::Vec;
@@ -6,7 +7,6 @@ use core::default::Default;
 use core::fmt;
 use num::FromPrimitive;
 use rcore_thread::std_thread::current;
-use crate::arch::signal::MachineContext;
 
 #[derive(Clone)]
 #[repr(C)]

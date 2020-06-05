@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::fs::FileLike;
-use crate::signal::{send_signal, Signal, has_signal_to_do};
-use crate::syscall::SysError::{ESRCH, EINTR};
+use crate::signal::{has_signal_to_do, send_signal, Signal};
+use crate::syscall::SysError::{EINTR, ESRCH};
 use alloc::sync::Weak;
 
 impl Syscall<'_> {

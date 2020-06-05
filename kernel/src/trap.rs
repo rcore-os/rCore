@@ -10,7 +10,9 @@ pub static mut TICK: usize = 0;
 
 global_asm!(include_str!("fpe.S"));
 
-extern "C" { fn fpe(); }
+extern "C" {
+    fn fpe();
+}
 
 lazy_static! {
     pub static ref TICK_ACTIVITY: Condvar = Condvar::new();

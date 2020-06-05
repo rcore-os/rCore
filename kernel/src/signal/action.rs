@@ -1,6 +1,6 @@
 use crate::signal::Signal;
-use bitflags::*;
 use bitflags::_core::fmt::Debug;
+use bitflags::*;
 use core::fmt::Formatter;
 
 pub const SIG_ERR: usize = usize::max_value() - 1;
@@ -65,7 +65,6 @@ impl Debug for SignalAction {
             .finish()
     }
 }
-
 
 #[repr(C)]
 #[derive(Copy, Clone)]

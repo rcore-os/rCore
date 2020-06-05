@@ -21,10 +21,10 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{FD_CLOEXEC, F_SETFD, O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::syscall::SysError::{EINVAL, ESPIPE, EINTR};
+use crate::signal::has_signal_to_do;
+use crate::syscall::SysError::{EINTR, EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
 use rcore_thread::std_thread::current;
-use crate::signal::has_signal_to_do;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
