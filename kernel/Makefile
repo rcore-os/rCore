@@ -77,7 +77,7 @@ endif
 
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(SMP)
+	-smp cores=$(SMP) -enable-kvm
 qemu_net_opts :=
 
 ifeq ($(ARCH), x86_64)
@@ -245,7 +245,7 @@ run: build justrun
 test: build justtest
 
 justrun:
-	@$(qemu) $(qemu_opts)
+	@sudo $(qemu) $(qemu_opts)
 
 justtest:
 	# unavailable now
@@ -257,7 +257,7 @@ debug: $(kernel) $(kernel_img)
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
 clion_debug: $(kernel) $(kernel_img)
-	$(qemu) $(qemu_opts) -s -S
+	sudo $(qemu) $(qemu_opts) -s -S
 
 build: $(kernel_img)
 

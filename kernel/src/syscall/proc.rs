@@ -271,9 +271,10 @@ impl Syscall<'_> {
         let proc = process_table.get(&pid);
         if (proc.is_some()) {
             // TODO: check process pid is the child of calling process
-            let lock = proc.unwrap().upgrade().unwrap();
-            let mut proc = lock.lock();
-            proc.pgid = pgid as i32;
+            if let Some(lock) = proc.unwrap().upgrade() {
+                let mut proc = lock.lock();
+                proc.pgid = pgid as i32;
+            }
             Ok(0)
         } else {
             Err(ESRCH)

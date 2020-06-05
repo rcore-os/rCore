@@ -77,6 +77,7 @@ impl TrapFrame {
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
+        tf.mxcsr = 0x1f80;
         tf
     }
     pub fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
@@ -88,6 +89,7 @@ impl TrapFrame {
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
+        tf.mxcsr = 0x1f80;
         tf
     }
 }
