@@ -1,5 +1,7 @@
 use crate::signal::Signal;
 use bitflags::*;
+use bitflags::_core::fmt::Debug;
+use core::fmt::Formatter;
 
 pub const SIG_ERR: usize = usize::max_value() - 1;
 pub const SIG_DFL: usize = 0;
@@ -44,13 +46,25 @@ impl Sigset {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct SignalAction {
     pub handler: usize, // this field may be an union
     pub mask: Sigset,
     pub flags: u32,
     pub restorer: usize,
 }
+
+impl Debug for SignalAction {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), core::fmt::Error> {
+        f.debug_struct("signal action")
+            .field("handler", &format!("{:#x}", self.handler))
+            .field("mask", &self.mask)
+            .field("flags", &SignalActionFlags::from_bits_truncate(self.flags))
+            .field("restorer", &format!("{:#x}", self.restorer))
+            .finish()
+    }
+}
+
 
 #[repr(C)]
 #[derive(Copy, Clone)]

@@ -178,7 +178,7 @@ impl Syscall<'_> {
                     Siginfo {
                         signo: signum as i32,
                         errno: 0,
-                        code: SI_USER,
+                        code: SI_TKILL,
                         field: Default::default(),
                     },
                 );

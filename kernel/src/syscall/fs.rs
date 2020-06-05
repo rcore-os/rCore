@@ -1137,33 +1137,52 @@ impl Syscall<'_> {
             "utimensat(raw): dirfd: {}, pathname: {}, times: {}, flags: {:#x}",
             dirfd as i64, pathname as usize, times as usize, flags
         );
-        let pathname = check_and_clone_cstr(pathname)?;
-        let proc = self.process();
-        let times = if times.is_null() {
-            [TimeSpec::get_epoch(), TimeSpec::get_epoch()]
+        const UTIME_NOW: usize = 0x3fffffff;
+        const UTIME_OMIT: usize = 0x3ffffffe;
+        let mut proc = self.process();
+        let mut times = if times.is_null() {
+            let epoch = TimeSpec::get_epoch();
+            [epoch, epoch]
         } else {
             let times = unsafe { self.vm().check_read_array(times, 2)? };
             [times[0], times[1]]
         };
-        info!(
-            "utimensat: dirfd: {}, pathname: {}, times: {:?}, flags: {:#x}",
-            dirfd as i64, pathname, times, flags
-        );
-        let follow = match flags {
-            0 => true,
-            fcntl::AT_SYMLINK_NOFOLLOW => false,
-            _ => return Err(EINVAL),
+        let mut inode = if pathname.is_null() {
+            let fd = dirfd;
+            info!("futimens: fd: {}, times: {:?}", fd, times);
+            proc.get_file(fd)?.inode()
+        } else {
+            let pathname = check_and_clone_cstr(pathname)?;
+            info!(
+                "utimensat: dirfd: {}, pathname: {}, times: {:?}, flags: {:#x}",
+                dirfd as i64, pathname, times, flags
+            );
+            let follow = match flags {
+                0 => true,
+                fcntl::AT_SYMLINK_NOFOLLOW => false,
+                _ => return Err(EINVAL),
+            };
+            proc.lookup_inode_at(dirfd, &pathname, follow)?
         };
-        let inode = proc.lookup_inode_at(dirfd, &pathname, follow)?;
         let mut metadata = inode.metadata()?;
-        metadata.atime = Timespec {
-            sec: times[0].sec as i64,
-            nsec: times[0].nsec as i32,
-        };
-        metadata.mtime = Timespec {
-            sec: times[1].sec as i64,
-            nsec: times[1].nsec as i32,
-        };
+        if times[0].nsec != UTIME_OMIT {
+            if times[0].nsec == UTIME_NOW {
+                times[0] = TimeSpec::get_epoch();
+            }
+            metadata.atime = Timespec {
+                sec: times[0].sec as i64,
+                nsec: times[0].nsec as i32,
+            };
+        }
+        if times[1].nsec != UTIME_OMIT {
+            if times[1].nsec == UTIME_NOW {
+                times[1] = TimeSpec::get_epoch();
+            }
+            metadata.mtime = Timespec {
+                sec: times[1].sec as i64,
+                nsec: times[1].nsec as i32,
+            };
+        }
         inode.set_metadata(&metadata)?;
         Ok(0)
     }
@@ -1587,11 +1606,11 @@ pub struct Stat {
     blocks: u64,
 
     /// last access time
-    atime: Timespec,
+    atime: TimeSpec,
     /// last modification time
-    mtime: Timespec,
+    mtime: TimeSpec,
     /// last status change time
-    ctime: Timespec,
+    ctime: TimeSpec,
 }
 
 #[cfg(target_arch = "mips")]
@@ -1764,9 +1783,18 @@ impl From<Metadata> for Stat {
             size: info.size as u64,
             blksize: info.blk_size as u64,
             blocks: info.blocks as u64,
-            atime: info.atime,
-            mtime: info.mtime,
-            ctime: info.ctime,
+            atime: TimeSpec {
+                sec: info.atime.sec as usize,
+                nsec: info.atime.nsec as usize,
+            },
+            mtime: TimeSpec {
+                sec: info.mtime.sec as usize,
+                nsec: info.mtime.nsec as usize,
+            },
+            ctime: TimeSpec {
+                sec: info.ctime.sec as usize,
+                nsec: info.ctime.nsec as usize,
+            },
             _pad0: 0,
         }
     }

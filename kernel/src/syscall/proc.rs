@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::fs::FileLike;
-use crate::signal::{send_signal, Signal};
-use crate::syscall::SysError::ESRCH;
+use crate::signal::{send_signal, Signal, has_signal_to_do};
+use crate::syscall::SysError::{ESRCH, EINTR};
 use alloc::sync::Weak;
 
 impl Syscall<'_> {
@@ -350,6 +350,9 @@ impl Syscall<'_> {
         if !time.is_zero() {
             // TODO: handle spurious wakeup
             thread::sleep(time.to_duration());
+            if has_signal_to_do() {
+                return Err(EINTR);
+            }
         }
         Ok(0)
     }
