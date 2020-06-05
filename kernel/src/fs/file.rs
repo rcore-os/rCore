@@ -7,14 +7,16 @@ use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
-use rcore_fs::vfs::FsError::{NotSupported, Interrupted};
+use rcore_fs::vfs::FsError::{Interrupted, NotSupported};
 use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Result};
 use rcore_memory::memory_set::handler::File;
 
 use crate::fs::fcntl::{O_APPEND, O_NONBLOCK};
+use crate::signal::{do_signal, has_signal_to_do};
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
+use rcore_thread::std_thread::current;
 use spin::RwLock;
 
 enum Flock {
@@ -123,10 +125,8 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
-                        let thread = unsafe { current_thread() };
-                        if thread.int && thread.int{
-                            thread.int = false;
-                            return Err(FsError::Interrupted)
+                        if has_signal_to_do() {
+                            return Err(Interrupted);
                         }
                         thread::yield_now();
                     }

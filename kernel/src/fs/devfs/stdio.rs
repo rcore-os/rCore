@@ -9,11 +9,11 @@ use super::tty::TTY;
 use crate::fs::devfs::foreground_pgid;
 use crate::fs::ioctl::*;
 use crate::process::process_group;
-use crate::signal::{send_signal, Signal};
+use crate::processor;
+use crate::signal::{send_signal, Siginfo, Signal, SI_KERNEL};
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
 use spin::RwLock;
-use crate::processor;
 
 #[derive(Default)]
 pub struct Stdin {
@@ -32,12 +32,17 @@ impl Stdin {
             match c as i32 {
                 // INTR
                 0o3 => {
-                    if processor().tid_option().is_none() {
-                        for proc in foregroud_processes {
-                            send_signal(proc, -1, SIGINT);
-                        }
-                    } else {
-                        info!("ignored");
+                    for proc in foregroud_processes {
+                        send_signal(
+                            proc,
+                            -1,
+                            Siginfo {
+                                signo: SIGINT as i32,
+                                errno: 0,
+                                code: SI_KERNEL,
+                                field: Default::default(),
+                            },
+                        );
                     }
                 }
                 _ => warn!("special char {} is unimplented", c),

@@ -39,12 +39,12 @@ mod proc;
 mod signal;
 mod time;
 
+use crate::signal::{Signal, SignalAction, SignalStack, Sigset, SignalFrame};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
-use crate::signal::{SignalAction, SigSet, SignalStack, Signal};
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -216,13 +216,16 @@ impl Syscall<'_> {
                 args[2] as *mut SignalAction,
                 args[3],
             ),
+            SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
-                args[1] as *const SigSet,
-                args[2] as *mut SigSet,
+                args[1] as *const Sigset,
+                args[2] as *mut Sigset,
                 args[3],
             ),
-            SYS_SIGALTSTACK => self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack),
+            SYS_SIGALTSTACK => {
+                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+            }
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
@@ -517,9 +520,11 @@ impl Syscall<'_> {
 
 pub type SysResult = Result<usize, SysError>;
 
+use num::FromPrimitive;
+
 #[allow(dead_code)]
 #[repr(isize)]
-#[derive(Debug)]
+#[derive(Debug, FromPrimitive)]
 pub enum SysError {
     EUNDEF = 0,
     EPERM = 1,

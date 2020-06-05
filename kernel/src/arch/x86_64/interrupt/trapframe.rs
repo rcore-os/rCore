@@ -1,11 +1,11 @@
-use core::default::Default;
-use core::fmt;
+use crate::arch::get_sp;
 use crate::process::{current_thread, thread_manager};
-use num::FromPrimitive;
-use rcore_thread::std_thread::current;
 use crate::signal::*;
 use alloc::vec::Vec;
-use crate::arch::get_sp;
+use core::default::Default;
+use core::fmt;
+use num::FromPrimitive;
+use rcore_thread::std_thread::current;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -90,6 +90,10 @@ impl TrapFrame {
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
         tf
+    }
+
+    pub fn get_sp(&self) -> usize {
+        self.rsp
     }
 }
 
@@ -176,8 +180,6 @@ impl Context {
         mov rsp, [rsi]      // rsi = to_rsp
         "::::"intel" "volatile");
 
-        asm!("mov r15, cr3"::::"intel" "volatile"); // debug
-
         asm!(
         "
         // restore page table
@@ -194,13 +196,12 @@ impl Context {
         pop r14
         pop r13
         pop r12": : : : "intel" "volatile");
+
         asm!("
         pop rbp
         pop rbx
         ": : : : "intel" "volatile");
         // info!("wang!");
-
-        handle_signal();
     }
 
     pub unsafe fn null() -> Self {

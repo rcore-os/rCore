@@ -106,5 +106,3 @@ pub fn set_sp(sp: usize) {
         asm!("mov $0, %rsp" :: "r" (sp) : "memory");
     }
 }
-
-

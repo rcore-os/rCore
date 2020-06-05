@@ -56,7 +56,8 @@ impl Syscall<'_> {
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
         // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
-        let mut new_thread = unsafe { current_thread() }.clone(self.tf, newsp, newtls, child_tid as usize);
+        let mut new_thread =
+            unsafe { current_thread() }.clone(self.tf, newsp, newtls, child_tid as usize);
         if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
             new_thread.clear_child_tid = child_tid as usize;
         }

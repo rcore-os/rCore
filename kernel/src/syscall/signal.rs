@@ -1,7 +1,8 @@
-use crate::process::{PROCESSES, thread_manager, process_of, current_thread};
+use crate::process::{current_thread, process_of, thread_manager, PROCESSES};
 use crate::process::{process, process_group};
+use crate::signal::Signal::SIGINT;
 use crate::signal::*;
-use crate::syscall::SysError::{EINVAL, ESRCH, ENOMEM, EPERM};
+use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
 use crate::thread;
 use num::FromPrimitive;
@@ -44,11 +45,24 @@ impl Syscall<'_> {
         }
     }
 
+    pub fn sys_rt_sigreturn(&mut self) -> SysResult {
+        info!("rt_sigreturn");
+        // FIXME: adapt arch
+        let frame = unsafe { &*((self.tf.get_sp() - 8) as *const SignalFrame) };
+        *self.tf = frame.tf.clone();
+        let ret = self.tf.rax as isize;
+        if ret >= 0 {
+            Ok(ret as usize)
+        } else {
+            Err(FromPrimitive::from_isize(-ret).unwrap())
+        }
+    }
+
     pub fn sys_rt_sigprocmask(
         &mut self,
         how: usize,
-        set: *const SigSet,
-        oldset: *mut SigSet,
+        set: *const Sigset,
+        oldset: *mut Sigset,
         sigsetsize: usize,
     ) -> SysResult {
         info!(
@@ -60,20 +74,17 @@ impl Syscall<'_> {
         }
         if !oldset.is_null() {
             let oldset = unsafe { self.vm().check_write_ptr(oldset)? };
-            *oldset = unsafe { current_thread() }.sig_mask;
+            *oldset = self.thread.sig_mask;
         }
         if !set.is_null() {
-            // let set = *unsafe { self.vm().check_read_ptr(set)? };
             let set = unsafe { self.vm().check_read_ptr(set)? };
-            let set = *set; // prevent deadlock when page fault
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
-            let thread = unsafe { current_thread() };
             match how {
-                BLOCK => thread.sig_mask |= set,
-                UNBLOCK => thread.sig_mask ^= thread.sig_mask & set,
-                SETMASK => thread.sig_mask = set,
+                BLOCK => self.thread.sig_mask.add_set(set),
+                UNBLOCK => self.thread.sig_mask.remove_set(set),
+                SETMASK => self.thread.sig_mask = *set,
                 _ => return Err(EINVAL),
             }
         }
@@ -82,12 +93,18 @@ impl Syscall<'_> {
 
     /// sending signal sig to process pid
     pub fn sys_kill(&mut self, pid: isize, signum: usize) -> SysResult {
-        if let Some(signal) = num::FromPrimitive::from_usize(signum) {
+        if let Some(signal) = <Signal as FromPrimitive>::from_usize(signum) {
             info!("kill: pid: {}, signal: {:?}", pid, signal);
+            let info = Siginfo {
+                signo: signum as i32,
+                errno: 0,
+                code: SI_USER,
+                field: Default::default(),
+            };
             match pid {
                 pid if pid > 0 => {
                     if let Some(process) = process(pid as usize) {
-                        send_signal(process, -1, signal);
+                        send_signal(process, -1, info);
                         Ok(0)
                     } else {
                         Err(ESRCH)
@@ -96,7 +113,7 @@ impl Syscall<'_> {
                 0 => {
                     let pgid = self.process().pgid;
                     for process in process_group(pgid) {
-                        send_signal(process, -1, signal);
+                        send_signal(process, -1, info);
                     }
                     Ok(0)
                 }
@@ -106,7 +123,7 @@ impl Syscall<'_> {
                     // has permission to send signals, except for process 1 (init)
                     for process in PROCESSES.read().values() {
                         if let Some(process) = process.upgrade() {
-                            send_signal(process, -1, signal);
+                            send_signal(process, -1, info);
                         }
                     }
                     Ok(0)
@@ -117,7 +134,7 @@ impl Syscall<'_> {
                         Err(ESRCH)
                     } else {
                         for process in process_group {
-                            send_signal(process, -1, signal);
+                            send_signal(process, -1, info);
                         }
                         Ok(0)
                     }
@@ -130,11 +147,19 @@ impl Syscall<'_> {
     }
 
     pub fn sys_tkill(&mut self, tid: usize, signum: usize) -> SysResult {
-        let signal = FromPrimitive::from_usize(signum);
-        if let Some(signal) = signal {
+        if let Some(signal) = <Signal as FromPrimitive>::from_usize(signum) {
             info!("tkill: tid: {}, signal: {:?}", tid, signal);
             if let Some(process) = process_of(tid) {
-                send_signal(process, tid as isize, signal);
+                send_signal(
+                    process,
+                    tid as isize,
+                    Siginfo {
+                        signo: signum as i32,
+                        errno: 0,
+                        code: SI_USER,
+                        field: Default::default(),
+                    },
+                );
                 Ok(0)
             } else {
                 Err(ESRCH)
