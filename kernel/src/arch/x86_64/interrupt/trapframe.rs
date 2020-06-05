@@ -6,6 +6,7 @@ use core::default::Default;
 use core::fmt;
 use num::FromPrimitive;
 use rcore_thread::std_thread::current;
+use crate::arch::signal::MachineContext;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -96,6 +97,38 @@ impl TrapFrame {
 
     pub fn get_sp(&self) -> usize {
         self.rsp
+    }
+
+    pub fn from_mcontext(mc: &MachineContext) -> Self {
+        // FIXME: missing fields
+        TrapFrame {
+            fpstate_offset: 16,
+            fpstate: Default::default(),
+            fsbase: mc.fs as usize,
+            mxcsr: 0x1f80,
+            r15: mc.r15,
+            r14: mc.r14,
+            r13: mc.r13,
+            r12: mc.r12,
+            rbp: mc.rbp,
+            rbx: mc.rbx,
+            r11: mc.r11,
+            r10: mc.r10,
+            r9: mc.r9,
+            r8: mc.r8,
+            rsi: mc.rsi,
+            rdi: mc.rdi,
+            rdx: mc.rdx,
+            rcx: mc.rcx,
+            rax: mc.rax,
+            trap_num: 0,
+            error_code: 0,
+            rip: mc.rip,
+            cs: mc.cs as usize,
+            rflags: 0,
+            rsp: mc.rsp,
+            ss: 0,
+        }
     }
 }
 

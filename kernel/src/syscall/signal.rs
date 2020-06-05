@@ -6,6 +6,7 @@ use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
 use crate::thread;
 use num::FromPrimitive;
+use crate::arch::interrupt::TrapFrame;
 
 impl Syscall<'_> {
     pub fn sys_rt_sigaction(
@@ -48,8 +49,29 @@ impl Syscall<'_> {
     pub fn sys_rt_sigreturn(&mut self) -> SysResult {
         info!("rt_sigreturn");
         // FIXME: adapt arch
-        let frame = unsafe { &*((self.tf.get_sp() - 8) as *const SignalFrame) };
+        let frame = unsafe { (&*((self.tf.get_sp() - 8) as *mut SignalFrame)) };
+
+        // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
         *self.tf = frame.tf.clone();
+        let mc = &frame.ucontext.mcontext;
+        self.tf.r15 = mc.r15;
+        self.tf.r14 = mc.r14;
+        self.tf.r13 = mc.r13;
+        self.tf.r12 = mc.r12;
+        self.tf.rbp = mc.rbp;
+        self.tf.rbx = mc.rbx;
+        self.tf.r11 = mc.r11;
+        self.tf.r10 = mc.r10;
+        self.tf.r9 = mc.r9;
+        self.tf.r8 = mc.r8;
+        self.tf.rsi = mc.rsi;
+        self.tf.rdi = mc.rdi;
+        self.tf.rdx = mc.rdx;
+        self.tf.rcx = mc.rcx;
+        self.tf.rax = mc.rax;
+        self.tf.rip = mc.rip;
+        self.tf.rsp = mc.rsp;
+
         let ret = self.tf.rax as isize;
         if ret >= 0 {
             Ok(ret as usize)
@@ -165,7 +187,7 @@ impl Syscall<'_> {
                 Err(ESRCH)
             }
         } else {
-            info!("tkill: tid: {}, signal: UNKNOWN", tid);
+            info!("tkill: tid: {}, signum: {}", tid, signum);
             Err(EINVAL)
         }
     }

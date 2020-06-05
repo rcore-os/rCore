@@ -14,6 +14,7 @@ use crate::syscall::{SysError, SysResult};
 use alloc::vec::Vec;
 use rcore_thread::std_thread::{current, yield_now};
 use crate::arch::syscall::SYS_RT_SIGRETURN;
+use crate::arch::signal::MachineContext;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -49,6 +50,9 @@ pub enum Signal {
     SIGPWR = 30,
     SIGSYS = 31,
     // real time signals
+    SIGRT32 = 32,
+    SIGRT33 = 33,
+    SIGRT34 = 34,
     SIGRT35 = 35,
     SIGRT36 = 36,
     SIGRT37 = 37,
@@ -82,7 +86,7 @@ pub enum Signal {
 }
 
 impl Signal {
-    pub const RTMIN: usize = 35;
+    pub const RTMIN: usize = 32;
     pub const RTMAX: usize = 64;
 
     pub fn is_standard(self) -> bool {
@@ -113,10 +117,23 @@ pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
 }
 
 #[repr(C)]
+#[derive(Clone)]
+pub struct UserContext {
+    pub flags: usize,
+    pub link: usize,
+    pub stack: SignalStack,
+    pub mcontext: MachineContext,
+    pub sig_mask: Sigset,
+    pub _fpregs_mem: [usize; 64],
+}
+
+#[repr(C)]
+#[derive(Clone)]
 pub struct SignalFrame {
     pub ret_code_addr: usize, // point to ret_code
     pub tf: TrapFrame,
     pub info: Siginfo,
+    pub ucontext: UserContext,  // adapt interface, a little bit waste
     pub ret_code: [u8; 7], // call sys_sigreturn
 }
 
@@ -196,9 +213,9 @@ pub fn do_signal(tf: &mut TrapFrame) {
             }
             _ => {
                 info!("goto handler at {:#x}", action.handler);
+                let stack = process.sigaltstack;
                 let sig_sp = {
                     if action_flags.contains(SignalActionFlags::ONSTACK) {
-                        let stack = process.sigaltstack;
                         let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
                         if !stack_flags.contains(SignalStackFlags::DISABLE) {
                             tf.get_sp()
@@ -221,12 +238,21 @@ pub fn do_signal(tf: &mut TrapFrame) {
                 };
                 frame.tf = tf.clone();
                 frame.info = info;
+                frame.ucontext = UserContext {
+                    flags: 0,
+                    link: 0,
+                    stack,
+                    mcontext: MachineContext::from_tf(tf),
+                    sig_mask: thread.sig_mask,
+                    _fpregs_mem: [0; 64],
+                };
                 if action_flags.contains(SignalActionFlags::RESTORER) {
                     frame.ret_code_addr = action.restorer;  // legacy
                 } else {
                     frame.ret_code_addr = frame.ret_code.as_ptr() as usize;
                     // mov SYS_RT_SIGRETURN, %eax
                     frame.ret_code[0] = 0xb8;
+                    // TODO: ref plz
                     unsafe { *(frame.ret_code.as_ptr().add(1) as *mut u32) = SYS_RT_SIGRETURN as u32; }
                     // syscall
                     frame.ret_code[5] = 0x0f;
@@ -241,7 +267,7 @@ pub fn do_signal(tf: &mut TrapFrame) {
                     tf.rdi = info.signo as usize;
                     tf.rsi = &frame.info as *const Siginfo as usize;
                     // TODO: complete context
-                    tf.rdx = 0;
+                    tf.rdx = &frame.ucontext as *const UserContext as usize;
                 }
                 return;
             }
@@ -258,7 +284,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct SignalStack {
     pub sp: usize,
     pub flags: u32,

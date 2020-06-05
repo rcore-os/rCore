@@ -317,6 +317,8 @@ impl Syscall<'_> {
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
             #[cfg(not(target_arch = "mips"))]
             SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
+            SYS_MSGGET => self.unimplemented("msgget", Ok(0)),
+            SYS_SHMGET => self.unimplemented("shmget", Ok(0)),
 
             // system
             SYS_GETPID => self.sys_getpid(),
@@ -378,6 +380,7 @@ impl Syscall<'_> {
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
+            SYS_MSGCTL => self.unimplemented("msgctl", Ok(0)),
 
             _ => {
                 let ret = match () {

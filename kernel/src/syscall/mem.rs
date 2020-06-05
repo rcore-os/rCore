@@ -46,7 +46,7 @@ impl Syscall<'_> {
             self.vm().push(
                 addr,
                 addr + len,
-                prot.to_attr(),
+                prot.to_attr().execute(),
                 Delay::new(GlobalFrameAlloc),
                 "mmap_anon",
             );
