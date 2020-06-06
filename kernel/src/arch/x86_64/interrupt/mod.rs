@@ -40,6 +40,7 @@ pub fn no_interrupt(f: impl FnOnce()) {
 #[inline(always)]
 pub fn enable_irq(irq: u8) {
     let mut ioapic = unsafe { IoApic::new(phys_to_virt(IOAPIC_ADDR as usize)) };
+    ioapic.set_irq_vector(irq, consts::IRQ0 + irq);
     ioapic.enable(irq, 0);
 }
 
