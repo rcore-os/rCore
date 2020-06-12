@@ -21,7 +21,6 @@ use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
 use core::mem::size_of;
-use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::*;

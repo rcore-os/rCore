@@ -158,14 +158,14 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
 
     pub fn ensure_support(&self) {
         let initialization = self.support_initialization.load(Ordering::Relaxed);
-        if (initialization == 2) {
+        if initialization == 2 {
             return;
         };
-        if (initialization == 1
+        if initialization == 1
             || self
                 .support_initialization
                 .compare_and_swap(0, 1, Ordering::Acquire)
-                != 0)
+                != 0
         {
             // Wait for another thread to initialize
             while self.support_initialization.load(Ordering::Acquire) == 1 {

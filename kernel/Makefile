@@ -91,7 +91,7 @@ ifeq ($(BOARD), qemu)
 qemu_opts += \
 	-drive format=qcow2,file=$(USER_QCOW2),media=disk,cache=writeback,id=sfsimg,if=none \
 	-device ahci,id=ahci0 \
-	-device ide-drive,drive=sfsimg,bus=ahci0.0
+	-device ide-hd,drive=sfsimg,bus=ahci0.0
 endif
 ifeq ($(PCI_PASSTHRU), )
 qemu_net_opts += \
