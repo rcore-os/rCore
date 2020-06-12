@@ -25,6 +25,7 @@ pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
+#[cfg(target_arch = "x86_64")]
 pub use self::signal::*;
 pub use self::time::*;
 
@@ -36,6 +37,7 @@ mod mem;
 mod misc;
 mod net;
 mod proc;
+#[cfg(target_arch = "x86_64")]
 mod signal;
 mod time;
 
@@ -210,22 +212,27 @@ impl Syscall<'_> {
             SYS_MADVISE => self.unimplemented("madvise", Ok(0)),
 
             // signal
+            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGACTION => self.sys_rt_sigaction(
                 args[0],
                 args[1] as *const SignalAction,
                 args[2] as *mut SignalAction,
                 args[3],
             ),
+            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
+            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
                 args[1] as *const Sigset,
                 args[2] as *mut Sigset,
                 args[3],
             ),
+            #[cfg(target_arch = "x86_64")]
             SYS_SIGALTSTACK => {
                 self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
             }
+            #[cfg(target_arch = "x86_64")]
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
@@ -300,6 +307,7 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
+            #[cfg(target_arch = "x86_64")]
             SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time

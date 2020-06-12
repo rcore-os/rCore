@@ -12,6 +12,8 @@ pub const INFORM_PER_MSEC: usize = 50;
 
 #[cfg(target_arch = "x86_64")]
 pub const ARCH: &'static str = "x86_64";
+#[cfg(target_arch = "riscv64")]
+pub const ARCH: &'static str = "riscv64";
 
 lazy_static! {
     pub static ref SMP_CORES: usize = {

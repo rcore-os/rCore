@@ -52,6 +52,11 @@ impl TrapFrame {
         tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }
+
+    pub fn get_sp(&self) -> usize {
+        // sp is x2
+        self.x[2]
+    }
 }
 
 use core::fmt::{Debug, Error, Formatter};

@@ -75,6 +75,7 @@ compression = { version = "0.1.4", default-features = false, features = ["gzip"]
 num = { version = "0.2.1", default-features = false }
 num-traits = { version = "0.2.11", default-features = false }
 num-derive = "0.3"
+pc-keyboard = "0.5"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rboot = { path = "../rboot", default-features = false }
@@ -82,7 +83,6 @@ apic = { git = "https://github.com/rcore-os/apic-rs" }
 x86_64 = "0.7"
 raw-cpuid = "7.0"
 uart_16550 = "0.2"
-pc-keyboard = "0.5"
 acpi = "0.4"
 aml = "0.4"
 
