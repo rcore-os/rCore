@@ -14,6 +14,8 @@ pub const INFORM_PER_MSEC: usize = 50;
 pub const ARCH: &'static str = "x86_64";
 #[cfg(target_arch = "riscv64")]
 pub const ARCH: &'static str = "riscv64";
+#[cfg(target_arch = "riscv32")]
+pub const ARCH: &'static str = "riscv32";
 #[cfg(target_arch = "aarch64")]
 pub const ARCH: &'static str = "aarch64";
 
