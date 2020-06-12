@@ -77,7 +77,7 @@ endif
 
 ### qemu options ###
 qemu_opts := \
-	-smp cores=$(SMP) -enable-kvm
+	-smp cores=$(SMP)
 qemu_net_opts :=
 
 ifeq ($(ARCH), x86_64)
