@@ -78,11 +78,6 @@ impl Pipe {
             false
         }
     }
-
-    // deprecate because of deadlock, use this inline instead
-    // fn is_broken(&self) -> bool {
-    //     self.data.lock().end_cnt < 2
-    // }
 }
 
 impl INode for Pipe {
@@ -93,9 +88,6 @@ impl INode for Pipe {
         if let PipeEnd::Read = self.direction {
             // TODO: release on process lock? Or maybe remove the condvar
             let mut data = self.data.lock();
-            // while data.buf.len() == 0 && data.end_cnt == 2 {
-            //     data = data.new_data.clone().wait(data);
-            // }
             if data.buf.len() == 0 && data.end_cnt == 2 {
                 Err(Again)
             } else {
@@ -113,7 +105,6 @@ impl INode for Pipe {
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         if let PipeEnd::Write = self.direction {
             let mut data = self.data.lock();
-            // data.buf.push_back(buf[0]);
             for c in buf {
                 data.buf.push_back(*c);
             }
