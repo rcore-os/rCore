@@ -245,19 +245,16 @@ run: build justrun
 test: build justtest
 
 justrun:
-	@sudo $(qemu) $(qemu_opts)
+	@$(qemu) $(qemu_opts)
 
 justtest:
 	# unavailable now
 	@#$(qemu) $(filter-out -serial mon:stdio, $(qemu_opts)) --append $(INIT) -serial file:../tests/stdout -monitor null
 
 debug: $(kernel) $(kernel_img)
-	$(qemu) $(qemu_opts) -s -S
+	@$(qemu) $(qemu_opts) -s -S &
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
-
-clion_debug: $(kernel) $(kernel_img)
-	sudo $(qemu) $(qemu_opts) -s -S
 
 build: $(kernel_img)
 
