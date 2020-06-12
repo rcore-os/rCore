@@ -11,6 +11,7 @@ pub mod io;
 pub mod memory;
 pub mod paging;
 pub mod rand;
+pub mod signal;
 pub mod syscall;
 pub mod timer;
 
@@ -66,3 +67,17 @@ const LOGO: &str = r#"
  / _, _// /_/ /(__  )/ /_ / /_/ /___/ /
 /_/ |_| \__,_//____/ \__/ \____//____/
 "#;
+
+pub fn get_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        asm!("mov sp, $0" : "=r"(sp));
+    }
+    sp
+}
+
+pub fn set_sp(sp: usize) {
+    unsafe {
+        asm!("mov $0, sp" :: "r" (sp) : "memory");
+    }
+}
