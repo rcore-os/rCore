@@ -19,7 +19,7 @@ use crate::arch::paging::*;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
-    ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
+    phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 use trapframe::UserContext;
@@ -29,6 +29,7 @@ use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
 };
+use apic::{LocalApic, XApic, LAPIC_ADDR};
 use bitflags::_core::cell::Ref;
 use core::{
     future::Future,
@@ -39,14 +40,19 @@ use core::{
 use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
 use x86_64::{
-    registers::control::{Cr3, Cr3Flags},
+    registers::control::{Cr2, Cr3, Cr3Flags},
     structures::paging::PhysFrame,
-    PhysAddr,
+    PhysAddr, VirtAddr,
 };
+
+#[derive(Default)]
+struct ThreadInner {
+    context: Option<Box<UserContext>>,
+}
 
 #[allow(dead_code)]
 pub struct Thread {
-    context: UserContext,
+    inner: Mutex<ThreadInner>,
     kstack: KernelStack,
     pub id: usize,
     /// Kernel performs futex wake when thread exits.
@@ -56,10 +62,6 @@ pub struct Thread {
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
     pub sig_mask: Sigset,
-    // set tf every time enter trap to access current trap frame everywhere when the thread is in the kernel
-    // using pointer to circumvent lifetime check, probably safe（确信）
-    // TODO: better implementation?
-    //pub tf: TrapFrame,
 }
 
 /// Pid type
@@ -151,7 +153,7 @@ impl Thread {
     pub unsafe fn new_init() -> Box<Thread> {
         let zero = MaybeUninit::<Thread>::zeroed();
         Box::new(Thread {
-            context: UserContext::default(),
+            inner: Mutex::new(ThreadInner::default()),
             // safety: other fields will never be used
             ..zero.assume_init()
         })
@@ -165,8 +167,7 @@ impl Thread {
         let kstack = KernelStack::new();
         Box::new(Thread {
             id: 0,
-            //context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm_token) },
-            context: todo!(),
+            inner: Mutex::new(ThreadInner::default()),
             kstack,
             clear_child_tid: 0,
             vm: vm.clone(),
@@ -363,10 +364,13 @@ impl Thread {
         let mut context = UserContext::default();
         context.general.rip = entry_addr;
         context.general.rsp = ustack_top;
+        context.general.rflags = 0x3202;
 
         Arc::new(Thread {
             id: 0,
-            context,
+            inner: Mutex::new(ThreadInner {
+                context: Some(Box::from(context))
+            }),
             kstack,
             clear_child_tid: 0,
             vm: vm.clone(),
@@ -435,7 +439,7 @@ impl Thread {
         // mask; the signal mask is preserved across execve(2).
         Box::new(Thread {
             id: 0,
-            context,
+            inner: Mutex::new(ThreadInner::default()),
             kstack,
             clear_child_tid: 0,
             vm,
@@ -456,8 +460,7 @@ impl Thread {
         let vm_token = self.vm.lock().token();
         Box::new(Thread {
             id: 0,
-            //context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), vm_token, tls) },
-            context: todo!(),
+            inner: Mutex::new(ThreadInner::default()),
             kstack,
             clear_child_tid,
             vm: self.vm.clone(),
@@ -681,16 +684,33 @@ pub fn spawn(thread: Arc<Thread>) {
     let vmtoken = thread.vm.lock().token();
     let future = async move {
         loop {
-            let mut cx = thread.context;
+            let mut cx = thread.inner.lock().context.take().unwrap();
             trace!("go to user: {:#x?}", cx);
             cx.run();
             trace!("back from user: {:#x?}", cx);
             //assert_eq!(cx.trap_num, 0x100, "user interrupt still no support");
-            let exit = handle_syscall(&thread, &mut cx.general).await;
+            let mut exit = false;
+            match cx.trap_num {
+                0x100 => exit = handle_syscall(&thread, &mut cx.general).await,
+                0x20..=0x3f => {
+                    let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
+                    lapic.eoi();
+                    trace!("handle irq {}", cx.trap_num);
+                }
+                0xe => {
+                    // page fault
+                    let addr = Cr2::read().as_u64();
+                    debug!("page fault @ {:#x}", addr);
+
+                    thread.vm.lock().handle_page_fault(addr as usize);
+                }
+                _ => {}
+            }
+            thread.inner.lock().context = Some(cx);
             //thread.end_running(cx);
-            //if exit {
-            //break;
-            //}
+            if exit {
+                break;
+            }
         }
     };
 

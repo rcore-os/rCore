@@ -98,10 +98,10 @@ impl Syscall<'_> {
         let pid = self.process().pid.clone();
         //let tid = thread::current().id();
         let tid = 0;
-        if !pid.is_init() {
-            // we trust pid 0 process
-            debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
-        }
+        //if !pid.is_init() {
+        // we trust pid 0 process
+        debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
+        //}
 
         // use platform-specific syscal numbers
         // See https://filippo.io/linux-syscall-table/
