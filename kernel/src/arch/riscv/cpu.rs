@@ -1,11 +1,11 @@
 pub unsafe fn set_cpu_id(cpu_id: usize) {
-    asm!("mv gp, $0" : : "r"(cpu_id));
+    llvm_asm!("mv gp, $0" : : "r"(cpu_id));
 }
 
 pub fn id() -> usize {
     let cpu_id;
     unsafe {
-        asm!("mv $0, gp" : "=r"(cpu_id));
+        llvm_asm!("mv $0, gp" : "=r"(cpu_id));
     }
     cpu_id
 }

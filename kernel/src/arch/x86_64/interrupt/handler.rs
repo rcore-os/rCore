@@ -72,6 +72,7 @@ use crate::processor;
 use crate::signal::do_signal;
 use bitflags::*;
 use log::*;
+use x86_64::registers::control::Cr2;
 
 global_asm!(include_str!("trap.asm"));
 global_asm!(include_str!("vector.asm"));
@@ -139,10 +140,7 @@ fn double_fault(tf: &TrapFrame) {
 }
 
 fn page_fault(tf: &mut TrapFrame) {
-    let addr: usize;
-    unsafe {
-        asm!("mov %cr2, $0" : "=r" (addr));
-    }
+    let addr = Cr2::read().as_u64() as usize;
 
     bitflags! {
         struct PageError: u8 {

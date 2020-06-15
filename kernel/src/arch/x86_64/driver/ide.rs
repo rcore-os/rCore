@@ -54,7 +54,7 @@ impl IDE {
                 if self.wait_error() {
                     return Err(());
                 }
-                asm!("rep insl" :: "{dx}"(self.base), "{rdi}"(ptr), "{cx}"(SECTOR_SIZE) : "rdi" : "volatile");
+                llvm_asm!("rep insl" :: "{dx}"(self.base), "{rdi}"(ptr), "{cx}"(SECTOR_SIZE) : "rdi" : "volatile");
             }
         }
         Ok(())
@@ -71,7 +71,7 @@ impl IDE {
                 if self.wait_error() {
                     return Err(());
                 }
-                asm!("rep outsl" :: "{dx}"(self.base), "{rsi}"(ptr), "{cx}"(SECTOR_SIZE) : "rsi" : "volatile");
+                llvm_asm!("rep outsl" :: "{dx}"(self.base), "{rsi}"(ptr), "{cx}"(SECTOR_SIZE) : "rsi" : "volatile");
             }
         }
         Ok(())
@@ -105,7 +105,7 @@ impl IDE {
 
             // ???
             let data = [0; SECTOR_SIZE];
-            asm!("rep insl" :: "{dx}"(self.base + ISA_DATA), "{rdi}"(data.as_ptr()), "{cx}"(SECTOR_SIZE) : "rdi" : "volatile");
+            llvm_asm!("rep insl" :: "{dx}"(self.base + ISA_DATA), "{rdi}"(data.as_ptr()), "{cx}"(SECTOR_SIZE) : "rdi" : "volatile");
         }
     }
 

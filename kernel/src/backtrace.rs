@@ -11,20 +11,20 @@ pub fn fp() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        asm!("mov $0, x29" : "=r"(ptr));
+        llvm_asm!("mov $0, x29" : "=r"(ptr));
     }
     #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
-        asm!("mv $0, s0" : "=r"(ptr));
+        llvm_asm!("mv $0, s0" : "=r"(ptr));
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
-        asm!("mov %rbp, $0" : "=r"(ptr));
+        llvm_asm!("mov %rbp, $0" : "=r"(ptr));
     }
     #[cfg(any(target_arch = "mips"))]
     unsafe {
         // read $sp
-        asm!("ori $0, $$29, 0" : "=r"(ptr));
+        llvm_asm!("ori $0, $$29, 0" : "=r"(ptr));
     }
 
     ptr
@@ -36,20 +36,20 @@ pub fn lr() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        asm!("mov $0, x30" : "=r"(ptr));
+        llvm_asm!("mov $0, x30" : "=r"(ptr));
     }
     #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     unsafe {
-        asm!("mv $0, ra" : "=r"(ptr));
+        llvm_asm!("mv $0, ra" : "=r"(ptr));
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
-        asm!("movq 8(%rbp), $0" : "=r"(ptr));
+        llvm_asm!("movq 8(%rbp), $0" : "=r"(ptr));
     }
 
     #[cfg(target_arch = "mips")]
     unsafe {
-        asm!("ori $0, $$31, 0" : "=r"(ptr));
+        llvm_asm!("ori $0, $$31, 0" : "=r"(ptr));
     }
 
     ptr

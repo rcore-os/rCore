@@ -71,13 +71,13 @@ const LOGO: &str = r#"
 pub fn get_sp() -> usize {
     let sp: usize;
     unsafe {
-        asm!("mov sp, $0" : "=r"(sp));
+        llvm_asm!("mov sp, $0" : "=r"(sp));
     }
     sp
 }
 
 pub fn set_sp(sp: usize) {
     unsafe {
-        asm!("mov $0, sp" :: "r" (sp) : "memory");
+        llvm_asm!("mov $0, sp" :: "r" (sp) : "memory");
     }
 }

@@ -467,7 +467,7 @@ impl Syscall<'_> {
                 }
 
                 unsafe {
-                    asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
+                    llvm_asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
                     *(_cur_tls as *mut usize) = args[0];
                 }
                 Ok(0)

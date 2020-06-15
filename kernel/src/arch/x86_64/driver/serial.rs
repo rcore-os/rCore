@@ -1,6 +1,5 @@
 use spin::Mutex;
 use uart_16550::SerialPort;
-use x86_64::instructions::port::Port;
 
 use crate::arch::interrupt::{consts, enable_irq};
 
@@ -13,18 +12,4 @@ pub fn init() {
     enable_irq(consts::COM1);
     enable_irq(consts::COM2);
     info!("serial: init end");
-}
-
-pub trait SerialRead {
-    fn receive(&mut self) -> u8;
-}
-
-impl SerialRead for SerialPort {
-    fn receive(&mut self) -> u8 {
-        unsafe {
-            let ports = self as *mut _ as *mut [Port<u8>; 6];
-            let data = &mut (*ports)[0];
-            data.read()
-        }
-    }
 }

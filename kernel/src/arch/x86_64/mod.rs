@@ -97,13 +97,13 @@ fn other_start() -> ! {
 pub fn get_sp() -> usize {
     let sp: usize;
     unsafe {
-        asm!("mov %rsp, $0" : "=r"(sp));
+        llvm_asm!("mov %rsp, $0" : "=r"(sp));
     }
     sp
 }
 
 pub fn set_sp(sp: usize) {
     unsafe {
-        asm!("mov $0, %rsp" :: "r" (sp) : "memory");
+        llvm_asm!("mov $0, %rsp" :: "r" (sp) : "memory");
     }
 }

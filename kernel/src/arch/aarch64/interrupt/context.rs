@@ -104,7 +104,7 @@ impl Context {
     #[naked]
     #[inline(never)]
     unsafe extern "C" fn __switch(_self_stack: &mut usize, _target_stack: &mut usize) {
-        asm!(
+        llvm_asm!(
         "
         mov x10, #-(12 * 8)
         add x8, sp, x10

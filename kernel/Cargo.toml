@@ -3,7 +3,7 @@ name = "rcore"
 version = "0.2.0"
 edition = "2018"
 authors = [
-    "WangRunji <wangrunji0408@163.com>",
+    "Runji Wang <wangrunji0408@163.com>",
     "Ben Pig Chu <benpichu@gmail.com>",
     "dzy <daizy15@mails.tsinghua.edu.cn>",
     "equation314 <equation618@gmail.com>",
@@ -55,14 +55,14 @@ bitflags = "1.2"
 bit_field = "0.10"
 volatile = "0.2"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
-buddy_system_allocator = "0.3.9"
-pci = { git = "https://github.com/rcore-os/pci-rs" }
-device_tree = { git = "https://github.com/rcore-os/device_tree-rs" }
-isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", features = ["log"] }
+buddy_system_allocator = "0.4.0"
+pci = { git = "https://github.com/rcore-os/pci-rs", rev = "a4e7cea6" }
+device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
+isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
-bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator" }
+bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator", rev = "03bd9909" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
 rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "e00f5ed" }
@@ -79,18 +79,18 @@ pc-keyboard = "0.5"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rboot = { path = "../rboot", default-features = false }
-apic = { git = "https://github.com/rcore-os/apic-rs" }
-x86_64 = "0.7"
-raw-cpuid = "7.0"
-uart_16550 = "0.2"
+apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
+x86_64 = "0.11"
+raw-cpuid = "8.0"
+uart_16550 = "0.2.7"
 acpi = "0.4"
 aml = "0.4"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+riscv = { git = "https://github.com/rcore-os/riscv", rev = "1c5bc80", features = ["inline-asm"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.0" }
+aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.1" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.5.1", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]

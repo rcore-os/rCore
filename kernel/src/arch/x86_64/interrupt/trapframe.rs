@@ -183,7 +183,7 @@ impl Context {
     #[naked]
     #[inline(never)]
     pub unsafe extern "C" fn switch(&mut self, _target: &mut Self) {
-        asm!(
+        llvm_asm!(
         "
         // push rip (by caller)
 

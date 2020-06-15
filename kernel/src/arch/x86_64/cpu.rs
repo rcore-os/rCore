@@ -1,7 +1,7 @@
 use crate::memory::phys_to_virt;
 use apic::{LocalApic, XApic};
 use raw_cpuid::CpuId;
-use x86_64::registers::control::{Cr0, Cr0Flags};
+use x86_64::registers::control::{Cr0, Cr0Flags, Cr4, Cr4Flags};
 
 /// Exit qemu
 /// See: https://wiki.osdev.org/Shutdown
@@ -41,12 +41,11 @@ pub fn init() {
     lapic.cpu_init();
 
     // enable FPU, the manual Volume 3 Chapter 13
-    let mut value: u64;
     unsafe {
-        asm!("mov %cr4, $0" : "=r" (value));
-        // OSFXSR | OSXMMEXCPT
-        value |= 1 << 9 | 1 << 10;
-        asm!("mov $0, %cr4" :: "r" (value) : "memory");
+        Cr4::update(|cr4| {
+            cr4.insert(Cr4Flags::OSFXSR);
+            cr4.insert(Cr4Flags::OSXMMEXCPT_ENABLE);
+        });
         Cr0::update(|cr0| {
             cr0.remove(Cr0Flags::EMULATE_COPROCESSOR);
             cr0.insert(Cr0Flags::MONITOR_COPROCESSOR);
