@@ -5,6 +5,9 @@ use crate::process::*;
 use crate::sync::Condvar;
 use rcore_thread::std_thread as thread;
 use rcore_thread::std_thread::current;
+use naive_timer::Timer;
+use core::time::Duration;
+use spin::Mutex;
 
 pub static mut TICK: usize = 0;
 
@@ -16,16 +19,14 @@ pub fn uptime_msec() -> usize {
     unsafe { crate::trap::TICK * crate::consts::USEC_PER_TICK / 1000 }
 }
 
+lazy_static! {
+    pub static ref NAIVE_TIMER: Mutex<Timer> = Mutex::new(Timer::default());
+}
+
 pub fn timer() {
-    if cpu::id() == 0 {
-        unsafe {
-            TICK += 1;
-            if uptime_msec() % INFORM_PER_MSEC == 0 {
-                TICK_ACTIVITY.notify_all();
-            }
-        }
-    }
-    processor().tick();
+    info!("timer");
+    let now = crate::arch::timer::timer_now();
+    NAIVE_TIMER.lock().expire(now);
 }
 
 pub fn error(tf: &TrapFrame) -> ! {

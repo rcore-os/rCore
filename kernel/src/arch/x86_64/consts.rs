@@ -11,3 +11,5 @@ pub const PHYSICAL_MEMORY_PM4: usize = (PHYSICAL_MEMORY_OFFSET >> 39) & 0o777;
 pub const USER_STACK_OFFSET: usize = 0x00008000_00000000 - USER_STACK_SIZE;
 pub const USER_STACK_SIZE: usize = 8 * 1024 * 1024; // 8 MB, the default config of Linux
 pub const KSEG2_START: usize = 0xffff_fe80_0000_0000;
+
+pub const ARCH: &'static str = "x86_64";

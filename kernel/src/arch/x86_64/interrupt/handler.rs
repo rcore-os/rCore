@@ -101,9 +101,11 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
             match irq {
                 Timer => {
                     crate::trap::timer();
+                    /*
                     if processor().tid_option().is_some() {
                         do_signal(tf);
                     }
+                    */
                 }
                 Keyboard => keyboard(),
                 COM1 => com1(),

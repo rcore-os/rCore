@@ -5,7 +5,7 @@ extern "C" {
     fn etext();
 }
 
-/// Returns the current frame pointer.or stack base pointer
+/// Returns the current frame pointer or stack base pointer
 #[inline(always)]
 pub fn fp() -> usize {
     let ptr: usize;

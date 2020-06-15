@@ -34,6 +34,7 @@ pub use rcore_thread::std_thread as thread;
 pub mod logging;
 #[macro_use]
 pub mod util;
+
 pub mod backtrace;
 pub mod consts;
 pub mod drivers;
@@ -68,7 +69,7 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    processor().run();
+    executor::run();
 }
 
 /// Global heap allocator
