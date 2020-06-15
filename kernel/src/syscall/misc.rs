@@ -1,6 +1,10 @@
+#![allow(dead_code)]
+
 use super::*;
 use crate::arch::cpu;
-use crate::consts::USER_STACK_SIZE;
+use crate::consts::{ARCH, USER_STACK_SIZE};
+use crate::syscall::SysError::ETIMEDOUT;
+use crate::trap::TICK_ACTIVITY;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
 
@@ -22,7 +26,7 @@ impl Syscall<'_> {
         info!("uname: buf: {:?}", buf);
 
         let offset = 65;
-        let strings = ["rCore", "orz", "0.1.0", "1", "machine", "domain"];
+        let strings = ["Linux", "orz", "0.1.0", "1", ARCH, "domain"];
         let buf = unsafe { self.vm().check_write_array(buf, strings.len() * offset)? };
 
         for i in 0..strings.len() {
@@ -43,6 +47,9 @@ impl Syscall<'_> {
         // we only have 4 cpu at most.
         // so just set it.
         mask[0] = 0b1111;
+        mask[1] = 0;
+        mask[2] = 0;
+        mask[3] = 0;
         Ok(0)
     }
 
@@ -86,18 +93,21 @@ impl Syscall<'_> {
 
         match op & 0xf {
             OP_WAIT => {
-                let _timeout = if timeout.is_null() {
-                    None
-                } else {
-                    Some(unsafe { *self.vm().check_read_ptr(timeout)? })
-                };
-
                 if atomic.load(Ordering::Acquire) != val {
                     return Err(SysError::EAGAIN);
                 }
-                // FIXME: support timeout
-                queue.wait(proc);
-                Ok(0)
+                if timeout.is_null() {
+                    queue.wait(proc);
+                    Ok(0)
+                } else {
+                    let timeout = unsafe { *self.vm().check_read_ptr(timeout)? };
+                    info!("futex wait timeout: {:?}", timeout);
+                    if queue.wait_timeout(proc, timeout).is_some() {
+                        Ok(0)
+                    } else {
+                        Err(ETIMEDOUT)
+                    }
+                }
             }
             OP_WAKE => {
                 let woken_up_count = queue.notify_n(val as usize);
@@ -120,7 +130,7 @@ impl Syscall<'_> {
         // we will skip verifying magic
         if cmd == LINUX_REBOOT_CMD_HALT {
             unsafe {
-                cpu::exit_in_qemu(1);
+                cpu::exit_in_qemu(0);
             }
         } else if cmd == LINUX_REBOOT_CMD_RESTART {
             unsafe {
@@ -183,7 +193,8 @@ impl Syscall<'_> {
         let mut i = 0;
         for elm in slice {
             unsafe {
-                *elm = i + crate::trap::TICK as u8;
+                // to prevent overflow
+                *elm = (i + crate::trap::TICK as u8 as u16) as u8;
             }
             i += 1;
         }

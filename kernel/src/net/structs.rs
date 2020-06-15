@@ -197,7 +197,7 @@ impl Socket for TcpSocketState {
         })
     }
 
-    fn write(&self, data: &[u8], sendto_endpoint: Option<Endpoint>) -> SysResult {
+    fn write(&self, data: &[u8], _sendto_endpoint: Option<Endpoint>) -> SysResult {
         let mut sockets = SOCKETS.lock();
         let mut socket = sockets.get::<TcpSocket>(self.handle.0);
 
@@ -212,7 +212,7 @@ impl Socket for TcpSocketState {
                         poll_ifaces();
                         Ok(size)
                     }
-                    Err(err) => Err(SysError::ENOBUFS),
+                    Err(_) => Err(SysError::ENOBUFS),
                 }
             } else {
                 Err(SysError::ENOBUFS)
@@ -480,7 +480,7 @@ impl Socket for UdpSocketState {
                     poll_ifaces();
                     Ok(data.len())
                 }
-                Err(err) => Err(SysError::ENOBUFS),
+                Err(_) => Err(SysError::ENOBUFS),
             }
         } else {
             Err(SysError::ENOBUFS)
@@ -523,7 +523,7 @@ impl Socket for UdpSocketState {
         }
     }
 
-    fn ioctl(&mut self, request: usize, arg1: usize, arg2: usize, arg3: usize) -> SysResult {
+    fn ioctl(&mut self, request: usize, arg1: usize, _arg2: usize, _arg3: usize) -> SysResult {
         match request {
             // SIOCGARP
             0x8954 => {
@@ -710,7 +710,7 @@ impl PacketSocketState {
 }
 
 impl Socket for PacketSocketState {
-    fn read(&self, data: &mut [u8]) -> (SysResult, Endpoint) {
+    fn read(&self, _data: &mut [u8]) -> (SysResult, Endpoint) {
         unimplemented!()
     }
 

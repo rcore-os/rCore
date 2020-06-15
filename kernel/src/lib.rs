@@ -5,7 +5,9 @@
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
+#![feature(negative_impls)]
 #![feature(alloc_prelude)]
+#![feature(const_fn)]
 #![deny(unused_must_use)]
 #![deny(stable_features)]
 #![deny(unused_unsafe)]
@@ -19,7 +21,10 @@ extern crate alloc;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+extern crate num;
 extern crate rlibc;
+#[macro_use]
+extern crate num_derive;
 
 pub use crate::process::{new_kernel_context, processor};
 pub use buddy_system_allocator::LockedHeapWithRescue;
@@ -40,6 +45,7 @@ pub mod memory;
 pub mod net;
 pub mod process;
 pub mod shell;
+pub mod signal;
 pub mod sync;
 pub mod syscall;
 pub mod trap;

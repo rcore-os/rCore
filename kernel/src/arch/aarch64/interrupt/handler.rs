@@ -87,6 +87,10 @@ fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         crate::trap::error(tf);
     }
 
+    syscall(tf)
+}
+
+pub fn syscall(tf: &mut TrapFrame) {
     // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
     let ret = crate::syscall::syscall(
         tf.x1to29[7] as usize,

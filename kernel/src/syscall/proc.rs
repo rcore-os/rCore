@@ -1,6 +1,10 @@
 //! Syscalls for process
 
 use super::*;
+use crate::fs::FileLike;
+use crate::signal::{has_signal_to_do, send_signal, Signal};
+use crate::syscall::SysError::{EINTR, ESRCH};
+use alloc::sync::Weak;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -9,10 +13,11 @@ impl Syscall<'_> {
         let pid = new_thread.proc.lock().pid.get();
         let tid = thread_manager().add(new_thread);
         thread_manager().detach(tid);
-        info!("fork: {} -> {}", thread::current().id(), pid);
+        info!("fork: {} -> {}", self.process().pid, pid);
         Ok(pid)
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn sys_vfork(&mut self) -> SysResult {
         self.sys_fork()
     }
@@ -49,15 +54,19 @@ impl Syscall<'_> {
             //return Err(SysError::ENOSYS);
         }
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
-        let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
-        let new_thread = self
+        // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
+        // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
+        let mut new_thread = self
             .thread
             .clone(self.tf, newsp, newtls, child_tid as usize);
+        if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
+            new_thread.clear_child_tid = child_tid as usize;
+        }
         let tid = thread_manager().add(new_thread);
         thread_manager().detach(tid);
         info!("clone: {} -> {}", thread::current().id(), tid);
         *parent_tid_ref = tid as u32;
-        *child_tid_ref = tid as u32;
+        // *child_tid_ref = tid as u32;
         Ok(tid)
     }
 
@@ -107,17 +116,20 @@ impl Syscall<'_> {
             }
             // if not, check pid
             let invalid = {
-                let children: Vec<_> = proc
+                let children = proc
                     .children
                     .iter()
-                    .filter_map(|weak| weak.upgrade())
-                    .collect();
+                    .filter_map(|(pid, weak)| {
+                        if weak.upgrade().is_none() {
+                            None
+                        } else {
+                            Some(pid)
+                        }
+                    })
+                    .collect::<Vec<_>>();
                 match target {
                     WaitFor::AnyChild | WaitFor::AnyChildInGroup => children.len() == 0,
-                    WaitFor::Pid(pid) => children
-                        .iter()
-                        .find(|p| p.lock().pid.get() == pid)
-                        .is_none(),
+                    WaitFor::Pid(pid) => children.iter().find(|p| p.get() == pid).is_none(),
                 }
             };
             if invalid {
@@ -185,6 +197,26 @@ impl Syscall<'_> {
         let (mut vm, entry_addr, ustack_top) =
             Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
 
+        // close file that FD_CLOEXEC is set
+        let close_fds = proc
+            .files
+            .iter()
+            .filter_map(|(fd, file_like)| {
+                if let FileLike::File(file) = file_like {
+                    if file.fd_cloexec {
+                        Some(*fd)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for fd in close_fds {
+            proc.files.remove(&fd);
+        }
+
         // Activate new page table
         core::mem::swap(&mut *self.vm(), &mut vm);
         unsafe {
@@ -207,33 +239,46 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// Kill the process
-    pub fn sys_kill(&mut self, pid: usize, sig: usize) -> SysResult {
-        info!(
-            "kill: thread {} kill process {} with signal {}",
-            thread::current().id(),
-            pid,
-            sig
-        );
-        let current_pid = self.process().pid.get().clone();
-        if current_pid == pid {
-            // killing myself
-            self.sys_exit_group(sig);
-        } else {
-            if let Some(proc_arc) = PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade()) {
-                let mut proc = proc_arc.lock();
-                proc.exit(sig);
-                Ok(0)
-            } else {
-                Err(SysError::EINVAL)
-            }
-        }
-    }
-
     /// Get the current process id
     pub fn sys_getpid(&mut self) -> SysResult {
         info!("getpid");
         Ok(self.process().pid.get())
+    }
+
+    pub fn sys_getpgid(&self, mut pid: usize) -> SysResult {
+        if pid == 0 {
+            pid = self.process().pid.get();
+        }
+        info!("getpgid: get pgid of process {}", pid);
+        let process_table = PROCESSES.read();
+        // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
+        let proc = process_table.get(&pid);
+        if let Some(proc) = proc {
+            let lock = proc.upgrade().unwrap();
+            let proc = lock.lock();
+            Ok(proc.pgid as usize)
+        } else {
+            Err(ESRCH)
+        }
+    }
+
+    pub fn sys_setpgid(&self, mut pid: usize, pgid: usize) -> SysResult {
+        if pid == 0 {
+            pid = self.process().pid.get();
+        }
+        info!("setpgid: set pgid of process {} to {}", pid, pgid);
+        let process_table = PROCESSES.read();
+        let proc = process_table.get(&pid);
+        if let Some(proc) = proc {
+            // TODO: check process pid is the child of calling process
+            if let Some(proc) = proc.upgrade() {
+                let mut proc = proc.lock();
+                proc.pgid = pgid as i32;
+            }
+            Ok(0)
+        } else {
+            Err(ESRCH)
+        }
     }
 
     /// Get the current thread id
@@ -245,8 +290,10 @@ impl Syscall<'_> {
 
     /// Get the parent process id
     pub fn sys_getppid(&mut self) -> SysResult {
-        if let Some(parent) = self.process().parent.upgrade() {
-            Ok(parent.lock().pid.get())
+        info!("getppid");
+        let (pid, parent) = self.process().parent.clone();
+        if parent.upgrade().is_some() {
+            Ok(pid.get())
         } else {
             Ok(0)
         }
@@ -291,7 +338,7 @@ impl Syscall<'_> {
         info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
         proc.exit(exit_code);
-
+        drop(proc);
         thread::yield_now();
         unreachable!();
     }
@@ -299,8 +346,13 @@ impl Syscall<'_> {
     pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {
         let time = unsafe { *self.vm().check_read_ptr(req)? };
         info!("nanosleep: time: {:#?}", time);
-        // TODO: handle spurious wakeup
-        thread::sleep(time.to_duration());
+        if !time.is_zero() {
+            // TODO: handle spurious wakeup
+            thread::sleep(time.to_duration());
+            if has_signal_to_do() {
+                return Err(EINTR);
+            }
+        }
         Ok(0)
     }
 

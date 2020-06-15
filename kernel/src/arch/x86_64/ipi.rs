@@ -10,7 +10,7 @@ use core::sync::atomic::{spin_loop_hint, AtomicU8, Ordering};
 pub type IPIEventItem = Box<dyn Fn()>;
 
 unsafe fn get_apic() -> XApic {
-    let mut lapic = XApic::new(phys_to_virt(LAPIC_ADDR));
+    let lapic = XApic::new(phys_to_virt(LAPIC_ADDR));
     lapic
 }
 

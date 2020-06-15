@@ -1,16 +1,13 @@
 use crate::fs::FileLike;
-use crate::memory::MemorySet;
 use crate::process::Process;
-use crate::sync::{Condvar, SpinNoIrqLock};
+use crate::sync::SpinNoIrqLock;
 use crate::syscall::{SysError, SysResult};
 use alloc::{collections::BTreeMap, collections::BTreeSet};
-use core::mem::size_of;
-use core::slice;
 
 pub struct EpollInstance {
     pub events: BTreeMap<usize, EpollEvent>,
-    pub readyList: SpinNoIrqLock<BTreeSet<usize>>,
-    pub newCtlList: SpinNoIrqLock<BTreeSet<usize>>,
+    pub ready_list: SpinNoIrqLock<BTreeSet<usize>>,
+    pub new_ctl_list: SpinNoIrqLock<BTreeSet<usize>>,
 }
 
 impl Clone for EpollInstance {
@@ -20,26 +17,26 @@ impl Clone for EpollInstance {
 }
 
 impl EpollInstance {
-    pub fn new(flags: usize) -> Self {
+    pub fn new(_flags: usize) -> Self {
         return EpollInstance {
             events: BTreeMap::new(),
-            readyList: Default::default(),
-            newCtlList: Default::default(),
+            ready_list: Default::default(),
+            new_ctl_list: Default::default(),
         };
     }
 
     pub fn control(&mut self, op: usize, fd: usize, event: &EpollEvent) -> SysResult {
-        match (op as i32) {
+        match op as i32 {
             EPollCtlOp::ADD => {
                 self.events.insert(fd, event.clone());
-                self.newCtlList.lock().insert(fd);
+                self.new_ctl_list.lock().insert(fd);
             }
 
             EPollCtlOp::MOD => {
                 if self.events.get(&fd).is_some() {
                     self.events.remove(&fd);
                     self.events.insert(fd, event.clone());
-                    self.newCtlList.lock().insert(fd);
+                    self.new_ctl_list.lock().insert(fd);
                 } else {
                     return Err(SysError::EPERM);
                 }
@@ -62,10 +59,9 @@ impl EpollInstance {
 
 #[derive(Clone, Copy)]
 pub struct EpollData {
-    ptr: u64,
+    _ptr: u64,
 }
 
-#[repr(packed)]
 #[derive(Clone)]
 pub struct EpollEvent {
     pub events: u32,     /* Epoll events */

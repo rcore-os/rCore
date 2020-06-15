@@ -17,25 +17,23 @@ pub mod memory;
 pub mod paging;
 pub mod rand;
 mod sbi;
+pub mod signal;
 pub mod syscall;
 pub mod timer;
 
 use crate::memory::phys_to_virt;
 use core::sync::atomic::{AtomicBool, Ordering};
-use log::*;
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
-    let mut device_tree_vaddr = phys_to_virt(device_tree_paddr);
+    let device_tree_vaddr = phys_to_virt(device_tree_paddr);
 
     unsafe {
         cpu::set_cpu_id(hartid);
     }
 
     #[cfg(feature = "board_rocket_chip")]
-    {
-        device_tree_vaddr = board::DTB.as_ptr() as usize;
-    }
+    let device_tree_vaddr = board::DTB.as_ptr() as usize;
 
     if hartid != BOOT_HART_ID {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {}
@@ -88,7 +86,7 @@ const BOOT_HART_ID: usize = 0;
 #[cfg(feature = "board_u540")]
 const BOOT_HART_ID: usize = 1;
 
-/// Constant & Macro for `trap.asm`
+// Constant & Macro for `trap.asm`
 #[cfg(target_arch = "riscv32")]
 global_asm!(
     r"
@@ -122,3 +120,17 @@ global_asm!(include_str!("boot/entry64.asm"));
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/entry_k210.asm"));
 global_asm!(include_str!("boot/trap.asm"));
+
+pub fn get_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        asm!("mv $0, sp" : "=r"(sp));
+    }
+    sp
+}
+
+pub fn set_sp(sp: usize) {
+    unsafe {
+        asm!("mv sp, $0" :: "r" (sp) : "memory");
+    }
+}

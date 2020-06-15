@@ -7,11 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - run: rm rust-toolchain
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly
+        toolchain: nightly-2020-04-06
         override: true
         components: rustfmt, clippy
     - name: Check code format
@@ -22,7 +21,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        arch: [x86_64, riscv32, riscv64, aarch64, mipsel]
+        # we will bring back mipsel later
+        arch: [x86_64, riscv32, riscv64, aarch64]
     steps:
     - uses: actions/checkout@v2
     - name: Checkout submodules
@@ -30,7 +30,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly-2020-01-17
+        toolchain: nightly-2020-04-06
         components: rust-src, llvm-tools-preview
 
     - name: Cache QEMU

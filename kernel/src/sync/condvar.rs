@@ -1,11 +1,13 @@
 use super::*;
+use crate::consts::{INFORM_PER_MSEC, USEC_PER_TICK};
+use crate::process::thread_manager;
 use crate::process::Process;
-use crate::process::{current_thread, thread_manager};
-use crate::thread;
+use crate::syscall::TimeSpec;
+use crate::{processor, thread};
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use rcore_thread::std_thread::Thread;
+use rcore_thread::std_thread::{sleep, Thread};
 
 pub struct RegisteredProcess {
     proc: Arc<SpinNoIrqLock<Process>>,
@@ -23,6 +25,10 @@ pub struct Condvar {
 impl Condvar {
     pub fn new() -> Self {
         Condvar::default()
+    }
+
+    pub fn wait_queue_len(&self) -> usize {
+        self.wait_queue.lock().len()
     }
 
     /// Park current thread and wait for this condvar to be notified.
@@ -44,7 +50,7 @@ impl Condvar {
     }
 
     /// Wait for condvar until condition() returns Some
-    pub fn wait_event<T>(condvar: &Condvar, mut condition: impl FnMut() -> Option<T>) -> T {
+    pub fn wait_event<T>(condvar: &Condvar, condition: impl FnMut() -> Option<T>) -> T {
         Self::wait_events(&[condvar], condition)
     }
 
@@ -60,7 +66,7 @@ impl Condvar {
         let mut locks = Vec::with_capacity(condvars.len());
         loop {
             for condvar in condvars {
-                let mut lock = condvar.wait_queue.lock();
+                let lock = condvar.wait_queue.lock();
                 locks.push(lock);
             }
             thread_manager().sleep(tid, 0);
@@ -69,11 +75,14 @@ impl Condvar {
             if let Some(res) = condition() {
                 let _ = FlagsGuard::no_irq_region();
                 thread_manager().cancel_sleeping(tid);
-                for condvar in condvars {
-                    let mut lock = condvar.wait_queue.lock();
-                    lock.retain(|t| !Arc::ptr_eq(t, &token));
-                }
                 return res;
+            } else {
+                for condvar in condvars {
+                    let mut queue = condvar.wait_queue.lock();
+                    if queue.iter().find(|&t| Arc::ptr_eq(t, &token)).is_none() {
+                        queue.push_front(token.clone());
+                    }
+                }
             }
             thread::yield_now();
         }
@@ -93,39 +102,77 @@ impl Condvar {
             drop(lock);
             drop(guard);
         });
-        let ret = mutex.lock();
+        // let mut lock = self.wait_queue.lock();
+        // lock.retain(|t| !Arc::ptr_eq(&t, &token));
+        mutex.lock()
+    }
+
+    /// Park current thread and wait for this condvar to be notified or timeout.
+    pub fn wait_timeout<'a, T, S>(
+        &self,
+        guard: MutexGuard<'a, T, S>,
+        timeout: TimeSpec,
+    ) -> Option<MutexGuard<'a, T, S>>
+    where
+        S: MutexSupport,
+    {
+        let mutex = guard.mutex;
+        let token = Arc::new(thread::current());
         let mut lock = self.wait_queue.lock();
-        lock.retain(|t| !Arc::ptr_eq(&t, &token));
-        ret
+        lock.push_back(token.clone());
+        drop(lock);
+        drop(guard);
+
+        let timeout = core::time::Duration::new(timeout.sec as u64, timeout.nsec as u32);
+        let begin = crate::trap::uptime_msec();
+        if timeout.as_millis() != 0 {
+            sleep(timeout);
+        }
+        // let mut lock = self.wait_queue.lock();
+        // lock.retain(|t| !Arc::ptr_eq(&t, &token));
+        let end = crate::trap::uptime_msec();
+        if end - begin >= timeout.as_millis() as usize {
+            None
+        } else {
+            Some(mutex.lock())
+        }
     }
 
     pub fn notify_one(&self) {
-        if let Some(t) = self.wait_queue.lock().front() {
+        let mut queue = self.wait_queue.lock();
+        if let Some(t) = queue.front() {
             self.epoll_callback(t);
+            // info!("nofity thread: {}", t.id());
             t.unpark();
+            queue.pop_front();
         }
     }
 
     pub fn notify_all(&self) {
-        let queue = self.wait_queue.lock();
+        let mut queue = self.wait_queue.lock();
         for t in queue.iter() {
             self.epoll_callback(t);
             t.unpark();
         }
+        queue.clear();
     }
+
     /// Notify up to `n` waiters.
     /// Return the number of waiters that were woken up.
     pub fn notify_n(&self, n: usize) -> usize {
         let mut count = 0;
-        let queue = self.wait_queue.lock();
+        let mut queue = self.wait_queue.lock();
         for t in queue.iter() {
             if count >= n {
                 break;
             }
+            self.epoll_callback(t);
             t.unpark();
             count += 1;
         }
-
+        for _ in 0..count {
+            queue.pop_front();
+        }
         count
     }
 
@@ -162,13 +209,13 @@ impl Condvar {
         let epoll_list = self.epoll_queue.lock();
         for ist in epoll_list.iter() {
             if thread.id() == ist.tid {
-                let mut proc = ist.proc.lock();
+                let proc = ist.proc.lock();
                 match proc.get_epoll_instance(ist.epfd) {
                     Ok(instacne) => {
-                        let mut readylist = instacne.readyList.lock();
-                        readylist.insert(ist.fd);
+                        let mut ready_list = instacne.ready_list.lock();
+                        ready_list.insert(ist.fd);
                     }
-                    Err(r) => {
+                    Err(_) => {
                         panic!("epoll instance not exist");
                     }
                 }

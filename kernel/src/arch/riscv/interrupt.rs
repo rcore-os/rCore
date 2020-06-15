@@ -1,5 +1,5 @@
 pub use self::context::*;
-use crate::drivers::{DRIVERS, IRQ_MANAGER};
+use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
 
@@ -112,7 +112,7 @@ fn timer() {
     crate::trap::timer();
 }
 
-fn syscall(tf: &mut TrapFrame) {
+pub fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4; // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(
         tf.x[17],

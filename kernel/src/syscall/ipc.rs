@@ -1,9 +1,6 @@
-use crate::sync::Semaphore;
-use crate::sync::SpinLock as Mutex;
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+#![allow(dead_code)]
+
 use bitflags::*;
-use core::cell::UnsafeCell;
-use spin::RwLock;
 
 pub use crate::ipc::*;
 
@@ -36,6 +33,7 @@ impl Syscall<'_> {
         let ops = unsafe { self.vm().check_read_array(ops, num_ops)? };
 
         let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
+        sem_array.otime();
         for &SemBuf { num, op, flags } in ops.iter() {
             let flags = SemFlags::from_bits_truncate(flags);
             if flags.contains(SemFlags::IPC_NOWAIT) {
@@ -45,9 +43,10 @@ impl Syscall<'_> {
 
             let _result = match op {
                 1 => sem.release(),
-                -1 => sem.acquire(),
+                -1 => sem.acquire()?,
                 _ => unimplemented!("Semaphore: semop.(Not 1/-1)"),
             };
+            sem.set_pid(self.process().pid.get());
             if flags.contains(SemFlags::SEM_UNDO) {
                 self.process().semaphores.add_undo(id, num, op);
             }
@@ -58,18 +57,49 @@ impl Syscall<'_> {
     pub fn sys_semctl(&self, id: usize, num: usize, cmd: usize, arg: isize) -> SysResult {
         info!("semctl: id: {}, num: {}, cmd: {}", id, num, cmd);
         let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
-        let sem = &sem_array[num as usize];
-
+        const IPC_RMID: usize = 0;
+        const IPC_SET: usize = 1;
+        const IPC_STAT: usize = 2;
+        const GETPID: usize = 11;
         const GETVAL: usize = 12;
         const GETALL: usize = 13;
+        const GETNCNT: usize = 14;
+        const GETZCNT: usize = 15;
         const SETVAL: usize = 16;
         const SETALL: usize = 17;
 
         match cmd {
-            SETVAL => sem.set(arg),
-            _ => unimplemented!("Semaphore: Semctl.(Not setval)"),
+            IPC_RMID => {
+                sem_array.remove();
+                Ok(0)
+            }
+            IPC_SET => {
+                // TODO: update IpcPerm
+                sem_array.ctime();
+                Ok(0)
+            }
+            IPC_STAT => {
+                *unsafe { self.vm().check_write_ptr(arg as *mut SemidDs)? } =
+                    *sem_array.semid_ds.lock();
+                Ok(0)
+            }
+            _ => {
+                let sem = &sem_array[num as usize];
+                match cmd {
+                    GETPID => Ok(sem.get_pid()),
+                    GETVAL => Ok(sem.get() as usize),
+                    GETNCNT => Ok(sem.get_ncnt()),
+                    GETZCNT => Ok(0),
+                    SETVAL => {
+                        sem.set(arg);
+                        sem.set_pid(self.process().pid.get());
+                        sem_array.ctime();
+                        Ok(0)
+                    }
+                    _ => unimplemented!("Semaphore Semctl cmd: {}", cmd),
+                }
+            }
         }
-        Ok(0)
     }
 
     pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SysResult {

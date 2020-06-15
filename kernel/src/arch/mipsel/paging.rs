@@ -125,7 +125,7 @@ impl Entry for PageEntry {
     fn readonly_shared(&self) -> bool {
         false
     }
-    fn set_shared(&mut self, writable: bool) {}
+    fn set_shared(&mut self, _writable: bool) {}
     fn clear_shared(&mut self) {}
     fn swapped(&self) -> bool {
         self.0.flags().contains(EF::RESERVED1)
@@ -136,11 +136,11 @@ impl Entry for PageEntry {
     fn user(&self) -> bool {
         true
     }
-    fn set_user(&mut self, value: bool) {}
+    fn set_user(&mut self, _value: bool) {}
     fn execute(&self) -> bool {
         true
     }
-    fn set_execute(&mut self, value: bool) {}
+    fn set_execute(&mut self, _value: bool) {}
     fn mmio(&self) -> u8 {
         0
     }

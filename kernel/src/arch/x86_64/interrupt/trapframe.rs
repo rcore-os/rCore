@@ -1,3 +1,4 @@
+use crate::arch::signal::MachineContext;
 use core::default::Default;
 use core::fmt;
 
@@ -28,6 +29,7 @@ pub struct TrapFrame {
     // Pushed by __alltraps at 'trap.asm'
     pub fsbase: usize,
 
+    pub mxcsr: usize,
     pub r15: usize,
     pub r14: usize,
     pub r13: usize,
@@ -71,6 +73,7 @@ impl TrapFrame {
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
+        tf.mxcsr = 0x1f80;
         tf
     }
     pub fn new_user_thread(entry_addr: usize, rsp: usize) -> Self {
@@ -82,7 +85,44 @@ impl TrapFrame {
         tf.rsp = rsp;
         tf.rflags = 0x282;
         tf.fpstate_offset = 16; // skip restoring for first time
+        tf.mxcsr = 0x1f80;
         tf
+    }
+
+    pub fn get_sp(&self) -> usize {
+        self.rsp
+    }
+
+    pub fn from_mcontext(mc: &MachineContext) -> Self {
+        // FIXME: missing fields
+        TrapFrame {
+            fpstate_offset: 16,
+            fpstate: Default::default(),
+            fsbase: mc.fs as usize,
+            mxcsr: 0x1f80,
+            r15: mc.r15,
+            r14: mc.r14,
+            r13: mc.r13,
+            r12: mc.r12,
+            rbp: mc.rbp,
+            rbx: mc.rbx,
+            r11: mc.r11,
+            r10: mc.r10,
+            r9: mc.r9,
+            r8: mc.r8,
+            rsi: mc.rsi,
+            rdi: mc.rdi,
+            rdx: mc.rdx,
+            rcx: mc.rcx,
+            rax: mc.rax,
+            trap_num: 0,
+            error_code: 0,
+            rip: mc.rip,
+            cs: mc.cs as usize,
+            rflags: 0,
+            rsp: mc.rsp,
+            ss: 0,
+        }
     }
 }
 
@@ -154,6 +194,8 @@ impl Context {
         push r13
         push r14
         push r15
+
+        // save page table
         mov r15, cr3
         push r15
 
@@ -161,19 +203,18 @@ impl Context {
         mov [rdi], rsp      // rdi = from_rsp
         mov rsp, [rsi]      // rsi = to_rsp
 
-        // Save old callee-save registers
+        // restore page table
         pop r15
         mov cr3, r15
+
+        // restore old callee-save registers
         pop r15
         pop r14
         pop r13
         pop r12
         pop rbp
         pop rbx
-
-        // pop rip
-        ret"
-        : : : : "intel" "volatile" )
+        ": : : : "intel" "volatile");
     }
 
     pub unsafe fn null() -> Self {

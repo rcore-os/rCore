@@ -1,15 +1,15 @@
 use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
+use rcore_fs::vfs::MMapArea;
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::PAGE_SIZE;
 
-use crate::memory::GlobalFrameAlloc;
-
 use super::*;
+use crate::memory::GlobalFrameAlloc;
 
 impl Syscall<'_> {
     pub fn sys_mmap(
         &mut self,
-        mut addr: usize,
+        addr: usize,
         len: usize,
         prot: usize,
         flags: usize,
@@ -20,10 +20,11 @@ impl Syscall<'_> {
         let flags = MmapFlags::from_bits_truncate(flags);
         info!(
             "mmap: addr={:#x}, size={:#x}, prot={:?}, flags={:?}, fd={}, offset={:#x}",
-            addr, len, prot, flags, fd, offset
+            addr, len, prot, flags, fd as isize, offset
         );
 
         let mut proc = self.process();
+        let mut addr = addr;
         if addr == 0 {
             // although NULL can be a valid address
             // but in C, NULL is regarded as allocation failure
@@ -58,48 +59,25 @@ impl Syscall<'_> {
                 );
                 return Ok(addr);
             }
+            self.vm().push(
+                addr,
+                addr + len,
+                prot.to_attr().execute(),
+                Delay::new(GlobalFrameAlloc),
+                "mmap_anon",
+            );
+            Ok(addr)
         } else {
-            let file = proc.get_file(fd)?;
-            info!("mmap path is {} ", &*file.path);
-            match &*file.path {
-                "/dev/fb0" => {
-                    use crate::drivers::gpu::fb::FRAME_BUFFER;
-                    let attr = prot.to_attr();
-                    #[cfg(feature = "board_raspi3")]
-                    let attr = attr.mmio(crate::arch::paging::MMIOType::NormalNonCacheable as u8);
-
-                    if let Some(fb) = FRAME_BUFFER.lock().as_ref() {
-                        self.vm().push(
-                            addr,
-                            addr + len,
-                            attr,
-                            Linear::new((fb.paddr() - addr) as isize),
-                            "mmap_file",
-                        );
-                        info!("mmap for /dev/fb0");
-                        return Ok(addr);
-                    } else {
-                        return Err(SysError::ENOENT);
-                    }
-                }
-                _ => {
-                    let inode = file.inode();
-                    self.vm().push(
-                        addr,
-                        addr + len,
-                        prot.to_attr(),
-                        File {
-                            file: INodeForMap(inode),
-                            mem_start: addr,
-                            file_start: offset,
-                            file_end: offset + len,
-                            allocator: GlobalFrameAlloc,
-                        },
-                        "mmap_file",
-                    );
-                    return Ok(addr);
-                }
+            let file_like = proc.get_file_like(fd)?;
+            let area = MMapArea {
+                start_vaddr: addr,
+                end_vaddr: addr + len,
+                prot: prot.bits(),
+                flags: flags.bits(),
+                offset,
             };
+            file_like.mmap(area)?;
+            Ok(addr)
         }
     }
 
@@ -109,7 +87,7 @@ impl Syscall<'_> {
             "mprotect: addr={:#x}, size={:#x}, prot={:?}",
             addr, len, prot
         );
-        let attr = prot.to_attr();
+        let _attr = prot.to_attr();
 
         // FIXME: properly set the attribute of the area
         //        now some mut ptr check is fault
@@ -129,6 +107,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 }
+
 bitflags! {
     pub struct MmapProt: usize {
         /// Data cannot be accessed
@@ -171,7 +150,7 @@ bitflags! {
 }
 
 impl MmapProt {
-    fn to_attr(self) -> MemoryAttr {
+    pub fn to_attr(self) -> MemoryAttr {
         let mut attr = MemoryAttr::default().user();
         if self.contains(MmapProt::EXEC) {
             attr = attr.execute();

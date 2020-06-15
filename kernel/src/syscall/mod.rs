@@ -25,6 +25,8 @@ pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
+#[cfg(target_arch = "x86_64")]
+pub use self::signal::*;
 pub use self::time::*;
 
 mod custom;
@@ -35,10 +37,14 @@ mod mem;
 mod misc;
 mod net;
 mod proc;
+#[cfg(target_arch = "x86_64")]
+mod signal;
 mod time;
 
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
+use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
 
@@ -51,7 +57,8 @@ lazy_static! {
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let thread = unsafe { current_thread() };
     let mut syscall = Syscall { thread, tf };
-    syscall.syscall(id, args)
+    let ret = syscall.syscall(id, args);
+    ret
 }
 
 /// All context needed for syscall
@@ -62,8 +69,9 @@ struct Syscall<'a> {
 
 impl Syscall<'_> {
     /// Get current process
+    /// spinlock is tend to deadlock, use busy waiting
     pub fn process(&self) -> MutexGuard<'_, Process, SpinNoIrq> {
-        self.thread.proc.lock()
+        self.thread.proc.busy_lock()
     }
 
     /// Get current virtual memory
@@ -108,12 +116,12 @@ impl Syscall<'_> {
             SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
             SYS_FCNTL => {
                 info!(
-                    "SYS_FCNTL : {} {} {} {}",
+                    "SYS_FCNTL : {} {:#x} {} {}",
                     args[0], args[1], args[2], args[3]
                 );
                 self.sys_fcntl(args[0], args[1], args[2])
             }
-            SYS_FLOCK => self.unimplemented("flock", Ok(0)),
+            SYS_FLOCK => self.sys_flock(args[0], args[1]),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
             SYS_TRUNCATE => self.sys_truncate(args[0] as *const u8, args[1]),
@@ -133,7 +141,9 @@ impl Syscall<'_> {
                 args[4],
             ),
             SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1] as *const u8, args[2]),
-            SYS_SYMLINKAT => self.unimplemented("symlinkat", Err(SysError::EACCES)),
+            SYS_SYMLINKAT => {
+                self.sys_symlinkat(args[0] as *const u8, args[1] as usize, args[2] as *const u8)
+            }
             SYS_READLINKAT => {
                 self.sys_readlinkat(args[0], args[1] as *const u8, args[2] as *mut u8, args[3])
             }
@@ -142,9 +152,16 @@ impl Syscall<'_> {
             SYS_FCHOWN => self.unimplemented("fchown", Ok(0)),
             SYS_FCHOWNAT => self.unimplemented("fchownat", Ok(0)),
             SYS_FACCESSAT => self.sys_faccessat(args[0], args[1] as *const u8, args[2], args[3]),
-            SYS_DUP3 => self.sys_dup2(args[0], args[1]), // TODO: handle `flags`
-            SYS_PIPE2 => self.sys_pipe(args[0] as *mut u32), // TODO: handle `flags`
-            SYS_UTIMENSAT => self.unimplemented("utimensat", Ok(0)),
+            SYS_DUP3 => self.sys_dup3(args[0], args[1], args[2]),
+            SYS_PIPE2 => self.sys_pipe2(args[0] as *mut u32, args[1]), // TODO: handle `flags`
+            SYS_SET_ROBUST_LIST => self.unimplemented("set_robuts_list", Ok(0)),
+            SYS_GET_ROBUST_LIST => self.unimplemented("get_robust_list", Ok(0)),
+            SYS_UTIMENSAT => self.sys_utimensat(
+                args[0],
+                args[1] as *const u8,
+                args[2] as *const TimeSpec,
+                args[3],
+            ),
             SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
                 args[0],
                 args[1] as *mut usize,
@@ -195,10 +212,28 @@ impl Syscall<'_> {
             SYS_MADVISE => self.unimplemented("madvise", Ok(0)),
 
             // signal
-            SYS_RT_SIGACTION => self.unimplemented("sigaction", Ok(0)),
-            SYS_RT_SIGPROCMASK => self.unimplemented("sigprocmask", Ok(0)),
-            SYS_SIGALTSTACK => self.unimplemented("sigaltstack", Ok(0)),
-            SYS_KILL => self.sys_kill(args[0], args[1]),
+            #[cfg(target_arch = "x86_64")]
+            SYS_RT_SIGACTION => self.sys_rt_sigaction(
+                args[0],
+                args[1] as *const SignalAction,
+                args[2] as *mut SignalAction,
+                args[3],
+            ),
+            #[cfg(target_arch = "x86_64")]
+            SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
+            #[cfg(target_arch = "x86_64")]
+            SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
+                args[0],
+                args[1] as *const Sigset,
+                args[2] as *mut Sigset,
+                args[3],
+            ),
+            #[cfg(target_arch = "x86_64")]
+            SYS_SIGALTSTACK => {
+                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+            }
+            #[cfg(target_arch = "x86_64")]
+            SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
             SYS_SCHED_YIELD => self.sys_yield(),
@@ -272,7 +307,8 @@ impl Syscall<'_> {
                 args[2] as i32,
                 args[3] as *const TimeSpec,
             ),
-            SYS_TKILL => self.unimplemented("tkill", Ok(0)),
+            #[cfg(target_arch = "x86_64")]
+            SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time
             SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
@@ -289,6 +325,8 @@ impl Syscall<'_> {
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
             #[cfg(not(target_arch = "mips"))]
             SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
+            SYS_MSGGET => self.unimplemented("msgget", Ok(0)),
+            SYS_SHMGET => self.unimplemented("shmget", Ok(0)),
 
             // shm
             #[cfg(not(target_arch = "mips"))]
@@ -308,7 +346,7 @@ impl Syscall<'_> {
             SYS_UNAME => self.sys_uname(args[0] as *mut u8),
             SYS_UMASK => self.unimplemented("umask", Ok(0o777)),
             //        SYS_GETRLIMIT => self.sys_getrlimit(),
-            //        SYS_SETRLIMIT => self.sys_setrlimit(),
+            SYS_SETRLIMIT => self.unimplemented("setrlimit", Ok(0)),
             SYS_GETRUSAGE => self.sys_getrusage(args[0], args[1] as *mut RUsage),
             SYS_SYSINFO => self.sys_sysinfo(args[0] as *mut SysInfo),
             SYS_TIMES => self.sys_times(args[0] as *mut Tms),
@@ -317,12 +355,16 @@ impl Syscall<'_> {
             SYS_SETUID => self.unimplemented("setuid", Ok(0)),
             SYS_GETEUID => self.unimplemented("geteuid", Ok(0)),
             SYS_GETEGID => self.unimplemented("getegid", Ok(0)),
-            SYS_SETPGID => self.unimplemented("setpgid", Ok(0)),
             SYS_GETPPID => self.sys_getppid(),
             SYS_SETSID => self.unimplemented("setsid", Ok(0)),
-            SYS_GETPGID => self.unimplemented("getpgid", Ok(0)),
+            SYS_GETPGID => self.sys_getpgid(args[0]),
+            SYS_SETPGID => self.sys_setpgid(args[0], args[1]),
             SYS_GETGROUPS => self.unimplemented("getgroups", Ok(0)),
+            SYS_RT_SIGTIMEDWAIT => self.unimplemented("rt_sigtimedwait", Ok(0)),
             SYS_SETGROUPS => self.unimplemented("setgroups", Ok(0)),
+            SYS_SETRESUID => self.unimplemented("setresuid", Ok(0)),
+            SYS_SETRESGID => self.unimplemented("setresgid", Ok(0)),
+            SYS_SETGID => self.unimplemented("setgid", Ok(0)),
             SYS_SETPRIORITY => self.sys_set_priority(args[0]),
             SYS_PRCTL => self.unimplemented("prctl", Ok(0)),
             SYS_MEMBARRIER => self.unimplemented("membarrier", Ok(0)),
@@ -358,6 +400,7 @@ impl Syscall<'_> {
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
+            SYS_MSGCTL => self.unimplemented("msgctl", Ok(0)),
 
             _ => {
                 let ret = match () {
@@ -418,7 +461,7 @@ impl Syscall<'_> {
             SYS_PIPE => {
                 let fd_ptr = args[0] as *mut u32;
                 match self.sys_pipe(fd_ptr) {
-                    Ok(code) => {
+                    Ok(_code) => {
                         unsafe {
                             self.tf.v0 = *fd_ptr as usize;
                             self.tf.v1 = *(fd_ptr.add(1)) as usize;
@@ -482,6 +525,7 @@ impl Syscall<'_> {
             SYS_RMDIR => self.sys_rmdir(args[0] as *const u8),
             SYS_LINK => self.sys_link(args[0] as *const u8, args[1] as *const u8),
             SYS_UNLINK => self.sys_unlink(args[0] as *const u8),
+            SYS_SYMLINK => self.sys_symlink(args[0] as *const u8, args[1] as *const u8),
             SYS_READLINK => self.sys_readlink(args[0] as *const u8, args[1] as *mut u8, args[2]),
             SYS_CHMOD => self.unimplemented("chmod", Ok(0)),
             SYS_CHOWN => self.unimplemented("chown", Ok(0)),
@@ -501,7 +545,7 @@ pub type SysResult = Result<usize, SysError>;
 
 #[allow(dead_code)]
 #[repr(isize)]
-#[derive(Debug)]
+#[derive(Debug, FromPrimitive)]
 pub enum SysError {
     EUNDEF = 0,
     EPERM = 1,
@@ -544,6 +588,7 @@ pub enum SysError {
     ENOSYS = 38,
     ENOTEMPTY = 39,
     ELOOP = 40,
+    EIDRM = 43,
     ENOTSOCK = 80,
     ENOPROTOOPT = 92,
     EPFNOSUPPORT = 96,
@@ -551,6 +596,7 @@ pub enum SysError {
     ENOBUFS = 105,
     EISCONN = 106,
     ENOTCONN = 107,
+    ETIMEDOUT = 110,
     ECONNREFUSED = 111,
 }
 

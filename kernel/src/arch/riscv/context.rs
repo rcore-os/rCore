@@ -52,6 +52,11 @@ impl TrapFrame {
         tf.sstatus.set_spp(sstatus::SPP::User);
         tf
     }
+
+    pub fn get_sp(&self) -> usize {
+        // sp is x2
+        self.x[2]
+    }
 }
 
 use core::fmt::{Debug, Error, Formatter};
@@ -185,6 +190,7 @@ impl Context {
         Load sp, 0(a1)
         Load s11, 1*XLENB(sp)
         csrw satp, s11
+        sfence.vma
         Load ra, 0*XLENB(sp)
         Load s0, 2*XLENB(sp)
         Load s1, 3*XLENB(sp)

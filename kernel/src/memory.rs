@@ -21,7 +21,6 @@ use bitmap_allocator::BitAlloc;
 use buddy_system_allocator::Heap;
 use core::mem;
 use core::mem::size_of;
-use lazy_static::*;
 use log::*;
 pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::*;
@@ -48,10 +47,7 @@ pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
 #[cfg(feature = "board_k210")]
 pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
-lazy_static! {
-    pub static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> =
-        SpinNoIrqLock::new(FrameAlloc::default());
-}
+pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::DEFAULT);
 
 /// Convert physical address to virtual address
 #[inline]
@@ -85,6 +81,16 @@ impl FrameAllocator for GlobalFrameAlloc {
         ret
         // TODO: try to swap out when alloc failed
     }
+    fn alloc_contiguous(&self, size: usize, align_log2: usize) -> Option<PhysAddr> {
+        // get the real address of the alloc frame
+        let ret = FRAME_ALLOCATOR
+            .lock()
+            .alloc_contiguous(size, align_log2)
+            .map(|id| id * PAGE_SIZE + MEMORY_OFFSET);
+        trace!("Allocate frame: {:x?}", ret);
+        ret
+        // TODO: try to swap out when alloc failed
+    }
     fn dealloc(&self, target: usize) {
         trace!("Deallocate frame: {:x}", target);
         FRAME_ALLOCATOR
@@ -98,6 +104,9 @@ pub fn alloc_frame() -> Option<usize> {
 }
 pub fn dealloc_frame(target: usize) {
     GlobalFrameAlloc.dealloc(target);
+}
+pub fn alloc_frame_contiguous(size: usize, align_log2: usize) -> Option<usize> {
+    GlobalFrameAlloc.alloc_contiguous(size, align_log2)
 }
 
 pub struct KernelStack(usize);
@@ -155,7 +164,7 @@ pub fn enlarge_heap(heap: &mut Heap) {
     let mut addrs = [(0, 0); 32];
     let mut addr_len = 0;
     let va_offset = PHYSICAL_MEMORY_OFFSET;
-    for i in 0..16384 {
+    for _ in 0..16384 {
         let page = alloc_frame().unwrap();
         let va = va_offset + page;
         if addr_len > 0 {

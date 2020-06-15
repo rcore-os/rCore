@@ -4,6 +4,7 @@ use super::*;
 use crate::consts::USEC_PER_TICK;
 use core::time::Duration;
 use lazy_static::lazy_static;
+use rcore_fs::vfs::Timespec;
 
 impl Syscall<'_> {
     pub fn sys_gettimeofday(&mut self, tv: *mut TimeVal, tz: *const u8) -> SysResult {
@@ -29,6 +30,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn sys_time(&mut self, time: *mut u64) -> SysResult {
         let sec = get_epoch_usec() / USEC_PER_SEC;
         if time as usize != 0 {
@@ -64,7 +66,7 @@ impl Syscall<'_> {
         info!("times: buf: {:?}", buf);
         let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
-        let tick_base = *TICK_BASE;
+        let _tick_base = *TICK_BASE;
         let tick = unsafe { crate::trap::TICK as u64 };
 
         let new_buf = Tms {
@@ -128,8 +130,8 @@ impl TimeVal {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TimeSpec {
-    sec: usize,
-    nsec: usize,
+    pub sec: usize,
+    pub nsec: usize,
 }
 
 impl TimeSpec {
@@ -146,6 +148,30 @@ impl TimeSpec {
         TimeSpec {
             sec: (usec / USEC_PER_SEC) as usize,
             nsec: (usec % USEC_PER_SEC * NSEC_PER_USEC) as usize,
+        }
+    }
+
+    // TODO: more precise; update when write
+    pub fn update(inode: &Arc<dyn INode>) {
+        let now = TimeSpec::get_epoch().into();
+        if let Ok(mut metadata) = inode.metadata() {
+            metadata.atime = now;
+            metadata.mtime = now;
+            metadata.ctime = now;
+            inode.set_metadata(&metadata).expect("set metadata failed");
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.sec == 0 && self.nsec == 0
+    }
+}
+
+impl Into<Timespec> for TimeSpec {
+    fn into(self) -> Timespec {
+        Timespec {
+            sec: self.sec as i64,
+            nsec: self.nsec as i32,
         }
     }
 }
