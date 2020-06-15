@@ -20,6 +20,9 @@ __alltraps:
     push r14
     push r15
 
+    sub rsp, 8
+    stmxcsr [rsp]
+
     # push fs.base
     xor rax, rax
     mov ecx, 0xC0000100
@@ -34,9 +37,7 @@ __alltraps:
     mov rax, rsp
     and rax, 0xFFFFFFFFFFFFFFF0
     # fxsave (rax)
-    .byte 0x0f
-    .byte 0xae
-    .byte 0x00
+    .byte 0x0f, 0xae, 0x00
     mov rcx, rsp
     sub rcx, rax
     # push fp state offset
@@ -60,9 +61,7 @@ trap_ret:
     add rax, 16
     sub rax, rcx
     # fxrstor (rax)
-    .byte 0x0f
-    .byte 0xae
-    .byte 0x08
+    .byte 0x0f, 0xae, 0x08
 skip_fxrstor:
     add rsp, 16+512
 
@@ -72,6 +71,9 @@ skip_fxrstor:
     shr rdx, 32
     mov ecx, 0xC0000100
     wrmsr # msr[ecx] <= edx:eax
+
+    ldmxcsr [rsp]
+    add rsp, 8
 
     pop r15
     pop r14
@@ -142,6 +144,9 @@ syscall_entry:
     push r14
     push r15
 
+    sub rsp, 8
+    stmxcsr [rsp]
+
     # push fs.base
     xor rax, rax
     mov ecx, 0xC0000100
@@ -156,9 +161,7 @@ syscall_entry:
     mov rax, rsp
     and rax, 0xFFFFFFFFFFFFFFF0
     # fxsave (rax)
-    .byte 0x0f
-    .byte 0xae
-    .byte 0x00
+    .byte 0x0f, 0xae, 0x00
     mov rcx, rsp
     sub rcx, rax
     # push fp state offset
@@ -184,9 +187,7 @@ syscall_return:
     add rax, 16
     sub rax, rcx
     # fxrstor (rax)
-    .byte 0x0f
-    .byte 0xae
-    .byte 0x08
+    .byte 0x0f, 0xae, 0x08
 skip_fxrstor1:
     add rsp, 16+512
 
@@ -196,6 +197,9 @@ skip_fxrstor1:
     shr rdx, 32
     mov ecx, 0xC0000100
     wrmsr # msr[ecx] <= edx:eax
+
+    ldmxcsr [rsp]
+    add rsp, 8
 
     pop r15
     pop r14

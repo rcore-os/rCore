@@ -112,7 +112,7 @@ fn timer() {
     crate::trap::timer();
 }
 
-fn syscall(tf: &mut TrapFrame) {
+pub fn syscall(tf: &mut TrapFrame) {
     tf.sepc += 4; // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(
         tf.x[17],

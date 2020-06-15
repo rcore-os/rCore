@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, sync::Weak, vec::Vec};
+use alloc::{
+    boxed::Box, collections::BTreeMap, collections::VecDeque, string::String, sync::Arc,
+    sync::Weak, vec::Vec,
+};
 use core::fmt;
 
 use core::str;
@@ -18,12 +21,16 @@ use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, SpinNoIrqLock as Mutex};
+use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
 
 use super::abi::{self, ProcInitInfo};
 use crate::process::thread_manager;
+use crate::signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset};
+use bitflags::_core::cell::Ref;
 use core::mem::MaybeUninit;
+use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
+use rcore_thread::std_thread::yield_now;
 
 #[allow(dead_code)]
 pub struct Thread {
@@ -35,6 +42,11 @@ pub struct Thread {
     // This is same as `proc.vm`
     pub vm: Arc<Mutex<MemorySet>>,
     pub proc: Arc<Mutex<Process>>,
+    pub sig_mask: Sigset,
+    // set tf every time enter trap to access current trap frame everywhere when the thread is in the kernel
+    // using pointer to circumvent lifetime check, probably safe（确信）
+    // TODO: better implementation?
+    pub tf: *mut TrapFrame,
 }
 
 /// Pid type
@@ -43,13 +55,15 @@ pub struct Thread {
 pub struct Pid(usize);
 
 impl Pid {
+    pub const INIT: usize = 1;
+
     pub fn get(&self) -> usize {
         self.0
     }
 
     /// Return whether this pid represents the init process
     pub fn is_init(&self) -> bool {
-        self.0 == 0
+        self.0 == Self::INIT
     }
 }
 
@@ -70,19 +84,51 @@ pub struct Process {
 
     // relationship
     pub pid: Pid, // i.e. tgid, usually the tid of first thread
-    pub parent: Weak<Mutex<Process>>,
-    pub children: Vec<Weak<Mutex<Process>>>,
+    pub pgid: i32,
+    // avoid deadlock, put pid out
+    pub parent: (Pid, Weak<Mutex<Process>>),
+    pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
     pub threads: Vec<Tid>, // threads in the same process
 
     // for waiting child
     pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
     pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
+
+    // delivered signals, tid specified thread, -1 stands for any thread
+    // TODO: implement with doubly linked list, but how to do it in rust safely? [doggy]
+    pub sig_queue: VecDeque<(Siginfo, isize)>,
+    pub pending_sigset: Sigset,
+
+    pub dispositions: [SignalAction; Signal::RTMAX + 1],
+    pub sigaltstack: SignalStack,
 }
 
 lazy_static! {
     /// Records the mapping between pid and Process struct.
     pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> =
         RwLock::new(BTreeMap::new());
+}
+
+/// return the process which thread tid is in
+pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
+    PROCESSES
+        .read()
+        .iter()
+        .filter_map(|(_, weak)| weak.upgrade())
+        .find(|proc| proc.lock().threads.contains(&tid))
+}
+
+pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
+    PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade())
+}
+
+pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
+    PROCESSES
+        .read()
+        .iter()
+        .filter_map(|(_, proc)| proc.upgrade())
+        .filter(|proc| proc.lock().pgid == pgid)
+        .collect::<Vec<_>>()
 }
 
 /// Let `rcore_thread` can switch between our `Thread`
@@ -131,13 +177,20 @@ impl Thread {
                 semaphores: SemProc::default(),
                 futexes: BTreeMap::default(),
                 pid: Pid(0),
-                parent: Weak::new(),
+                pgid: -1, // kernel thread do not have a process?
+                parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
+                sig_queue: VecDeque::new(),
+                pending_sigset: Sigset::empty(),
+                dispositions: [SignalAction::default(); Signal::RTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
+            sig_mask: Sigset::empty(),
+            tf: 0 as _,
         })
     }
 
@@ -222,7 +275,7 @@ impl Thread {
             vm.push(
                 ustack_buttom,
                 ustack_top - PAGE_SIZE * 4,
-                MemoryAttr::default().user(),
+                MemoryAttr::default().user().execute(),
                 Delay::new(GlobalFrameAlloc),
                 "user_stack_delay",
             );
@@ -230,7 +283,7 @@ impl Thread {
             vm.push(
                 ustack_top - PAGE_SIZE * 4,
                 ustack_top,
-                MemoryAttr::default().user(),
+                MemoryAttr::default().user().execute(), // feature
                 ByFrame::new(GlobalFrameAlloc),
                 "user_stack",
             );
@@ -271,6 +324,8 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stdin"),
+                false,
+                false,
             )),
         );
         files.insert(
@@ -284,6 +339,8 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stdout"),
+                false,
+                false,
             )),
         );
         files.insert(
@@ -297,6 +354,8 @@ impl Thread {
                     nonblock: false,
                 },
                 String::from("stderr"),
+                false,
+                false,
             )),
         );
 
@@ -315,13 +374,20 @@ impl Thread {
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
                 pid: Pid(0),
-                parent: Weak::new(),
+                pgid: 0,
+                parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
                 child_exit: Arc::new(Condvar::new()),
                 child_exit_code: BTreeMap::new(),
+                pending_sigset: Sigset::empty(),
+                sig_queue: VecDeque::new(),
+                dispositions: [SignalAction::default(); Signal::RTMAX + 1],
+                sigaltstack: SignalStack::default(),
             }
             .add_to_table(),
+            sig_mask: Sigset::default(),
+            tf: 0 as _,
         })
     }
 
@@ -334,30 +400,43 @@ impl Thread {
         let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
 
         let mut proc = self.proc.lock();
+
         let new_proc = Process {
             vm: vm.clone(),
-            files: proc.files.clone(),
+            files: proc.files.clone(), // share open file descriptions
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
             pid: Pid(0),
-            parent: Arc::downgrade(&self.proc),
+            pgid: proc.pgid,
+            parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
             threads: Vec::new(),
             child_exit: Arc::new(Condvar::new()),
             child_exit_code: BTreeMap::new(),
+            pending_sigset: Sigset::empty(),
+            sig_queue: VecDeque::new(),
+            dispositions: proc.dispositions.clone(),
+            sigaltstack: Default::default(),
         }
         .add_to_table();
         // link to parent
-        proc.children.push(Arc::downgrade(&new_proc));
+        proc.children
+            .push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
 
+        // this part in linux manpage seems ambiguous:
+        // Each of the threads in a process has its own signal mask.
+        // A child created via fork(2) inherits a copy of its parent's signal
+        // mask; the signal mask is preserved across execve(2).
         Box::new(Thread {
             context,
             kstack,
             clear_child_tid: 0,
             vm,
             proc: new_proc,
+            sig_mask: self.sig_mask,
+            tf: 0 as _,
         })
     }
 
@@ -377,6 +456,8 @@ impl Thread {
             clear_child_tid,
             vm: self.vm.clone(),
             proc: self.proc.clone(),
+            sig_mask: self.sig_mask,
+            tf: 0 as _,
         })
     }
 }
@@ -386,8 +467,10 @@ impl Process {
     fn add_to_table(mut self) -> Arc<Mutex<Self>> {
         let mut process_table = PROCESSES.write();
 
-        // assign pid
-        let pid = (0..).find(|i| process_table.get(i).is_none()).unwrap();
+        // assign pid, do not start from 0
+        let pid = (Pid::INIT..)
+            .find(|i| process_table.get(i).is_none())
+            .unwrap();
         self.pid = Pid(pid);
 
         // put to process table
@@ -398,6 +481,11 @@ impl Process {
     }
     fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
+    }
+
+    // get the lowest available fd great than or equal to arg
+    pub fn get_free_fd_from(&self, arg: usize) -> usize {
+        (arg..).find(|i| !self.files.contains_key(i)).unwrap()
     }
     /// Add a file to the process, return its fd.
     pub fn add_file(&mut self, file_like: FileLike) -> usize {
@@ -415,16 +503,34 @@ impl Process {
     /// Exit the process.
     /// Kill all threads and notify parent with the exit code.
     pub fn exit(&mut self, exit_code: usize) {
-        // quit all threads
-        for tid in self.threads.iter() {
-            thread_manager().exit(*tid, 1);
+        // avoid some strange dead lock
+        // self.files.clear(); this does not work sometime, for unknown reason
+        // manually drop
+        let fds = self.files.iter().map(|(fd, _)| *fd).collect::<Vec<_>>();
+        for fd in fds.iter() {
+            let file = self.files.remove(fd).unwrap();
+            drop(file);
         }
+
         // notify parent and fill exit code
-        if let Some(parent) = self.parent.upgrade() {
-            let mut parent = parent.lock();
+        if let Some(parent) = self.parent.1.upgrade() {
+            let mut parent = parent.busy_lock();
             parent.child_exit_code.insert(self.pid.get(), exit_code);
             parent.child_exit.notify_one();
         }
+
+        // quit all threads
+        // this must be after setting the value of subprocess, or the threads will be treated exit before actually exits
+        for tid in self.threads.iter() {
+            thread_manager().exit(*tid, 1);
+        }
+        self.threads.clear();
+
+        info!("process {} exist with {}", self.pid.get(), exit_code);
+    }
+
+    pub fn exited(&self) -> bool {
+        self.threads.is_empty()
     }
 }
 

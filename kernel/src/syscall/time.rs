@@ -4,6 +4,7 @@ use super::*;
 use crate::consts::USEC_PER_TICK;
 use core::time::Duration;
 use lazy_static::lazy_static;
+use rcore_fs::vfs::Timespec;
 
 impl Syscall<'_> {
     pub fn sys_gettimeofday(&mut self, tv: *mut TimeVal, tz: *const u8) -> SysResult {
@@ -129,8 +130,8 @@ impl TimeVal {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TimeSpec {
-    sec: usize,
-    nsec: usize,
+    pub sec: usize,
+    pub nsec: usize,
 }
 
 impl TimeSpec {
@@ -150,8 +151,28 @@ impl TimeSpec {
         }
     }
 
+    // TODO: more precise; update when write
+    pub fn update(inode: &Arc<dyn INode>) {
+        let now = TimeSpec::get_epoch().into();
+        if let Ok(mut metadata) = inode.metadata() {
+            metadata.atime = now;
+            metadata.mtime = now;
+            metadata.ctime = now;
+            inode.set_metadata(&metadata).expect("set metadata failed");
+        }
+    }
+
     pub fn is_zero(&self) -> bool {
         self.sec == 0 && self.nsec == 0
+    }
+}
+
+impl Into<Timespec> for TimeSpec {
+    fn into(self) -> Timespec {
+        Timespec {
+            sec: self.sec as i64,
+            nsec: self.nsec as i32,
+        }
     }
 }
 

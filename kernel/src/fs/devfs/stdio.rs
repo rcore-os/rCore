@@ -5,20 +5,52 @@ use core::any::Any;
 
 use rcore_fs::vfs::*;
 
+use super::tty::TTY;
+use crate::fs::devfs::foreground_pgid;
 use crate::fs::ioctl::*;
+use crate::process::process_group;
+use crate::processor;
+use crate::signal::{send_signal, Siginfo, Signal, SI_KERNEL};
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use spin::RwLock;
 
 #[derive(Default)]
 pub struct Stdin {
     buf: Mutex<VecDeque<char>>,
     pub pushed: Condvar,
+    winsize: RwLock<Winsize>,
+    termios: RwLock<Termois>,
 }
 
 impl Stdin {
     pub fn push(&self, c: char) {
-        self.buf.lock().push_back(c);
-        self.pushed.notify_one();
+        let lflag = LocalModes::from_bits_truncate(self.termios.read().lflag);
+        if lflag.contains(LocalModes::ISIG) && [0o3, 0o34, 0o32, 0o31].contains(&(c as i32)) {
+            use Signal::*;
+            let foregroud_processes = process_group(foreground_pgid());
+            match c as i32 {
+                // INTR
+                0o3 => {
+                    for proc in foregroud_processes {
+                        send_signal(
+                            proc,
+                            -1,
+                            Siginfo {
+                                signo: SIGINT as i32,
+                                errno: 0,
+                                code: SI_KERNEL,
+                                field: Default::default(),
+                            },
+                        );
+                    }
+                }
+                _ => warn!("special char {} is unimplented", c),
+            }
+        } else {
+            self.buf.lock().push_back(c);
+            self.pushed.notify_one();
+        }
     }
     pub fn pop(&self) -> char {
         #[cfg(feature = "board_k210")]
@@ -46,7 +78,9 @@ impl Stdin {
 }
 
 #[derive(Default)]
-pub struct Stdout;
+pub struct Stdout {
+    winsize: RwLock<Winsize>,
+}
 
 lazy_static! {
     pub static ref STDIN: Arc<Stdin> = Arc::new(Stdin::default());
@@ -74,15 +108,44 @@ impl INode for Stdin {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
-            TCGETS | TIOCGWINSZ | TIOCSPGRP => {
-                // pretend to be tty
+            TIOCGWINSZ => {
+                let winsize = data as *mut Winsize;
+                unsafe {
+                    *winsize = *self.winsize.read();
+                }
+                Ok(0)
+            }
+            TCGETS => {
+                let termois = data as *mut Termois;
+                unsafe {
+                    *termois = *self.termios.read();
+                }
+                let lflag = LocalModes::from_bits_truncate(self.termios.read().lflag);
+                info!("get lfags: {:?}", lflag);
+                Ok(0)
+            }
+            TCSETS => {
+                let termois = data as *const Termois;
+                unsafe {
+                    *self.termios.write() = *termois;
+                }
+                let lflag = LocalModes::from_bits_truncate(self.termios.read().lflag);
+                info!("set lfags: {:?}", lflag);
                 Ok(0)
             }
             TIOCGPGRP => {
                 // pretend to be have a tty process group
+                // Get the process group ID of the foreground process group on
+                // this terminal.
                 // TODO: verify pointer
                 unsafe { *(data as *mut u32) = 0 };
                 Ok(0)
+            }
+            TIOCSPGRP => {
+                let gid = unsafe { *(data as *const i32) };
+                info!("set foreground process group id to {}", gid);
+                Ok(0)
+                // println!(pid)
             }
             _ => Err(FsError::NotSupported),
         }
@@ -112,7 +175,14 @@ impl INode for Stdout {
     }
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
-            TCGETS | TIOCGWINSZ | TIOCSPGRP => {
+            TIOCGWINSZ => {
+                let winsize = data as *mut Winsize;
+                unsafe {
+                    *winsize = *self.winsize.read();
+                }
+                Ok(0)
+            }
+            TCSETS | TCGETS | TIOCSPGRP => {
                 // pretend to be tty
                 Ok(0)
             }

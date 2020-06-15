@@ -21,7 +21,10 @@ extern crate alloc;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+extern crate num;
 extern crate rlibc;
+#[macro_use]
+extern crate num_derive;
 
 pub use crate::process::{new_kernel_context, processor};
 pub use buddy_system_allocator::LockedHeapWithRescue;
@@ -42,6 +45,7 @@ pub mod memory;
 pub mod net;
 pub mod process;
 pub mod shell;
+pub mod signal;
 pub mod sync;
 pub mod syscall;
 pub mod trap;

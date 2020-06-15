@@ -68,6 +68,7 @@ This is a project of THU courses:
 * [Operating System Train (2018 Autumn)](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2018)
 * [Operating System (2019 Spring)](http://os.cs.tsinghua.edu.cn/oscourse/OS2019spring/projects)
 * [Operating System Train (2019 Autumn)](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2019)
+* [Operating System (2020 Spring)](http://os.cs.tsinghua.edu.cn/oscourse/OS2020spring/projects)
 
 [Reports](./docs) and [Dev docs](https://rucore.gitbook.io/rust-os-docs/) (in Chinese)
 

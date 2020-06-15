@@ -17,6 +17,7 @@ pub mod memory;
 pub mod paging;
 pub mod rand;
 mod sbi;
+pub mod signal;
 pub mod syscall;
 pub mod timer;
 
@@ -119,3 +120,17 @@ global_asm!(include_str!("boot/entry64.asm"));
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/entry_k210.asm"));
 global_asm!(include_str!("boot/trap.asm"));
+
+pub fn get_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        asm!("mv $0, sp" : "=r"(sp));
+    }
+    sp
+}
+
+pub fn set_sp(sp: usize) {
+    unsafe {
+        asm!("mv sp, $0" :: "r" (sp) : "memory");
+    }
+}

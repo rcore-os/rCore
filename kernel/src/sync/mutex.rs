@@ -34,6 +34,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use rcore_thread::std_thread::yield_now;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
@@ -142,6 +143,16 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
         MutexGuard {
             mutex: self,
             support_guard,
+        }
+    }
+
+    /// lock using busy waiting
+    pub fn busy_lock(&self) -> MutexGuard<T, S> {
+        loop {
+            if let Some(x) = self.try_lock() {
+                break x;
+            }
+            yield_now();
         }
     }
 

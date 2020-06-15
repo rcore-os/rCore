@@ -15,6 +15,7 @@ pub mod ipi;
 pub mod memory;
 pub mod paging;
 pub mod rand;
+pub mod signal;
 pub mod syscall;
 pub mod timer;
 
@@ -91,4 +92,18 @@ fn other_start() -> ! {
     interrupt::fast_syscall::init();
     // call the first main function in kernel.
     crate::kmain();
+}
+
+pub fn get_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        asm!("mov %rsp, $0" : "=r"(sp));
+    }
+    sp
+}
+
+pub fn set_sp(sp: usize) {
+    unsafe {
+        asm!("mov $0, %rsp" :: "r" (sp) : "memory");
+    }
 }

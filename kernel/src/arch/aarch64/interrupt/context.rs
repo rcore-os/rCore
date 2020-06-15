@@ -31,6 +31,7 @@ impl TrapFrame {
         tf.spsr = 0b1101_00_0101; // To EL 1, enable IRQ
         tf
     }
+
     pub fn new_user_thread(entry_addr: usize, sp: usize) -> Self {
         use core::mem::zeroed;
         let mut tf: Self = unsafe { zeroed() };
@@ -38,6 +39,10 @@ impl TrapFrame {
         tf.elr = entry_addr;
         tf.spsr = 0b1101_00_0000; // To EL 0, enable IRQ
         tf
+    }
+
+    pub fn get_sp(&self) -> usize {
+        self.sp
     }
 }
 
