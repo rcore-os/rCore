@@ -326,6 +326,7 @@ impl Syscall<'_> {
             #[cfg(not(target_arch = "mips"))]
             SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
             SYS_MSGGET => self.unimplemented("msgget", Ok(0)),
+            #[cfg(target_arch = "mips")]
             SYS_SHMGET => self.unimplemented("shmget", Ok(0)),
 
             // shm
