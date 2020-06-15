@@ -12,6 +12,7 @@
 #![deny(stable_features)]
 #![deny(unused_unsafe)]
 #![deny(ellipsis_inclusive_range_patterns)]
+#![allow(warnings)]
 #![no_std]
 
 // just keep it ...
@@ -26,9 +27,8 @@ extern crate rlibc;
 #[macro_use]
 extern crate num_derive;
 
-pub use crate::process::{new_kernel_context, processor};
+pub use crate::process::new_kernel_context;
 pub use buddy_system_allocator::LockedHeapWithRescue;
-pub use rcore_thread::std_thread as thread;
 
 #[macro_use] // print!
 pub mod logging;

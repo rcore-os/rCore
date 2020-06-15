@@ -4,19 +4,19 @@ use super::*;
 use crate::fs::FileLike;
 use crate::signal::{has_signal_to_do, send_signal, Signal};
 use crate::syscall::SysError::{EINTR, ESRCH};
-use alloc::sync::Weak;
 use alloc::boxed::Box;
+use alloc::sync::Weak;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
     pub fn sys_fork(&mut self) -> SysResult {
         //let new_thread = self.thread.fork(self.tf);
         let new_thread: Box<Thread> = todo!();
-        let pid = new_thread.proc.lock().pid.get();
-        let tid = thread_manager().add(new_thread);
-        thread_manager().detach(tid);
-        info!("fork: {} -> {}", self.process().pid, pid);
-        Ok(pid)
+        //let pid = new_thread.proc.lock().pid.get();
+        //let tid = thread_manager().add(new_thread);
+        //thread_manager().detach(tid);
+        //info!("fork: {} -> {}", self.process().pid, pid);
+        Ok(0)
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -59,6 +59,7 @@ impl Syscall<'_> {
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
         // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
         todo!();
+        /*
         //let mut new_thread = self
             //.thread
             //.clone(self.tf, newsp, newtls, child_tid as usize);
@@ -67,11 +68,15 @@ impl Syscall<'_> {
         }
         //let tid = thread_manager().add(new_thread);
         let tid: usize = todo!();
-        thread_manager().detach(tid);
-        info!("clone: {} -> {}", thread::current().id(), tid);
+        //thread_manager().detach(tid);
+        info!("clone: {} -> {}",
+        0,
+         //thread::current().id(),
+         tid);
         *parent_tid_ref = tid as u32;
         // *child_tid_ref = tid as u32;
         Ok(tid)
+        */
     }
 
     /// Wait for the process exit.
@@ -141,7 +146,8 @@ impl Syscall<'_> {
             }
             info!(
                 "wait: thread {} -> {:?}, sleep",
-                thread::current().id(),
+                //thread::current().id(),
+                0,
                 target
             );
             let condvar = proc.child_exit.clone();
@@ -188,10 +194,11 @@ impl Syscall<'_> {
 
         // Kill other threads
         proc.threads.retain(|&tid| {
-            if tid != thread::current().id() {
-                thread_manager().exit(tid, 1);
-            }
-            tid == thread::current().id()
+            //if tid != thread::current().id() {
+            //thread_manager().exit(tid, 1);
+            //}
+            //tid == thread::current().id()
+            tid == 0
         });
 
         // Read program file
@@ -235,12 +242,12 @@ impl Syscall<'_> {
         todo!();
         //*self.tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
 
-        info!("exec:END: path: {:?}", path);
+        //info!("exec:END: path: {:?}", path);
         Ok(0)
     }
 
     pub fn sys_yield(&mut self) -> SysResult {
-        thread::yield_now();
+        //thread::yield_now();
         Ok(0)
     }
 
@@ -290,7 +297,8 @@ impl Syscall<'_> {
     pub fn sys_gettid(&mut self) -> SysResult {
         info!("gettid");
         // use pid as tid for now
-        Ok(thread::current().id())
+        //Ok(thread::current().id())
+        Ok(0)
     }
 
     /// Get the parent process id
@@ -306,7 +314,8 @@ impl Syscall<'_> {
 
     /// Exit the current thread
     pub fn sys_exit(&mut self, exit_code: usize) -> ! {
-        let tid = thread::current().id();
+        //let tid = thread::current().id();
+        let tid = 0;
         info!("exit: {}, code: {}", tid, exit_code);
         let mut proc = self.process();
         proc.threads.retain(|&id| id != tid);
@@ -332,8 +341,8 @@ impl Syscall<'_> {
 
         drop(proc);
 
-        thread_manager().exit(tid, exit_code as usize);
-        thread::yield_now();
+        //thread_manager().exit(tid, exit_code as usize);
+        //thread::yield_now();
         unreachable!();
     }
 
@@ -344,7 +353,7 @@ impl Syscall<'_> {
 
         proc.exit(exit_code);
         drop(proc);
-        thread::yield_now();
+        //thread::yield_now();
         unreachable!();
     }
 
@@ -353,7 +362,7 @@ impl Syscall<'_> {
         info!("nanosleep: time: {:#?}", time);
         if !time.is_zero() {
             // TODO: handle spurious wakeup
-            thread::sleep(time.to_duration());
+            //thread::sleep(time.to_duration());
             if has_signal_to_do() {
                 return Err(EINTR);
             }
@@ -362,15 +371,16 @@ impl Syscall<'_> {
     }
 
     pub fn sys_set_priority(&mut self, priority: usize) -> SysResult {
-        let pid = thread::current().id();
-        thread_manager().set_priority(pid, priority as u8);
+        //let pid = thread::current().id();
+        //thread_manager().set_priority(pid, priority as u8);
         Ok(0)
     }
 
     pub fn sys_set_tid_address(&mut self, tidptr: *mut u32) -> SysResult {
         info!("set_tid_address: {:?}", tidptr);
-        self.thread.clear_child_tid = tidptr as usize;
-        Ok(thread::current().id())
+        //self.thread.clear_child_tid = tidptr as usize;
+        //Ok(thread::current().id())
+        Ok(0)
     }
 }
 

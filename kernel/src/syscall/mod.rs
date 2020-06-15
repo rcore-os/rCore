@@ -14,7 +14,6 @@ use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
-use crate::thread;
 use crate::util;
 
 pub use self::custom::*;
@@ -41,13 +40,12 @@ mod proc;
 mod signal;
 mod time;
 
-use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset, SignalUserContext};
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
-use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
-use trapframe::UserContext;
+use trapframe::{GeneralRegs, UserContext};
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -55,19 +53,26 @@ lazy_static! {
 }
 
 /// System call dispatcher
-pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
-    let thread = unsafe { current_thread() };
-    todo!();
-    //let mut syscall = Syscall { thread, tf };
-    //let ret = syscall.syscall(id, args);
-    //ret
-    0
+pub async fn handle_syscall(thread: &Arc<Thread>, regs: &mut GeneralRegs) -> bool {
+    let num = regs.rax;
+    let args = [regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9];
+    let mut syscall = Syscall {
+        thread,
+        regs,
+        exit: false,
+    };
+    let ret = syscall.syscall(num, args).await;
+    let exit = syscall.exit;
+    regs.rax = ret as usize;
+    exit
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
-    thread: &'a mut Thread,
-    tf: &'a mut UserContext,
+    pub thread: &'a Arc<Thread>,
+    pub regs: &'a mut GeneralRegs,
+    /// Set `true` to exit current task.
+    pub exit: bool,
 }
 
 impl Syscall<'_> {
@@ -86,12 +91,13 @@ impl Syscall<'_> {
     // This #[deny(unreachable_patterns)] checks if each match arm is defined
     // See discussion in https://github.com/oscourse-tsinghua/rcore_plus/commit/17e644e54e494835f1a49b34b80c2c4f15ed0dbe.
     #[deny(unreachable_patterns)]
-    fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
+    async fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
         #[cfg(feature = "profile")]
         let begin_time = unsafe { core::arch::x86_64::_rdtsc() };
         let cid = cpu::id();
         let pid = self.process().pid.clone();
-        let tid = thread::current().id();
+        //let tid = thread::current().id();
+        let tid = 0;
         if !pid.is_init() {
             // we trust pid 0 process
             debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
@@ -406,7 +412,8 @@ impl Syscall<'_> {
                     ret
                 } else {
                     error!("unknown syscall id: {}, args: {:x?}", id, args);
-                    crate::trap::error(self.tf);
+                    todo!()
+                    //crate::trap::error(self.tf);
                 }
             }
         };

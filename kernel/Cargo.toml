@@ -66,7 +66,6 @@ pci = { git = "https://github.com/rcore-os/pci-rs", rev = "a4e7cea6" }
 pc-keyboard = "0.5"
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
 rcore-memory = { path = "../crate/memory" }
-rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "e00f5ed" }
 rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
 rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }

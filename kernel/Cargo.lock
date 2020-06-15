@@ -155,11 +155,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deque"
-version = "0.3.2"
-source = "git+https://github.com/rcore-os/deque.git?branch=no_std#b13a836dd69ae82cc0b8d711c2990b9baf5170d1"
-
-[[package]]
 name = "device_tree"
 version = "1.0.3"
 source = "git+https://github.com/rcore-os/device_tree-rs?rev=2fa8411c#2fa8411c421c6b4761992fd3d1a9b2427bf0cfc4"
@@ -471,7 +466,6 @@ dependencies = [
  "rcore-fs-ramfs",
  "rcore-fs-sfs",
  "rcore-memory",
- "rcore-thread",
  "riscv 0.5.0",
  "rlibc",
  "smoltcp",
@@ -552,16 +546,6 @@ name = "rcore-memory"
 version = "0.1.0"
 dependencies = [
  "log",
-]
-
-[[package]]
-name = "rcore-thread"
-version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-thread?rev=e00f5ed#e00f5ed11479e5436470497ec9ce49510fee94e1"
-dependencies = [
- "deque",
- "log",
- "spin",
 ]
 
 [[package]]

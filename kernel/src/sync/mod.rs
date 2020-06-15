@@ -54,4 +54,3 @@ pub use self::semaphore::*;
 mod condvar;
 mod mutex;
 mod semaphore;
-pub mod test;

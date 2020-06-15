@@ -9,7 +9,6 @@ use super::tty::TTY;
 use crate::fs::devfs::foreground_pgid;
 use crate::fs::ioctl::*;
 use crate::process::process_group;
-use crate::processor;
 use crate::signal::{send_signal, Siginfo, Signal, SI_KERNEL};
 use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;

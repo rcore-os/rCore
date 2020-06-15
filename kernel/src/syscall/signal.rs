@@ -1,4 +1,4 @@
-use crate::process::{current_thread, process_of, thread_manager, PROCESSES};
+use crate::process::{current_thread, process_of, PROCESSES};
 use crate::process::{process, process_group};
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
@@ -52,11 +52,13 @@ impl Syscall<'_> {
         //let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
         let frame: SignalFrame = todo!();
         // frame.info.signo
+        /*
         {
             let mut process = self.process();
             process.sigaltstack.flags ^=
                 process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
         }
+        */
 
         // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
         todo!();
@@ -82,7 +84,7 @@ impl Syscall<'_> {
         self.tf.general.rsp = mc.rsp;
         */
 
-        let ret = self.tf.general.rax as isize;
+        let ret = self.regs.rax as isize;
         if ret >= 0 {
             Ok(ret as usize)
         } else {
@@ -113,12 +115,14 @@ impl Syscall<'_> {
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
+            /*
             match how {
                 BLOCK => self.thread.sig_mask.add_set(set),
                 UNBLOCK => self.thread.sig_mask.remove_set(set),
                 SETMASK => self.thread.sig_mask = *set,
                 _ => return Err(EINVAL),
             }
+            */
         }
         return Ok(0);
     }

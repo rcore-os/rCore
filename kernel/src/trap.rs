@@ -3,10 +3,8 @@ use crate::arch::interrupt::{syscall, TrapFrame};
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
 use crate::{signal::SignalUserContext, sync::Condvar};
-use rcore_thread::std_thread as thread;
-use rcore_thread::std_thread::current;
-use naive_timer::Timer;
 use core::time::Duration;
+use naive_timer::Timer;
 use spin::Mutex;
 use trapframe::UserContext;
 
@@ -36,7 +34,7 @@ pub fn error(tf: &UserContext) -> ! {
         let mut proc = current_thread().proc.lock();
         proc.exit(0x100);
     }
-    thread::yield_now();
+    //thread::yield_now();
     unreachable!();
 }
 

@@ -7,7 +7,6 @@ use core::fmt;
 use core::str;
 use log::*;
 use rcore_memory::{Page, PAGE_SIZE};
-use rcore_thread::Tid;
 use spin::RwLock;
 use xmas_elf::{
     header,
@@ -16,27 +15,40 @@ use xmas_elf::{
 };
 
 use crate::arch::interrupt::TrapFrame;
-use trapframe::UserContext;
+use crate::arch::paging::*;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
     ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
+use trapframe::UserContext;
 
 use super::abi::{self, ProcInitInfo};
-use crate::process::thread_manager;
-use crate::signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset};
+use crate::{
+    signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
+    syscall::handle_syscall,
+};
 use bitflags::_core::cell::Ref;
-use core::mem::MaybeUninit;
+use core::{
+    future::Future,
+    mem::MaybeUninit,
+    pin::Pin,
+    task::{Context, Poll},
+};
 use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
-use rcore_thread::std_thread::yield_now;
+use x86_64::{
+    registers::control::{Cr3, Cr3Flags},
+    structures::paging::PhysFrame,
+    PhysAddr,
+};
 
 #[allow(dead_code)]
 pub struct Thread {
     context: UserContext,
     kstack: KernelStack,
+    pub id: usize,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
@@ -47,7 +59,7 @@ pub struct Thread {
     // set tf every time enter trap to access current trap frame everywhere when the thread is in the kernel
     // using pointer to circumvent lifetime check, probably safe（确信）
     // TODO: better implementation?
-    pub tf: *mut TrapFrame,
+    //pub tf: TrapFrame,
 }
 
 /// Pid type
@@ -73,6 +85,8 @@ impl fmt::Display for Pid {
         write!(f, "{}", self.0)
     }
 }
+
+type Tid = usize;
 
 pub struct Process {
     // resources
@@ -132,22 +146,6 @@ pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
         .collect::<Vec<_>>()
 }
 
-/// Let `rcore_thread` can switch between our `Thread`
-impl rcore_thread::Context for Thread {
-    unsafe fn switch_to(&mut self, target: &mut dyn rcore_thread::Context) {
-        use core::mem::transmute;
-        let (target, _): (&mut Thread, *const ()) = transmute(target);
-        todo!();
-        //self.context.switch(&mut target.context);
-    }
-
-    fn set_tid(&mut self, tid: Tid) {
-        let mut proc = self.proc.lock();
-        // add it to threads
-        proc.threads.push(tid);
-    }
-}
-
 impl Thread {
     /// Make a struct for the init thread
     pub unsafe fn new_init() -> Box<Thread> {
@@ -166,6 +164,7 @@ impl Thread {
         let vm = Arc::new(Mutex::new(vm));
         let kstack = KernelStack::new();
         Box::new(Thread {
+            id: 0,
             //context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm_token) },
             context: todo!(),
             kstack,
@@ -193,7 +192,6 @@ impl Thread {
             }
             .add_to_table(),
             sig_mask: Sigset::empty(),
-            tf: 0 as _,
         })
     }
 
@@ -308,7 +306,7 @@ impl Thread {
         exec_path: &str,
         args: Vec<String>,
         envs: Vec<String>,
-    ) -> Box<Thread> {
+    ) -> Arc<Thread> {
         let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();
 
         let vm_token = vm.token();
@@ -362,11 +360,13 @@ impl Thread {
             )),
         );
 
-        Box::new(Thread {
-            //context: unsafe {
-                //Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm_token)
-            //},
-            context: todo!(),
+        let mut context = UserContext::default();
+        context.general.rip = entry_addr;
+        context.general.rsp = ustack_top;
+
+        Arc::new(Thread {
+            id: 0,
+            context,
             kstack,
             clear_child_tid: 0,
             vm: vm.clone(),
@@ -391,7 +391,6 @@ impl Thread {
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
-            tf: 0 as _,
         })
     }
 
@@ -435,13 +434,13 @@ impl Thread {
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
         Box::new(Thread {
+            id: 0,
             context,
             kstack,
             clear_child_tid: 0,
             vm,
             proc: new_proc,
             sig_mask: self.sig_mask,
-            tf: 0 as _,
         })
     }
 
@@ -456,6 +455,7 @@ impl Thread {
         let kstack = KernelStack::new();
         let vm_token = self.vm.lock().token();
         Box::new(Thread {
+            id: 0,
             //context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), vm_token, tls) },
             context: todo!(),
             kstack,
@@ -463,7 +463,6 @@ impl Thread {
             vm: self.vm.clone(),
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,
-            tf: 0 as _,
         })
     }
 }
@@ -528,7 +527,7 @@ impl Process {
         // quit all threads
         // this must be after setting the value of subprocess, or the threads will be treated exit before actually exits
         for tid in self.threads.iter() {
-            thread_manager().exit(*tid, 1);
+            //thread_manager().exit(*tid, 1);
         }
         self.threads.clear();
 
@@ -675,5 +674,50 @@ pub struct INodeForMap(pub Arc<dyn INode>);
 impl Read for INodeForMap {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         self.0.read_at(offset, buf).unwrap()
+    }
+}
+
+pub fn spawn(thread: Arc<Thread>) {
+    let vmtoken = thread.vm.lock().token();
+    let future = async move {
+        loop {
+            let mut cx = thread.context;
+            trace!("go to user: {:#x?}", cx);
+            cx.run();
+            trace!("back from user: {:#x?}", cx);
+            //assert_eq!(cx.trap_num, 0x100, "user interrupt still no support");
+            let exit = handle_syscall(&thread, &mut cx.general).await;
+            //thread.end_running(cx);
+            //if exit {
+            //break;
+            //}
+        }
+    };
+
+    spawn_thread(Box::pin(future), vmtoken);
+}
+
+pub fn spawn_thread(future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>, vmtoken: usize) {
+    executor::spawn(PageTableSwitchWrapper {
+        inner: Mutex::new(future),
+        vmtoken,
+    });
+}
+
+struct PageTableSwitchWrapper {
+    inner: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    vmtoken: usize,
+}
+
+impl Future for PageTableSwitchWrapper {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        unsafe {
+            Cr3::write(
+                PhysFrame::containing_address(PhysAddr::new(self.vmtoken as u64)),
+                Cr3Flags::empty(),
+            );
+        }
+        self.inner.lock().as_mut().poll(cx)
     }
 }

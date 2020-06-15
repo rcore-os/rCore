@@ -1,6 +1,7 @@
 //! Kernel shell
 
 use crate::fs::ROOT_INODE;
+use crate::process::structs::spawn;
 use crate::process::*;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -25,20 +26,24 @@ pub fn add_user_shell() {
     let init_shell = "/rust/sh";
 
     #[cfg(target_arch = "x86_64")]
-    let init_envs =
+    let init_envs: Vec<String> =
         vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/x86_64-alpine-linux-musl/bin".into()];
 
     #[cfg(not(target_arch = "x86_64"))]
     let init_envs = Vec::new();
 
-    let init_args = vec!["busybox".into(), "ash".into()];
+    let init_args: Vec<String> = vec!["busybox".into(), "ash".into()];
 
     if let Ok(inode) = ROOT_INODE.lookup(init_shell) {
-        processor()
-            .manager()
-            .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
+        let thread = Thread::new_user(&inode, init_shell, init_args, init_envs);
+        spawn(thread);
+    /*
+    processor()
+        .manager()
+        .add(Thread::new_user(&inode, init_shell, init_args, init_envs));
+        */
     } else {
-        thread_manager().add(Thread::new_kernel(shell, 0));
+        //thread_manager().add(Thread::new_kernel(shell, 0));
     }
 }
 
@@ -68,13 +73,15 @@ pub extern "C" fn shell(_arg: usize) -> ! {
         }
         let name = cmd.trim().split(' ').next().unwrap();
         if let Ok(inode) = ROOT_INODE.lookup(name) {
+            /*
             let _tid = thread_manager().add(Thread::new_user(
                 &inode,
                 &cmd,
                 cmd.split(' ').map(|s| s.into()).collect(),
                 Vec::new(),
             ));
-        // TODO: wait until process exits, or use user land shell completely
+            */
+            // TODO: wait until process exits, or use user land shell completely
         } else {
             println!("Program not exist");
         }

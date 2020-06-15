@@ -3,9 +3,9 @@ pub mod fast_syscall;
 mod handler;
 
 pub use self::handler::*;
-pub use trapframe::TrapFrame;
 use crate::memory::phys_to_virt;
 use apic::*;
+pub use trapframe::TrapFrame;
 
 #[inline(always)]
 pub unsafe fn enable() {

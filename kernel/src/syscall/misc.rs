@@ -15,7 +15,7 @@ impl Syscall<'_> {
         match code {
             ARCH_SET_FS => {
                 info!("sys_arch_prctl: set FSBASE to {:#x}", addr);
-                self.tf.general.fsbase = addr;
+                self.regs.fsbase = addr;
                 Ok(0)
             }
             _ => Err(SysError::EINVAL),
@@ -70,7 +70,8 @@ impl Syscall<'_> {
     ) -> SysResult {
         info!(
             "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
-            thread::current().id(),
+            0,
+            //thread::current().id(),
             uaddr,
             op,
             val,

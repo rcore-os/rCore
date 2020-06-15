@@ -4,11 +4,9 @@ use rcore_fs::vfs::*;
 pub use super::{STDIN, STDOUT};
 use crate::fs::ioctl::*;
 use crate::process::current_thread;
-use crate::processor;
 use crate::syscall::SysError;
 use alloc::sync::Arc;
 use rcore_fs::vfs::FsError::NotSupported;
-use rcore_thread::std_thread::current;
 use spin::RwLock;
 
 // Ref: [https://linux.die.net/man/4/tty]

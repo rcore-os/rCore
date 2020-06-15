@@ -3,7 +3,6 @@ use core::fmt;
 use lazy_static::lazy_static;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
-use crate::processor;
 use crate::sync::SpinNoIrqLock as Mutex;
 
 lazy_static! {
@@ -66,6 +65,7 @@ impl Log for SimpleLogger {
             return;
         }
 
+        /*
         if let Some(tid) = processor().tid_option() {
             print_in_color(
                 format_args!(
@@ -78,16 +78,17 @@ impl Log for SimpleLogger {
                 level_to_color_code(record.level()),
             );
         } else {
-            print_in_color(
-                format_args!(
-                    "[{:>5}][{},-] {}\n",
-                    record.level(),
-                    crate::arch::cpu::id(),
-                    record.args()
-                ),
-                level_to_color_code(record.level()),
-            );
-        }
+            */
+        print_in_color(
+            format_args!(
+                "[{:>5}][{},-] {}\n",
+                record.level(),
+                crate::arch::cpu::id(),
+                record.args()
+            ),
+            level_to_color_code(record.level()),
+        );
+        //}
     }
     fn flush(&self) {}
 }

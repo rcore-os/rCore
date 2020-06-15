@@ -3,7 +3,6 @@
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
 use crate::syscall::{MmapProt, SysResult, TimeSpec};
-use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
@@ -16,7 +15,6 @@ use crate::signal::{do_signal, has_signal_to_do};
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
-use rcore_thread::std_thread::current;
 use spin::RwLock;
 
 enum Flock {
@@ -128,7 +126,7 @@ impl FileHandle {
                         if has_signal_to_do() {
                             return Err(Interrupted);
                         }
-                        thread::yield_now();
+                        //thread::yield_now();
                     }
                     Err(err) => {
                         return Err(err);

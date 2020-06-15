@@ -1,4 +1,4 @@
-use crate::process::{current_thread, process, process_of, thread_manager, Process};
+use crate::process::{current_thread, process, process_of, Process};
 use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
 use bitflags::*;
@@ -10,7 +10,6 @@ pub use self::action::*;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::signal::MachineContext;
 use crate::arch::syscall::SYS_RT_SIGRETURN;
-use rcore_thread::std_thread::{current, yield_now};
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -103,12 +102,12 @@ pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
         info!("send {:?} to process {}", signal, process.pid.get());
         for &tid in process.threads.iter() {
             // TODO: check mask here
-            thread_manager().wakeup(tid);
+            //thread_manager().wakeup(tid);
         }
     } else {
         info!("send {:?} to thread {}", signal, tid);
         // TODO: check mask here
-        thread_manager().wakeup(tid as usize);
+        //thread_manager().wakeup(tid as usize);
     }
 }
 
@@ -130,7 +129,7 @@ pub struct SignalFrame {
     pub tf: TrapFrame,
     pub info: Siginfo,
     pub ucontext: SignalUserContext, // adapt interface, a little bit waste
-    pub ret_code: [u8; 7],     // call sys_sigreturn
+    pub ret_code: [u8; 7],           // call sys_sigreturn
 }
 
 pub fn has_signal_to_do() -> bool {
@@ -143,7 +142,8 @@ pub fn has_signal_to_do() -> bool {
             .iter()
             .find(|(info, tid)| {
                 let tid = *tid;
-                (tid == -1 || tid as usize == current().id())
+                tid == -1
+                //(tid == -1 || tid as usize == current().id())
                     && !thread
                         .sig_mask
                         .contains(FromPrimitive::from_i32(info.signo).unwrap())
@@ -161,7 +161,8 @@ pub fn do_signal(tf: &mut TrapFrame) {
             .iter()
             .enumerate()
             .find_map(|(idx, &(info, tid))| {
-                if (tid == -1 || tid as usize == current().id())
+                //if (tid == -1 || tid as usize == current().id())
+                if tid == -1
                     && !thread
                         .sig_mask
                         .contains(FromPrimitive::from_i32(info.signo).unwrap())
@@ -193,7 +194,7 @@ pub fn do_signal(tf: &mut TrapFrame) {
                         info!("default action: Term");
                         // FIXME: exit code ref please?
                         process.exit(info.signo as usize + 128);
-                        yield_now();
+                        //yield_now();
                         unreachable!()
                     }
                     _ => (),

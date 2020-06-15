@@ -24,7 +24,6 @@ use crate::process::Process;
 use crate::signal::has_signal_to_do;
 use crate::syscall::SysError::{EINTR, EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
-use rcore_thread::std_thread::current;
 
 impl Syscall<'_> {
     pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
@@ -384,20 +383,28 @@ impl Syscall<'_> {
                         FileLike::File(_file) => {
                             &crate::fs::STDIN.pushed.register_epoll_list(
                                 self.thread.proc.clone(),
-                                thread::current().id(),
+                                0,
+                                //thread::current().id(),
                                 epfd,
                                 *fd,
                             );
-                            callbacks.push((0, thread::current().id(), epfd, *fd));
+                            callbacks.push((
+                                0, 0, // thread::current().id(),
+                                epfd, *fd,
+                            ));
                         }
                         FileLike::Socket(_socket) => {
                             &(*crate::drivers::SOCKET_ACTIVITY).register_epoll_list(
                                 self.thread.proc.clone(),
-                                thread::current().id(),
+                                0,
+                                //thread::current().id(),
                                 epfd,
                                 *fd,
                             );
-                            callbacks.push((1, thread::current().id(), epfd, *fd));
+                            callbacks.push((
+                                1, 0, //thread::current().id(),
+                                epfd, *fd,
+                            ));
                         }
                         FileLike::EpollInstance(_) => {
                             return Err(SysError::EINVAL);

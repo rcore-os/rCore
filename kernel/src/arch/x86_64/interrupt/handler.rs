@@ -68,7 +68,6 @@ use super::consts::*;
 use super::TrapFrame;
 use crate::drivers::IRQ_MANAGER;
 use crate::process::current_thread;
-use crate::processor;
 use crate::signal::do_signal;
 use bitflags::*;
 use log::*;
@@ -85,11 +84,11 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         tf.trap_num,
         super::super::cpu::id()
     );
-    if processor().tid_option().is_some() {
-        unsafe {
-            current_thread().tf = tf as *mut TrapFrame;
-        }
-    }
+    //if processor().tid_option().is_some() {
+    //unsafe {
+    //current_thread().tf = tf as *mut TrapFrame;
+    //}
+    //}
     // Dispatch
     match tf.trap_num as u8 {
         Breakpoint => breakpoint(),
@@ -215,15 +214,15 @@ fn ide() {
 #[no_mangle]
 pub extern "C" fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
-    tf.rax = ret as usize;
+    //let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
+    //tf.rax = ret as usize;
     do_signal(tf);
 }
 
 fn syscall32(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    let ret = crate::syscall::syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
-    tf.rax = ret as usize;
+    //let ret = crate::syscall::syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
+    //tf.rax = ret as usize;
 }
 
 /// Support `syscall` instruction
