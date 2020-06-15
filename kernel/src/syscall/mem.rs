@@ -1,5 +1,5 @@
-use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
 use rcore_fs::vfs::MMapArea;
+use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::PAGE_SIZE;
 
