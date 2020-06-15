@@ -145,7 +145,7 @@ impl Context {
     #[inline(never)]
     pub unsafe extern "C" fn switch(&mut self, _target: &mut Self) {
         #[cfg(target_arch = "riscv32")]
-        asm!(
+        llvm_asm!(
             r"
         .equ XLENB, 4
         .macro Load reg, mem
@@ -156,7 +156,7 @@ impl Context {
         .endm"
         );
         #[cfg(target_arch = "riscv64")]
-        asm!(
+        llvm_asm!(
             r"
         .equ XLENB, 8
         .macro Load reg, mem
@@ -166,7 +166,7 @@ impl Context {
             sd \reg, \mem
         .endm"
         );
-        asm!("
+        llvm_asm!("
         // save from's registers
         addi  sp, sp, (-XLENB*14)
         Store sp, 0(a0)

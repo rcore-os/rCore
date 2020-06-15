@@ -269,11 +269,11 @@ impl MutexSupport for Spin {
     fn cpu_relax(&self) {
         unsafe {
             #[cfg(target_arch = "x86_64")]
-            asm!("pause" :::: "volatile");
+            llvm_asm!("pause" :::: "volatile");
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
-            asm!("nop" :::: "volatile");
+            llvm_asm!("nop" :::: "volatile");
             #[cfg(target_arch = "aarch64")]
-            asm!("yield" :::: "volatile");
+            llvm_asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {}
@@ -307,11 +307,11 @@ impl MutexSupport for SpinNoIrq {
     fn cpu_relax(&self) {
         unsafe {
             #[cfg(target_arch = "x86_64")]
-            asm!("pause" :::: "volatile");
+            llvm_asm!("pause" :::: "volatile");
             #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
-            asm!("nop" :::: "volatile");
+            llvm_asm!("nop" :::: "volatile");
             #[cfg(target_arch = "aarch64")]
-            asm!("yield" :::: "volatile");
+            llvm_asm!("yield" :::: "volatile");
         }
     }
     fn before_lock() -> Self::GuardData {

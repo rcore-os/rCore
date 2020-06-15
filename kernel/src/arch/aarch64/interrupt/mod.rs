@@ -20,13 +20,13 @@ pub fn init() {
 /// Enable the interrupt (only IRQ).
 #[inline(always)]
 pub unsafe fn enable() {
-    asm!("msr daifclr, #2");
+    llvm_asm!("msr daifclr, #2");
 }
 
 /// Disable the interrupt (only IRQ).
 #[inline(always)]
 pub unsafe fn disable() {
-    asm!("msr daifset, #2");
+    llvm_asm!("msr daifset, #2");
 }
 
 /// Disable the interrupt and store the status.

@@ -124,13 +124,13 @@ global_asm!(include_str!("boot/trap.asm"));
 pub fn get_sp() -> usize {
     let sp: usize;
     unsafe {
-        asm!("mv $0, sp" : "=r"(sp));
+        llvm_asm!("mv $0, sp" : "=r"(sp));
     }
     sp
 }
 
 pub fn set_sp(sp: usize) {
     unsafe {
-        asm!("mv sp, $0" :: "r" (sp) : "memory");
+        llvm_asm!("mv sp, $0" :: "r" (sp) : "memory");
     }
 }

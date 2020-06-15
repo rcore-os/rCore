@@ -43,10 +43,10 @@ pub fn init() {
     // enable FPU, the manual Volume 3 Chapter 13
     let mut value: u64;
     unsafe {
-        asm!("mov %cr4, $0" : "=r" (value));
+        llvm_asm!("mov %cr4, $0" : "=r" (value));
         // OSFXSR | OSXMMEXCPT
         value |= 1 << 9 | 1 << 10;
-        asm!("mov $0, %cr4" :: "r" (value) : "memory");
+        llvm_asm!("mov $0, %cr4" :: "r" (value) : "memory");
         Cr0::update(|cr0| {
             cr0.remove(Cr0Flags::EMULATE_COPROCESSOR);
             cr0.insert(Cr0Flags::MONITOR_COPROCESSOR);

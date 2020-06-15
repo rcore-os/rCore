@@ -80,7 +80,7 @@ pc-keyboard = "0.5"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rboot = { path = "../rboot", default-features = false }
 apic = { git = "https://github.com/rcore-os/apic-rs" }
-x86_64 = "0.7"
+x86_64 = "0.11"
 raw-cpuid = "7.0"
 uart_16550 = "0.2"
 acpi = "0.4"

@@ -252,13 +252,13 @@ impl PageTableExt for PageTableImpl {
     }
 
     unsafe fn set_token(token: usize) {
-        asm!("csrw satp, $0" :: "r"(token) :: "volatile");
+        llvm_asm!("csrw satp, $0" :: "r"(token) :: "volatile");
     }
 
     fn active_token() -> usize {
         let mut token;
         unsafe {
-            asm!("csrr $0, satp" : "=r"(token) ::: "volatile");
+            llvm_asm!("csrr $0, satp" : "=r"(token) ::: "volatile");
         }
         token
     }

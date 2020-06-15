@@ -21,13 +21,13 @@ pub unsafe fn disable() {
 #[inline(always)]
 pub unsafe fn disable_and_store() -> usize {
     let r: usize;
-    asm!("pushfq; popq $0; cli" : "=r"(r) :: "memory");
+    llvm_asm!("pushfq; popq $0; cli" : "=r"(r) :: "memory");
     r
 }
 
 #[inline(always)]
 pub unsafe fn restore(flags: usize) {
-    asm!("pushq $0; popfq" :: "r"(flags) : "memory" "flags");
+    llvm_asm!("pushq $0; popfq" :: "r"(flags) : "memory" "flags");
 }
 
 #[inline(always)]

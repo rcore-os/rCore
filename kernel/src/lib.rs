@@ -1,7 +1,7 @@
 #![feature(lang_items)]
 #![feature(naked_functions)]
 #![feature(untagged_unions)]
-#![feature(asm)]
+#![feature(llvm_asm)]
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]

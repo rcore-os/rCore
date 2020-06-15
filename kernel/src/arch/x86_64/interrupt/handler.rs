@@ -141,7 +141,7 @@ fn double_fault(tf: &TrapFrame) {
 fn page_fault(tf: &mut TrapFrame) {
     let addr: usize;
     unsafe {
-        asm!("mov %cr2, $0" : "=r" (addr));
+        llvm_asm!("mov %cr2, $0" : "=r" (addr));
     }
 
     bitflags! {
