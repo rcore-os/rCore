@@ -8,14 +8,6 @@ use rcore_thread::std_thread::current;
 
 pub static mut TICK: usize = 0;
 
-#[cfg(target_arch = "x86_64")]
-global_asm!(include_str!("fpe.S"));
-
-#[cfg(target_arch = "x86_64")]
-extern "C" {
-    fn fpe();
-}
-
 lazy_static! {
     pub static ref TICK_ACTIVITY: Condvar = Condvar::new();
 }
@@ -28,8 +20,6 @@ pub fn timer() {
     if cpu::id() == 0 {
         unsafe {
             TICK += 1;
-            #[cfg(target_arch = "x86_64")]
-            fpe();
             if uptime_msec() % INFORM_PER_MSEC == 0 {
                 TICK_ACTIVITY.notify_all();
             }

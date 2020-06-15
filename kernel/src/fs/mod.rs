@@ -97,8 +97,8 @@ lazy_static! {
         });
         let devfs = dev.mount(devfs).expect("failed to mount DevFS");
 
-        let shm = devfs.root_inode().find(true, "shm").expect("cannot find shm");
         // mount RamFS at /dev/shm
+        let shm = devfs.root_inode().find(true, "shm").expect("cannot find shm");
         let shmfs = RamFS::new();
         shm.mount(shmfs).expect("failed to mount /dev/shm");
 

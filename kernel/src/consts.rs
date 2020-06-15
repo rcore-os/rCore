@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 pub use crate::arch::consts::*;
-use alloc::string::String;
 
 pub const MAX_CPU_NUM: usize = 64;
 pub const MAX_PROCESS_NUM: usize = 512;

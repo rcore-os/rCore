@@ -1,12 +1,6 @@
-use crate::arch::get_sp;
 use crate::arch::signal::MachineContext;
-use crate::process::{current_thread, thread_manager};
-use crate::signal::*;
-use alloc::vec::Vec;
 use core::default::Default;
 use core::fmt;
-use num::FromPrimitive;
-use rcore_thread::std_thread::current;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -200,43 +194,27 @@ impl Context {
         push r13
         push r14
         push r15
-        "::::"intel" "volatile");
 
-        asm!("
         // save page table
         mov r15, cr3
-        push r15"::::"intel" "volatile"
-        );
+        push r15
 
-        asm!(
-        "
         // Switch stacks
         mov [rdi], rsp      // rdi = from_rsp
         mov rsp, [rsi]      // rsi = to_rsp
-        "::::"intel" "volatile");
 
-        asm!(
-        "
         // restore page table
         pop r15
         mov cr3, r15
-        "::::"intel" "volatile");
 
-        asm!("
         // restore old callee-save registers
         pop r15
-        ": : : : "intel" "volatile"
-        );
-        asm!("
         pop r14
         pop r13
-        pop r12": : : : "intel" "volatile");
-
-        asm!("
+        pop r12
         pop rbp
         pop rbx
         ": : : : "intel" "volatile");
-        // info!("wang!");
     }
 
     pub unsafe fn null() -> Self {

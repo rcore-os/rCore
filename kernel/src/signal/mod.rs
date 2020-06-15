@@ -10,10 +10,6 @@ pub use self::action::*;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::signal::MachineContext;
 use crate::arch::syscall::SYS_RT_SIGRETURN;
-use crate::arch::{get_sp, set_sp};
-use crate::processor;
-use crate::syscall::{SysError, SysResult};
-use alloc::vec::Vec;
 use rcore_thread::std_thread::{current, yield_now};
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]

@@ -8,17 +8,17 @@ use crate::syscall::SysError;
 use core::cell::Cell;
 use core::ops::Deref;
 
-struct SemaphoreInner {
-    pub count: isize,
-    pub pid: usize,
-    pub removed: bool,
-}
-
 /// A counting, blocking, semaphore.
 pub struct Semaphore {
     // value and removed
     lock: Mutex<SemaphoreInner>,
     cvar: Condvar,
+}
+
+struct SemaphoreInner {
+    count: isize,
+    pid: usize,
+    removed: bool,
 }
 
 /// An RAII guard which will release a resource acquired from a semaphore when

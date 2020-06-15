@@ -111,17 +111,11 @@ lazy_static! {
 
 /// return the process which thread tid is in
 pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
-    PROCESSES.read().iter().find_map(|(pid, weak)| {
-        if let Some(process) = weak.upgrade() {
-            if process.lock().threads.contains(&tid) {
-                Some(process)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    })
+    PROCESSES
+        .read()
+        .iter()
+        .filter_map(|(_, weak)| weak.upgrade())
+        .find(|proc| proc.lock().threads.contains(&tid))
 }
 
 pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
@@ -132,17 +126,8 @@ pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
         .iter()
-        .filter_map(|(pid, proc)| {
-            if let Some(proc) = proc.upgrade() {
-                if proc.lock().pgid == pgid {
-                    Some(proc)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
+        .filter_map(|(_, proc)| proc.upgrade())
+        .filter(|proc| proc.lock().pgid == pgid)
         .collect::<Vec<_>>()
 }
 

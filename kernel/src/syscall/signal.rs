@@ -1,11 +1,8 @@
-use crate::arch::interrupt::TrapFrame;
 use crate::process::{current_thread, process_of, thread_manager, PROCESSES};
 use crate::process::{process, process_group};
-use crate::signal::Signal::SIGINT;
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
-use crate::thread;
 use num::FromPrimitive;
 
 impl Syscall<'_> {
@@ -52,7 +49,7 @@ impl Syscall<'_> {
     pub fn sys_rt_sigreturn(&mut self) -> SysResult {
         info!("rt_sigreturn");
         // FIXME: adapt arch
-        let frame = unsafe { (&*((self.tf.get_sp() - 8) as *mut SignalFrame)) };
+        let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
         // frame.info.signo
         {
             let mut process = self.process();

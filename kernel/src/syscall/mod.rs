@@ -531,8 +531,6 @@ impl Syscall<'_> {
 
 pub type SysResult = Result<usize, SysError>;
 
-use num::FromPrimitive;
-
 #[allow(dead_code)]
 #[repr(isize)]
 #[derive(Debug, FromPrimitive)]

@@ -383,7 +383,7 @@ impl Syscall<'_> {
                     match file_like {
                         FileLike::File(_file) => {
                             &crate::fs::STDIN.pushed.register_epoll_list(
-                                unsafe { current_thread() }.proc.clone(),
+                                self.thread.proc.clone(),
                                 thread::current().id(),
                                 epfd,
                                 *fd,
@@ -392,7 +392,7 @@ impl Syscall<'_> {
                         }
                         FileLike::Socket(_socket) => {
                             &(*crate::drivers::SOCKET_ACTIVITY).register_epoll_list(
-                                unsafe { current_thread() }.proc.clone(),
+                                self.thread.proc.clone(),
                                 thread::current().id(),
                                 epfd,
                                 *fd,

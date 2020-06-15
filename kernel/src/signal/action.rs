@@ -7,13 +7,13 @@ pub const SIG_ERR: usize = usize::max_value() - 1;
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
 
-pub const SI_ASYNCNL: i32 = (-60);
-pub const SI_TKILL: i32 = (-6);
-pub const SI_SIGIO: i32 = (-5);
-pub const SI_ASYNCIO: i32 = (-4);
-pub const SI_MESGQ: i32 = (-3);
-pub const SI_TIMER: i32 = (-2);
-pub const SI_QUEUE: i32 = (-1);
+pub const SI_ASYNCNL: i32 = -60;
+pub const SI_TKILL: i32 = -6;
+pub const SI_SIGIO: i32 = -5;
+pub const SI_ASYNCIO: i32 = -4;
+pub const SI_MESGQ: i32 = -3;
+pub const SI_TIMER: i32 = -2;
+pub const SI_QUEUE: i32 = -1;
 pub const SI_USER: i32 = 0;
 pub const SI_KERNEL: i32 = 128;
 
