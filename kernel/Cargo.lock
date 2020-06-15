@@ -2,8 +2,8 @@
 # It is not intended for manual editing.
 [[package]]
 name = "aarch64"
-version = "3.0.0"
-source = "git+https://github.com/rcore-os/aarch64#fe633820b6866f5442be0ae6de7fd9182333a27a"
+version = "3.0.1"
+source = "git+https://github.com/rcore-os/aarch64#f8d9a77a59d00f125dc73f942149ab09d9180b1c"
 dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -60,7 +60,7 @@ name = "bcm2837"
 version = "2.5.1"
 source = "git+https://github.com/rcore-os/bcm2837#38794ed7b48bf75bf691b75e17fe57f77d2f3a4f"
 dependencies = [
- "aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 3.0.1 (git+https://github.com/rcore-os/aarch64)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -373,7 +373,7 @@ dependencies = [
 name = "rcore"
 version = "0.2.0"
 dependencies = [
- "aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)",
+ "aarch64 3.0.1 (git+https://github.com/rcore-os/aarch64)",
  "acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "apic 0.1.0 (git+https://github.com/rcore-os/apic-rs?rev=fb86bd7)",
@@ -730,7 +730,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum aarch64 3.0.0 (git+https://github.com/rcore-os/aarch64)" = "<none>"
+"checksum aarch64 3.0.1 (git+https://github.com/rcore-os/aarch64)" = "<none>"
 "checksum acpi 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2c18d706bdc322dd4f8f7930a5879ad8df3d78d4452a678d5419c72f9f69acea"
 "checksum aml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b7669e841017880c2710777c46ec654272163379bbe55de6e17a2a2388d44d92"
 "checksum apic 0.1.0 (git+https://github.com/rcore-os/apic-rs?rev=fb86bd7)" = "<none>"
