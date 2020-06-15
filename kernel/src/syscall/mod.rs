@@ -41,12 +41,13 @@ mod proc;
 mod signal;
 mod time;
 
-use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset};
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset, SignalUserContext};
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
 use rcore_thread::std_thread::yield_now;
 #[cfg(feature = "profile")]
 use spin::Mutex;
+use trapframe::UserContext;
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -56,15 +57,17 @@ lazy_static! {
 /// System call dispatcher
 pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
     let thread = unsafe { current_thread() };
-    let mut syscall = Syscall { thread, tf };
-    let ret = syscall.syscall(id, args);
-    ret
+    todo!();
+    //let mut syscall = Syscall { thread, tf };
+    //let ret = syscall.syscall(id, args);
+    //ret
+    0
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
     thread: &'a mut Thread,
-    tf: &'a mut TrapFrame,
+    tf: &'a mut UserContext,
 }
 
 impl Syscall<'_> {

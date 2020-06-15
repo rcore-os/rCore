@@ -74,12 +74,12 @@ use bitflags::*;
 use log::*;
 use x86_64::registers::control::Cr2;
 
-global_asm!(include_str!("trap.asm"));
-global_asm!(include_str!("vector.asm"));
+//global_asm!(include_str!("trap.asm"));
+//global_asm!(include_str!("vector.asm"));
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     trace!(
         "Interrupt: {:#x} @ CPU{}",
         tf.trap_num,
@@ -234,12 +234,14 @@ fn invalid_opcode(tf: &mut TrapFrame) {
         tf.rip += 2; // must before syscall
         syscall(tf);
     } else {
-        crate::trap::error(tf);
+        todo!()
+        //crate::trap::error(tf);
     }
 }
 
 fn error(tf: &TrapFrame) {
-    crate::trap::error(tf);
+    todo!()
+    //crate::trap::error(tf);
 }
 
 #[no_mangle]

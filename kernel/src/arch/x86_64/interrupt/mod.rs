@@ -1,10 +1,9 @@
 pub mod consts;
 pub mod fast_syscall;
 mod handler;
-mod trapframe;
 
 pub use self::handler::*;
-pub use self::trapframe::*;
+pub use trapframe::TrapFrame;
 use crate::memory::phys_to_virt;
 use apic::*;
 

@@ -114,7 +114,7 @@ pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
 
 #[repr(C)]
 #[derive(Clone)]
-pub struct UserContext {
+pub struct SignalUserContext {
     pub flags: usize,
     pub link: usize,
     pub stack: SignalStack,
@@ -129,7 +129,7 @@ pub struct SignalFrame {
     pub ret_code_addr: usize, // point to ret_code
     pub tf: TrapFrame,
     pub info: Siginfo,
-    pub ucontext: UserContext, // adapt interface, a little bit waste
+    pub ucontext: SignalUserContext, // adapt interface, a little bit waste
     pub ret_code: [u8; 7],     // call sys_sigreturn
 }
 
@@ -215,12 +215,13 @@ pub fn do_signal(tf: &mut TrapFrame) {
                     if action_flags.contains(SignalActionFlags::ONSTACK) {
                         let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
                         if stack_flags.contains(SignalStackFlags::DISABLE) {
-                            tf.get_sp()
+                            todo!()
                         } else {
                             stack.sp + stack.size
                         }
                     } else {
-                        tf.get_sp()
+                        todo!()
+                        //tf.get_sp()
                     }
                 } - core::mem::size_of::<SignalFrame>();
                 let frame = if let Ok(frame) = unsafe {
@@ -235,7 +236,7 @@ pub fn do_signal(tf: &mut TrapFrame) {
                 };
                 frame.tf = tf.clone();
                 frame.info = info;
-                frame.ucontext = UserContext {
+                frame.ucontext = SignalUserContext {
                     flags: 0,
                     link: 0,
                     stack,
@@ -266,7 +267,7 @@ pub fn do_signal(tf: &mut TrapFrame) {
                     tf.rdi = info.signo as usize;
                     tf.rsi = &frame.info as *const Siginfo as usize;
                     // TODO: complete context
-                    tf.rdx = &frame.ucontext as *const UserContext as usize;
+                    tf.rdx = &frame.ucontext as *const SignalUserContext as usize;
                 }
                 return;
             }

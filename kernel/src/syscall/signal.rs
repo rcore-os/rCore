@@ -49,7 +49,8 @@ impl Syscall<'_> {
     pub fn sys_rt_sigreturn(&mut self) -> SysResult {
         info!("rt_sigreturn");
         // FIXME: adapt arch
-        let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
+        //let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
+        let frame: SignalFrame = todo!();
         // frame.info.signo
         {
             let mut process = self.process();
@@ -58,27 +59,30 @@ impl Syscall<'_> {
         }
 
         // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
-        *self.tf = frame.tf.clone();
+        todo!();
+        //*self.tf = frame.tf.clone();
+        /*
         let mc = &frame.ucontext.mcontext;
-        self.tf.r15 = mc.r15;
-        self.tf.r14 = mc.r14;
-        self.tf.r13 = mc.r13;
-        self.tf.r12 = mc.r12;
-        self.tf.rbp = mc.rbp;
-        self.tf.rbx = mc.rbx;
-        self.tf.r11 = mc.r11;
-        self.tf.r10 = mc.r10;
-        self.tf.r9 = mc.r9;
-        self.tf.r8 = mc.r8;
-        self.tf.rsi = mc.rsi;
-        self.tf.rdi = mc.rdi;
-        self.tf.rdx = mc.rdx;
-        self.tf.rcx = mc.rcx;
-        self.tf.rax = mc.rax;
-        self.tf.rip = mc.rip;
-        self.tf.rsp = mc.rsp;
+        self.tf.general.r15 = mc.r15;
+        self.tf.general.r14 = mc.r14;
+        self.tf.general.r13 = mc.r13;
+        self.tf.general.r12 = mc.r12;
+        self.tf.general.rbp = mc.rbp;
+        self.tf.general.rbx = mc.rbx;
+        self.tf.general.r11 = mc.r11;
+        self.tf.general.r10 = mc.r10;
+        self.tf.general.r9 = mc.r9;
+        self.tf.general.r8 = mc.r8;
+        self.tf.general.rsi = mc.rsi;
+        self.tf.general.rdi = mc.rdi;
+        self.tf.general.rdx = mc.rdx;
+        self.tf.general.rcx = mc.rcx;
+        self.tf.general.rax = mc.rax;
+        self.tf.general.rip = mc.rip;
+        self.tf.general.rsp = mc.rsp;
+        */
 
-        let ret = self.tf.rax as isize;
+        let ret = self.tf.general.rax as isize;
         if ret >= 0 {
             Ok(ret as usize)
         } else {

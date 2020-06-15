@@ -2,12 +2,13 @@ use crate::arch::cpu;
 use crate::arch::interrupt::{syscall, TrapFrame};
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
-use crate::sync::Condvar;
+use crate::{signal::SignalUserContext, sync::Condvar};
 use rcore_thread::std_thread as thread;
 use rcore_thread::std_thread::current;
 use naive_timer::Timer;
 use core::time::Duration;
 use spin::Mutex;
+use trapframe::UserContext;
 
 pub static mut TICK: usize = 0;
 
@@ -29,7 +30,7 @@ pub fn timer() {
     NAIVE_TIMER.lock().expire(now);
 }
 
-pub fn error(tf: &TrapFrame) -> ! {
+pub fn error(tf: &UserContext) -> ! {
     error!("{:#x?}", tf);
     unsafe {
         let mut proc = current_thread().proc.lock();

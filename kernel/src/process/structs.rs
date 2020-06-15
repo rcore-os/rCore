@@ -15,7 +15,8 @@ use xmas_elf::{
     ElfFile,
 };
 
-use crate::arch::interrupt::{Context, TrapFrame};
+use crate::arch::interrupt::TrapFrame;
+use trapframe::UserContext;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
@@ -34,7 +35,7 @@ use rcore_thread::std_thread::yield_now;
 
 #[allow(dead_code)]
 pub struct Thread {
-    context: Context,
+    context: UserContext,
     kstack: KernelStack,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
@@ -136,7 +137,8 @@ impl rcore_thread::Context for Thread {
     unsafe fn switch_to(&mut self, target: &mut dyn rcore_thread::Context) {
         use core::mem::transmute;
         let (target, _): (&mut Thread, *const ()) = transmute(target);
-        self.context.switch(&mut target.context);
+        todo!();
+        //self.context.switch(&mut target.context);
     }
 
     fn set_tid(&mut self, tid: Tid) {
@@ -151,7 +153,7 @@ impl Thread {
     pub unsafe fn new_init() -> Box<Thread> {
         let zero = MaybeUninit::<Thread>::zeroed();
         Box::new(Thread {
-            context: Context::null(),
+            context: UserContext::default(),
             // safety: other fields will never be used
             ..zero.assume_init()
         })
@@ -164,7 +166,8 @@ impl Thread {
         let vm = Arc::new(Mutex::new(vm));
         let kstack = KernelStack::new();
         Box::new(Thread {
-            context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm_token) },
+            //context: unsafe { Context::new_kernel_thread(entry, arg, kstack.top(), vm_token) },
+            context: todo!(),
             kstack,
             clear_child_tid: 0,
             vm: vm.clone(),
@@ -360,9 +363,10 @@ impl Thread {
         );
 
         Box::new(Thread {
-            context: unsafe {
-                Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm_token)
-            },
+            //context: unsafe {
+                //Context::new_user_thread(entry_addr, ustack_top, kstack.top(), vm_token)
+            //},
+            context: todo!(),
             kstack,
             clear_child_tid: 0,
             vm: vm.clone(),
@@ -397,7 +401,8 @@ impl Thread {
         let vm = self.vm.lock().clone();
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));
-        let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
+        //let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
+        let context = todo!();
 
         let mut proc = self.proc.lock();
 
@@ -451,7 +456,8 @@ impl Thread {
         let kstack = KernelStack::new();
         let vm_token = self.vm.lock().token();
         Box::new(Thread {
-            context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), vm_token, tls) },
+            //context: unsafe { Context::new_clone(tf, stack_top, kstack.top(), vm_token, tls) },
+            context: todo!(),
             kstack,
             clear_child_tid,
             vm: self.vm.clone(),

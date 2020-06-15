@@ -5,11 +5,13 @@ use crate::fs::FileLike;
 use crate::signal::{has_signal_to_do, send_signal, Signal};
 use crate::syscall::SysError::{EINTR, ESRCH};
 use alloc::sync::Weak;
+use alloc::boxed::Box;
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
     pub fn sys_fork(&mut self) -> SysResult {
-        let new_thread = self.thread.fork(self.tf);
+        //let new_thread = self.thread.fork(self.tf);
+        let new_thread: Box<Thread> = todo!();
         let pid = new_thread.proc.lock().pid.get();
         let tid = thread_manager().add(new_thread);
         thread_manager().detach(tid);
@@ -56,13 +58,15 @@ impl Syscall<'_> {
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
         // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
-        let mut new_thread = self
-            .thread
-            .clone(self.tf, newsp, newtls, child_tid as usize);
+        todo!();
+        //let mut new_thread = self
+            //.thread
+            //.clone(self.tf, newsp, newtls, child_tid as usize);
         if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
-            new_thread.clear_child_tid = child_tid as usize;
+            //new_thread.clear_child_tid = child_tid as usize;
         }
-        let tid = thread_manager().add(new_thread);
+        //let tid = thread_manager().add(new_thread);
+        let tid: usize = todo!();
         thread_manager().detach(tid);
         info!("clone: {} -> {}", thread::current().id(), tid);
         *parent_tid_ref = tid as u32;
@@ -228,7 +232,8 @@ impl Syscall<'_> {
         drop(proc);
 
         // Modify the TrapFrame
-        *self.tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
+        todo!();
+        //*self.tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
 
         info!("exec:END: path: {:?}", path);
         Ok(0)
