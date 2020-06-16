@@ -99,12 +99,11 @@ impl Syscall<'_> {
         let begin_time = unsafe { core::arch::x86_64::_rdtsc() };
         let cid = cpu::id();
         let pid = self.process().pid.clone();
-        //let tid = thread::current().id();
-        let tid: usize = 0;
-        //if !pid.is_init() {
-        // we trust pid 0 process
-        debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
-        //}
+        let tid = self.thread.tid;
+        if !pid.is_init() {
+            // we trust pid 0 process
+            debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
+        }
 
         // use platform-specific syscal numbers
         // See https://filippo.io/linux-syscall-table/

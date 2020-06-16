@@ -329,10 +329,10 @@ impl Syscall<'_> {
     }
 
     /// Exit the current thread
-    pub fn sys_exit(&mut self, exit_code: usize) -> ! {
-        //let tid = thread::current().id();
-        let tid = 0;
+    pub fn sys_exit(&mut self, exit_code: usize) -> SysResult {
+        let tid = self.thread.tid;
         info!("exit: {}, code: {}", tid, exit_code);
+
         let mut proc = self.process();
         proc.threads.retain(|&id| id != tid);
 
@@ -356,10 +356,8 @@ impl Syscall<'_> {
         }
 
         drop(proc);
-
-        //thread_manager().exit(tid, exit_code as usize);
-        //thread::yield_now();
-        unreachable!();
+        self.exit = true;
+        Ok(0)
     }
 
     /// Exit the current thread group (i.e. process)
