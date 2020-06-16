@@ -73,9 +73,6 @@ use bitflags::*;
 use log::*;
 use x86_64::registers::control::Cr2;
 
-//global_asm!(include_str!("trap.asm"));
-//global_asm!(include_str!("vector.asm"));
-
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {

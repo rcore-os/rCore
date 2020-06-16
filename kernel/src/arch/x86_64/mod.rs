@@ -46,9 +46,6 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
         consts::PHYSICAL_MEMORY_OFFSET
     );
 
-    // setup fast syscall in x86_64
-    interrupt::fast_syscall::init();
-
     // Init physical memory management
     memory::init(boot_info);
 
@@ -57,19 +54,13 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
         trapframe::init();
     }
 
-    // Init GDT
-    //gdt::init();
-    // Init trap handling
-    // WARN: IDT must be initialized after GDT.
-    //       Because x86_64::IDT will use current CS segment in IDT entry.
-    //idt::init();
-    // Init virtual space
+    // init virtual space
     memory::init_kernel_kseg2_map();
-    // get local apic id of cpu
+    // init local apic
     cpu::init();
     // now we can start LKM.
     crate::lkm::manager::ModuleManager::init();
-    // Use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
+    // use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
     driver::init(boot_info);
     // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
     crate::drivers::init();
@@ -87,14 +78,12 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
 /// The entry point for other processors
 fn other_start() -> ! {
-    // init gdt
-    gdt::init();
     // init trap handling
-    idt::init();
+    unsafe {
+        trapframe::init();
+    }
     // init local apic
     cpu::init();
-    // setup fast syscall in x86_64
-    interrupt::fast_syscall::init();
     // call the first main function in kernel.
     crate::kmain();
 }

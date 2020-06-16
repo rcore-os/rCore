@@ -1,5 +1,4 @@
 pub mod consts;
-pub mod fast_syscall;
 mod handler;
 
 pub use self::handler::*;
