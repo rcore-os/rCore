@@ -220,6 +220,10 @@ impl FileHandle {
         self.inode.poll()
     }
 
+    pub async fn async_poll(&self) -> Result<PollStatus> {
+        self.inode.async_poll().await
+    }
+
     pub fn io_control(&self, cmd: u32, arg: usize) -> Result<usize> {
         self.inode.io_control(cmd, arg)
     }

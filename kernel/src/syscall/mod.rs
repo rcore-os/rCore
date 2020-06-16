@@ -27,6 +27,7 @@ pub use self::proc::*;
 #[cfg(target_arch = "x86_64")]
 pub use self::signal::*;
 pub use self::time::*;
+pub use self::user::*;
 
 mod custom;
 mod fs;
@@ -39,6 +40,7 @@ mod proc;
 #[cfg(target_arch = "x86_64")]
 mod signal;
 mod time;
+mod user;
 
 use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 #[cfg(feature = "profile")]
@@ -97,7 +99,7 @@ impl Syscall<'_> {
         let cid = cpu::id();
         let pid = self.process().pid.clone();
         //let tid = thread::current().id();
-        let tid = 0;
+        let tid: usize = 0;
         //if !pid.is_init() {
         // we trust pid 0 process
         debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
@@ -190,7 +192,12 @@ impl Syscall<'_> {
                 args[5] as *const u32,
             ),
             SYS_PPOLL => {
-                self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
+                self.sys_ppoll(
+                    UserInOutPtr::from(args[0]),
+                    args[1],
+                    UserInPtr::from(args[2]),
+                )
+                .await
             } // ignore sigmask
             SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
             SYS_EPOLL_CTL => {
@@ -402,7 +409,7 @@ impl Syscall<'_> {
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]
-                    () => self.x86_64_syscall(id, args),
+                    () => self.x86_64_syscall(id, args).await,
                     #[cfg(target_arch = "mips")]
                     () => self.mips_syscall(id, args),
                     #[cfg(all(not(target_arch = "x86_64"), not(target_arch = "mips")))]
@@ -499,12 +506,15 @@ impl Syscall<'_> {
     }
 
     #[cfg(target_arch = "x86_64")]
-    fn x86_64_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
+    async fn x86_64_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
         let ret = match id {
             SYS_OPEN => self.sys_open(args[0] as *const u8, args[1], args[2]),
             SYS_STAT => self.sys_stat(args[0] as *const u8, args[1] as *mut Stat),
             SYS_LSTAT => self.sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
-            SYS_POLL => self.sys_poll(args[0] as *mut PollFd, args[1], args[2]),
+            SYS_POLL => {
+                self.sys_poll(UserInOutPtr::from(args[0]), args[1], args[2])
+                    .await
+            }
             SYS_ACCESS => self.sys_access(args[0] as *const u8, args[1]),
             SYS_PIPE => self.sys_pipe(args[0] as *mut u32),
             SYS_SELECT => self.sys_select(

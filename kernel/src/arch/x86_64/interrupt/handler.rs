@@ -79,7 +79,7 @@ use x86_64::registers::control::Cr2;
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
-    info!(
+    trace!(
         "Interrupt: {:#x} @ CPU{}",
         tf.trap_num,
         super::super::cpu::id()

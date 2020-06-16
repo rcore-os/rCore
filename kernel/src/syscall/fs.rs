@@ -13,6 +13,10 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 use crate::trap::TICK_ACTIVITY;
+use alloc::boxed::Box;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
@@ -81,31 +85,33 @@ impl Syscall<'_> {
 
     /// sys_ppoll function is for handling the third argument of sys_poll.
 
-    pub fn sys_ppoll(
+    pub async fn sys_ppoll(
         &mut self,
-        ufds: *mut PollFd,
+        ufds: UserInOutPtr<PollFd>,
         nfds: usize,
-        timeout: *const TimeSpec,
+        timeout: UserInPtr<TimeSpec>,
     ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
-            info!(
-                "ppoll: ufds: {:#x}, nfds: {}, timeout: {:#x}",
-                ufds as usize, nfds, timeout as usize
-            );
+            info!("ppoll: nfds: {}", nfds);
         }
         let timeout_msecs = if timeout.is_null() {
             1 << 31 // infinity
         } else {
-            let timeout = unsafe { self.vm().check_read_ptr(timeout)? };
+            let timeout = timeout.read().unwrap();
             timeout.to_msec()
         };
         drop(proc);
 
-        self.sys_poll(ufds, nfds, timeout_msecs as usize)
+        self.sys_poll(ufds, nfds, timeout_msecs as usize).await
     }
 
-    pub fn sys_poll(&mut self, ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
+    pub async fn sys_poll(
+        &mut self,
+        ufds: UserInOutPtr<PollFd>,
+        nfds: usize,
+        timeout_msecs: usize,
+    ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
             // we trust pid 0 process
@@ -118,7 +124,7 @@ impl Syscall<'_> {
         // check whether the fds is valid and is owned by this process
         let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
 
-        let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
+        let polls = ufds.read_array(nfds).unwrap();
 
         if !proc.pid.is_init() {
             info!("poll: fds: {:?}", polls);
@@ -126,55 +132,62 @@ impl Syscall<'_> {
 
         drop(proc);
 
-        let begin_time_ms = crate::trap::uptime_msec();
-        Condvar::wait_events(condvars.as_slice(), move || {
-            if has_signal_to_do() {
-                return Some(Err(EINTR));
-            }
+        struct PollFuture<'a> {
+            polls: Vec<PollFd>,
+            syscall: &'a Syscall<'a>,
+        }
 
-            use PollEvents as PE;
-            let proc = self.process();
-            let mut events = 0;
+        impl<'a> Future for PollFuture<'a> {
+            type Output = SysResult;
 
-            // iterate each poll to check whether it is ready
-            for poll in polls.iter_mut() {
-                poll.revents = PE::empty();
-                if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
-                    let status = match file_like.poll() {
-                        Ok(ret) => ret,
-                        Err(err) => return Some(Err(err)),
-                    };
-                    if status.error {
-                        poll.revents |= PE::HUP;
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                use PollEvents as PE;
+                let proc = self.syscall.process();
+                let mut events = 0;
+
+                // iterate each poll to check whether it is ready
+                for poll in self.as_mut().polls.iter_mut() {
+                    poll.revents = PE::empty();
+                    if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
+                        let mut fut = Box::pin(file_like.async_poll());
+                        let status = match fut.as_mut().poll(cx) {
+                            Poll::Ready(Ok(ret)) => ret,
+                            Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                            Poll::Pending => continue,
+                        };
+                        if status.error {
+                            poll.revents |= PE::HUP;
+                            events += 1;
+                        }
+                        if status.read && poll.events.contains(PE::IN) {
+                            poll.revents |= PE::IN;
+                            events += 1;
+                        }
+                        if status.write && poll.events.contains(PE::OUT) {
+                            poll.revents |= PE::OUT;
+                            events += 1;
+                        }
+                    } else {
+                        poll.revents |= PE::ERR;
                         events += 1;
                     }
-                    if status.read && poll.events.contains(PE::IN) {
-                        poll.revents |= PE::IN;
-                        events += 1;
-                    }
-                    if status.write && poll.events.contains(PE::OUT) {
-                        poll.revents |= PE::OUT;
-                        events += 1;
-                    }
-                } else {
-                    poll.revents |= PE::ERR;
-                    events += 1;
                 }
-            }
-            drop(proc);
+                drop(proc);
 
-            // some event happens, so evoke the process
-            if events > 0 {
-                return Some(Ok(events));
-            }
+                // some event happens, so evoke the process
+                if events > 0 {
+                    return Poll::Ready(Ok(events));
+                }
 
-            let current_time_ms = crate::trap::uptime_msec();
-            // time runs out, so the evoke the process
-            if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
-                return Some(Ok(0));
+                return Poll::Pending;
             }
-            return None;
-        })
+        }
+
+        let future = PollFuture {
+            polls,
+            syscall: self,
+        };
+        future.await
     }
 
     pub fn sys_pselect6(

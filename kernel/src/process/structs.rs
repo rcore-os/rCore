@@ -369,7 +369,7 @@ impl Thread {
         Arc::new(Thread {
             id: 0,
             inner: Mutex::new(ThreadInner {
-                context: Some(Box::from(context))
+                context: Some(Box::from(context)),
             }),
             kstack,
             clear_child_tid: 0,

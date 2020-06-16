@@ -75,6 +75,19 @@ impl FileLike {
         };
         Ok(status)
     }
+    pub async fn async_poll(&self) -> Result<PollStatus, SysError> {
+        let status = match self {
+            FileLike::File(file) => file.async_poll().await?,
+            FileLike::Socket(socket) => {
+                let (read, write, error) = socket.poll();
+                PollStatus { read, write, error }
+            }
+            FileLike::EpollInstance(_) => {
+                return Err(SysError::ENOSYS);
+            }
+        };
+        Ok(status)
+    }
 }
 
 impl fmt::Debug for FileLike {

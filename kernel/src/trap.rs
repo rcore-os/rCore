@@ -23,7 +23,6 @@ lazy_static! {
 }
 
 pub fn timer() {
-    info!("timer");
     let now = crate::arch::timer::timer_now();
     NAIVE_TIMER.lock().expire(now);
 }
