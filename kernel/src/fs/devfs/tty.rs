@@ -3,7 +3,7 @@ use rcore_fs::vfs::*;
 
 pub use super::{STDIN, STDOUT};
 use crate::fs::ioctl::*;
-use crate::process::current_thread;
+use crate::process::{current_thread, Pgid};
 use crate::syscall::SysError;
 use alloc::sync::Arc;
 use rcore_fs::vfs::FsError::NotSupported;
@@ -12,14 +12,14 @@ use spin::RwLock;
 // Ref: [https://linux.die.net/man/4/tty]
 #[derive(Default)]
 pub struct TtyINode {
-    pub foreground_pgid: RwLock<i32>,
+    pub foreground_pgid: RwLock<Pgid>,
 }
 
 lazy_static! {
     pub static ref TTY: Arc<TtyINode> = Arc::new(TtyINode::default());
 }
 
-pub fn foreground_pgid() -> i32 {
+pub fn foreground_pgid() -> Pgid {
     *TTY.foreground_pgid.read()
 }
 

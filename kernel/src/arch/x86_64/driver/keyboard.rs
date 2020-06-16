@@ -1,6 +1,6 @@
+use crate::sync::SpinLock as Mutex;
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use spin::Mutex;
 use x86_64::instructions::port::Port;
 
 pub fn init() {

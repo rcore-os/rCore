@@ -90,7 +90,7 @@ pub fn spawn(thread: Arc<Thread>) {
     spawn_thread(Box::pin(future), vmtoken);
 }
 
-pub fn spawn_thread(future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>, vmtoken: usize) {
+fn spawn_thread(future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>, vmtoken: usize) {
     executor::spawn(PageTableSwitchWrapper {
         inner: Mutex::new(future),
         vmtoken,

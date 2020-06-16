@@ -1,4 +1,4 @@
-use spin::Mutex;
+use crate::sync::SpinNoIrqLock as Mutex;
 use uart_16550::SerialPort;
 
 use crate::arch::interrupt::{consts, enable_irq};

@@ -2,11 +2,11 @@ use crate::drivers::block::*;
 use crate::drivers::net::*;
 use crate::drivers::{Driver, DRIVERS, NET_DRIVERS};
 use crate::memory::phys_to_virt;
+use crate::sync::SpinLock as Mutex;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use pci::*;
 use rcore_memory::PAGE_SIZE;
-use spin::Mutex;
 
 const PCI_COMMAND: u16 = 0x04;
 const PCI_CAP_PTR: u16 = 0x34;

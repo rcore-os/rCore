@@ -9,7 +9,7 @@ use crate::ipc::SemProc;
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{Condvar, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
@@ -72,6 +72,9 @@ impl fmt::Display for Pid {
     }
 }
 
+/// process group id type
+pub type Pgid = i32;
+
 pub struct Process {
     /// Virtual memory
     pub vm: Arc<Mutex<MemorySet>>,
@@ -82,14 +85,14 @@ pub struct Process {
     /// Executable path
     pub exec_path: String,
     /// Futex
-    futexes: BTreeMap<usize, Arc<Condvar>>,
+    pub futexes: BTreeMap<usize, Arc<Condvar>>,
     /// Semaphore
     pub semaphores: SemProc,
 
     /// Pid i.e. tgid, usually the tid of first thread
     pub pid: Pid,
     //// Process group id
-    pub pgid: i32,
+    pub pgid: Pgid,
     /// Parent process
     /// Avoid deadlock, put pid out
     pub parent: (Pid, Weak<Mutex<Process>>),
@@ -98,6 +101,8 @@ pub struct Process {
     /// Threads
     /// threads in the same process
     pub threads: Vec<Tid>,
+    /// Events like exiting
+    pub eventbus: Arc<Mutex<EventBus>>,
 
     // for waiting child
     pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
@@ -133,7 +138,7 @@ pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
 }
 
 /// Get process group by pgid
-pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
+pub fn process_group(pgid: Pgid) -> Vec<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
         .iter()

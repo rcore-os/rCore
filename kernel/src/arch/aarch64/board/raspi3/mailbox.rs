@@ -3,13 +3,13 @@
 //! (ref: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
 
 use crate::memory::kernel_offset;
+use crate::sync::SpinNoIrqLock as Mutex;
 use aarch64::cache::*;
 use alloc::string::String;
 use bcm2837::addr::phys_to_bus;
 use bcm2837::mailbox::{Mailbox, MailboxChannel};
 use core::mem;
 use lazy_static::lazy_static;
-use spin::Mutex;
 
 lazy_static! {
     static ref MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());

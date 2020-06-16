@@ -3,7 +3,10 @@
 use super::*;
 use crate::fs::FileLike;
 use crate::signal::{has_signal_to_do, send_signal, Signal};
-use crate::syscall::SysError::{EINTR, ESRCH};
+use crate::{
+    sync::{wait_for_event, Event},
+    syscall::SysError::{EINTR, ESRCH},
+};
 use alloc::boxed::Box;
 use alloc::sync::Weak;
 
@@ -13,6 +16,7 @@ impl Syscall<'_> {
         let new_thread = self.thread.fork(self.context);
         let pid = new_thread.proc.lock().pid.get();
         info!("fork: {} -> {}", self.process().pid, pid);
+        spawn(new_thread);
         Ok(pid)
     }
 
@@ -78,10 +82,10 @@ impl Syscall<'_> {
 
     /// Wait for the process exit.
     /// Return the PID. Store exit code to `wstatus` if it's not null.
-    pub fn sys_wait4(&mut self, pid: isize, wstatus: *mut i32) -> SysResult {
+    pub async fn sys_wait4(&mut self, pid: isize, wstatus: UserInOutPtr<i32>) -> SysResult {
         info!("wait4: pid: {}, code: {:?}", pid, wstatus);
         let wstatus = if !wstatus.is_null() {
-            Some(unsafe { self.vm().check_write_ptr(wstatus)? })
+            Some(wstatus)
         } else {
             None
         };
@@ -115,8 +119,8 @@ impl Syscall<'_> {
                     let mut process_table = PROCESSES.write();
                     process_table.remove(&pid);
                 }
-                if let Some(wstatus) = wstatus {
-                    *wstatus = exit_code as i32;
+                if let Some(mut wstatus) = wstatus {
+                    wstatus.write(exit_code as i32)?;
                 }
                 return Ok(pid);
             }
@@ -147,8 +151,7 @@ impl Syscall<'_> {
                 0,
                 target
             );
-            let condvar = proc.child_exit.clone();
-            condvar.wait(proc);
+            wait_for_event(proc.eventbus.clone(), Event::PROCESS_QUIT).await;
         }
     }
 
@@ -276,13 +279,14 @@ impl Syscall<'_> {
             pid = self.process().pid.get();
         }
         info!("setpgid: set pgid of process {} to {}", pid, pgid);
+
         let process_table = PROCESSES.read();
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
             // TODO: check process pid is the child of calling process
             if let Some(proc) = proc.upgrade() {
                 let mut proc = proc.lock();
-                proc.pgid = pgid as i32;
+                proc.pgid = pgid as Pgid;
             }
             Ok(0)
         } else {

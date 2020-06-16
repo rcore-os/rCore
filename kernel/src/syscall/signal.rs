@@ -1,5 +1,4 @@
-use crate::process::{current_thread, process_of, PROCESSES};
-use crate::process::{process, process_group};
+use crate::process::*;
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
@@ -165,7 +164,7 @@ impl Syscall<'_> {
                     Ok(0)
                 }
                 _ => {
-                    let process_group = process_group((-pid) as i32);
+                    let process_group = process_group((-pid) as Pgid);
                     if process_group.is_empty() {
                         Err(ESRCH)
                     } else {

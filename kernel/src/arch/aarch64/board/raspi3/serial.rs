@@ -1,7 +1,7 @@
+use crate::sync::SpinNoIrqLock as Mutex;
 use bcm2837::mini_uart::{MiniUart, MiniUartInterruptId};
 use core::fmt;
 use lazy_static::lazy_static;
-use spin::Mutex;
 
 /// Struct to get a global SerialPort interface
 pub struct SerialPort {

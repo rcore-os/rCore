@@ -8,6 +8,7 @@
 #![allow(non_upper_case_globals)]
 
 use super::mailbox;
+use crate::sync::SpinNoIrqLock as Mutex;
 use crate::thread;
 use bcm2837::emmc::*;
 use core::mem;
@@ -1396,8 +1397,6 @@ impl EmmcCtl {
         }
     }
 }
-
-use spin::Mutex;
 
 lazy_static! {
     pub static ref EMMC_CTL: Mutex<EmmcCtl> = Mutex::new(EmmcCtl::new());

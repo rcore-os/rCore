@@ -1,13 +1,12 @@
 use super::ipi::IPIEventItem;
+use crate::consts::MAX_CPU_NUM;
+use crate::sync::SpinLock as Mutex;
 use alloc::vec::*;
 use core::sync::atomic::{AtomicBool, Ordering};
 use x86_64::registers::model_specific::Msr;
 use x86_64::structures::gdt::*;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::{PrivilegeLevel, VirtAddr};
-
-use crate::consts::MAX_CPU_NUM;
-use crate::sync::SpinLock as Mutex;
 
 /// Init TSS & GDT.
 pub fn init() {

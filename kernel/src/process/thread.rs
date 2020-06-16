@@ -10,7 +10,7 @@ use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::process::structs::ElfExt;
-use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{Condvar, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
@@ -283,6 +283,7 @@ impl Thread {
                 sig_queue: VecDeque::new(),
                 dispositions: [SignalAction::default(); Signal::RTMAX + 1],
                 sigaltstack: SignalStack::default(),
+                eventbus: EventBus::new(),
             }
             .add_to_table(),
             sig_mask: Sigset::default(),
@@ -291,7 +292,7 @@ impl Thread {
 
     /// Fork a new process from current one
     /// Only current process is persisted
-    pub fn fork(&self, tf: &UserContext) -> Box<Thread> {
+    pub fn fork(&self, tf: &UserContext) -> Arc<Thread> {
         let kstack = KernelStack::new();
         /// clone virtual memory
         let vm = self.vm.lock().clone();
@@ -322,6 +323,7 @@ impl Thread {
             sig_queue: VecDeque::new(),
             dispositions: proc.dispositions.clone(),
             sigaltstack: Default::default(),
+            eventbus: EventBus::new(),
         }
         .add_to_table();
 
@@ -333,7 +335,7 @@ impl Thread {
         // Each of the threads in a process has its own signal mask.
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
-        Box::new(Thread {
+        Arc::new(Thread {
             tid: child_pid.get(), // tid = pid
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::new(context)),

@@ -1,3 +1,4 @@
+use super::SysError;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
@@ -28,14 +29,7 @@ pub type UserInPtr<T> = UserPtr<T, In>;
 pub type UserOutPtr<T> = UserPtr<T, Out>;
 pub type UserInOutPtr<T> = UserPtr<T, InOut>;
 
-type Result<T> = core::result::Result<T, Error>;
-
-/// The error type which is returned from user pointer.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Error {
-    InvalidUtf8,
-    InvalidPointer,
-}
+type Result<T> = core::result::Result<T, SysError>;
 
 impl<T, P: Policy> Debug for UserPtr<T, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
@@ -74,7 +68,7 @@ impl<T, P: Policy> UserPtr<T, P> {
 
     pub fn check(&self) -> Result<()> {
         if self.ptr.is_null() {
-            return Err(Error::InvalidPointer);
+            return Err(SysError::EINVAL);
         }
         Ok(())
     }
@@ -117,7 +111,7 @@ impl<P: Read> UserPtr<u8, P> {
     pub fn read_string(&self, len: usize) -> Result<String> {
         self.check()?;
         let src = unsafe { core::slice::from_raw_parts(self.ptr, len) };
-        let s = core::str::from_utf8(src).map_err(|_| Error::InvalidUtf8)?;
+        let s = core::str::from_utf8(src).map_err(|_| SysError::EINVAL)?;
         Ok(String::from(s))
     }
 
