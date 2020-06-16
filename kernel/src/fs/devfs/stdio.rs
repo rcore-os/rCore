@@ -70,7 +70,12 @@ impl Stdin {
         loop {
             let mut buf_lock = self.buf.lock();
             match buf_lock.pop_front() {
-                Some(c) => return c,
+                Some(c) => {
+                    if buf_lock.len() == 0 {
+                        self.eventbus.lock().clear(Event::READABLE);
+                    }
+                    return c;
+                }
                 None => {
                     self.pushed.wait(buf_lock);
                 }
