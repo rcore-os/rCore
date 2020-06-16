@@ -102,27 +102,48 @@ impl Syscall<'_> {
             _ => unimplemented!(),
         };
         loop {
+            info!("wait4 loop: pid: {}, code: {:?}", pid, wstatus);
             let mut proc = self.process();
-            // check child_exit_code
+
+            // check child state
             let find = match target {
-                WaitFor::AnyChild | WaitFor::AnyChildInGroup => proc
-                    .child_exit_code
-                    .iter()
-                    .next()
-                    .map(|(&pid, &code)| (pid, code)),
-                WaitFor::Pid(pid) => proc.child_exit_code.get(&pid).map(|&code| (pid, code)),
+                WaitFor::AnyChild | WaitFor::AnyChildInGroup => {
+                    let mut res = None;
+                    for (pid, child) in &proc.children {
+                        if let Some(c) = child.upgrade() {
+                            let p = c.lock();
+                            if p.exited() {
+                                res = Some((p.pid, p.exit_code));
+                                break;
+                            }
+                        } else {
+                            info!("wait: pid {} is missing", pid);
+                        }
+                    }
+                    res
+                }
+                WaitFor::Pid(pid) => {
+                    let mut res = None;
+                    if let Some(c) = process(pid) {
+                        let p = c.lock();
+                        if p.exited() {
+                            res = Some((p.pid, p.exit_code));
+                        }
+                    }
+                    res
+                }
             };
             // if found, return
             if let Some((pid, exit_code)) = find {
-                proc.child_exit_code.remove(&pid);
-                {
+                info!("wait: found pid {}", pid);
+                if true {
                     let mut process_table = PROCESSES.write();
-                    process_table.remove(&pid);
+                    process_table.remove(&pid.get());
                 }
                 if let Some(mut wstatus) = wstatus {
                     wstatus.write(exit_code as i32)?;
                 }
-                return Ok(pid);
+                return Ok(pid.get());
             }
             // if not, check pid
             let invalid = {
@@ -143,15 +164,16 @@ impl Syscall<'_> {
                 }
             };
             if invalid {
+                info!("wait: no valid child proc");
                 return Err(SysError::ECHILD);
             }
-            info!(
-                "wait: thread {} -> {:?}, sleep",
-                //thread::current().id(),
-                0,
-                target
-            );
-            wait_for_event(proc.eventbus.clone(), Event::PROCESS_QUIT).await;
+
+            info!("wait: thread {} -> {:?}, sleep", self.thread.tid, target);
+
+            let eventbus = proc.eventbus.clone();
+            drop(proc);
+
+            wait_for_event(eventbus, Event::CHILD_PROCESS_QUIT).await;
         }
     }
 
@@ -173,10 +195,7 @@ impl Syscall<'_> {
         argv: *const *const u8,
         envp: *const *const u8,
     ) -> SysResult {
-        info!(
-            "exec:BEG: path: {:?}, argv: {:?}, envp: {:?}",
-            path, argv, envp
-        );
+        info!("exec: path: {:?}, argv: {:?}, envp: {:?}", path, argv, envp);
         let mut proc = self.process();
         let path = check_and_clone_cstr(path)?;
         let args = check_and_clone_cstr_array(argv)?;
@@ -187,19 +206,11 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
 
-        info!(
-            "exec:STEP2: path: {:?}, args: {:?}, envs: {:?}",
-            path, args, envs
-        );
+        info!("exec: path: {:?}, args: {:?}, envs: {:?}", path, args, envs);
 
         // Kill other threads
-        proc.threads.retain(|&tid| {
-            //if tid != thread::current().id() {
-            //thread_manager().exit(tid, 1);
-            //}
-            //tid == thread::current().id()
-            tid == 0
-        });
+        // TODO: stop and wait until they are finished
+        proc.threads.retain(|&tid| tid == self.thread.tid);
 
         // Read program file
         let inode = proc.lookup_inode(&path)?;
@@ -239,10 +250,10 @@ impl Syscall<'_> {
         drop(proc);
 
         // Modify the TrapFrame
-        todo!();
-        //*self.tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
+        self.context.general.rip = entry_addr;
+        self.context.general.rsp = ustack_top;
 
-        //info!("exec:END: path: {:?}", path);
+        info!("exec:END: path: {:?}", path);
         Ok(0)
     }
 
@@ -266,8 +277,7 @@ impl Syscall<'_> {
         // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
-            let lock = proc.upgrade().unwrap();
-            let proc = lock.lock();
+            let proc = proc.lock();
             Ok(proc.pgid as usize)
         } else {
             Err(ESRCH)
@@ -284,10 +294,8 @@ impl Syscall<'_> {
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
             // TODO: check process pid is the child of calling process
-            if let Some(proc) = proc.upgrade() {
-                let mut proc = proc.lock();
-                proc.pgid = pgid as Pgid;
-            }
+            let mut proc = proc.lock();
+            proc.pgid = pgid as Pgid;
             Ok(0)
         } else {
             Err(ESRCH)
@@ -348,14 +356,15 @@ impl Syscall<'_> {
     }
 
     /// Exit the current thread group (i.e. process)
-    pub fn sys_exit_group(&mut self, exit_code: usize) -> ! {
+    pub fn sys_exit_group(&mut self, exit_code: usize) -> SysResult {
         let mut proc = self.process();
         info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
         proc.exit(exit_code);
         drop(proc);
-        //thread::yield_now();
-        unreachable!();
+        // TODO: quit other threads
+        self.exit = true;
+        Ok(0)
     }
 
     pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {

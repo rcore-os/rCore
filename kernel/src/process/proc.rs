@@ -9,7 +9,7 @@ use crate::ipc::SemProc;
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, EventBus, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{Condvar, Event, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
@@ -78,35 +78,44 @@ pub type Pgid = i32;
 pub struct Process {
     /// Virtual memory
     pub vm: Arc<Mutex<MemorySet>>,
+
     /// Opened files
     pub files: BTreeMap<usize, FileLike>,
+
     /// Current working dirctory
     pub cwd: String,
+
     /// Executable path
     pub exec_path: String,
+
     /// Futex
     pub futexes: BTreeMap<usize, Arc<Condvar>>,
+
     /// Semaphore
     pub semaphores: SemProc,
 
     /// Pid i.e. tgid, usually the tid of first thread
     pub pid: Pid,
+
     //// Process group id
     pub pgid: Pgid,
+
     /// Parent process
     /// Avoid deadlock, put pid out
     pub parent: (Pid, Weak<Mutex<Process>>),
+
     /// Children process
     pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
+
     /// Threads
     /// threads in the same process
     pub threads: Vec<Tid>,
+
     /// Events like exiting
     pub eventbus: Arc<Mutex<EventBus>>,
 
-    // for waiting child
-    pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
-    pub child_exit_code: BTreeMap<usize, usize>, // child process store its exit code here
+    /// Exit code
+    pub exit_code: usize,
 
     // delivered signals, tid specified thread, -1 stands for any thread
     // TODO: implement with doubly linked list, but how to do it in rust safely? [doggy]
@@ -119,7 +128,7 @@ pub struct Process {
 
 lazy_static! {
     /// Records the mapping between pid and Process struct.
-    pub static ref PROCESSES: RwLock<BTreeMap<usize, Weak<Mutex<Process>>>> =
+    pub static ref PROCESSES: RwLock<BTreeMap<usize, Arc<Mutex<Process>>>> =
         RwLock::new(BTreeMap::new());
 }
 
@@ -128,13 +137,13 @@ pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
         .iter()
-        .filter_map(|(_, weak)| weak.upgrade())
+        .map(|(_, proc)| proc.clone())
         .find(|proc| proc.lock().threads.contains(&tid))
 }
 
 /// Get process by pid
 pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
-    PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade())
+    PROCESSES.read().get(&pid).cloned()
 }
 
 /// Get process group by pgid
@@ -142,7 +151,7 @@ pub fn process_group(pgid: Pgid) -> Vec<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
         .iter()
-        .filter_map(|(_, proc)| proc.upgrade())
+        .map(|(_, proc)| proc.clone())
         .filter(|proc| proc.lock().pgid == pgid)
         .collect::<Vec<_>>()
 }
@@ -160,7 +169,7 @@ impl Process {
 
         // put to process table
         let self_ref = Arc::new(Mutex::new(self));
-        process_table.insert(pid, Arc::downgrade(&self_ref));
+        process_table.insert(pid, self_ref.clone());
 
         self_ref
     }
@@ -203,11 +212,11 @@ impl Process {
         }
 
         // notify parent and fill exit code
+        self.eventbus.lock().set(Event::PROCESS_QUIT);
         if let Some(parent) = self.parent.1.upgrade() {
-            let mut parent = parent.busy_lock();
-            parent.child_exit_code.insert(self.pid.get(), exit_code);
-            parent.child_exit.notify_one();
+            parent.lock().eventbus.lock().set(Event::CHILD_PROCESS_QUIT);
         }
+        self.exit_code = exit_code;
 
         // quit all threads
         // this must be after setting the value of subprocess, or the threads will be treated exit before actually exits
@@ -216,7 +225,7 @@ impl Process {
         }
         self.threads.clear();
 
-        info!("process {} exist with {}", self.pid.get(), exit_code);
+        info!("process {} exit with {}", self.pid.get(), exit_code);
     }
 
     pub fn exited(&self) -> bool {

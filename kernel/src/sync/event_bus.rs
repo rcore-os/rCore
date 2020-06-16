@@ -16,6 +16,7 @@ bitflags! {
         const ERROR                         = 1 << 2;
 
         const PROCESS_QUIT                  = 1 << 10;
+        const CHILD_PROCESS_QUIT            = 1 << 11;
     }
 }
 

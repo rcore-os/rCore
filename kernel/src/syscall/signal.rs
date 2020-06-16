@@ -157,9 +157,7 @@ impl Syscall<'_> {
                     // sig is sent to every process for which the calling process
                     // has permission to send signals, except for process 1 (init)
                     for process in PROCESSES.read().values() {
-                        if let Some(process) = process.upgrade() {
-                            send_signal(process, -1, info);
-                        }
+                        send_signal(process.clone(), -1, info);
                     }
                     Ok(0)
                 }

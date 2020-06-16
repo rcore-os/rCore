@@ -277,8 +277,7 @@ impl Thread {
                 parent: (Pid::new(), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
+                exit_code: 0,
                 pending_sigset: Sigset::empty(),
                 sig_queue: VecDeque::new(),
                 dispositions: [SignalAction::default(); Signal::RTMAX + 1],
@@ -317,8 +316,7 @@ impl Thread {
             parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
             threads: Vec::new(),
-            child_exit: Arc::new(Condvar::new()),
-            child_exit_code: BTreeMap::new(),
+            exit_code: 0,
             pending_sigset: Sigset::empty(),
             sig_queue: VecDeque::new(),
             dispositions: proc.dispositions.clone(),
@@ -330,6 +328,9 @@ impl Thread {
         // link to parent
         let child_pid = new_proc.lock().pid.clone();
         proc.children.push((child_pid, Arc::downgrade(&new_proc)));
+
+        // set init thread tid
+        new_proc.lock().threads.push(child_pid.get());
 
         // this part in linux manpage seems ambiguous:
         // Each of the threads in a process has its own signal mask.
