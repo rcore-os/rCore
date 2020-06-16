@@ -10,13 +10,18 @@ use crate::fs::devfs::foreground_pgid;
 use crate::fs::ioctl::*;
 use crate::process::process_group;
 use crate::signal::{send_signal, Siginfo, Signal, SI_KERNEL};
-use crate::sync::Condvar;
 use crate::sync::SpinNoIrqLock as Mutex;
+use crate::sync::{Condvar, Event, EventBus};
+use alloc::boxed::Box;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use spin::RwLock;
 
 #[derive(Default)]
 pub struct Stdin {
     buf: Mutex<VecDeque<char>>,
+    eventbus: Mutex<EventBus>,
     pub pushed: Condvar,
     winsize: RwLock<Winsize>,
     termios: RwLock<Termois>,
@@ -48,6 +53,7 @@ impl Stdin {
             }
         } else {
             self.buf.lock().push_back(c);
+            self.eventbus.lock().set(Event::READABLE);
             self.pushed.notify_one();
         }
     }
@@ -105,6 +111,35 @@ impl INode for Stdin {
             error: false,
         })
     }
+
+    fn async_poll<'a>(
+        &'a self,
+    ) -> Pin<Box<dyn Future<Output = Result<PollStatus>> + Send + Sync + 'a>> {
+        struct SerialFuture<'a> {
+            stdin: &'a Stdin,
+        };
+
+        impl<'a> Future for SerialFuture<'a> {
+            type Output = Result<PollStatus>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                if self.stdin.can_read() {
+                    return Poll::Ready(self.stdin.poll());
+                }
+                let waker = cx.waker().clone();
+                self.stdin.eventbus.lock().subscribe(Box::new({
+                    move |_| {
+                        waker.wake_by_ref();
+                        true
+                    }
+                }));
+                Poll::Pending
+            }
+        }
+
+        Box::pin(SerialFuture { stdin: self })
+    }
+
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
             TIOCGWINSZ => {

@@ -48,9 +48,11 @@
 #![allow(dead_code)]
 
 pub use self::condvar::*;
+pub use self::event_bus::*;
 pub use self::mutex::*;
 pub use self::semaphore::*;
 
 mod condvar;
+mod event_bus;
 mod mutex;
 mod semaphore;
