@@ -136,10 +136,16 @@ impl Syscall<'_> {
             // if found, return
             if let Some((pid, exit_code)) = find {
                 info!("wait: found pid {}", pid);
+
+                // remove from process table
                 if true {
                     let mut process_table = PROCESSES.write();
                     process_table.remove(&pid.get());
                 }
+
+                // remove from children
+                proc.children.retain(|(p, _)| *p != pid);
+
                 if let Some(mut wstatus) = wstatus {
                     wstatus.write(exit_code as i32)?;
                 }
@@ -173,7 +179,8 @@ impl Syscall<'_> {
             let eventbus = proc.eventbus.clone();
             drop(proc);
 
-            wait_for_event(eventbus, Event::CHILD_PROCESS_QUIT).await;
+            wait_for_event(eventbus.clone(), Event::CHILD_PROCESS_QUIT).await;
+            eventbus.lock().clear(Event::CHILD_PROCESS_QUIT);
         }
     }
 
