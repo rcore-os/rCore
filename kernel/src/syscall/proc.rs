@@ -10,13 +10,10 @@ use alloc::sync::Weak;
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
     pub fn sys_fork(&mut self) -> SysResult {
-        //let new_thread = self.thread.fork(self.tf);
-        let new_thread: Box<Thread> = todo!();
-        //let pid = new_thread.proc.lock().pid.get();
-        //let tid = thread_manager().add(new_thread);
-        //thread_manager().detach(tid);
-        //info!("fork: {} -> {}", self.process().pid, pid);
-        Ok(0)
+        let new_thread = self.thread.fork(self.context);
+        let pid = new_thread.proc.lock().pid.get();
+        info!("fork: {} -> {}", self.process().pid, pid);
+        Ok(pid)
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -206,7 +203,7 @@ impl Syscall<'_> {
 
         // Make new Thread
         let (mut vm, entry_addr, ustack_top) =
-            Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
+            Thread::new_user_vm(&inode, args, envs).map_err(|_| SysError::EINVAL)?;
 
         // close file that FD_CLOEXEC is set
         let close_fds = proc

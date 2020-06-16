@@ -1,8 +1,3 @@
-extern crate cc;
-
-use std::fs::File;
-use std::io::{Result, Write};
-
 fn main() {
     println!("cargo:rerun-if-env-changed=LOG");
     println!("cargo:rerun-if-env-changed=SMP");

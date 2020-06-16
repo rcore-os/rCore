@@ -55,24 +55,25 @@ lazy_static! {
 }
 
 /// System call dispatcher
-pub async fn handle_syscall(thread: &Arc<Thread>, regs: &mut GeneralRegs) -> bool {
+pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> bool {
+    let regs = &context.general;
     let num = regs.rax;
     let args = [regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9];
     let mut syscall = Syscall {
         thread,
-        regs,
+        context,
         exit: false,
     };
     let ret = syscall.syscall(num, args).await;
     let exit = syscall.exit;
-    regs.rax = ret as usize;
+    context.general.rax = ret as usize;
     exit
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
     pub thread: &'a Arc<Thread>,
-    pub regs: &'a mut GeneralRegs,
+    pub context: &'a mut UserContext,
     /// Set `true` to exit current task.
     pub exit: bool,
 }

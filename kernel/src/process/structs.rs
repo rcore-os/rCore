@@ -45,6 +45,7 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+/// Mutable part of a thread struct
 #[derive(Default)]
 struct ThreadInner {
     context: Option<Box<UserContext>>,
@@ -52,21 +53,25 @@ struct ThreadInner {
 
 #[allow(dead_code)]
 pub struct Thread {
+    /// Mutable part
     inner: Mutex<ThreadInner>,
+    /// Kernel stack
     kstack: KernelStack,
-    pub id: usize,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
-    // This is same as `proc.vm`
+    /// This is same as `proc.vm`, avoid extra locking
     pub vm: Arc<Mutex<MemorySet>>,
+    /// The process that this thread belongs to
     pub proc: Arc<Mutex<Process>>,
+    /// Thread id
+    pub tid: Tid,
+    /// Signal mask
     pub sig_mask: Sigset,
 }
 
 /// Pid type
-/// For strong type separation
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(usize);
 
 impl Pid {
@@ -88,24 +93,35 @@ impl fmt::Display for Pid {
     }
 }
 
+/// Tid type
 type Tid = usize;
 
 pub struct Process {
-    // resources
+    /// Virtual memory
     pub vm: Arc<Mutex<MemorySet>>,
+    /// Opened files
     pub files: BTreeMap<usize, FileLike>,
+    /// Current working dirctory
     pub cwd: String,
+    /// Executable path
     pub exec_path: String,
+    /// Futex
     futexes: BTreeMap<usize, Arc<Condvar>>,
+    /// Semaphore
     pub semaphores: SemProc,
 
-    // relationship
-    pub pid: Pid, // i.e. tgid, usually the tid of first thread
+    /// Pid i.e. tgid, usually the tid of first thread
+    pub pid: Pid,
+    //// Process group id
     pub pgid: i32,
-    // avoid deadlock, put pid out
+    /// Parent process
+    /// Avoid deadlock, put pid out
     pub parent: (Pid, Weak<Mutex<Process>>),
+    /// Children process
     pub children: Vec<(Pid, Weak<Mutex<Process>>)>,
-    pub threads: Vec<Tid>, // threads in the same process
+    /// Threads
+    /// threads in the same process
+    pub threads: Vec<Tid>,
 
     // for waiting child
     pub child_exit: Arc<Condvar>, // notified when the a child process is going to terminate
@@ -126,7 +142,7 @@ lazy_static! {
         RwLock::new(BTreeMap::new());
 }
 
-/// return the process which thread tid is in
+/// Return the process which thread tid is in
 pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
@@ -135,10 +151,12 @@ pub fn process_of(tid: usize) -> Option<Arc<Mutex<Process>>> {
         .find(|proc| proc.lock().threads.contains(&tid))
 }
 
+/// Get process by pid
 pub fn process(pid: usize) -> Option<Arc<Mutex<Process>>> {
     PROCESSES.read().get(&pid).and_then(|weak| weak.upgrade())
 }
 
+/// Get process group by pgid
 pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
     PROCESSES
         .read()
@@ -149,64 +167,16 @@ pub fn process_group(pgid: i32) -> Vec<Arc<Mutex<Process>>> {
 }
 
 impl Thread {
-    /// Make a struct for the init thread
-    pub unsafe fn new_init() -> Box<Thread> {
-        let zero = MaybeUninit::<Thread>::zeroed();
-        Box::new(Thread {
-            inner: Mutex::new(ThreadInner::default()),
-            // safety: other fields will never be used
-            ..zero.assume_init()
-        })
-    }
-
-    /// Make a new kernel thread starting from `entry` with `arg`
-    pub fn new_kernel(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<Thread> {
-        let vm = MemorySet::new();
-        let vm_token = vm.token();
-        let vm = Arc::new(Mutex::new(vm));
-        let kstack = KernelStack::new();
-        Box::new(Thread {
-            id: 0,
-            inner: Mutex::new(ThreadInner::default()),
-            kstack,
-            clear_child_tid: 0,
-            vm: vm.clone(),
-            // TODO: kernel thread should not have a process
-            proc: Process {
-                vm,
-                files: BTreeMap::default(),
-                cwd: String::from("/"),
-                exec_path: String::new(),
-                semaphores: SemProc::default(),
-                futexes: BTreeMap::default(),
-                pid: Pid(0),
-                pgid: -1, // kernel thread do not have a process?
-                parent: (Pid(0), Weak::new()),
-                children: Vec::new(),
-                threads: Vec::new(),
-                child_exit: Arc::new(Condvar::new()),
-                child_exit_code: BTreeMap::new(),
-                sig_queue: VecDeque::new(),
-                pending_sigset: Sigset::empty(),
-                dispositions: [SignalAction::default(); Signal::RTMAX + 1],
-                sigaltstack: SignalStack::default(),
-            }
-            .add_to_table(),
-            sig_mask: Sigset::empty(),
-        })
-    }
-
-    /// Construct virtual memory of a new user process from ELF `data`.
+    /// Construct virtual memory of a new user process from ELF at `inode`.
     /// Return `(MemorySet, entry_point, ustack_top)`
     pub fn new_user_vm(
         inode: &Arc<dyn INode>,
-        _exec_path: &str,
         args: Vec<String>,
         envs: Vec<String>,
     ) -> Result<(MemorySet, usize, usize), &'static str> {
         // Read ELF header
         // 0x3c0: magic number from ld-musl.so
-        let mut data: [u8; 0x3c0] = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut data = [0u8; 0x3c0];
         inode
             .read_at(0, &mut data)
             .map_err(|_| "failed to read from INode")?;
@@ -234,6 +204,7 @@ impl Thread {
             _ => return Err("invalid ELF arch"),
         }
 
+        // auxiliary vector
         let mut auxv = {
             let mut map = BTreeMap::new();
             if let Some(phdr_vaddr) = elf.get_phdr_vaddr() {
@@ -244,6 +215,8 @@ impl Thread {
             map.insert(abi::AT_PAGESZ, PAGE_SIZE);
             map
         };
+
+        // entry point
         let mut entry_addr = elf.header.pt2.entry_point() as usize;
         // Make page table
         let (mut vm, bias) = elf.make_memory_set(inode);
@@ -263,9 +236,13 @@ impl Thread {
                 .map_err(|_| "failed to read from INode")?;
             let elf_interp = ElfFile::new(&interp_data)?;
             elf_interp.append_as_interpreter(&interp_inode, &mut vm, bias);
-            debug!("entry point: {:x}", elf.header.pt2.entry_point() as usize);
+
+            // update auxiliary vector
             auxv.insert(abi::AT_ENTRY, elf.header.pt2.entry_point() as usize);
             auxv.insert(abi::AT_BASE, bias);
+
+            // use interpreter as actual entry point
+            debug!("entry point: {:x}", elf.header.pt2.entry_point() as usize);
             entry_addr = elf_interp.header.pt2.entry_point() as usize + bias;
         }
 
@@ -274,6 +251,8 @@ impl Thread {
         let mut ustack_top = {
             let ustack_buttom = USER_STACK_OFFSET;
             let ustack_top = USER_STACK_OFFSET + USER_STACK_SIZE;
+
+            // user stack except top 4 pages
             vm.push(
                 ustack_buttom,
                 ustack_top - PAGE_SIZE * 4,
@@ -281,6 +260,7 @@ impl Thread {
                 Delay::new(GlobalFrameAlloc),
                 "user_stack_delay",
             );
+
             // We are going to write init info now. So map the last 4 pages eagerly.
             vm.push(
                 ustack_top - PAGE_SIZE * 4,
@@ -308,12 +288,14 @@ impl Thread {
         args: Vec<String>,
         envs: Vec<String>,
     ) -> Arc<Thread> {
-        let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, exec_path, args, envs).unwrap();
+        /// get virtual memory info
+        let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, args, envs).unwrap();
 
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));
         let kstack = KernelStack::new();
 
+        // initial fds
         let mut files = BTreeMap::new();
         files.insert(
             0,
@@ -361,13 +343,14 @@ impl Thread {
             )),
         );
 
+        // user context
         let mut context = UserContext::default();
         context.general.rip = entry_addr;
         context.general.rsp = ustack_top;
         context.general.rflags = 0x3202;
 
         Arc::new(Thread {
-            id: 0,
+            tid: 1, // default is init
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::from(context)),
             }),
@@ -381,7 +364,7 @@ impl Thread {
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
-                pid: Pid(0),
+                pid: Pid(0), // allocated in add_to_table()
                 pgid: 0,
                 parent: (Pid(0), Weak::new()),
                 children: Vec::new(),
@@ -399,13 +382,17 @@ impl Thread {
     }
 
     /// Fork a new process from current one
-    pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
+    /// Only current process is persisted
+    pub fn fork(&self, tf: &UserContext) -> Box<Thread> {
         let kstack = KernelStack::new();
+        /// clone virtual memory
         let vm = self.vm.lock().clone();
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));
-        //let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
-        let context = todo!();
+
+        /// context of new thread
+        let mut context = tf.clone();
+        context.general.rax = 0;
 
         let mut proc = self.proc.lock();
 
@@ -429,17 +416,21 @@ impl Thread {
             sigaltstack: Default::default(),
         }
         .add_to_table();
+
         // link to parent
+        let child_pid = new_proc.lock().pid.clone();
         proc.children
-            .push((new_proc.lock().pid.clone(), Arc::downgrade(&new_proc)));
+            .push((child_pid, Arc::downgrade(&new_proc)));
 
         // this part in linux manpage seems ambiguous:
         // Each of the threads in a process has its own signal mask.
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
         Box::new(Thread {
-            id: 0,
-            inner: Mutex::new(ThreadInner::default()),
+            tid: child_pid.get(), // tid = pid
+            inner: Mutex::new(ThreadInner {
+                context: Some(Box::new(context))
+            }),
             kstack,
             clear_child_tid: 0,
             vm,
@@ -459,7 +450,7 @@ impl Thread {
         let kstack = KernelStack::new();
         let vm_token = self.vm.lock().token();
         Box::new(Thread {
-            id: 0,
+            tid: 0,
             inner: Mutex::new(ThreadInner::default()),
             kstack,
             clear_child_tid,
@@ -487,14 +478,17 @@ impl Process {
 
         self_ref
     }
+
+    /// Get lowest free fd
     fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
     }
 
-    // get the lowest available fd great than or equal to arg
+    /// get the lowest available fd great than or equal to arg
     pub fn get_free_fd_from(&self, arg: usize) -> usize {
         (arg..).find(|i| !self.files.contains_key(i)).unwrap()
     }
+
     /// Add a file to the process, return its fd.
     pub fn add_file(&mut self, file_like: FileLike) -> usize {
         let fd = self.get_free_fd();
@@ -691,7 +685,7 @@ pub fn spawn(thread: Arc<Thread>) {
             //assert_eq!(cx.trap_num, 0x100, "user interrupt still no support");
             let mut exit = false;
             match cx.trap_num {
-                0x100 => exit = handle_syscall(&thread, &mut cx.general).await,
+                0x100 => exit = handle_syscall(&thread, &mut cx).await,
                 0x20..=0x3f => {
                     let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
                     lapic.eoi();

@@ -99,6 +99,3 @@ bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.5.1", opti
 [target.'cfg(target_arch = "mips")'.dependencies]
 mips = "^0.2.0"
 paste = "0.1"
-
-[build-dependencies]
-cc = "1.0"

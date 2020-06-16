@@ -442,7 +442,6 @@ dependencies = [
  "bitmap-allocator",
  "bitvec",
  "buddy_system_allocator",
- "cc",
  "compression",
  "device_tree",
  "executor",

@@ -84,7 +84,7 @@ impl Syscall<'_> {
         self.tf.general.rsp = mc.rsp;
         */
 
-        let ret = self.regs.rax as isize;
+        let ret = self.context.general.rax as isize;
         if ret >= 0 {
             Ok(ret as usize)
         } else {

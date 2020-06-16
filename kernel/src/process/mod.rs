@@ -9,16 +9,7 @@ mod abi;
 pub mod structs;
 
 pub fn init() {
-    // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
-    //let scheduler = scheduler::RRScheduler::new(5);
-    //let manager = Arc::new(ThreadPool::new(scheduler, MAX_PROCESS_NUM));
-
-    //unsafe {
-    //for cpu_id in 0..MAX_CPU_NUM {
-    //PROCESSORS[cpu_id].init(cpu_id, Thread::new_init(), manager.clone());
-    //}
-    //}
-
+    // create init process
     crate::shell::add_user_shell();
 
     info!("process: init end");
@@ -33,11 +24,4 @@ pub unsafe fn current_thread() -> &'static mut Thread {
     //let (process, _): (&mut Thread, *const ()) = core::mem::transmute(processor().context());
     //process
     todo!()
-}
-
-// Implement dependencies for std::thread
-#[no_mangle]
-pub fn new_kernel_context(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<UserContext> {
-    todo!()
-    //Thread::new_kernel(entry, arg)
 }
