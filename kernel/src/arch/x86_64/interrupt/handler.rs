@@ -81,11 +81,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         tf.trap_num,
         super::super::cpu::id()
     );
-    //if processor().tid_option().is_some() {
-    //unsafe {
-    //current_thread().tf = tf as *mut TrapFrame;
-    //}
-    //}
+
     // Dispatch
     match tf.trap_num as u8 {
         Breakpoint => breakpoint(),
@@ -175,7 +171,14 @@ fn keyboard() {
     trace!("\nInterupt: Keyboard");
     if let Some(key) = keyboard::receive() {
         match key {
-            DecodedKey::Unicode(c) => crate::trap::serial(c),
+            DecodedKey::Unicode(c) => {
+                // at most 4 is needed
+                let mut buffer = [0u8; 4];
+                let res = c.encode_utf8(&mut buffer);
+                for c in res.bytes() {
+                    crate::trap::serial(c)
+                }
+            }
             DecodedKey::RawKey(code) => {
                 let s = match code {
                     KeyCode::ArrowUp => "\u{1b}[A",
@@ -184,7 +187,7 @@ fn keyboard() {
                     KeyCode::ArrowLeft => "\u{1b}[D",
                     _ => "",
                 };
-                for c in s.chars() {
+                for c in s.bytes() {
                     crate::trap::serial(c);
                 }
             }
@@ -195,7 +198,7 @@ fn keyboard() {
 fn com1() {
     use crate::arch::driver::serial::*;
     trace!("\nInterupt: COM1");
-    crate::trap::serial(COM1.lock().receive() as char);
+    crate::trap::serial(COM1.lock().receive());
 }
 
 fn com2() {

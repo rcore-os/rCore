@@ -122,7 +122,7 @@ impl Syscall<'_> {
         }
 
         // check whether the fds is valid and is owned by this process
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         let polls = ufds.read_array(nfds).unwrap();
 
@@ -229,7 +229,7 @@ impl Syscall<'_> {
             1 << 31
         };
 
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -394,13 +394,6 @@ impl Syscall<'_> {
                 Some(file_like) => {
                     match file_like {
                         FileLike::File(_file) => {
-                            &crate::fs::STDIN.pushed.register_epoll_list(
-                                self.thread.proc.clone(),
-                                0,
-                                //thread::current().id(),
-                                epfd,
-                                *fd,
-                            );
                             callbacks.push((
                                 0, 0, // thread::current().id(),
                                 epfd, *fd,
@@ -429,7 +422,7 @@ impl Syscall<'_> {
             drop(proc);
         }
 
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         let begin_time_ms = crate::trap::uptime_msec();
         let condition = move || {
@@ -516,9 +509,6 @@ impl Syscall<'_> {
 
         for cb in callbacks.iter() {
             match cb.0 {
-                0 => &crate::fs::STDIN
-                    .pushed
-                    .unregister_epoll_list(cb.1, cb.2, cb.3),
                 1 => &(*crate::drivers::SOCKET_ACTIVITY).unregister_epoll_list(cb.1, cb.2, cb.3),
                 _ => panic!("cb error"),
             };

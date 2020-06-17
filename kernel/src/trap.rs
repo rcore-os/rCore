@@ -27,20 +27,10 @@ pub fn timer() {
     NAIVE_TIMER.lock().expire(now);
 }
 
-pub fn error(tf: &UserContext) -> ! {
-    error!("{:#x?}", tf);
-    unsafe {
-        let mut proc = current_thread().proc.lock();
-        proc.exit(0x100);
-    }
-    //thread::yield_now();
-    unreachable!();
-}
-
-pub fn serial(c: char) {
-    if c == '\r' {
+pub fn serial(c: u8) {
+    if c == b'\r' {
         // in linux, we use '\n' instead
-        crate::fs::STDIN.push('\n');
+        crate::fs::STDIN.push(b'\n');
     } else {
         crate::fs::STDIN.push(c);
     }

@@ -3,7 +3,7 @@ use rcore_fs::vfs::*;
 
 pub use super::{STDIN, STDOUT};
 use crate::fs::ioctl::*;
-use crate::process::{current_thread, Pgid};
+use crate::process::Pgid;
 use crate::syscall::SysError;
 use alloc::sync::Arc;
 use rcore_fs::vfs::FsError::NotSupported;

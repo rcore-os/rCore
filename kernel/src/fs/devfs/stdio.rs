@@ -20,15 +20,14 @@ use spin::RwLock;
 
 #[derive(Default)]
 pub struct Stdin {
-    buf: Mutex<VecDeque<char>>,
+    buf: Mutex<VecDeque<u8>>,
     eventbus: Mutex<EventBus>,
-    pub pushed: Condvar,
     winsize: RwLock<Winsize>,
     termios: RwLock<Termois>,
 }
 
 impl Stdin {
-    pub fn push(&self, c: char) {
+    pub fn push(&self, c: u8) {
         let lflag = LocalModes::from_bits_truncate(self.termios.read().lflag);
         if lflag.contains(LocalModes::ISIG) && [0o3, 0o34, 0o32, 0o31].contains(&(c as i32)) {
             use Signal::*;
@@ -54,34 +53,18 @@ impl Stdin {
         } else {
             self.buf.lock().push_back(c);
             self.eventbus.lock().set(Event::READABLE);
-            self.pushed.notify_one();
         }
     }
-    pub fn pop(&self) -> char {
-        #[cfg(feature = "board_k210")]
-        loop {
-            // polling
-            let c = crate::arch::io::getchar();
-            if c != '\0' {
-                return c;
-            }
+
+    pub fn pop(&self) -> u8 {
+        let mut buf_lock = self.buf.lock();
+        let c = buf_lock.pop_front().unwrap();
+        if buf_lock.len() == 0 {
+            self.eventbus.lock().clear(Event::READABLE);
         }
-        #[cfg(not(feature = "board_k210"))]
-        loop {
-            let mut buf_lock = self.buf.lock();
-            match buf_lock.pop_front() {
-                Some(c) => {
-                    if buf_lock.len() == 0 {
-                        self.eventbus.lock().clear(Event::READABLE);
-                    }
-                    return c;
-                }
-                None => {
-                    self.pushed.wait(buf_lock);
-                }
-            }
-        }
+        return c;
     }
+
     pub fn can_read(&self) -> bool {
         return self.buf.lock().len() > 0;
     }
@@ -184,7 +167,6 @@ impl INode for Stdin {
                 let gid = unsafe { *(data as *const i32) };
                 info!("set foreground process group id to {}", gid);
                 Ok(0)
-                // println!(pid)
             }
             _ => Err(FsError::NotSupported),
         }
@@ -198,13 +180,15 @@ impl INode for Stdout {
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
+
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         use core::str;
-        //we do not care the utf-8 things, we just want to print it!
+        // we do not care the utf-8 things, we just want to print it!
         let s = unsafe { str::from_utf8_unchecked(buf) };
         print!("{}", s);
         Ok(buf.len())
     }
+
     fn poll(&self) -> Result<PollStatus> {
         Ok(PollStatus {
             read: false,
@@ -212,6 +196,7 @@ impl INode for Stdout {
             error: false,
         })
     }
+
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
         match cmd as usize {
             TIOCGWINSZ => {
@@ -234,6 +219,7 @@ impl INode for Stdout {
             _ => Err(FsError::NotSupported),
         }
     }
+
     fn as_any_ref(&self) -> &dyn Any {
         self
     }

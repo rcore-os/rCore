@@ -68,7 +68,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     if cx.trap_num == 0x20 + 4 {
                         use crate::arch::driver::serial::*;
                         info!("\nInterupt: COM1");
-                        crate::trap::serial(COM1.lock().receive() as char);
+                        crate::trap::serial(COM1.lock().receive());
                     }
                 }
                 0xe => {
