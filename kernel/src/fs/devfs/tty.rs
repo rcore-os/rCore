@@ -24,7 +24,7 @@ pub struct TtyINode {
     buf: Mutex<VecDeque<u8>>,
     eventbus: Mutex<EventBus>,
     winsize: RwLock<Winsize>,
-    termios: RwLock<Termois>,
+    termios: RwLock<Termios>,
 }
 
 lazy_static! {
@@ -159,7 +159,7 @@ impl INode for TtyINode {
                 Ok(0)
             }
             TCGETS => {
-                let termois = data as *mut Termois;
+                let termois = data as *mut Termios;
                 unsafe {
                     *termois = *self.termios.read();
                 }
@@ -168,7 +168,7 @@ impl INode for TtyINode {
                 Ok(0)
             }
             TCSETS => {
-                let termois = data as *const Termois;
+                let termois = data as *const Termios;
                 unsafe {
                     *self.termios.write() = *termois;
                 }
