@@ -11,7 +11,7 @@ use rcore_fs_sfs::{INodeImpl, SimpleFileSystem};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{ShmINode, STDIN, STDOUT, TTY};
+pub use self::devfs::{ShmINode, TTY};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;

@@ -30,8 +30,8 @@ pub fn timer() {
 pub fn serial(c: u8) {
     if c == b'\r' {
         // in linux, we use '\n' instead
-        crate::fs::STDIN.push(b'\n');
+        crate::fs::TTY.push(b'\n');
     } else {
-        crate::fs::STDIN.push(c);
+        crate::fs::TTY.push(c);
     }
 }

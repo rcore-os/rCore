@@ -158,7 +158,8 @@ impl TimeSpec {
             metadata.atime = now;
             metadata.mtime = now;
             metadata.ctime = now;
-            inode.set_metadata(&metadata).expect("set metadata failed");
+            // silently fail for device file
+            inode.set_metadata(&metadata).ok();
         }
     }
 

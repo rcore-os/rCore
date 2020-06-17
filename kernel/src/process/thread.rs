@@ -208,14 +208,14 @@ impl Thread {
         files.insert(
             0,
             FileLike::File(FileHandle::new(
-                crate::fs::STDIN.clone(),
+                crate::fs::TTY.clone(),
                 OpenOptions {
                     read: true,
                     write: false,
                     append: false,
                     nonblock: false,
                 },
-                String::from("stdin"),
+                String::from("/dev/tty"),
                 false,
                 false,
             )),
@@ -223,14 +223,14 @@ impl Thread {
         files.insert(
             1,
             FileLike::File(FileHandle::new(
-                crate::fs::STDOUT.clone(),
+                crate::fs::TTY.clone(),
                 OpenOptions {
                     read: false,
                     write: true,
                     append: false,
                     nonblock: false,
                 },
-                String::from("stdout"),
+                String::from("/dev/tty"),
                 false,
                 false,
             )),
@@ -238,14 +238,14 @@ impl Thread {
         files.insert(
             2,
             FileLike::File(FileHandle::new(
-                crate::fs::STDOUT.clone(),
+                crate::fs::TTY.clone(),
                 OpenOptions {
                     read: false,
                     write: true,
                     append: false,
                     nonblock: false,
                 },
-                String::from("stderr"),
+                String::from("/dev/tty"),
                 false,
                 false,
             )),
