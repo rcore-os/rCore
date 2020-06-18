@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::fs::FileLike;
-use crate::signal::{has_signal_to_do, send_signal, Signal};
+use crate::signal::{send_signal, Signal};
 use crate::{
     sync::{wait_for_event, Event},
     syscall::SysError::{EINTR, ESRCH},
@@ -378,7 +378,7 @@ impl Syscall<'_> {
         if !time.is_zero() {
             // TODO: handle spurious wakeup
             //thread::sleep(time.to_duration());
-            if has_signal_to_do() {
+            if self.has_signal_to_do() {
                 return Err(EINTR);
             }
         }

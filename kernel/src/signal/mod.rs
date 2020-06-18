@@ -132,26 +132,6 @@ pub struct SignalFrame {
     pub ret_code: [u8; 7],           // call sys_sigreturn
 }
 
-pub fn has_signal_to_do() -> bool {
-    let thread = unsafe { current_thread() };
-    unsafe {
-        current_thread()
-            .proc
-            .lock()
-            .sig_queue
-            .iter()
-            .find(|(info, tid)| {
-                let tid = *tid;
-                tid == -1
-                //(tid == -1 || tid as usize == current().id())
-                    && !thread
-                        .sig_mask
-                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
-            })
-            .is_some()
-    }
-}
-
 pub fn do_signal(tf: &mut TrapFrame) {
     let thread = unsafe { current_thread() };
     let mut process = unsafe { current_thread().proc.lock() };

@@ -11,7 +11,6 @@ use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Re
 use rcore_memory::memory_set::handler::File;
 
 use crate::fs::fcntl::{O_APPEND, O_NONBLOCK};
-use crate::signal::{do_signal, has_signal_to_do};
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
@@ -123,9 +122,10 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
-                        if has_signal_to_do() {
-                            return Err(Interrupted);
-                        }
+                        // TODO: async
+                        //if has_signal_to_do() {
+                        //return Err(Interrupted);
+                        //}
                         //thread::yield_now();
                     }
                     Err(err) => {

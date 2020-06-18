@@ -25,7 +25,6 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{FD_CLOEXEC, F_SETFD, O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::signal::has_signal_to_do;
 use crate::syscall::SysError::{EINTR, EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
 

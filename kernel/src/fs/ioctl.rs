@@ -45,8 +45,13 @@ pub const FIOCLEX: usize = 0x6601;
 
 // rustc using pipe and ioctl pipe file with this request id
 // for non-blocking/blocking IO control setting
+#[cfg(not(target_arch = "mips"))]
 pub const FIONBIO: usize = 0x5421;
+#[cfg(target_arch = "mips")]
+pub const FIONBIO: usize = 0x667E;
 
+// ref: https://www.man7.org/linux/man-pages/man3/termios.3.html
+// c_lflag constants
 bitflags! {
     pub struct LocalModes : u32 {
         const ISIG = 0o000001;
