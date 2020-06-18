@@ -65,6 +65,9 @@ pub fn spawn(thread: Arc<Thread>) {
                     let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
                     lapic.eoi();
                     trace!("handle irq {}", cx.trap_num);
+                    if cx.trap_num == 0x20 {
+                        crate::trap::timer();
+                    }
                     if cx.trap_num == 0x20 + 4 {
                         use crate::arch::driver::serial::*;
                         info!("\nInterupt: COM1");

@@ -51,19 +51,19 @@ pub type Tid = usize;
 
 /// Mutable part of a thread struct
 #[derive(Default)]
-struct ThreadInner {
+pub struct ThreadInner {
+    /// user context
+    /// None when thread is running in user
     context: Option<Box<UserContext>>,
+    /// Kernel performs futex wake when thread exits.
+    /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
+    pub clear_child_tid: usize,
 }
 
 #[allow(dead_code)]
 pub struct Thread {
     /// Mutable part
-    inner: Mutex<ThreadInner>,
-    /// Kernel stack
-    kstack: KernelStack,
-    /// Kernel performs futex wake when thread exits.
-    /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
-    pub clear_child_tid: usize,
+    pub inner: Mutex<ThreadInner>,
     /// This is same as `proc.vm`, avoid extra locking
     pub vm: Arc<Mutex<MemorySet>>,
     /// The process that this thread belongs to
@@ -201,7 +201,6 @@ impl Thread {
 
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));
-        let kstack = KernelStack::new();
 
         // initial fds
         let mut files = BTreeMap::new();
@@ -261,9 +260,8 @@ impl Thread {
             tid: 1, // default is init
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::from(context)),
+                clear_child_tid: 0,
             }),
-            kstack,
-            clear_child_tid: 0,
             vm: vm.clone(),
             proc: Process {
                 vm,
@@ -292,7 +290,6 @@ impl Thread {
     /// Fork a new process from current one
     /// Only current process is persisted
     pub fn fork(&self, tf: &UserContext) -> Arc<Thread> {
-        let kstack = KernelStack::new();
         /// clone virtual memory
         let vm = self.vm.lock().clone();
         let vm_token = vm.token();
@@ -340,9 +337,8 @@ impl Thread {
             tid: child_pid.get(), // tid = pid
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::new(context)),
+                clear_child_tid: 0,
             }),
-            kstack,
-            clear_child_tid: 0,
             vm,
             proc: new_proc,
             sig_mask: self.sig_mask,
@@ -357,13 +353,13 @@ impl Thread {
         tls: usize,
         clear_child_tid: usize,
     ) -> Box<Thread> {
-        let kstack = KernelStack::new();
         let vm_token = self.vm.lock().token();
         Box::new(Thread {
             tid: 0,
-            inner: Mutex::new(ThreadInner::default()),
-            kstack,
-            clear_child_tid,
+            inner: Mutex::new(ThreadInner {
+                clear_child_tid,
+                ..ThreadInner::default()
+            }),
             vm: self.vm.clone(),
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,

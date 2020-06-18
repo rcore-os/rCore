@@ -1,14 +1,22 @@
 //! Syscalls for process
 
 use super::*;
+use crate::arch::timer::timer_now;
 use crate::fs::FileLike;
 use crate::signal::{send_signal, Signal};
 use crate::{
     sync::{wait_for_event, Event},
     syscall::SysError::{EINTR, ESRCH},
+    trap::NAIVE_TIMER,
 };
 use alloc::boxed::Box;
 use alloc::sync::Weak;
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
@@ -345,7 +353,7 @@ impl Syscall<'_> {
         // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
         // FIXME: do it in all possible ways a thread can exit
         //        it has memory access so we can't move it to Thread::drop?
-        let clear_child_tid = self.thread.clear_child_tid as *mut u32;
+        let clear_child_tid = self.thread.inner.lock().clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
             if let Ok(clear_child_tid_ref) = unsafe { self.vm().check_write_ptr(clear_child_tid) } {
@@ -372,12 +380,12 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {
-        let time = unsafe { *self.vm().check_read_ptr(req)? };
+    pub async fn sys_nanosleep(&mut self, req: UserInPtr<TimeSpec>) -> SysResult {
+        let time = req.read()?;
         info!("nanosleep: time: {:#?}", time);
         if !time.is_zero() {
-            // TODO: handle spurious wakeup
-            //thread::sleep(time.to_duration());
+            // TODO: handle wakeup
+            sleep_for(time.to_duration()).await;
             if self.has_signal_to_do() {
                 return Err(EINTR);
             }
@@ -386,16 +394,40 @@ impl Syscall<'_> {
     }
 
     pub fn sys_set_priority(&mut self, priority: usize) -> SysResult {
-        //let pid = thread::current().id();
-        //thread_manager().set_priority(pid, priority as u8);
         Ok(0)
     }
 
     pub fn sys_set_tid_address(&mut self, tidptr: *mut u32) -> SysResult {
         info!("set_tid_address: {:?}", tidptr);
-        //self.thread.clear_child_tid = tidptr as usize;
-        //Ok(thread::current().id())
-        Ok(0)
+        self.thread.inner.lock().clear_child_tid = tidptr as usize;
+        Ok(self.thread.tid)
+    }
+}
+
+// sleeping
+pub fn sleep_for(deadline: Duration) -> impl Future {
+    SleepFuture { deadline }
+}
+
+pub struct SleepFuture {
+    deadline: Duration,
+}
+
+impl Future for SleepFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if timer_now() >= self.deadline {
+            return Poll::Ready(());
+        }
+        // check infinity
+        if self.deadline.as_nanos() < i64::max_value() as u128 {
+            let waker = cx.waker().clone();
+            NAIVE_TIMER
+                .lock()
+                .add(self.deadline, Box::new(move |_| waker.wake()));
+        }
+        Poll::Pending
     }
 }
 

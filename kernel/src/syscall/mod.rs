@@ -330,7 +330,7 @@ impl Syscall<'_> {
             SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time
-            SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
+            SYS_NANOSLEEP => self.sys_nanosleep(UserInPtr::from(args[0])).await,
             SYS_SETITIMER => self.unimplemented("setitimer", Ok(0)),
             SYS_GETTIMEOFDAY => {
                 self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8)
