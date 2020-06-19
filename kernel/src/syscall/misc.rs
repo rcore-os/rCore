@@ -95,13 +95,13 @@ impl Syscall<'_> {
                 // avoid deadlock
                 drop(proc);
                 if timeout.is_null() {
-                    queue.wait().await?;
+                    queue.wait(None).await?;
                     Ok(0)
                 } else {
                     // TODO: timeout
                     let timeout = timeout.read()?;
                     info!("futex wait timeout: {:?}", timeout);
-                    queue.wait().await?;
+                    queue.wait(Some(timeout.to_duration())).await?;
                     Ok(0)
                 }
             }

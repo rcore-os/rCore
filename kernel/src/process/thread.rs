@@ -477,6 +477,7 @@ fn spawn_thread(
     });
 }
 
+#[must_use = "future does nothing unless polled/`await`-ed"]
 struct PageTableSwitchWrapper {
     inner: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
     vmtoken: usize,

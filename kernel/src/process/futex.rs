@@ -1,8 +1,14 @@
-use crate::{sync::SpinNoIrqLock as Mutex, syscall::SysResult};
+use crate::trap::NAIVE_TIMER;
+use crate::{
+    arch::timer::timer_now,
+    sync::SpinNoIrqLock as Mutex,
+    syscall::{SysError, SysResult},
+};
+use alloc::boxed::Box;
 use alloc::{collections::VecDeque, sync::Arc};
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use core::{future::Future, task::Waker};
+use core::{future::Future, task::Waker, time::Duration};
 
 pub struct Waiter {
     waker: Option<Waker>,
@@ -43,10 +49,13 @@ impl Futex {
         wake_count
     }
 
-    pub fn wait(self: &Arc<Self>) -> impl Future<Output = SysResult> {
+    pub fn wait(self: &Arc<Self>, timeout: Option<Duration>) -> impl Future<Output = SysResult> {
+        #[must_use = "future does nothing unless polled/`await`-ed"]
         struct FutexFuture {
             waiter: Arc<Mutex<Waiter>>,
+            deadline: Option<Duration>,
         }
+
         impl Future for FutexFuture {
             type Output = SysResult;
 
@@ -56,12 +65,28 @@ impl Futex {
                 if inner.woken {
                     return Poll::Ready(Ok(0));
                 }
+                if let Some(deadline) = self.deadline {
+                    if timer_now() >= deadline {
+                        inner.woken = true;
+                        return Poll::Ready(Err(SysError::ETIMEDOUT));
+                    }
+                }
+
                 // first time?
                 if inner.waker.is_none() {
+                    // futex
                     let mut futex = inner.futex.inner.lock();
                     futex.waiters.push_back(self.waiter.clone());
                     drop(futex);
                     inner.waker.replace(cx.waker().clone());
+
+                    // timer
+                    if let Some(deadline) = self.deadline {
+                        let waker = cx.waker().clone();
+                        NAIVE_TIMER
+                            .lock()
+                            .add(deadline, Box::new(move |_| waker.wake()));
+                    }
                 }
                 Poll::Pending
             }
@@ -73,6 +98,7 @@ impl Futex {
                 woken: false,
                 futex: self.clone(),
             })),
+            deadline: timeout.map(|t| timer_now() + t),
         }
     }
 }

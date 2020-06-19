@@ -64,6 +64,7 @@ pub fn wait_for_event(bus: Arc<Mutex<EventBus>>, mask: Event) -> impl Future<Out
     EventBusFuture { bus, mask }
 }
 
+#[must_use = "future does nothing unless polled/`await`-ed"]
 struct EventBusFuture {
     bus: Arc<Mutex<EventBus>>,
     mask: Event,

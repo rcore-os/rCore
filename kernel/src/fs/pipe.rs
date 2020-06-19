@@ -133,6 +133,7 @@ impl INode for Pipe {
     fn async_poll<'a>(
         &'a self,
     ) -> Pin<Box<dyn Future<Output = Result<PollStatus>> + Send + Sync + 'a>> {
+        #[must_use = "future does nothing unless polled/`await`-ed"]
         struct PipeFuture<'a> {
             pipe: &'a Pipe,
         };

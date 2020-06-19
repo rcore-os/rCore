@@ -111,6 +111,7 @@ impl INode for TtyINode {
     fn async_poll<'a>(
         &'a self,
     ) -> Pin<Box<dyn Future<Output = Result<PollStatus>> + Send + Sync + 'a>> {
+        #[must_use = "future does nothing unless polled/`await`-ed"]
         struct SerialFuture<'a> {
             tty: &'a TtyINode,
         };

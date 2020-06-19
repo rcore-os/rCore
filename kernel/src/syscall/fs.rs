@@ -140,6 +140,7 @@ impl Syscall<'_> {
 
         drop(proc);
 
+        #[must_use = "future does nothing unless polled/`await`-ed"]
         struct PollFuture<'a> {
             polls: Vec<PollFd>,
             syscall: &'a Syscall<'a>,

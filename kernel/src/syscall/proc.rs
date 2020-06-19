@@ -401,14 +401,17 @@ impl Syscall<'_> {
 }
 
 // sleeping
-pub fn sleep_for(deadline: Duration) -> impl Future {
+pub fn sleep_for(duration: Duration) -> impl Future {
     SleepFuture {
-        deadline: timer_now() + deadline,
+        deadline: timer_now() + duration,
+        duration,
     }
 }
 
+#[must_use = "future does nothing unless polled/`await`-ed"]
 pub struct SleepFuture {
     deadline: Duration,
+    duration: Duration,
 }
 
 impl Future for SleepFuture {
@@ -419,7 +422,7 @@ impl Future for SleepFuture {
             return Poll::Ready(());
         }
         // check infinity
-        if self.deadline.as_nanos() < i64::max_value() as u128 {
+        if self.duration.as_nanos() < i64::max_value() as u128 {
             let waker = cx.waker().clone();
             NAIVE_TIMER
                 .lock()
