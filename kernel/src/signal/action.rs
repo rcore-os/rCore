@@ -58,10 +58,10 @@ pub struct SignalAction {
 impl Debug for SignalAction {
     fn fmt(&self, f: &mut Formatter) -> Result<(), core::fmt::Error> {
         f.debug_struct("signal action")
-            .field("handler", &format!("{:#x}", self.handler))
+            .field("handler", &self.handler)
             .field("mask", &self.mask)
             .field("flags", &SignalActionFlags::from_bits_truncate(self.flags))
-            .field("restorer", &format!("{:#x}", self.restorer))
+            .field("restorer", &self.restorer)
             .finish()
     }
 }

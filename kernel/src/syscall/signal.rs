@@ -48,7 +48,7 @@ impl Syscall<'_> {
                 }
                 if !act.is_null() {
                     let act = unsafe { self.vm().check_read_ptr(act)? };
-                    info!("new action: {:?}", act);
+                    info!("new action: {:x?}", act);
                     proc.dispositions[signum] = *act;
                 }
                 Ok(0)

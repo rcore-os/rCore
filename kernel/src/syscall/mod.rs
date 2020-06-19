@@ -137,13 +137,7 @@ impl Syscall<'_> {
                 self.sys_sendfile(args[0], args[1], UserInOutPtr::from(args[2]), args[3])
                     .await
             }
-            SYS_FCNTL => {
-                info!(
-                    "SYS_FCNTL : {} {:#x} {} {}",
-                    args[0], args[1], args[2], args[3]
-                );
-                self.sys_fcntl(args[0], args[1], args[2])
-            }
+            SYS_FCNTL => self.sys_fcntl(args[0], args[1], args[2]),
             SYS_FLOCK => self.sys_flock(args[0], args[1]),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),

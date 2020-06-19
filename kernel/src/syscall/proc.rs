@@ -402,7 +402,9 @@ impl Syscall<'_> {
 
 // sleeping
 pub fn sleep_for(deadline: Duration) -> impl Future {
-    SleepFuture { deadline }
+    SleepFuture {
+        deadline: timer_now() + deadline,
+    }
 }
 
 pub struct SleepFuture {
