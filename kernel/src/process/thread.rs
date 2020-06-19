@@ -81,7 +81,8 @@ impl Thread {
         inode: &Arc<dyn INode>,
         args: Vec<String>,
         envs: Vec<String>,
-    ) -> Result<(MemorySet, usize, usize), &'static str> {
+        vm: &mut MemorySet,
+    ) -> Result<(usize, usize), &'static str> {
         // Read ELF header
         // 0x3c0: magic number from ld-musl.so
         let mut data = [0u8; 0x3c0];
@@ -127,7 +128,7 @@ impl Thread {
         // entry point
         let mut entry_addr = elf.header.pt2.entry_point() as usize;
         // Make page table
-        let (mut vm, bias) = elf.make_memory_set(inode);
+        let bias = elf.make_memory_set(vm, inode);
 
         // Check interpreter (for dynamic link)
         // When interpreter is used, map both dynamic linker and executable
@@ -143,7 +144,7 @@ impl Thread {
                 .read_at(0, &mut interp_data)
                 .map_err(|_| "failed to read from INode")?;
             let elf_interp = ElfFile::new(&interp_data)?;
-            elf_interp.append_as_interpreter(&interp_inode, &mut vm, bias);
+            elf_interp.append_as_interpreter(&interp_inode, vm, bias);
 
             // update auxiliary vector
             auxv.insert(abi::AT_ENTRY, elf.header.pt2.entry_point() as usize);
@@ -186,7 +187,7 @@ impl Thread {
             vm.with(|| ustack_top = init_info.push_at(ustack_top));
         }
 
-        Ok((vm, entry_addr, ustack_top))
+        Ok((entry_addr, ustack_top))
     }
 
     /// Make a new user process from ELF `data`
@@ -197,7 +198,8 @@ impl Thread {
         envs: Vec<String>,
     ) -> Arc<Thread> {
         /// get virtual memory info
-        let (vm, entry_addr, ustack_top) = Self::new_user_vm(inode, args, envs).unwrap();
+        let mut vm = MemorySet::new();
+        let (entry_addr, ustack_top) = Self::new_user_vm(inode, args, envs, &mut vm).unwrap();
 
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));

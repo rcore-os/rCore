@@ -233,8 +233,11 @@ impl Syscall<'_> {
         let inode = proc.lookup_inode(&path)?;
 
         // Make new Thread
-        let (mut vm, entry_addr, ustack_top) =
-            Thread::new_user_vm(&inode, args, envs).map_err(|_| SysError::EINVAL)?;
+        // Re-create vm
+        let mut vm = self.vm();
+        vm.clear();
+        let (entry_addr, ustack_top) =
+            Thread::new_user_vm(&inode, args, envs, &mut vm).map_err(|_| SysError::EINVAL)?;
 
         // close file that FD_CLOEXEC is set
         let close_fds = proc
@@ -257,10 +260,10 @@ impl Syscall<'_> {
         }
 
         // Activate new page table
-        core::mem::swap(&mut *self.vm(), &mut vm);
         unsafe {
-            self.vm().activate();
+            vm.activate();
         }
+        drop(vm);
 
         // Modify exec path
         proc.exec_path = path.clone();

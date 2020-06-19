@@ -61,8 +61,8 @@ impl ToMemoryAttr for Flags {
 
 /// Helper functions to process ELF file
 pub trait ElfExt {
-    /// Generate a MemorySet according to the ELF file.
-    fn make_memory_set(&self, inode: &Arc<dyn INode>) -> (MemorySet, usize);
+    /// Setup MemorySet according to the ELF file.
+    fn make_memory_set(&self, ms: &mut MemorySet, inode: &Arc<dyn INode>) -> usize;
 
     /// Get interpreter string if it has.
     fn get_interpreter(&self) -> Result<&str, &str>;
@@ -81,9 +81,8 @@ pub trait ElfExt {
 }
 
 impl ElfExt for ElfFile<'_> {
-    fn make_memory_set(&self, inode: &Arc<dyn INode>) -> (MemorySet, usize) {
+    fn make_memory_set(&self, ms: &mut MemorySet, inode: &Arc<dyn INode>) -> usize {
         debug!("creating MemorySet from ELF");
-        let mut ms = MemorySet::new();
         let mut farthest_memory: usize = 0;
         for ph in self.program_iter() {
             if ph.get_type() != Ok(Type::Load) {
@@ -106,10 +105,8 @@ impl ElfExt for ElfFile<'_> {
                 farthest_memory = ph.virtual_addr() as usize + ph.mem_size() as usize;
             }
         }
-        (
-            ms,
-            (Page::of_addr(farthest_memory + PAGE_SIZE)).start_address(),
-        )
+
+        Page::of_addr(farthest_memory + PAGE_SIZE).start_address()
     }
     fn append_as_interpreter(&self, inode: &Arc<dyn INode>, ms: &mut MemorySet, bias: usize) {
         debug!("inserting interpreter from ELF");
