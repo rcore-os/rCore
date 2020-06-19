@@ -92,7 +92,10 @@ impl Syscall<'_> {
     ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
-            info!("ppoll: nfds: {}", nfds);
+            info!(
+                "ppoll: ufds: {:?} nfds: {}, timeout: {:?}",
+                ufds, nfds, timeout
+            );
         }
         let timeout_msecs = if timeout.is_null() {
             1 << 31 // infinity

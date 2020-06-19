@@ -213,3 +213,20 @@ pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
         _ => None,
     }
 }
+
+pub fn copy_to_user<T>(addr: *mut T, src: *const T) -> bool {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn write_user<T>(dst: *mut T, src: *const T) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<T>()) {
+        return false;
+    }
+    match unsafe { write_user(addr, src) } {
+        0 => true,
+        _ => false,
+    }
+}

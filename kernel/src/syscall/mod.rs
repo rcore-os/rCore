@@ -44,9 +44,9 @@ mod user;
 
 use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 #[cfg(feature = "profile")]
-use alloc::collections::BTreeMap;
+use crate::sync::SpinNoIrqLock as Mutex;
 #[cfg(feature = "profile")]
-use spin::Mutex;
+use alloc::collections::BTreeMap;
 use trapframe::{GeneralRegs, UserContext};
 
 #[cfg(feature = "profile")]
@@ -333,9 +333,9 @@ impl Syscall<'_> {
             SYS_NANOSLEEP => self.sys_nanosleep(UserInPtr::from(args[0])).await,
             SYS_SETITIMER => self.unimplemented("setitimer", Ok(0)),
             SYS_GETTIMEOFDAY => {
-                self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8)
+                self.sys_gettimeofday(UserOutPtr::from(args[0]), UserInPtr::from(args[1]))
             }
-            SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+            SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], UserOutPtr::from(args[1])),
 
             // sem
             #[cfg(not(target_arch = "mips"))]

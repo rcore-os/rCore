@@ -7,26 +7,27 @@ use lazy_static::lazy_static;
 use rcore_fs::vfs::Timespec;
 
 impl Syscall<'_> {
-    pub fn sys_gettimeofday(&mut self, tv: *mut TimeVal, tz: *const u8) -> SysResult {
+    pub fn sys_gettimeofday(
+        &mut self,
+        mut tv: UserOutPtr<TimeVal>,
+        tz: UserInPtr<u8>,
+    ) -> SysResult {
         info!("gettimeofday: tv: {:?}, tz: {:?}", tv, tz);
-        if tz as usize != 0 {
+        // don't support tz
+        if !tz.is_null() {
             return Err(SysError::EINVAL);
         }
 
-        let tv = unsafe { self.vm().check_write_ptr(tv)? };
-
         let timeval = TimeVal::get_epoch();
-        *tv = timeval;
+        tv.write(timeval)?;
         Ok(0)
     }
 
-    pub fn sys_clock_gettime(&mut self, clock: usize, ts: *mut TimeSpec) -> SysResult {
+    pub fn sys_clock_gettime(&mut self, clock: usize, mut ts: UserOutPtr<TimeSpec>) -> SysResult {
         info!("clock_gettime: clock: {:?}, ts: {:?}", clock, ts);
 
-        let ts = unsafe { self.vm().check_write_ptr(ts)? };
-
         let timespec = TimeSpec::get_epoch();
-        *ts = timespec;
+        ts.write(timespec)?;
         Ok(0)
     }
 

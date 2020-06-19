@@ -382,7 +382,7 @@ impl Syscall<'_> {
 
     pub async fn sys_nanosleep(&mut self, req: UserInPtr<TimeSpec>) -> SysResult {
         let time = req.read()?;
-        info!("nanosleep: time: {:#?}", time);
+        info!("nanosleep: time: {:#?},", time);
         if !time.is_zero() {
             // TODO: handle wakeup
             sleep_for(time.to_duration()).await;

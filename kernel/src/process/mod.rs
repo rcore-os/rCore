@@ -15,6 +15,7 @@ pub mod proc;
 pub mod structs;
 pub mod thread;
 
+use crate::sync::SpinNoIrqLock as Mutex;
 use apic::{XApic, LAPIC_ADDR};
 use core::{
     future::Future,
@@ -22,7 +23,6 @@ use core::{
     task::{Context, Poll},
 };
 pub use proc::*;
-use spin::Mutex;
 pub use structs::*;
 pub use thread::*;
 use x86_64::{

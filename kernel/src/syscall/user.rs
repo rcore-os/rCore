@@ -1,5 +1,5 @@
 use super::SysError;
-use crate::memory::copy_from_user;
+use crate::memory::{copy_from_user, copy_to_user};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
@@ -66,13 +66,6 @@ impl<T, P: Policy> UserPtr<T, P> {
     pub fn as_ptr(&self) -> *mut T {
         self.ptr
     }
-
-    pub fn check(&self) -> Result<()> {
-        if self.ptr.is_null() {
-            return Err(SysError::EINVAL);
-        }
-        Ok(())
-    }
 }
 
 impl<T, P: Read> UserPtr<T, P> {
@@ -81,9 +74,11 @@ impl<T, P: Read> UserPtr<T, P> {
     }
 
     pub fn read(&self) -> Result<T> {
-        // TODO: check ptr and return err
-        self.check()?;
-        Ok(unsafe { self.ptr.read() })
+        if let Some(res) = copy_from_user(self.ptr) {
+            Ok(res)
+        } else {
+            Err(SysError::EFAULT)
+        }
     }
 
     pub fn read_if_not_null(&self) -> Result<Option<T>> {
@@ -98,11 +93,14 @@ impl<T, P: Read> UserPtr<T, P> {
         if len == 0 {
             return Ok(Vec::default());
         }
-        self.check()?;
         let mut ret = Vec::<T>::with_capacity(len);
-        unsafe {
-            ret.set_len(len);
-            ret.as_mut_ptr().copy_from_nonoverlapping(self.ptr, len);
+        for i in 0..len {
+            let ptr = unsafe { self.ptr.add(i) };
+            if let Some(res) = copy_from_user(ptr) {
+                ret.push(res)
+            } else {
+                return Err(SysError::EFAULT);
+            }
         }
         Ok(ret)
     }
@@ -110,41 +108,34 @@ impl<T, P: Read> UserPtr<T, P> {
 
 impl<P: Read> UserPtr<u8, P> {
     pub fn read_string(&self, len: usize) -> Result<String> {
-        self.check()?;
-        let src = unsafe { core::slice::from_raw_parts(self.ptr, len) };
-        let s = core::str::from_utf8(src).map_err(|_| SysError::EINVAL)?;
+        let src = self.read_array(len)?;
+        let s = core::str::from_utf8(&src).map_err(|_| SysError::EINVAL)?;
         Ok(String::from(s))
     }
 
     pub fn read_cstring(&self) -> Result<String> {
-        self.check()?;
-        let len = unsafe { (0usize..).find(|&i| *self.ptr.add(i) == 0).unwrap() };
-        self.read_string(len)
-    }
-}
-
-impl<P: Read> UserPtr<UserPtr<u8, P>, P> {
-    pub fn read_cstring_array(&self) -> Result<Vec<String>> {
-        self.check()?;
-        let len = unsafe {
-            (0usize..)
-                .find(|&i| self.ptr.add(i).read().is_null())
-                .unwrap()
-        };
-        self.read_array(len)?
-            .into_iter()
-            .map(|ptr| ptr.read_cstring())
-            .collect()
+        for i in 0.. {
+            let ptr = unsafe { self.ptr.add(i) };
+            if let Some(res) = copy_from_user(ptr) {
+                if res == 0 {
+                    // found
+                    return self.read_string(i);
+                }
+            } else {
+                return Err(SysError::EFAULT);
+            }
+        }
+        Err(SysError::EINVAL)
     }
 }
 
 impl<T, P: Write> UserPtr<T, P> {
     pub fn write(&mut self, value: T) -> Result<()> {
-        self.check()?;
-        unsafe {
-            self.ptr.write(value);
+        if copy_to_user(self.ptr, &value) {
+            Ok(())
+        } else {
+            Err(SysError::EFAULT)
         }
-        Ok(())
     }
 
     pub fn write_if_not_null(&mut self, value: T) -> Result<()> {
@@ -158,10 +149,11 @@ impl<T, P: Write> UserPtr<T, P> {
         if values.is_empty() {
             return Ok(());
         }
-        self.check()?;
-        unsafe {
-            self.ptr
-                .copy_from_nonoverlapping(values.as_ptr(), values.len());
+        for i in 0..values.len() {
+            let ptr = unsafe { self.ptr.add(i) };
+            if !copy_to_user(ptr, &values[i]) {
+                return Err(SysError::EFAULT);
+            }
         }
         Ok(())
     }
@@ -171,8 +163,10 @@ impl<P: Write> UserPtr<u8, P> {
     pub fn write_cstring(&mut self, s: &str) -> Result<()> {
         let bytes = s.as_bytes();
         self.write_array(bytes)?;
-        unsafe {
-            self.ptr.add(bytes.len()).write(0);
+        let ptr = unsafe { self.ptr.add(bytes.len()) };
+        let null = 0u8;
+        if !copy_to_user(ptr, &null) {
+            return Err(SysError::EFAULT);
         }
         Ok(())
     }
