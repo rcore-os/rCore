@@ -1,6 +1,6 @@
 use super::{
     abi::{self, ProcInitInfo},
-    Tid,
+    Futex, Tid,
 };
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::paging::*;
@@ -90,7 +90,7 @@ pub struct Process {
     pub exec_path: String,
 
     /// Futex
-    pub futexes: BTreeMap<usize, Arc<Condvar>>,
+    pub futexes: BTreeMap<usize, Arc<Futex>>,
 
     /// Semaphore
     pub semaphores: SemProc,
@@ -187,9 +187,9 @@ impl Process {
     }
 
     /// Get futex by addr
-    pub fn get_futex(&mut self, uaddr: usize) -> Arc<Condvar> {
+    pub fn get_futex(&mut self, uaddr: usize) -> Arc<Futex> {
         if !self.futexes.contains_key(&uaddr) {
-            self.futexes.insert(uaddr, Arc::new(Condvar::new()));
+            self.futexes.insert(uaddr, Arc::new(Futex::new()));
         }
         self.futexes.get(&uaddr).unwrap().clone()
     }

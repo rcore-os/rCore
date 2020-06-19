@@ -354,8 +354,8 @@ impl Syscall<'_> {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
             if let Ok(clear_child_tid_ref) = unsafe { self.vm().check_write_ptr(clear_child_tid) } {
                 *clear_child_tid_ref = 0;
-                let queue = proc.get_futex(clear_child_tid as usize);
-                queue.notify_one();
+                let futex = proc.get_futex(clear_child_tid as usize);
+                futex.wake(1);
             }
         }
 

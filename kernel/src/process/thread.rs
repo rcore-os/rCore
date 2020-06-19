@@ -1,9 +1,9 @@
 use super::{
     abi::{self, ProcInitInfo},
-    add_to_process_table, Pid, Process,
+    add_to_process_table, Pid, Process, PROCESSORS,
 };
 use crate::arch::interrupt::TrapFrame;
-use crate::arch::paging::*;
+use crate::arch::{cpu, paging::*};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
@@ -385,17 +385,21 @@ impl Thread {
     /// Create a new thread in the same process.
     pub fn new_clone(
         &self,
-        tf: &UserContext,
+        context: &UserContext,
         stack_top: usize,
         tls: usize,
         clear_child_tid: usize,
     ) -> Arc<Thread> {
         let vm_token = self.vm.lock().token();
+        let mut new_context = context.clone();
+        new_context.general.rsp = stack_top;
+        new_context.general.fsbase = tls;
+
         let thread = Thread {
             tid: 0,
             inner: Mutex::new(ThreadInner {
                 clear_child_tid,
-                ..ThreadInner::default()
+                context: Some(Box::new(new_context)),
             }),
             vm: self.vm.clone(),
             proc: self.proc.clone(),
@@ -412,5 +416,92 @@ impl Thread {
 
     pub fn end_running(&self, cx: Box<UserContext>) {
         self.inner.lock().context = Some(cx);
+    }
+}
+
+pub fn spawn(thread: Arc<Thread>) {
+    let vmtoken = thread.vm.lock().token();
+    let temp = thread.clone();
+    let future = async move {
+        loop {
+            let mut cx = thread.begin_running();
+            trace!("go to user: {:#x?}", cx);
+            cx.run();
+            trace!("back from user: {:#x?}", cx);
+
+            let mut exit = false;
+            match cx.trap_num {
+                0x100 => exit = handle_syscall(&thread, &mut cx).await,
+                0x20..=0x3f => {
+                    let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
+                    lapic.eoi();
+                    trace!("handle irq {}", cx.trap_num);
+                    if cx.trap_num == 0x20 {
+                        crate::trap::timer();
+                    }
+                    if cx.trap_num == 0x20 + 4 {
+                        use crate::arch::driver::serial::*;
+                        info!("\nInterupt: COM1");
+                        crate::trap::serial(COM1.lock().receive());
+                    }
+                }
+                0xe => {
+                    // page fault
+                    let addr = Cr2::read().as_u64();
+                    debug!("page fault @ {:#x}", addr);
+
+                    thread.vm.lock().handle_page_fault(addr as usize);
+                }
+                _ => {}
+            }
+            thread.end_running(cx);
+            if exit {
+                break;
+            }
+        }
+    };
+
+    spawn_thread(Box::pin(future), vmtoken, temp);
+}
+
+fn spawn_thread(
+    future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>,
+    vmtoken: usize,
+    thread: Arc<Thread>,
+) {
+    executor::spawn(PageTableSwitchWrapper {
+        inner: Mutex::new(future),
+        vmtoken,
+        thread,
+    });
+}
+
+struct PageTableSwitchWrapper {
+    inner: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    vmtoken: usize,
+    thread: Arc<Thread>,
+}
+
+impl Future for PageTableSwitchWrapper {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // set cpu local thread
+        // TODO: task local?
+        let cpu_id = cpu::id();
+        unsafe {
+            PROCESSORS[cpu_id] = Some(self.thread.clone());
+        }
+        // vmtoken won't change
+        unsafe {
+            Cr3::write(
+                PhysFrame::containing_address(PhysAddr::new(self.vmtoken as u64)),
+                Cr3Flags::empty(),
+            );
+        }
+        let res = self.inner.lock().as_mut().poll(cx);
+        unsafe {
+            PROCESSORS[cpu_id] = None;
+        }
+        res
     }
 }

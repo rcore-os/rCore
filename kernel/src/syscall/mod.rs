@@ -335,12 +335,15 @@ impl Syscall<'_> {
                     .await
             } // TODO: wait4
             SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0] as *mut u32),
-            SYS_FUTEX => self.sys_futex(
-                args[0],
-                args[1] as u32,
-                args[2] as i32,
-                args[3] as *const TimeSpec,
-            ),
+            SYS_FUTEX => {
+                self.sys_futex(
+                    args[0],
+                    args[1] as u32,
+                    args[2] as i32,
+                    UserInPtr::from(args[3]),
+                )
+                .await
+            }
             #[cfg(target_arch = "x86_64")]
             SYS_TKILL => self.sys_tkill(args[0], args[1]),
 

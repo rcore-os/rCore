@@ -61,21 +61,16 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_futex(
+    pub async fn sys_futex(
         &mut self,
         uaddr: usize,
         op: u32,
         val: i32,
-        timeout: *const TimeSpec,
+        timeout: UserInPtr<TimeSpec>,
     ) -> SysResult {
         info!(
             "futex: [{}] uaddr: {:#x}, op: {:#x}, val: {}, timeout_ptr: {:?}",
-            0,
-            //thread::current().id(),
-            uaddr,
-            op,
-            val,
-            timeout
+            self.thread.tid, uaddr, op, val, timeout
         );
         if op & OP_PRIVATE == 0 {
             warn!("process-shared futex is unimplemented");
@@ -97,21 +92,21 @@ impl Syscall<'_> {
                 if atomic.load(Ordering::Acquire) != val {
                     return Err(SysError::EAGAIN);
                 }
+                // avoid deadlock
+                drop(proc);
                 if timeout.is_null() {
-                    queue.wait(proc);
+                    queue.wait().await?;
                     Ok(0)
                 } else {
-                    let timeout = unsafe { *self.vm().check_read_ptr(timeout)? };
+                    // TODO: timeout
+                    let timeout = timeout.read()?;
                     info!("futex wait timeout: {:?}", timeout);
-                    if queue.wait_timeout(proc, timeout).is_some() {
-                        Ok(0)
-                    } else {
-                        Err(ETIMEDOUT)
-                    }
+                    queue.wait().await?;
+                    Ok(0)
                 }
             }
             OP_WAKE => {
-                let woken_up_count = queue.notify_n(val as usize);
+                let woken_up_count = queue.wake(val as usize);
                 Ok(woken_up_count)
             }
             _ => {
