@@ -1,7 +1,7 @@
 //! File handle for process
 
 use crate::memory::GlobalFrameAlloc;
-use crate::process::INodeForMap;
+use crate::process::{current_thread, INodeForMap};
 use crate::syscall::{MmapProt, SysResult, TimeSpec};
 use alloc::{string::String, sync::Arc};
 use core::fmt;
@@ -235,8 +235,7 @@ impl FileHandle {
         match self.inode.metadata()?.type_ {
             FileType::File => {
                 let prot = MmapProt::from_bits_truncate(area.prot);
-                /*
-                let thread = unsafe { current_thread() };
+                let thread = current_thread().unwrap();
                 thread.vm.lock().push(
                     area.start_vaddr,
                     area.end_vaddr,
@@ -250,7 +249,6 @@ impl FileHandle {
                     },
                     "mmap_file",
                 );
-                */
                 Ok(())
             }
             FileType::CharDevice => self.inode.mmap(area),

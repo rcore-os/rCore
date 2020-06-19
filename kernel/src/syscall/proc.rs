@@ -56,36 +56,28 @@ impl Syscall<'_> {
             return self.sys_fork();
         }
         if (flags != 0x7d0f00) && (flags != 0x5d0f00) {
-            //0x5d0f00 is the args from gcc of alpine linux
-            //warn!("sys_clone only support musl pthread_create");
-            panic!(
-                "sys_clone only support sys_fork OR musl pthread_create without flags{:x}",
+            // 0x5d0f00 is the args from gcc of alpine linux
+            warn!(
+                "sys_clone only support sys_fork or musl pthread_create without flags{:x}",
                 flags
             );
-            //return Err(SysError::ENOSYS);
+            return Err(SysError::ENOSYS);
         }
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
-        // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
-        todo!();
-        /*
-        //let mut new_thread = self
-            //.thread
-            //.clone(self.tf, newsp, newtls, child_tid as usize);
+        let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
+        let mut new_thread = self
+            .thread
+            .new_clone(self.context, newsp, newtls, child_tid as usize);
         if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
-            //new_thread.clear_child_tid = child_tid as usize;
+            new_thread.inner.lock().clear_child_tid = child_tid as usize;
         }
-        //let tid = thread_manager().add(new_thread);
-        let tid: usize = todo!();
-        //thread_manager().detach(tid);
-        info!("clone: {} -> {}",
-        0,
-         //thread::current().id(),
-         tid);
+        let tid: usize = new_thread.tid;
+        info!("clone: {} -> {}", self.thread.tid, tid);
         *parent_tid_ref = tid as u32;
-        // *child_tid_ref = tid as u32;
+        *child_tid_ref = tid as u32;
+        spawn(new_thread);
         Ok(tid)
-        */
     }
 
     /// Wait for the process exit.
@@ -292,8 +284,8 @@ impl Syscall<'_> {
             pid = self.process().pid.get();
         }
         info!("getpgid: get pgid of process {}", pid);
+
         let process_table = PROCESSES.read();
-        // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
             let proc = proc.lock();

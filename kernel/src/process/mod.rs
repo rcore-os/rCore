@@ -38,16 +38,17 @@ pub fn init() {
     info!("process: init end");
 }
 
-static mut THREADS: [Option<Arc<Thread>>; MAX_CPU_NUM] = [None; MAX_CPU_NUM];
+static mut PROCESSORS: [Option<Arc<Thread>>; MAX_CPU_NUM] = [None; MAX_CPU_NUM];
 
 /// Get current thread
 ///
 /// `Thread` is a thread-local object.
 /// It is safe to call this once, and pass `&mut Thread` as a function argument.
-/// Should only be called in kernel trap handler
+///
+/// Don't use it unless necessary.
 pub fn current_thread() -> Option<Arc<Thread>> {
     let cpu_id = cpu::id();
-    unsafe { THREADS[cpu_id].clone() }
+    unsafe { PROCESSORS[cpu_id].clone() }
 }
 
 pub fn spawn(thread: Arc<Thread>) {
@@ -120,7 +121,7 @@ impl Future for PageTableSwitchWrapper {
         // TODO: task local?
         let cpu_id = cpu::id();
         unsafe {
-            THREADS[cpu_id] = Some(self.thread.clone());
+            PROCESSORS[cpu_id] = Some(self.thread.clone());
         }
         // vmtoken won't change
         unsafe {
@@ -131,7 +132,7 @@ impl Future for PageTableSwitchWrapper {
         }
         let res = self.inner.lock().as_mut().poll(cx);
         unsafe {
-            THREADS[cpu_id] = None;
+            PROCESSORS[cpu_id] = None;
         }
         res
     }

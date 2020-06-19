@@ -1,6 +1,6 @@
 use super::{
     abi::{self, ProcInitInfo},
-    Pid, Process,
+    add_to_process_table, Pid, Process,
 };
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::paging::*;
@@ -74,7 +74,30 @@ pub struct Thread {
     pub sig_mask: Sigset,
 }
 
+lazy_static! {
+    /// Records the mapping between pid and Process struct.
+    pub static ref THREADS: RwLock<BTreeMap<usize, Arc<Thread>>> =
+        RwLock::new(BTreeMap::new());
+}
+
 impl Thread {
+    /// Assign a tid and put itself to global thread table.
+    pub fn add_to_table(mut self) -> Arc<Self> {
+        let mut thread_table = THREADS.write();
+
+        // assign tid, do not start from 0
+        let tid = (Pid::INIT..)
+            .find(|i| thread_table.get(i).is_none())
+            .unwrap();
+        self.tid = tid;
+
+        // put to thread table
+        let self_ref = Arc::new(self);
+        thread_table.insert(tid, self_ref.clone());
+
+        self_ref
+    }
+
     /// Construct virtual memory of a new user process from ELF at `inode`.
     /// Return `(MemorySet, entry_point, ustack_top)`
     pub fn new_user_vm(
@@ -259,21 +282,21 @@ impl Thread {
         context.general.rsp = ustack_top;
         context.general.rflags = 0x3202;
 
-        Arc::new(Thread {
-            tid: 1, // default is init
+        let thread = Thread {
+            tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::from(context)),
                 clear_child_tid: 0,
             }),
             vm: vm.clone(),
-            proc: Process {
+            proc: Arc::new(Mutex::new(Process {
                 vm,
                 files,
                 cwd: String::from("/"),
                 exec_path: String::from(exec_path),
                 futexes: BTreeMap::default(),
                 semaphores: SemProc::default(),
-                pid: Pid::new(), // allocated in add_to_table()
+                pid: Pid::new(), // allocated later
                 pgid: 0,
                 parent: (Pid::new(), Weak::new()),
                 children: Vec::new(),
@@ -284,10 +307,16 @@ impl Thread {
                 dispositions: [SignalAction::default(); Signal::RTMAX + 1],
                 sigaltstack: SignalStack::default(),
                 eventbus: EventBus::new(),
-            }
-            .add_to_table(),
+            })),
             sig_mask: Sigset::default(),
-        })
+        };
+
+        let res = thread.add_to_table();
+
+        // set pid to tid
+        add_to_process_table(res.proc.clone(), Pid(res.tid));
+
+        res
     }
 
     /// Fork a new process from current one
@@ -304,14 +333,14 @@ impl Thread {
 
         let mut proc = self.proc.lock();
 
-        let new_proc = Process {
+        let new_proc = Arc::new(Mutex::new(Process {
             vm: vm.clone(),
             files: proc.files.clone(), // share open file descriptions
             cwd: proc.cwd.clone(),
             exec_path: proc.exec_path.clone(),
             futexes: BTreeMap::default(),
             semaphores: proc.semaphores.clone(),
-            pid: Pid::new(),
+            pid: Pid::new(), // assigned later
             pgid: proc.pgid,
             parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
@@ -322,22 +351,15 @@ impl Thread {
             dispositions: proc.dispositions.clone(),
             sigaltstack: Default::default(),
             eventbus: EventBus::new(),
-        }
-        .add_to_table();
+        }));
 
-        // link to parent
-        let child_pid = new_proc.lock().pid.clone();
-        proc.children.push((child_pid, Arc::downgrade(&new_proc)));
-
-        // set init thread tid
-        new_proc.lock().threads.push(child_pid.get());
-
+        // new thread
         // this part in linux manpage seems ambiguous:
         // Each of the threads in a process has its own signal mask.
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
-        Arc::new(Thread {
-            tid: child_pid.get(), // tid = pid
+        let new_thread = Thread {
+            tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::new(context)),
                 clear_child_tid: 0,
@@ -345,19 +367,31 @@ impl Thread {
             vm,
             proc: new_proc,
             sig_mask: self.sig_mask,
-        })
+        }
+        .add_to_table();
+
+        // link thread and process
+        let child_pid = Pid(new_thread.tid);
+        add_to_process_table(new_thread.proc.clone(), Pid(new_thread.tid));
+        new_thread.proc.lock().threads.push(new_thread.tid);
+
+        // link to parent
+        proc.children
+            .push((child_pid, Arc::downgrade(&new_thread.proc)));
+
+        new_thread
     }
 
     /// Create a new thread in the same process.
-    pub fn clone(
+    pub fn new_clone(
         &self,
-        tf: &TrapFrame,
+        tf: &UserContext,
         stack_top: usize,
         tls: usize,
         clear_child_tid: usize,
-    ) -> Box<Thread> {
+    ) -> Arc<Thread> {
         let vm_token = self.vm.lock().token();
-        Box::new(Thread {
+        let thread = Thread {
             tid: 0,
             inner: Mutex::new(ThreadInner {
                 clear_child_tid,
@@ -366,7 +400,10 @@ impl Thread {
             vm: self.vm.clone(),
             proc: self.proc.clone(),
             sig_mask: self.sig_mask,
-        })
+        };
+        let res = thread.add_to_table();
+        res.proc.lock().threads.push(res.tid);
+        res
     }
 
     pub fn begin_running(&self) -> Box<UserContext> {

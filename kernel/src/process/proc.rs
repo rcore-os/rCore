@@ -9,6 +9,7 @@ use crate::ipc::SemProc;
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
+use crate::process::thread::THREADS;
 use crate::sync::{Condvar, Event, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
@@ -47,7 +48,7 @@ use xmas_elf::{
 
 /// Pid type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pid(usize);
+pub struct Pid(pub usize);
 
 impl Pid {
     pub const INIT: usize = 1;
@@ -156,24 +157,18 @@ pub fn process_group(pgid: Pgid) -> Vec<Arc<Mutex<Process>>> {
         .collect::<Vec<_>>()
 }
 
+/// Set pid and put itself to global process table.
+pub fn add_to_process_table(proc: Arc<Mutex<Process>>, pid: Pid) {
+    let mut process_table = PROCESSES.write();
+
+    // set pid
+    proc.lock().pid = pid;
+
+    // put to process table
+    process_table.insert(pid.get(), proc.clone());
+}
+
 impl Process {
-    /// Assign a pid and put itself to global process table.
-    pub fn add_to_table(mut self) -> Arc<Mutex<Self>> {
-        let mut process_table = PROCESSES.write();
-
-        // assign pid, do not start from 0
-        let pid = (Pid::INIT..)
-            .find(|i| process_table.get(i).is_none())
-            .unwrap();
-        self.pid = Pid(pid);
-
-        // put to process table
-        let self_ref = Arc::new(Mutex::new(self));
-        process_table.insert(pid, self_ref.clone());
-
-        self_ref
-    }
-
     /// Get lowest free fd
     fn get_free_fd(&self) -> usize {
         (0..).find(|i| !self.files.contains_key(i)).unwrap()
@@ -220,8 +215,10 @@ impl Process {
 
         // quit all threads
         // this must be after setting the value of subprocess, or the threads will be treated exit before actually exits
+        // remove from thread table
+        let mut thread_table = THREADS.write();
         for tid in self.threads.iter() {
-            //thread_manager().exit(*tid, 1);
+            thread_table.remove(tid);
         }
         self.threads.clear();
 
