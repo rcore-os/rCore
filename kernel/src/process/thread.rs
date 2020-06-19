@@ -392,6 +392,7 @@ impl Thread {
     ) -> Arc<Thread> {
         let vm_token = self.vm.lock().token();
         let mut new_context = context.clone();
+        new_context.general.rax = 0;
         new_context.general.rsp = stack_top;
         new_context.general.fsbase = tls;
 
@@ -448,7 +449,7 @@ pub fn spawn(thread: Arc<Thread>) {
                 0xe => {
                     // page fault
                     let addr = Cr2::read().as_u64();
-                    debug!("page fault @ {:#x}", addr);
+                    debug!("page fault from user @ {:#x}", addr);
 
                     thread.vm.lock().handle_page_fault(addr as usize);
                 }
