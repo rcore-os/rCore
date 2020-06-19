@@ -50,7 +50,7 @@ pub unsafe fn current_thread() -> &'static mut Thread {
 }
 
 pub fn spawn(thread: Arc<Thread>) {
-    let vmtoken = thread.vm.lock().token();
+    let temp = thread.clone();
     let future = async move {
         loop {
             let mut cx = thread.begin_running();
@@ -90,27 +90,29 @@ pub fn spawn(thread: Arc<Thread>) {
         }
     };
 
-    spawn_thread(Box::pin(future), vmtoken);
+    spawn_thread(Box::pin(future), temp);
 }
 
-fn spawn_thread(future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>, vmtoken: usize) {
+fn spawn_thread(future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>, thread: Arc<Thread>) {
     executor::spawn(PageTableSwitchWrapper {
         inner: Mutex::new(future),
-        vmtoken,
+        thread,
     });
 }
 
 struct PageTableSwitchWrapper {
     inner: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    vmtoken: usize,
+    thread: Arc<Thread>,
 }
 
 impl Future for PageTableSwitchWrapper {
     type Output = ();
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // vmtoken might change upon sys_exec
+        let vmtoken = self.thread.vm.lock().token();
         unsafe {
             Cr3::write(
-                PhysFrame::containing_address(PhysAddr::new(self.vmtoken as u64)),
+                PhysFrame::containing_address(PhysAddr::new(vmtoken as u64)),
                 Cr3Flags::empty(),
             );
         }
