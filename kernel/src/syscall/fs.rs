@@ -29,16 +29,16 @@ use crate::syscall::SysError::{EINTR, EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
 
 impl Syscall<'_> {
-    pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
+    pub async fn sys_read(&mut self, fd: usize, base: UserOutPtr<u8>, len: usize) -> SysResult {
         let mut proc = self.process();
         if !proc.pid.is_init() {
             // we trust pid 0 process
             info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
         }
-        let slice = unsafe { self.vm().check_write_array(base, len)? };
+        let slice = unsafe { self.vm().check_write_array(base.ptr(), len)? };
 
-        let file_like = unsafe { (*UnsafeCell::new(proc).get()).get_file_like(fd)? };
-        let len = file_like.read(slice)?;
+        let file_like = proc.get_file_like(fd)?;
+        let len = file_like.read(slice).await?;
         Ok(len)
     }
 
@@ -54,14 +54,20 @@ impl Syscall<'_> {
         Ok(len)
     }
 
-    pub fn sys_pread(&mut self, fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResult {
+    pub async fn sys_pread(
+        &mut self,
+        fd: usize,
+        mut base: UserOutPtr<u8>,
+        len: usize,
+        offset: usize,
+    ) -> SysResult {
         info!(
             "pread: fd: {}, base: {:?}, len: {}, offset: {}",
             fd, base, len, offset
         );
         let mut proc = self.process();
-        let slice = unsafe { self.vm().check_write_array(base, len)? };
-        let len = proc.get_file(fd)?.read_at(offset, slice)?;
+        let slice = unsafe { self.vm().check_write_array(base.ptr(), len)? };
+        let len = proc.get_file(fd)?.read_at(offset, slice).await?;
         Ok(len)
     }
 
@@ -518,18 +524,24 @@ impl Syscall<'_> {
         Ok(num)
     }
 
-    pub fn sys_readv(&mut self, fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    pub async fn sys_readv(
+        &mut self,
+        fd: usize,
+        iov_ptr: UserInPtr<IoVec>,
+        iov_count: usize,
+    ) -> SysResult {
         info!(
             "readv: fd: {}, iov: {:?}, count: {}",
             fd, iov_ptr, iov_count
         );
         let mut proc = self.process();
-        let mut iovs = unsafe { IoVecs::check_and_new(iov_ptr, iov_count, &self.vm(), true)? };
+        let mut iovs =
+            unsafe { IoVecs::check_and_new(iov_ptr.ptr(), iov_count, &self.vm(), true)? };
 
         // read all data to a buf
         let file_like = proc.get_file_like(fd)?;
         let mut buf = iovs.new_buf(true);
-        let len = file_like.read(buf.as_mut_slice())?;
+        let len = file_like.read(buf.as_mut_slice()).await?;
         // copy data to user
         iovs.write_all_from_slice(&buf[..len]);
         Ok(len)
@@ -1204,22 +1216,23 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_sendfile(
+    pub async fn sys_sendfile(
         &mut self,
         out_fd: usize,
         in_fd: usize,
-        offset_ptr: *mut usize,
+        offset_ptr: UserInOutPtr<usize>,
         count: usize,
     ) -> SysResult {
-        self.sys_copy_file_range(in_fd, offset_ptr, out_fd, 0 as *mut usize, count, 0)
+        self.sys_copy_file_range(in_fd, offset_ptr, out_fd, UserInOutPtr::from(0), count, 0)
+            .await
     }
 
-    pub fn sys_copy_file_range(
+    pub async fn sys_copy_file_range(
         &mut self,
         in_fd: usize,
-        in_offset: *mut usize,
+        mut in_offset: UserInOutPtr<usize>,
         out_fd: usize,
-        out_offset: *mut usize,
+        mut out_offset: UserInOutPtr<usize>,
         count: usize,
         flags: usize,
     ) -> SysResult {
@@ -1240,16 +1253,14 @@ impl Syscall<'_> {
         // non-null means update {in,out}_offset instead
 
         let mut read_offset = if !in_offset.is_null() {
-            unsafe { *self.vm().check_read_ptr(in_offset)? }
+            in_offset.read()?
         } else {
             in_file.seek(SeekFrom::Current(0))? as usize
         };
 
         let orig_out_file_offset = out_file.seek(SeekFrom::Current(0))?;
         let write_offset = if !out_offset.is_null() {
-            out_file.seek(SeekFrom::Start(
-                unsafe { *self.vm().check_read_ptr(out_offset)? } as u64,
-            ))? as usize
+            out_file.seek(SeekFrom::Start(out_offset.read()? as u64))? as usize
         } else {
             0
         };
@@ -1259,7 +1270,7 @@ impl Syscall<'_> {
         let mut total_written = 0;
         while bytes_read < count {
             let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
+            let read_len = in_file.read_at(read_offset, &mut buffer[..len]).await?;
             if read_len == 0 {
                 break;
             }
@@ -1284,17 +1295,13 @@ impl Syscall<'_> {
         }
 
         if !in_offset.is_null() {
-            unsafe {
-                in_offset.write(read_offset);
-            }
+            in_offset.write(read_offset)?;
         } else {
             in_file.seek(SeekFrom::Current(bytes_read as i64))?;
         }
 
         if !out_offset.is_null() {
-            unsafe {
-                out_offset.write(write_offset + total_written);
-            }
+            out_offset.write(write_offset + total_written)?;
             out_file.seek(SeekFrom::Start(orig_out_file_offset))?;
         }
         info!(

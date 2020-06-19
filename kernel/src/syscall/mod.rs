@@ -110,7 +110,10 @@ impl Syscall<'_> {
         // And https://fedora.juszkiewicz.com.pl/syscalls.html.
         let ret = match id {
             // file
-            SYS_READ => self.sys_read(args[0], args[1] as *mut u8, args[2]),
+            SYS_READ => {
+                self.sys_read(args[0], UserOutPtr::from(args[1]), args[2])
+                    .await
+            }
             SYS_WRITE => self.sys_write(args[0], args[1] as *const u8, args[2]),
             SYS_OPENAT => self.sys_openat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_CLOSE => self.sys_close(args[0]),
@@ -120,11 +123,20 @@ impl Syscall<'_> {
             }
             SYS_LSEEK => self.sys_lseek(args[0], args[1] as i64, args[2] as u8),
             SYS_IOCTL => self.sys_ioctl(args[0], args[1], args[2], args[3], args[4]),
-            SYS_PREAD64 => self.sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
+            SYS_PREAD64 => {
+                self.sys_pread(args[0], UserOutPtr::from(args[1]), args[2], args[3])
+                    .await
+            }
             SYS_PWRITE64 => self.sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
-            SYS_READV => self.sys_readv(args[0], args[1] as *const IoVec, args[2]),
+            SYS_READV => {
+                self.sys_readv(args[0], UserInPtr::from(args[1]), args[2])
+                    .await
+            }
             SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
-            SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
+            SYS_SENDFILE => {
+                self.sys_sendfile(args[0], args[1], UserInOutPtr::from(args[2]), args[3])
+                    .await
+            }
             SYS_FCNTL => {
                 info!(
                     "SYS_FCNTL : {} {:#x} {} {}",
@@ -173,14 +185,17 @@ impl Syscall<'_> {
                 args[2] as *const TimeSpec,
                 args[3],
             ),
-            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
-                args[0],
-                args[1] as *mut usize,
-                args[2],
-                args[3] as *mut usize,
-                args[4],
-                args[5],
-            ),
+            SYS_COPY_FILE_RANGE => {
+                self.sys_copy_file_range(
+                    args[0],
+                    UserInOutPtr::from(args[1]),
+                    args[2],
+                    UserInOutPtr::from(args[3]),
+                    args[4],
+                    args[5],
+                )
+                .await
+            }
 
             // io multiplexing
             SYS_PSELECT6 => self.sys_pselect6(

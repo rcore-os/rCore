@@ -26,9 +26,9 @@ impl FileLike {
         }
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> SysResult {
+    pub async fn read(&mut self, buf: &mut [u8]) -> SysResult {
         let len = match self {
-            FileLike::File(file) => file.read(buf)?,
+            FileLike::File(file) => file.read(buf).await?,
             FileLike::Socket(socket) => socket.read(buf).0?,
             FileLike::EpollInstance(_) => {
                 return Err(SysError::ENOSYS);

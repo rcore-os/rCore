@@ -52,6 +52,10 @@ impl<T, P: Policy> From<usize> for UserPtr<T, P> {
 }
 
 impl<T, P: Policy> UserPtr<T, P> {
+    pub fn ptr(&self) -> *mut T {
+        self.ptr
+    }
+
     pub fn is_null(&self) -> bool {
         self.ptr.is_null()
     }

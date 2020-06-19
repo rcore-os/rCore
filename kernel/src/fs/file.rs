@@ -103,13 +103,14 @@ impl FileHandle {
     // let mut ret = 0 as usize;
     // }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let len = self.read_at(self.description.read().offset as usize, buf)?;
+    pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let offset = self.description.read().offset as usize;
+        let len = self.read_at(offset, buf).await?;
         self.description.write().offset += len as u64;
         Ok(len)
     }
 
-    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         // let options = &self.description.read().options;
         if !self.description.read().options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
@@ -122,7 +123,8 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
-                        // TODO: async
+                        // TODO: signal
+                        self.async_poll().await?;
                         //if has_signal_to_do() {
                         //return Err(Interrupted);
                         //}

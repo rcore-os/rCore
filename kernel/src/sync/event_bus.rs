@@ -11,10 +11,13 @@ use core::{
 bitflags! {
     #[derive(Default)]
     pub struct Event: u32 {
+        /// File
         const READABLE                      = 1 << 0;
         const WRITABLE                      = 1 << 1;
         const ERROR                         = 1 << 2;
+        const CLOSED                        = 1 << 3;
 
+        /// Process
         const PROCESS_QUIT                  = 1 << 10;
         const CHILD_PROCESS_QUIT            = 1 << 11;
     }
