@@ -225,19 +225,18 @@ impl Syscall<'_> {
 
         info!("exec: path: {:?}, args: {:?}, envs: {:?}", path, args, envs);
 
-        // Kill other threads
-        // TODO: stop and wait until they are finished
-        proc.threads.retain(|&tid| tid == self.thread.tid);
-
         // Read program file
         let inode = proc.lookup_inode(&path)?;
 
         // Make new Thread
         // Re-create vm
         let mut vm = self.vm();
-        vm.clear();
         let (entry_addr, ustack_top) =
             Thread::new_user_vm(&inode, args, envs, &mut vm).map_err(|_| SysError::EINVAL)?;
+
+        // Kill other threads
+        // TODO: stop and wait until they are finished
+        proc.threads.retain(|&tid| tid == self.thread.tid);
 
         // close file that FD_CLOEXEC is set
         let close_fds = proc

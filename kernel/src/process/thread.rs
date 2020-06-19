@@ -128,6 +128,7 @@ impl Thread {
         // entry point
         let mut entry_addr = elf.header.pt2.entry_point() as usize;
         // Make page table
+        vm.clear();
         let bias = elf.make_memory_set(vm, inode);
 
         // Check interpreter (for dynamic link)
