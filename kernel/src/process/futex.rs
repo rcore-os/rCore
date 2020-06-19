@@ -31,7 +31,9 @@ impl Futex {
         let mut inner = self.inner.lock();
         for i in 0..wake_count {
             if let Some(waiter) = inner.waiters.pop_front() {
-                if let Some(waker) = waiter.lock().waker.take() {
+                let mut waiter = waiter.lock();
+                waiter.woken = true;
+                if let Some(waker) = waiter.waker.take() {
                     waker.wake();
                 }
             } else {
