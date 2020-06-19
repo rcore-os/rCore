@@ -141,8 +141,9 @@ impl Drop for KernelStack {
 pub fn handle_page_fault(addr: usize) -> bool {
     debug!("page fault @ {:#x}", addr);
 
-    let thread = unsafe { current_thread() };
-    thread.vm.lock().handle_page_fault(addr)
+    let thread = current_thread().unwrap();
+    let mut lock = thread.vm.lock();
+    lock.handle_page_fault(addr)
 }
 
 pub fn init_heap() {

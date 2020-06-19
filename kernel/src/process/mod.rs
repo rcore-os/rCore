@@ -38,15 +38,16 @@ pub fn init() {
     info!("process: init end");
 }
 
+static mut THREADS: [Option<Arc<Thread>>; MAX_CPU_NUM] = [None; MAX_CPU_NUM];
+
 /// Get current thread
 ///
 /// `Thread` is a thread-local object.
 /// It is safe to call this once, and pass `&mut Thread` as a function argument.
-pub unsafe fn current_thread() -> &'static mut Thread {
-    // trick: force downcast from trait object
-    //let (process, _): (&mut Thread, *const ()) = core::mem::transmute(processor().context());
-    //process
-    todo!()
+/// Should only be called in kernel trap handler
+pub fn current_thread() -> Option<Arc<Thread>> {
+    let cpu_id = cpu::id();
+    unsafe { THREADS[cpu_id].clone() }
 }
 
 pub fn spawn(thread: Arc<Thread>) {
@@ -109,6 +110,10 @@ impl Future for PageTableSwitchWrapper {
     type Output = ();
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // vmtoken might change upon sys_exec
+        let cpu_id = cpu::id();
+        unsafe {
+            THREADS[cpu_id] = Some(self.thread.clone());
+        }
         let vmtoken = self.thread.vm.lock().token();
         unsafe {
             Cr3::write(
@@ -116,6 +121,10 @@ impl Future for PageTableSwitchWrapper {
                 Cr3Flags::empty(),
             );
         }
-        self.inner.lock().as_mut().poll(cx)
+        let res = self.inner.lock().as_mut().poll(cx);
+        unsafe {
+            THREADS[cpu_id] = None;
+        }
+        res
     }
 }

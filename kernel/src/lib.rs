@@ -8,6 +8,7 @@
 #![feature(negative_impls)]
 #![feature(alloc_prelude)]
 #![feature(const_fn)]
+#![feature(const_in_array_repeat_expressions)]
 #![deny(unused_must_use)]
 #![deny(stable_features)]
 #![deny(unused_unsafe)]

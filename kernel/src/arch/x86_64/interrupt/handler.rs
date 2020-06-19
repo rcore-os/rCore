@@ -67,7 +67,6 @@
 use super::consts::*;
 use super::TrapFrame;
 use crate::drivers::IRQ_MANAGER;
-use crate::process::current_thread;
 use crate::signal::do_signal;
 use bitflags::*;
 use log::*;
@@ -216,7 +215,7 @@ pub extern "C" fn syscall(tf: &mut TrapFrame) {
     trace!("\nInterupt: Syscall {:#x?}", tf.rax);
     //let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
     //tf.rax = ret as usize;
-    do_signal(tf);
+    //do_signal(tf);
 }
 
 fn syscall32(tf: &mut TrapFrame) {

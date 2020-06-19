@@ -1,4 +1,4 @@
-use crate::process::{current_thread, process, process_of, Process};
+use crate::process::{process, process_of, Process, Thread};
 use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
 use bitflags::*;
@@ -132,9 +132,8 @@ pub struct SignalFrame {
     pub ret_code: [u8; 7],           // call sys_sigreturn
 }
 
-pub fn do_signal(tf: &mut TrapFrame) {
-    let thread = unsafe { current_thread() };
-    let mut process = unsafe { current_thread().proc.lock() };
+pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
+    let mut process = thread.proc.lock();
     while let Some((idx, info)) =
         process
             .sig_queue
