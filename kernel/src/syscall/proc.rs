@@ -145,6 +145,11 @@ impl Syscall<'_> {
             if let Some((pid, exit_code)) = find {
                 info!("wait: found pid {}", pid);
 
+                // write before removing to handle EFAULT
+                if let Some(mut wstatus) = wstatus {
+                    wstatus.write(exit_code as i32)?;
+                }
+
                 // remove from process table
                 if true {
                     let mut process_table = PROCESSES.write();
@@ -154,9 +159,6 @@ impl Syscall<'_> {
                 // remove from children
                 proc.children.retain(|(p, _)| *p != pid);
 
-                if let Some(mut wstatus) = wstatus {
-                    wstatus.write(exit_code as i32)?;
-                }
                 return Ok(pid.get());
             }
             // if not, check pid
