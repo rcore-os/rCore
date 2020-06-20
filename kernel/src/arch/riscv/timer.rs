@@ -1,4 +1,5 @@
 use super::sbi;
+use core::time::Duration;
 use log::*;
 use riscv::register::*;
 
@@ -39,4 +40,11 @@ pub fn set_next() {
     // 100Hz @ QEMU
     let timebase = 250000;
     sbi::set_timer(get_cycle() + timebase);
+}
+
+pub fn timer_now() -> Duration {
+    // TODO: get actual freq
+    const FREQUENCY: u16 = 2600;
+    let time = get_cycle();
+    Duration::from_nanos(time * 1000 / FREQUENCY as u64)
 }

@@ -6,7 +6,6 @@ use crate::{
     syscall::handle_syscall,
 };
 use alloc::{boxed::Box, sync::Arc};
-use apic::LocalApic;
 use log::*;
 use trapframe::UserContext;
 
@@ -17,7 +16,6 @@ pub mod structs;
 pub mod thread;
 
 use crate::sync::SpinNoIrqLock as Mutex;
-use apic::{XApic, LAPIC_ADDR};
 use core::{
     future::Future,
     pin::Pin,

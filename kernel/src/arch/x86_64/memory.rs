@@ -4,6 +4,11 @@ use bitmap_allocator::BitAlloc;
 use rboot::{BootInfo, MemoryType};
 use rcore_memory::paging::*;
 use rcore_memory::PAGE_SIZE;
+use x86_64::{
+    registers::control::{Cr2, Cr3, Cr3Flags},
+    structures::paging::PhysFrame,
+    PhysAddr, VirtAddr,
+};
 
 pub fn init(boot_info: &BootInfo) {
     init_frame_allocator(boot_info);
@@ -34,4 +39,17 @@ pub fn init_kernel_kseg2_map() {
 
     page_table.map(0xfffffe8000000000, 0x0).update();
     page_table.unmap(0xfffffe8000000000);
+}
+
+pub fn set_page_table(vmtoken: usize) {
+    unsafe {
+        Cr3::write(
+            PhysFrame::containing_address(PhysAddr::new(vmtoken as u64)),
+            Cr3Flags::empty(),
+        );
+    }
+}
+
+pub fn get_page_fault_addr() -> usize {
+    Cr2::read().as_u64() as usize
 }

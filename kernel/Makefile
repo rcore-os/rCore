@@ -315,7 +315,7 @@ else ifeq ($(ARCH), mipsel)
 	done
 	$(hostcc) -Dboard_$(BOARD) -E src/arch/$(ARCH)/boot/linker.ld.S -o src/arch/$(ARCH)/boot/linker.ld
 endif
-	@cargo build $(build_args)
+	@CARGO_FEATURE_INLINE_ASM=true cargo build $(build_args)
 
 
 ### user programs ###

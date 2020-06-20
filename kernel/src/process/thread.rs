@@ -3,7 +3,11 @@ use super::{
     add_to_process_table, Pid, Process, PROCESSORS,
 };
 use crate::arch::interrupt::TrapFrame;
-use crate::arch::{cpu, paging::*};
+use crate::arch::{
+    cpu,
+    memory::{get_page_fault_addr, set_page_table},
+    paging::*,
+};
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
@@ -35,11 +39,6 @@ use rcore_fs::vfs::INode;
 use rcore_memory::{Page, PAGE_SIZE};
 use spin::RwLock;
 use trapframe::UserContext;
-use x86_64::{
-    registers::control::{Cr2, Cr3, Cr3Flags},
-    structures::paging::PhysFrame,
-    PhysAddr, VirtAddr,
-};
 use xmas_elf::{
     header,
     program::{Flags, SegmentData, Type},
@@ -278,8 +277,8 @@ impl Thread {
 
         // user context
         let mut context = UserContext::default();
-        context.general.rip = entry_addr;
-        context.general.rsp = ustack_top;
+        context.general.set_ip(entry_addr);
+        context.general.set_sp(ustack_top);
         context.general.rflags = 0x3202;
 
         let thread = Thread {
@@ -329,7 +328,7 @@ impl Thread {
 
         /// context of new thread
         let mut context = tf.clone();
-        context.general.rax = 0;
+        context.general.set_syscall_ret(0);
 
         let mut proc = self.proc.lock();
 
@@ -392,9 +391,9 @@ impl Thread {
     ) -> Arc<Thread> {
         let vm_token = self.vm.lock().token();
         let mut new_context = context.clone();
-        new_context.general.rax = 0;
-        new_context.general.rsp = stack_top;
-        new_context.general.fsbase = tls;
+        new_context.general.set_syscall_ret(0);
+        new_context.general.set_sp(stack_top);
+        new_context.general.set_tls(tls);
 
         let thread = Thread {
             tid: 0,
@@ -448,7 +447,7 @@ pub fn spawn(thread: Arc<Thread>) {
                 }
                 0xe => {
                     // page fault
-                    let addr = Cr2::read().as_u64();
+                    let addr = get_page_fault_addr();
                     debug!("page fault from user @ {:#x}", addr);
 
                     thread.vm.lock().handle_page_fault(addr as usize);
@@ -494,12 +493,7 @@ impl Future for PageTableSwitchWrapper {
             PROCESSORS[cpu_id] = Some(self.thread.clone());
         }
         // vmtoken won't change
-        unsafe {
-            Cr3::write(
-                PhysFrame::containing_address(PhysAddr::new(self.vmtoken as u64)),
-                Cr3Flags::empty(),
-            );
-        }
+        set_page_table(self.vmtoken);
         let res = self.inner.lock().as_mut().poll(cx);
         unsafe {
             PROCESSORS[cpu_id] = None;

@@ -19,7 +19,6 @@ use alloc::{
     boxed::Box, collections::BTreeMap, collections::VecDeque, string::String, sync::Arc,
     sync::Weak, vec::Vec,
 };
-use apic::{LocalApic, XApic, LAPIC_ADDR};
 use bitflags::_core::cell::Ref;
 use core::fmt;
 use core::str;
@@ -35,11 +34,6 @@ use rcore_fs::vfs::INode;
 use rcore_memory::{Page, PAGE_SIZE};
 use spin::RwLock;
 use trapframe::UserContext;
-use x86_64::{
-    registers::control::{Cr2, Cr3, Cr3Flags},
-    structures::paging::PhysFrame,
-    PhysAddr, VirtAddr,
-};
 use xmas_elf::{
     header,
     program::{Flags, SegmentData, Type},
