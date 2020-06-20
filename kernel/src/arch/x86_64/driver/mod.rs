@@ -1,5 +1,4 @@
 pub mod keyboard;
-pub mod rtc_cmos;
 pub mod serial;
 
 use super::BootInfo;

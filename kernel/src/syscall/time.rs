@@ -84,7 +84,7 @@ impl Syscall<'_> {
 
 // should be initialized together
 lazy_static! {
-    pub static ref EPOCH_BASE: u64 = crate::arch::timer::read_epoch();
+    pub static ref EPOCH_BASE: u64 = crate::drivers::rtc::read_epoch();
     pub static ref TICK_BASE: u64 = unsafe { crate::trap::TICK as u64 };
 }
 

@@ -9,6 +9,7 @@ use spin::RwLock;
 
 pub use block::BlockDriver;
 pub use net::NetDriver;
+use rtc::RtcDriver;
 
 pub mod block;
 pub mod bus;
@@ -19,6 +20,7 @@ pub mod input;
 pub mod irq;
 pub mod net;
 pub mod provider;
+pub mod rtc;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
@@ -26,6 +28,7 @@ pub enum DeviceType {
     Gpu,
     Input,
     Block,
+    Rtc,
 }
 
 pub trait Driver: Send + Sync {
@@ -43,8 +46,12 @@ pub trait Driver: Send + Sync {
     fn get_id(&self) -> String;
 
     // trait casting
-    fn as_net(&self) -> Option<&dyn NetDriver>;
-    fn as_block(&self) -> Option<&dyn BlockDriver>;
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        None
+    }
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
 }
 
 lazy_static! {
@@ -52,6 +59,7 @@ lazy_static! {
     pub static ref DRIVERS: RwLock<Vec<Arc<dyn Driver>>> = RwLock::new(Vec::new());
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<dyn NetDriver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn BlockDriver>>> = RwLock::new(Vec::new());
+    pub static ref RTC_DRIVERS: RwLock<Vec<Arc<dyn RtcDriver>>> = RwLock::new(Vec::new());
     pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
 }
 

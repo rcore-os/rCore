@@ -20,11 +20,6 @@ pub fn get_cycle() -> u64 {
     }
 }
 
-pub fn read_epoch() -> u64 {
-    // TODO: support RTC
-    0
-}
-
 /// Enable timer interrupt
 pub fn init() {
     // Enable supervisor timer interrupt

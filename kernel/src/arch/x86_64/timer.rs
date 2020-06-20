@@ -1,9 +1,5 @@
 use core::time::Duration;
 
-pub fn read_epoch() -> u64 {
-    super::driver::rtc_cmos::read_epoch()
-}
-
 pub fn timer_now() -> Duration {
     // TODO: get actual tsc
     const TSC_FREQUENCY: u16 = 2600;
