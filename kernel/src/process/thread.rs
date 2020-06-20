@@ -278,7 +278,8 @@ impl Thread {
         let mut context = UserContext::default();
         context.set_ip(entry_addr);
         context.set_sp(ustack_top);
-        if cfg!(target_arch = "x86_64") {
+        #[cfg(target_arch = "x86_64")]
+        if true {
             context.general.rflags = 0x3202;
         }
 
@@ -429,7 +430,7 @@ pub fn spawn(thread: Arc<Thread>) {
             trace!("go to user: {:#x?}", cx);
             cx.run();
             trace!("back from user: {:#x?}", cx);
-            let mut trap_num = 0;
+            let mut trap_num: usize = 0;
             if cfg!(target_arch = "x86_64") {
                 trap_num = cx.trap_num;
             }

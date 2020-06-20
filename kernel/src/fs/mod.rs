@@ -16,6 +16,7 @@ pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::pseudo::*;
+use crate::drivers::BlockDriverWrapper;
 
 mod devfs;
 mod device;
@@ -51,7 +52,7 @@ lazy_static! {
             {
                 use crate::drivers::BlockDriver;
                 use rcore_fs::dev::block_cache::BlockCache;
-                let driver = BlockDriver(
+                let driver = BlockDriverWrapper(
                     crate::drivers::BLK_DRIVERS
                         .read().iter()
                         .next().expect("Block device not found")

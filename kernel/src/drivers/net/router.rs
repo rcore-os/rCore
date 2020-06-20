@@ -15,8 +15,11 @@ use smoltcp::Result;
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY};
-use crate::memory::phys_to_virt;
+use super::{
+    super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY},
+    NetDriver,
+};
+use crate::{drivers::BlockDriver, memory::phys_to_virt};
 
 const AXI_STREAM_FIFO_ISR: *mut u32 = phys_to_virt(0x64A0_0000) as *mut u32;
 const AXI_STREAM_FIFO_IER: *mut u32 = phys_to_virt(0x64A0_0004) as *mut u32;
@@ -199,6 +202,16 @@ impl Driver for RouterInterface {
         format!("router")
     }
 
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+}
+
+impl NetDriver for RouterInterface {
     fn get_mac(&self) -> EthernetAddress {
         unimplemented!()
     }

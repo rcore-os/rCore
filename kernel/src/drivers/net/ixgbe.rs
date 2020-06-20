@@ -17,10 +17,13 @@ use smoltcp::Result;
 
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
-use crate::sync::SpinNoIrqLock as Mutex;
+use crate::{drivers::BlockDriver, sync::SpinNoIrqLock as Mutex};
 
-use super::super::{
-    provider::Provider, DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY,
+use super::{
+    super::{
+        provider::Provider, DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY,
+    },
+    NetDriver,
 };
 
 #[derive(Clone)]
@@ -75,6 +78,16 @@ impl Driver for IXGBEInterface {
         self.ifname.clone()
     }
 
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+}
+
+impl NetDriver for IXGBEInterface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }

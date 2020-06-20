@@ -3,8 +3,11 @@ use alloc::sync::Arc;
 
 use virtio_drivers::{VirtIOBlk, VirtIOHeader};
 
-use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS, IRQ_MANAGER};
-use crate::sync::SpinNoIrqLock as Mutex;
+use super::{
+    super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS, IRQ_MANAGER},
+    BlockDriver,
+};
+use crate::{drivers::NetDriver, sync::SpinNoIrqLock as Mutex};
 
 struct VirtIOBlkDriver(Mutex<VirtIOBlk<'static>>);
 
@@ -21,6 +24,16 @@ impl Driver for VirtIOBlkDriver {
         format!("virtio_block")
     }
 
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        None
+    }
+}
+
+impl BlockDriver for VirtIOBlkDriver {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         self.0.lock().read_block(block_id, buf).is_ok()
     }

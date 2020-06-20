@@ -16,11 +16,14 @@ use isomorphic_drivers::net::ethernet::intel::e1000::E1000;
 use isomorphic_drivers::net::ethernet::structs::EthernetAddress as DriverEthernetAddress;
 use rcore_memory::PAGE_SIZE;
 
-use crate::drivers::provider::Provider;
+use crate::drivers::{provider::Provider, BlockDriver};
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::{
+    super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY},
+    NetDriver,
+};
 
 #[derive(Clone)]
 pub struct E1000Driver(Arc<Mutex<E1000<Provider>>>);
@@ -65,6 +68,16 @@ impl Driver for E1000Interface {
         String::from("e1000")
     }
 
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+}
+
+impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }
