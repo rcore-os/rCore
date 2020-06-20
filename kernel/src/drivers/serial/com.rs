@@ -38,7 +38,7 @@ impl Driver for COM {
     }
 
     fn get_id(&self) -> String {
-        format!("com_{}", self.base)
+        format!("uart16550_{}", self.base)
     }
 }
 

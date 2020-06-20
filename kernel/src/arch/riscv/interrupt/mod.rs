@@ -2,6 +2,7 @@ pub use self::context::*;
 use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
+use riscv::register::{scause::Scause, sscratch, stvec};
 use trapframe::UserContext;
 
 pub mod consts;
@@ -33,7 +34,7 @@ pub unsafe fn restore(flags: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+pub extern "C" fn trap_handler(scause: Scause, stval: usize, tf: &mut TrapFrame) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
     trace!(
         "Interrupt @ CPU{}: {:?} ",
@@ -59,27 +60,7 @@ fn external() {
         super::board::handle_external_interrupt();
     }
 
-    // true means handled, false otherwise
-    let handlers = [try_process_serial, try_process_drivers];
-    for handler in handlers.iter() {
-        if handler() == true {
-            break;
-        }
-    }
-}
-
-fn try_process_serial() -> bool {
-    match super::io::getchar_option() {
-        Some(ch) => {
-            crate::trap::serial(ch);
-            true
-        }
-        None => false,
-    }
-}
-
-fn try_process_drivers() -> bool {
-    IRQ_MANAGER.read().try_handle_interrupt(None)
+    IRQ_MANAGER.read().try_handle_interrupt(None);
 }
 
 fn ipi() {

@@ -1,18 +1,42 @@
 //! 16550 serial adapter driver for malta board
 
-#![allow(dead_code)]
-
+use super::SerialDriver;
+use crate::drivers::IRQ_MANAGER;
+use crate::drivers::SERIAL_DRIVERS;
+use crate::drivers::{DeviceType, Driver, DRIVERS};
 use crate::sync::SpinLock as Mutex;
 use crate::util::{read, write};
+use alloc::{string::String, sync::Arc};
 use core::fmt::{Arguments, Result, Write};
 
 pub struct SerialPort {
     base: usize,
 }
 
+impl Driver for SerialPort {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
+        if let Some(c) = self.getchar_option() {
+            crate::trap::serial(c);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn device_type(&self) -> DeviceType {
+        DeviceType::Serial
+    }
+
+    fn get_id(&self) -> String {
+        format!("com_{}", self.base)
+    }
+}
+
 impl SerialPort {
-    fn new() -> SerialPort {
-        SerialPort { base: 0 }
+    fn new(base: usize) -> SerialPort {
+        let mut res = SerialPort { base: 0 };
+        res.init(base);
+        res
     }
 
     pub fn init(&mut self, base: usize) {
@@ -34,12 +58,12 @@ impl SerialPort {
     }
 
     /// non-blocking version of putchar()
-    pub fn putchar(&mut self, c: u8) {
+    pub fn putchar(&self, c: u8) {
         write(self.base + COM_TX, c);
     }
 
     /// blocking version of getchar()
-    pub fn getchar(&mut self) -> char {
+    pub fn getchar(&mut self) -> u8 {
         loop {
             if (read::<u8>(self.base + COM_LSR) & COM_LSR_DATA) == 0 {
                 break;
@@ -47,43 +71,29 @@ impl SerialPort {
         }
         let c = read::<u8>(self.base + COM_RX);
         match c {
-            255 => '\0', // null
-            c => c as char,
+            255 => b'\0', // null
+            c => c,
         }
     }
 
     /// non-blocking version of getchar()
-    pub fn getchar_option(&mut self) -> Option<char> {
+    pub fn getchar_option(&self) -> Option<u8> {
         match read::<u8>(self.base + COM_LSR) & COM_LSR_DATA {
             0 => None,
-            _ => Some(read::<u8>(self.base + COM_RX) as u8 as char),
+            _ => Some(read::<u8>(self.base + COM_RX) as u8),
         }
-    }
-
-    pub fn putfmt(&mut self, fmt: Arguments) {
-        self.write_fmt(fmt).unwrap();
     }
 }
 
-impl Write for SerialPort {
-    fn write_str(&mut self, s: &str) -> Result {
-        for c in s.bytes() {
-            match c {
-                127 => {
-                    self.putchar(8);
-                    self.putchar(b' ');
-                    self.putchar(8);
-                }
-                b'\n' => {
-                    self.putchar(b'\r');
-                    self.putchar(b'\n');
-                }
-                c => {
-                    self.putchar(c);
-                }
-            }
+impl SerialDriver for SerialPort {
+    fn read(&self) -> u8 {
+        self.getchar_option().unwrap_or(0)
+    }
+
+    fn write(&self, data: &[u8]) {
+        for byte in data {
+            self.putchar(*byte);
         }
-        Ok(())
     }
 }
 
@@ -107,10 +117,10 @@ const COM_LSR_DATA: u8 = 0x01; // Data available
 const COM_LSR_TXRDY: u8 = 0x20; // Transmit buffer avail
 const COM_LSR_TSRE: u8 = 0x40; // Transmitter off
 
-lazy_static! {
-    pub static ref SERIAL_PORT: Mutex<SerialPort> = Mutex::new(SerialPort::new());
-}
-
-pub fn init(base: usize) {
-    SERIAL_PORT.lock().init(base);
+pub fn init(irq: Option<usize>, base: usize) {
+    info!("Init uart16550 at {:#x}", base);
+    let com = Arc::new(SerialPort::new(base));
+    DRIVERS.write().push(com.clone());
+    SERIAL_DRIVERS.write().push(com.clone());
+    IRQ_MANAGER.write().register_opt(irq, com);
 }

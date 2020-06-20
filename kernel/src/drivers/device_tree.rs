@@ -5,7 +5,9 @@ use device_tree::{DeviceTree, Node};
 
 use super::bus::virtio_mmio::virtio_probe;
 use super::net::router::router_init;
+use super::serial::uart16550;
 use super::CMDLINE;
+use crate::memory::phys_to_virt;
 
 const DEVICE_TREE_MAGIC: u32 = 0xd00dfeed;
 
@@ -18,7 +20,11 @@ fn walk_dt_node(dt: &Node) {
         if compatible == "rcore,router" {
             router_init();
         }
-        // TODO: initial other devices (16650, etc.)
+        if compatible == "ns16550a" {
+            let addr = dt.prop_u64("reg").unwrap() as usize;
+            uart16550::init(None, phys_to_virt(addr));
+        }
+        // TODO: init other devices
     }
     if let Ok(bootargs) = dt.prop_str("bootargs") {
         if bootargs.len() > 0 {

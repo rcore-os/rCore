@@ -7,6 +7,7 @@ use core::fmt::{Result, Write};
 pub mod com;
 #[cfg(target_arch = "x86_64")]
 pub mod keyboard;
+pub mod uart16550;
 
 pub trait SerialDriver: Driver {
     // read one byte from tty

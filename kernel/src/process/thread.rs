@@ -9,6 +9,7 @@ use crate::arch::{
     memory::{get_page_fault_addr, set_page_table},
     paging::*,
 };
+use crate::drivers::IRQ_MANAGER;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
 use crate::memory::{
@@ -443,9 +444,12 @@ pub fn spawn(thread: Arc<Thread>) {
                 Syscall => exit = handle_syscall(&thread, &mut cx).await,
                 IrqMin..=IrqMax => {
                     crate::arch::interrupt::ack(trap_num);
-                    trace!("handle irq {}", trap_num);
+                    info!("handle irq {:#x}", trap_num);
                     if trap_num == Timer {
                         crate::arch::interrupt::timer();
+                    } else {
+                        // we don't know the actual irq
+                        IRQ_MANAGER.read().try_handle_interrupt(None);
                     }
                 }
                 _ if is_page_fault(trap_num) => {
