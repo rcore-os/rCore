@@ -48,7 +48,7 @@ pub extern "C" fn trap_handler(scause: Scause, stval: usize, tf: &mut TrapFrame)
 }
 
 fn external() {
-    #[cfg(any(feature = "board_u540", feature = "board_rocket_chip"))]
+    #[cfg(feature = "board_u540")]
     unsafe {
         super::board::handle_external_interrupt();
     }

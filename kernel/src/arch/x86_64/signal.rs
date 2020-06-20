@@ -1,4 +1,4 @@
-use crate::arch::interrupt::TrapFrame;
+use trapframe::TrapFrame;
 
 #[repr(C)]
 #[derive(Clone, Debug)]

@@ -3,10 +3,7 @@ use trapframe;
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 pub mod board;
-#[cfg(feature = "board_rocket_chip")]
-#[path = "board/rocket_chip/mod.rs"]
-pub mod board;
-#[cfg(not(any(feature = "board_u540", feature = "board_rocket_chip")))]
+#[cfg(not(feature = "board_u540"))]
 #[path = "board/virt/mod.rs"]
 pub mod board;
 
@@ -33,9 +30,6 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     unsafe {
         cpu::set_cpu_id(hartid);
     }
-
-    #[cfg(feature = "board_rocket_chip")]
-    let device_tree_vaddr = board::DTB.as_ptr() as usize;
 
     if hartid != BOOT_HART_ID {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {}
@@ -92,33 +86,6 @@ const BOOT_HART_ID: usize = 0;
 #[cfg(feature = "board_u540")]
 const BOOT_HART_ID: usize = 1;
 
-// Constant & Macro for `trap.asm`
-#[cfg(target_arch = "riscv32")]
-global_asm!(
-    r"
-    .equ XLENB,     4
-    .equ XLENb,     32
-    .macro LOAD a1, a2
-        lw \a1, \a2*XLENB(sp)
-    .endm
-    .macro STORE a1, a2
-        sw \a1, \a2*XLENB(sp)
-    .endm
-"
-);
-#[cfg(target_arch = "riscv64")]
-global_asm!(
-    r"
-    .equ XLENB,     8
-    .equ XLENb,     64
-    .macro LOAD a1, a2
-        ld \a1, \a2*XLENB(sp)
-    .endm
-    .macro STORE a1, a2
-        sd \a1, \a2*XLENB(sp)
-    .endm
-"
-);
 #[cfg(target_arch = "riscv32")]
 global_asm!(include_str!("boot/entry32.asm"));
 #[cfg(all(target_arch = "riscv64", not(feature = "board_k210")))]

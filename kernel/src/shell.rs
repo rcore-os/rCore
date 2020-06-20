@@ -13,16 +13,7 @@ pub fn add_user_shell() {
     // This one can transfer env vars!
     // Why???
 
-    //    #[cfg(target_arch = "x86_64")]
-    //        let init_shell="/bin/busybox"; // from alpine linux
-    //
-    //    #[cfg(not(target_arch = "x86_64"))]
-    #[cfg(not(feature = "board_rocket_chip"))]
     let init_shell = "/busybox"; //from docker-library
-
-    // fd is not available on rocket chip
-    #[cfg(feature = "board_rocket_chip")]
-    let init_shell = "/rust/sh";
 
     #[cfg(target_arch = "x86_64")]
     let init_envs: Vec<String> =
