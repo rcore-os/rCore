@@ -24,7 +24,6 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     let cpu_id = cpu::id();
-    println!("Hello world! from CPU {}!", cpu_id);
 
     if cpu_id != 0 {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {
@@ -33,10 +32,16 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
         other_start();
     }
 
-    // init log, heap and graphic output
+    // init log and heap
     crate::logging::init();
     crate::memory::init_heap();
+
+    // serial
+    crate::drivers::early_init();
+    // init graphic output
     driver::init_graphic(boot_info);
+
+    println!("Hello world! from CPU {}!", cpu_id);
 
     // check BootInfo from bootloader
     info!("{:#x?}", boot_info);

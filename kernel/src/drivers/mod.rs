@@ -10,7 +10,7 @@ use spin::RwLock;
 pub use block::BlockDriver;
 pub use net::NetDriver;
 pub use rtc::RtcDriver;
-pub use tty::TtyDriver;
+pub use serial::SerialDriver;
 
 /// Block device
 pub mod block;
@@ -33,7 +33,7 @@ pub mod provider;
 /// Real time clock
 pub mod rtc;
 /// Serial port
-pub mod tty;
+pub mod serial;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
@@ -42,7 +42,7 @@ pub enum DeviceType {
     Input,
     Block,
     Rtc,
-    Tty,
+    Serial,
 }
 
 pub trait Driver: Send + Sync {
@@ -79,7 +79,7 @@ lazy_static! {
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<dyn NetDriver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn BlockDriver>>> = RwLock::new(Vec::new());
     pub static ref RTC_DRIVERS: RwLock<Vec<Arc<dyn RtcDriver>>> = RwLock::new(Vec::new());
-    pub static ref TTY_DRIVERS: RwLock<Vec<Arc<dyn TtyDriver>>> = RwLock::new(Vec::new());
+    pub static ref SERIAL_DRIVERS: RwLock<Vec<Arc<dyn SerialDriver>>> = RwLock::new(Vec::new());
     pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
 }
 
@@ -118,6 +118,12 @@ pub fn init(dtb: usize) {
 #[cfg(target_arch = "x86_64")]
 pub fn init() {
     bus::pci::init();
+    rtc::rtc_cmos::init();
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn early_init() {
+    serial::com::init();
 }
 
 lazy_static! {

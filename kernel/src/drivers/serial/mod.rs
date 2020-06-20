@@ -1,10 +1,12 @@
 use super::Driver;
-use super::TTY_DRIVERS;
+use super::SERIAL_DRIVERS;
+use alloc::sync::Arc;
+use core::fmt::{Result, Write};
 
 #[cfg(target_arch = "x86_64")]
 pub mod com;
 
-pub trait TtyDriver: Driver {
+pub trait SerialDriver: Driver {
     // read one byte from tty
     fn read(&self) -> u8;
 

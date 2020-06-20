@@ -1,4 +1,5 @@
 use super::Driver;
+use crate::arch::interrupt::enable_irq;
 use alloc::collections::btree_map::Entry;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -20,6 +21,7 @@ impl IrqManager {
     }
 
     pub fn register_irq(&mut self, irq: usize, driver: Arc<dyn Driver>) {
+        enable_irq(irq);
         match self.mapping.entry(irq) {
             Entry::Occupied(mut e) => {
                 e.get_mut().push(driver);

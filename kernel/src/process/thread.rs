@@ -444,9 +444,9 @@ pub fn spawn(thread: Arc<Thread>) {
                     if trap_num == 0x20 {
                         crate::trap::timer();
                     } else if trap_num == 0x20 + 4 {
-                        use crate::arch::driver::serial::*;
+                        //use crate::arch::driver::serial::*;
                         info!("\nInterupt: COM1");
-                        crate::trap::serial(COM1.lock().receive());
+                        //crate::trap::serial(COM1.lock().receive());
                     }
                 }
                 0xe => {

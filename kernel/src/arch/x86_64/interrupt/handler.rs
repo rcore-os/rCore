@@ -83,7 +83,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
 
     // Dispatch
     match tf.trap_num {
-        Breakpoint => breakpoint(),
         DoubleFault => double_fault(tf),
         PageFault => page_fault(tf),
         IRQ0..=63 => {
@@ -99,8 +98,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                     */
                 }
                 Keyboard => keyboard(),
-                COM1 => com1(),
-                COM2 => com2(),
                 _ => {
                     if IRQ_MANAGER.read().try_handle_interrupt(Some(irq)) {
                         debug!("driver processed interrupt");
@@ -110,9 +107,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                 }
             }
         }
-        Syscall32 => syscall32(tf),
-        InvalidOpcode => invalid_opcode(tf),
-        DivideError | GeneralProtectionFault => error(tf),
         IPIFuncCall => {
             let irq = tf.trap_num - IRQ0;
             super::ack(irq); // must ack before switching
@@ -120,10 +114,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         }
         _ => panic!("Unhandled interrupt {:x}", tf.trap_num),
     }
-}
-
-fn breakpoint() {
-    error!("\nEXCEPTION: Breakpoint");
 }
 
 fn double_fault(tf: &TrapFrame) {
@@ -160,7 +150,7 @@ fn page_fault(tf: &mut TrapFrame) {
     }
 
     error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:?}", addr, code);
-    error(tf);
+    loop {}
 }
 
 fn keyboard() {
@@ -191,54 +181,4 @@ fn keyboard() {
             }
         }
     }
-}
-
-fn com1() {
-    use crate::arch::driver::serial::*;
-    trace!("\nInterupt: COM1");
-    crate::trap::serial(COM1.lock().receive());
-}
-
-fn com2() {
-    use crate::arch::driver::serial::*;
-    trace!("\nInterupt: COM2");
-    COM2.lock().receive();
-}
-
-#[no_mangle]
-pub extern "C" fn syscall(tf: &mut TrapFrame) {
-    trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    //let ret = crate::syscall::syscall(tf.rax, [tf.rdi, tf.rsi, tf.rdx, tf.r10, tf.r8, tf.r9], tf);
-    //tf.rax = ret as usize;
-    //do_signal(tf);
-}
-
-fn syscall32(tf: &mut TrapFrame) {
-    trace!("\nInterupt: Syscall {:#x?}", tf.rax);
-    //let ret = crate::syscall::syscall(tf.rax, [tf.rdx, tf.rcx, tf.rbx, tf.rdi, tf.rsi, 0], tf);
-    //tf.rax = ret as usize;
-}
-
-/// Support `syscall` instruction
-fn invalid_opcode(tf: &mut TrapFrame) {
-    let opcode = unsafe { (tf.rip as *mut u16).read() };
-    const SYSCALL_OPCODE: u16 = 0x05_0f;
-    if opcode == SYSCALL_OPCODE {
-        tf.rip += 2; // must before syscall
-        syscall(tf);
-    } else {
-        todo!()
-        //crate::trap::error(tf);
-    }
-}
-
-fn error(tf: &TrapFrame) {
-    todo!()
-    //crate::trap::error(tf);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn set_return_rsp(tf: *const TrapFrame) {
-    use crate::arch::gdt::Cpu;
-    Cpu::current().set_ring0_rsp(tf.add(1) as usize);
 }

@@ -156,7 +156,6 @@ pub fn init_heap() {
             .lock()
             .init(HEAP.as_ptr() as usize, HEAP_BLOCK * MACHINE_ALIGN);
     }
-    info!("heap init end");
 }
 
 pub fn enlarge_heap(heap: &mut Heap) {

@@ -1,7 +1,7 @@
 //! COM ports in x86
 use super::super::DRIVERS;
 use super::super::IRQ_MANAGER;
-use super::{super::TTY_DRIVERS, TtyDriver};
+use super::{super::SERIAL_DRIVERS, SerialDriver};
 use crate::{
     drivers::{DeviceType, Driver},
     sync::SpinNoIrqLock as Mutex,
@@ -28,11 +28,13 @@ impl COM {
 
 impl Driver for COM {
     fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
-        false
+        let c = self.read();
+        crate::trap::serial(c);
+        true
     }
 
     fn device_type(&self) -> DeviceType {
-        DeviceType::Tty
+        DeviceType::Serial
     }
 
     fn get_id(&self) -> String {
@@ -40,7 +42,7 @@ impl Driver for COM {
     }
 }
 
-impl TtyDriver for COM {
+impl SerialDriver for COM {
     fn read(&self) -> u8 {
         self.port.lock().receive()
     }
@@ -61,6 +63,6 @@ pub fn init() {
 fn add(base: u16, irq: usize) {
     let com = Arc::new(COM::new(base));
     DRIVERS.write().push(com.clone());
-    TTY_DRIVERS.write().push(com.clone());
+    SERIAL_DRIVERS.write().push(com.clone());
     IRQ_MANAGER.write().register_irq(irq, com);
 }

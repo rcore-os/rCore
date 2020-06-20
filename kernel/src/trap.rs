@@ -1,5 +1,5 @@
 use crate::arch::cpu;
-use crate::arch::interrupt::{syscall, TrapFrame};
+use crate::arch::interrupt::TrapFrame;
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
 use crate::sync::SpinNoIrqLock as Mutex;
