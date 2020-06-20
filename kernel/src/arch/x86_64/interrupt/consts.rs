@@ -31,7 +31,6 @@ pub const Timer: usize = 0;
 pub const Keyboard: usize = 1;
 pub const COM2: usize = 3;
 pub const COM1: usize = 4;
-pub const IDE: usize = 14;
 pub const Error: usize = 19;
 pub const Spurious: usize = 31;
 

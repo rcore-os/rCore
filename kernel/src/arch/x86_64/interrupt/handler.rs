@@ -101,7 +101,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                 Keyboard => keyboard(),
                 COM1 => com1(),
                 COM2 => com2(),
-                IDE => ide(),
                 _ => {
                     if IRQ_MANAGER.read().try_handle_interrupt(Some(irq as u32)) {
                         debug!("driver processed interrupt");
@@ -204,10 +203,6 @@ fn com2() {
     use crate::arch::driver::serial::*;
     trace!("\nInterupt: COM2");
     COM2.lock().receive();
-}
-
-fn ide() {
-    trace!("\nInterupt: IDE");
 }
 
 #[no_mangle]
