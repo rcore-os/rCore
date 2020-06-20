@@ -5,6 +5,22 @@ use crate::syscall::{SysResult, Syscall};
 use num::FromPrimitive;
 
 impl Syscall<'_> {
+    pub fn has_signal_to_do(&self) -> bool {
+        self.thread
+            .proc
+            .lock()
+            .sig_queue
+            .iter()
+            .find(|(info, tid)| {
+                let tid = *tid;
+                (tid == -1 || tid as usize == self.thread.tid)
+                    && !self
+                        .thread
+                        .sig_mask
+                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
+            })
+            .is_some()
+    }
     pub fn sys_rt_sigaction(
         &self,
         signum: usize,
@@ -83,7 +99,7 @@ impl Syscall<'_> {
         self.tf.general.rsp = mc.rsp;
         */
 
-        let ret = self.context.general.rax as isize;
+        let ret = self.context.get_syscall_ret() as isize;
         if ret >= 0 {
             Ok(ret as usize)
         } else {

@@ -25,7 +25,6 @@ pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
-#[cfg(target_arch = "x86_64")]
 pub use self::signal::*;
 pub use self::time::*;
 pub use self::user::*;
@@ -38,7 +37,6 @@ mod mem;
 mod misc;
 mod net;
 mod proc;
-#[cfg(target_arch = "x86_64")]
 mod signal;
 mod time;
 mod user;
@@ -240,27 +238,22 @@ impl Syscall<'_> {
             SYS_MADVISE => self.unimplemented("madvise", Ok(0)),
 
             // signal
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGACTION => self.sys_rt_sigaction(
                 args[0],
                 args[1] as *const SignalAction,
                 args[2] as *mut SignalAction,
                 args[3],
             ),
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
                 args[1] as *const Sigset,
                 args[2] as *mut Sigset,
                 args[3],
             ),
-            #[cfg(target_arch = "x86_64")]
             SYS_SIGALTSTACK => {
                 self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
             }
-            #[cfg(target_arch = "x86_64")]
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
@@ -564,23 +557,6 @@ impl Syscall<'_> {
             _ => return None,
         };
         Some(ret)
-    }
-
-    pub fn has_signal_to_do(&self) -> bool {
-        self.thread
-            .proc
-            .lock()
-            .sig_queue
-            .iter()
-            .find(|(info, tid)| {
-                let tid = *tid;
-                (tid == -1 || tid as usize == self.thread.tid)
-                    && !self
-                        .thread
-                        .sig_mask
-                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
-            })
-            .is_some()
     }
 }
 
