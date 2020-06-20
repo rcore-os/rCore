@@ -6,7 +6,6 @@ pub mod acpi;
 pub mod board;
 pub mod consts;
 pub mod cpu;
-pub mod driver;
 pub mod gdt;
 pub mod interrupt;
 pub mod io;
@@ -38,8 +37,6 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
     // serial
     crate::drivers::early_init();
-    // init graphic output
-    driver::init_graphic(boot_info);
 
     println!("Hello world! from CPU {}!", cpu_id);
 
@@ -64,8 +61,8 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     cpu::init();
     // now we can start LKM.
     crate::lkm::manager::ModuleManager::init();
-    // use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
-    driver::init(boot_info);
+    // init board
+    board::init_driver(boot_info);
     // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
     crate::drivers::init();
     // init cpu scheduler and process manager, and add user shell app in process manager

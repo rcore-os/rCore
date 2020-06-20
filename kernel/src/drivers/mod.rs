@@ -119,6 +119,8 @@ pub fn init(dtb: usize) {
 pub fn init() {
     bus::pci::init();
     rtc::rtc_cmos::init();
+    serial::keyboard::init();
+    console::init();
 }
 
 #[cfg(target_arch = "x86_64")]

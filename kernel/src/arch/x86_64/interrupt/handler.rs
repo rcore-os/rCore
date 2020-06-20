@@ -97,10 +97,9 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                     }
                     */
                 }
-                Keyboard => keyboard(),
                 _ => {
                     if IRQ_MANAGER.read().try_handle_interrupt(Some(irq)) {
-                        debug!("driver processed interrupt");
+                        trace!("driver processed interrupt");
                         return;
                     }
                     warn!("unhandled external IRQ number: {}", irq);
@@ -151,34 +150,4 @@ fn page_fault(tf: &mut TrapFrame) {
 
     error!("\nEXCEPTION: Page Fault @ {:#x}, code: {:?}", addr, code);
     loop {}
-}
-
-fn keyboard() {
-    use crate::arch::driver::keyboard;
-    use pc_keyboard::{DecodedKey, KeyCode};
-    trace!("\nInterupt: Keyboard");
-    if let Some(key) = keyboard::receive() {
-        match key {
-            DecodedKey::Unicode(c) => {
-                // at most 4 is needed
-                let mut buffer = [0u8; 4];
-                let res = c.encode_utf8(&mut buffer);
-                for c in res.bytes() {
-                    crate::trap::serial(c)
-                }
-            }
-            DecodedKey::RawKey(code) => {
-                let s = match code {
-                    KeyCode::ArrowUp => "\u{1b}[A",
-                    KeyCode::ArrowDown => "\u{1b}[B",
-                    KeyCode::ArrowRight => "\u{1b}[C",
-                    KeyCode::ArrowLeft => "\u{1b}[D",
-                    _ => "",
-                };
-                for c in s.bytes() {
-                    crate::trap::serial(c);
-                }
-            }
-        }
-    }
 }
