@@ -280,8 +280,13 @@ impl Thread {
         context.set_ip(entry_addr);
         context.set_sp(ustack_top);
         #[cfg(target_arch = "x86_64")]
-        if true {
+        {
             context.general.rflags = 0x3202;
+        }
+        #[cfg(target_arch = "riscv64")]
+        {
+            // SUM | FS | SPIE
+            context.sstatus = 1 << 18 | 1 << 14 | 1 << 13 | 1 << 5;
         }
 
         let thread = Thread {
@@ -451,7 +456,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     thread.vm.lock().handle_page_fault(addr as usize);
                 }
                 _ => {
-                    warn!("unhandled trap {}", trap_num);
+                    panic!("unhandled trap {} {:x?}", trap_num, cx);
                 }
             }
             thread.end_running(cx);

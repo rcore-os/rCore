@@ -56,7 +56,7 @@ lazy_static! {
 /// System call dispatcher
 pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> bool {
     let regs = &context.general;
-    let num = context.get_syscall_ret();
+    let num = context.get_syscall_num();
     let args = context.get_syscall_args();
     let mut syscall = Syscall {
         thread,
@@ -66,6 +66,10 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let ret = syscall.syscall(num, args).await;
     let exit = syscall.exit;
     context.set_syscall_ret(ret as usize);
+    #[cfg(target_arch = "riscv64")]
+    {
+        context.sepc = context.sepc + 4;
+    }
     exit
 }
 
