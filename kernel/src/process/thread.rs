@@ -2,6 +2,7 @@ use super::{
     abi::{self, ProcInitInfo},
     add_to_process_table, Pid, Process, PROCESSORS,
 };
+use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Timer};
 use crate::arch::interrupt::{get_trap_num, TrapFrame};
 use crate::arch::{
     cpu,
@@ -434,26 +435,24 @@ pub fn spawn(thread: Arc<Thread>) {
 
             let mut exit = false;
             match trap_num {
-                0x100 => exit = handle_syscall(&thread, &mut cx).await,
-                0x20..=0x3f => {
+                Syscall => exit = handle_syscall(&thread, &mut cx).await,
+                IrqMin..=IrqMax => {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {}", trap_num);
-                    if trap_num == 0x20 {
-                        crate::trap::timer();
-                    } else if trap_num == 0x20 + 4 {
-                        //use crate::arch::driver::serial::*;
-                        info!("\nInterupt: COM1");
-                        //crate::trap::serial(COM1.lock().receive());
+                    if trap_num == Timer {
+                        crate::arch::interrupt::timer();
                     }
                 }
-                0xe => {
+                _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
                     debug!("page fault from user @ {:#x}", addr);
 
                     thread.vm.lock().handle_page_fault(addr as usize);
                 }
-                _ => {}
+                _ => {
+                    warn!("unhandled trap {}", trap_num);
+                }
             }
             thread.end_running(cx);
             if exit {

@@ -23,11 +23,12 @@ pub const SIMDFloatingPointException: usize = 19;
 pub const VirtualizationException: usize = 20;
 pub const SecurityException: usize = 30;
 
-pub const IRQ0: usize = 32;
-pub const Syscall32: usize = 0x80;
+pub const IrqMin: usize = 0x20;
+pub const IrqMax: usize = 0x3f;
+pub const Syscall: usize = 0x100;
 
 // IRQ
-pub const Timer: usize = 0;
+pub const Timer: usize = IrqMin + 0;
 pub const Error: usize = 19;
 pub const Spurious: usize = 31;
 
@@ -44,3 +45,7 @@ pub const PIRQH: usize = 23;
 
 // IPI constants
 pub const IPIFuncCall: usize = 0xfc;
+
+pub fn is_page_fault(trap: usize) -> bool {
+    trap == PageFault
+}

@@ -85,10 +85,10 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     match tf.trap_num {
         DoubleFault => double_fault(tf),
         PageFault => page_fault(tf),
-        IRQ0..=63 => {
-            let irq = tf.trap_num - IRQ0;
+        IrqMin..=IrqMax => {
+            let irq = tf.trap_num - IrqMin;
             super::ack(irq); // must ack before switching
-            match irq {
+            match tf.trap_num {
                 Timer => {
                     crate::trap::timer();
                     /*
@@ -107,7 +107,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
             }
         }
         IPIFuncCall => {
-            let irq = tf.trap_num - IRQ0;
+            let irq = tf.trap_num - IrqMin;
             super::ack(irq); // must ack before switching
             super::super::gdt::Cpu::current().handle_ipi();
         }

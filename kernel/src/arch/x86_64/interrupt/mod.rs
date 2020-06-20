@@ -38,8 +38,12 @@ pub fn no_interrupt(f: impl FnOnce()) {
 #[inline(always)]
 pub fn enable_irq(irq: usize) {
     let mut ioapic = unsafe { IoApic::new(phys_to_virt(IOAPIC_ADDR as usize)) };
-    ioapic.set_irq_vector(irq as u8, (consts::IRQ0 + irq) as u8);
+    ioapic.set_irq_vector(irq as u8, (consts::IrqMin + irq) as u8);
     ioapic.enable(irq as u8, 0);
+}
+
+pub fn timer() {
+    crate::trap::timer();
 }
 
 #[inline(always)]

@@ -4,7 +4,7 @@ use log::*;
 use riscv::register::*;
 use trapframe::UserContext;
 
-#[path = "context.rs"]
+pub mod consts;
 mod context;
 
 /// Enable interrupt
@@ -87,7 +87,7 @@ fn ipi() {
     super::sbi::clear_ipi();
 }
 
-fn timer() {
+pub fn timer() {
     super::timer::set_next();
     crate::trap::timer();
 }
