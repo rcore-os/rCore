@@ -56,6 +56,11 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let regs = &context.general;
     let num = context.get_syscall_num();
     let args = context.get_syscall_args();
+    // add before fork
+    #[cfg(target_arch = "riscv64")]
+    {
+        context.sepc = context.sepc + 4;
+    }
     let mut syscall = Syscall {
         thread,
         context,
@@ -64,10 +69,6 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let ret = syscall.syscall(num, args).await;
     let exit = syscall.exit;
     context.set_syscall_ret(ret as usize);
-    #[cfg(target_arch = "riscv64")]
-    {
-        context.sepc = context.sepc + 4;
-    }
     exit
 }
 

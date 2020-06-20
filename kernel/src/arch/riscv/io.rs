@@ -7,5 +7,5 @@ pub fn putfmt(fmt: Arguments) {
     if let Some(serial) = drivers.first_mut() {
         serial.write(format!("{}", fmt).as_bytes());
     }
-    // might miss some earyl messages
+    // might miss some early messages
 }
