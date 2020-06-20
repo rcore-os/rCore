@@ -9,18 +9,31 @@ use spin::RwLock;
 
 pub use block::BlockDriver;
 pub use net::NetDriver;
-use rtc::RtcDriver;
+pub use rtc::RtcDriver;
+pub use tty::TtyDriver;
 
+/// Block device
 pub mod block;
+/// Bus controller
 pub mod bus;
+/// Character console
 pub mod console;
+/// Device tree
 pub mod device_tree;
+/// Display controller
 pub mod gpu;
+/// Mouse device
 pub mod input;
+/// Interrupt controller
 pub mod irq;
+/// Network controller
 pub mod net;
+/// For isomorphic_drivers
 pub mod provider;
+/// Real time clock
 pub mod rtc;
+/// Serial port
+pub mod tty;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
@@ -29,6 +42,7 @@ pub enum DeviceType {
     Input,
     Block,
     Rtc,
+    Tty,
 }
 
 pub trait Driver: Send + Sync {
@@ -36,7 +50,7 @@ pub trait Driver: Send + Sync {
     // return false otherwise
     // irq number is provided when available
     // driver should skip handling when irq number is mismatched
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool;
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool;
 
     // return the correspondent device type, see DeviceType
     fn device_type(&self) -> DeviceType;
@@ -49,7 +63,12 @@ pub trait Driver: Send + Sync {
     fn as_net(&self) -> Option<&dyn NetDriver> {
         None
     }
+
     fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+
+    fn as_rtc(&self) -> Option<&dyn RtcDriver> {
         None
     }
 }
@@ -60,6 +79,7 @@ lazy_static! {
     pub static ref NET_DRIVERS: RwLock<Vec<Arc<dyn NetDriver>>> = RwLock::new(Vec::new());
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn BlockDriver>>> = RwLock::new(Vec::new());
     pub static ref RTC_DRIVERS: RwLock<Vec<Arc<dyn RtcDriver>>> = RwLock::new(Vec::new());
+    pub static ref TTY_DRIVERS: RwLock<Vec<Arc<dyn TtyDriver>>> = RwLock::new(Vec::new());
     pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
 }
 

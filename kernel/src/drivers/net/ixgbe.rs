@@ -38,12 +38,12 @@ pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
     driver: IXGBEDriver,
     ifname: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
     id: String,
 }
 
 impl Driver for IXGBEInterface {
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         if irq.is_some() && self.irq.is_some() && irq != self.irq {
             // not ours, skip it
             return false;
@@ -196,7 +196,7 @@ impl phy::TxToken for IXGBETxToken {
 
 pub fn ixgbe_init(
     name: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
     header: usize,
     size: usize,
     index: usize,

@@ -12,7 +12,7 @@ use crate::{drivers::NetDriver, sync::SpinNoIrqLock as Mutex};
 struct VirtIOBlkDriver(Mutex<VirtIOBlk<'static>>);
 
 impl Driver for VirtIOBlkDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         self.0.lock().ack_interrupt()
     }
 

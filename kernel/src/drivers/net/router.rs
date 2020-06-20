@@ -147,7 +147,7 @@ pub struct RouterInterface {
 }
 
 impl Driver for RouterInterface {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         let mut driver = self.driver.0.lock();
 
         let isr = unsafe { AXI_STREAM_FIFO_ISR.read_volatile() };

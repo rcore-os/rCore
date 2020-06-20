@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 pub struct IrqManager {
     // drivers that only respond to specific irq
-    mapping: BTreeMap<u32, Vec<Arc<dyn Driver>>>,
+    mapping: BTreeMap<usize, Vec<Arc<dyn Driver>>>,
     // drivers that respond to all irqs
     all: Vec<Arc<dyn Driver>>,
 }
@@ -19,7 +19,7 @@ impl IrqManager {
         }
     }
 
-    pub fn register_irq(&mut self, irq: u32, driver: Arc<dyn Driver>) {
+    pub fn register_irq(&mut self, irq: usize, driver: Arc<dyn Driver>) {
         match self.mapping.entry(irq) {
             Entry::Occupied(mut e) => {
                 e.get_mut().push(driver);
@@ -36,7 +36,7 @@ impl IrqManager {
         self.all.push(driver);
     }
 
-    pub fn register_opt(&mut self, irq_opt: Option<u32>, driver: Arc<dyn Driver>) {
+    pub fn register_opt(&mut self, irq_opt: Option<usize>, driver: Arc<dyn Driver>) {
         if let Some(irq) = irq_opt {
             self.register_irq(irq, driver);
         } else {
@@ -44,7 +44,7 @@ impl IrqManager {
         }
     }
 
-    pub fn deregister_irq(&mut self, irq: u32, driver: Arc<dyn Driver>) {
+    pub fn deregister_irq(&mut self, irq: usize, driver: Arc<dyn Driver>) {
         if let Some(e) = self.mapping.get_mut(&irq) {
             e.retain(|d| !Arc::ptr_eq(&d, &driver));
         }
@@ -54,7 +54,7 @@ impl IrqManager {
         self.all.retain(|d| !Arc::ptr_eq(&d, &driver));
     }
 
-    pub fn try_handle_interrupt(&self, irq_opt: Option<u32>) -> bool {
+    pub fn try_handle_interrupt(&self, irq_opt: Option<usize>) -> bool {
         if let Some(irq) = irq_opt {
             if let Some(e) = self.mapping.get(&irq) {
                 for dri in e.iter() {

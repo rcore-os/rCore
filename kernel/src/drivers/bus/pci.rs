@@ -77,7 +77,7 @@ impl PortOps for PortOpsImpl {
 
 /// Enable the pci device and its interrupt
 /// Return assigned MSI interrupt number when applicable
-unsafe fn enable(loc: Location) -> Option<u32> {
+unsafe fn enable(loc: Location) -> Option<usize> {
     let ops = &PortOpsImpl;
     let am = CSpaceAccessMethod::IO;
 
@@ -101,7 +101,7 @@ unsafe fn enable(loc: Location) -> Option<u32> {
             am.write32(ops, loc, cap_ptr + PCI_MSI_ADDR, 0xfee00000 | (0 << 12));
             MSI_IRQ += 1;
             let irq = MSI_IRQ;
-            assigned_irq = Some(irq);
+            assigned_irq = Some(irq as usize);
             // we offset all our irq numbers by 32
             if (orig_ctrl >> 16) & (1 << 7) != 0 {
                 // 64bit

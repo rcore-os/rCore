@@ -18,7 +18,7 @@ use super::{
 pub struct AHCIDriver(Mutex<AHCI<Provider>>);
 
 impl Driver for AHCIDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         false
     }
 
@@ -55,7 +55,7 @@ impl BlockDriver for AHCIDriver {
     }
 }
 
-pub fn init(_irq: Option<u32>, header: usize, size: usize) -> Option<Arc<AHCIDriver>> {
+pub fn init(_irq: Option<usize>, header: usize, size: usize) -> Option<Arc<AHCIDriver>> {
     if let Some(ahci) = AHCI::new(header, size) {
         let driver = Arc::new(AHCIDriver(Mutex::new(ahci)));
         DRIVERS.write().push(driver.clone());

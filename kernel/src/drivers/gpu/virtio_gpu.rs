@@ -13,7 +13,7 @@ use crate::{
 struct VirtIOGpuDriver(Mutex<VirtIOGpu<'static>>);
 
 impl Driver for VirtIOGpuDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         self.0.lock().ack_interrupt()
     }
 

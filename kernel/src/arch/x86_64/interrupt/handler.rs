@@ -102,7 +102,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                 COM1 => com1(),
                 COM2 => com2(),
                 _ => {
-                    if IRQ_MANAGER.read().try_handle_interrupt(Some(irq as u32)) {
+                    if IRQ_MANAGER.read().try_handle_interrupt(Some(irq)) {
                         debug!("driver processed interrupt");
                         return;
                     }

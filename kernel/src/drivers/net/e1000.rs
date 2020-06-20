@@ -32,11 +32,11 @@ pub struct E1000Interface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>,
     driver: E1000Driver,
     name: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
 }
 
 impl Driver for E1000Interface {
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         if irq.is_some() && self.irq.is_some() && irq != self.irq {
             // not ours, skip it
             return false;
@@ -186,7 +186,7 @@ impl phy::TxToken for E1000TxToken {
 }
 
 // JudgeDuck-OS/kern/e1000.c
-pub fn init(name: String, irq: Option<u32>, header: usize, size: usize, index: usize) {
+pub fn init(name: String, irq: Option<usize>, header: usize, size: usize, index: usize) {
     info!("Probing e1000 {}", name);
 
     // randomly generated

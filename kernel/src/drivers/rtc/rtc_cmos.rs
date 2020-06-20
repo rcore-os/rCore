@@ -35,7 +35,7 @@ fn bcd2bin(num: u64) -> u64 {
 pub struct RtcCmos;
 
 impl Driver for RtcCmos {
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         false
     }
 

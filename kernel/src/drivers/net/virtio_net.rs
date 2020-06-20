@@ -36,7 +36,7 @@ impl NetDriver for VirtIONetDriver {
 }
 
 impl Driver for VirtIONetDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         self.0.lock().ack_interrupt()
     }
 

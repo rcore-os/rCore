@@ -14,7 +14,7 @@ use crate::{
 struct VirtIOInputDriver(Mutex<VirtIOInput<'static>>);
 
 impl Driver for VirtIOInputDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         let mut input = self.0.lock();
         let ack = input.ack_interrupt().expect("failed to ack interrupt");
         if ack {
