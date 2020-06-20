@@ -4,7 +4,7 @@ mod handler;
 pub use self::handler::*;
 use crate::memory::phys_to_virt;
 use apic::*;
-pub use trapframe::{TrapFrame, UserContext};
+use trapframe::{TrapFrame, UserContext};
 
 #[inline(always)]
 pub unsafe fn enable() {

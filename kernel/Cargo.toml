@@ -54,7 +54,7 @@ bit_field = "0.10"
 buddy_system_allocator = "0.4.0"
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
-executor = { git = "https://github.com/rcore-os/executor.git", rev = "93d0d54" }
+executor = { git = "https://github.com/rcore-os/executor.git", rev = "662d3de" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
 log = "0.4"

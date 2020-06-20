@@ -1,4 +1,5 @@
 use crate::memory::phys_to_virt;
+use riscv::register::sie;
 
 /// Mask all external interrupt except serial.
 pub unsafe fn init_external_interrupt() {
@@ -15,6 +16,8 @@ pub unsafe fn init_external_interrupt() {
 
     const HART0_S_MODE_PRIO_THRESH: *mut u32 = phys_to_virt(0x0C00_0000 + 0x20_1000) as *mut u32;
     HART0_S_MODE_PRIO_THRESH.write_volatile(0); // Permits everything
+
+    sie::set_sext();
 }
 
 pub unsafe fn enable_serial_interrupt() {

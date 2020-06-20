@@ -1,12 +1,10 @@
-pub use self::context::*;
 use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
 use riscv::register::{scause::Scause, sscratch, stvec};
-use trapframe::UserContext;
+use trapframe::{TrapFrame, UserContext};
 
 pub mod consts;
-mod context;
 
 /// Enable interrupt
 #[inline]
@@ -36,20 +34,16 @@ pub unsafe fn restore(flags: usize) {
 #[no_mangle]
 pub extern "C" fn trap_handler(scause: Scause, stval: usize, tf: &mut TrapFrame) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
-    trace!(
-        "Interrupt @ CPU{}: {:?} ",
-        super::cpu::id(),
-        tf.scause.cause()
-    );
-    match tf.scause.cause() {
+    trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), scause.cause());
+    match scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
         Trap::Exception(E::UserEnvCall) => syscall(tf),
-        Trap::Exception(E::LoadPageFault) => page_fault(tf),
-        Trap::Exception(E::StorePageFault) => page_fault(tf),
-        Trap::Exception(E::InstructionPageFault) => page_fault(tf),
-        _ => panic!("unhandled trap"),
+        Trap::Exception(E::LoadPageFault) => page_fault(stval, tf),
+        Trap::Exception(E::StorePageFault) => page_fault(stval, tf),
+        Trap::Exception(E::InstructionPageFault) => page_fault(stval, tf),
+        _ => panic!("unhandled trap {:?}", scause.cause()),
     }
     trace!("Interrupt end");
 }
@@ -85,8 +79,8 @@ pub fn syscall(tf: &mut TrapFrame) {
     */
 }
 
-fn page_fault(tf: &mut TrapFrame) {
-    let addr = tf.stval;
+fn page_fault(stval: usize, tf: &mut TrapFrame) {
+    let addr = stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     if crate::memory::handle_page_fault(addr) {

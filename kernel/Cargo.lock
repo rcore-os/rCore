@@ -186,7 +186,7 @@ dependencies = [
 [[package]]
 name = "executor"
 version = "0.6.0"
-source = "git+https://github.com/rcore-os/executor.git?rev=93d0d54#93d0d54f1785dbf620ab98554e5fa320402183bb"
+source = "git+https://github.com/rcore-os/executor.git?rev=662d3de#662d3ded46d53c4b6d144335719c50fc0adb2221"
 dependencies = [
  "executor-macros",
  "lazy_static",
@@ -199,7 +199,7 @@ dependencies = [
 [[package]]
 name = "executor-macros"
 version = "0.0.1"
-source = "git+https://github.com/rcore-os/executor.git?rev=93d0d54#93d0d54f1785dbf620ab98554e5fa320402183bb"
+source = "git+https://github.com/rcore-os/executor.git?rev=662d3de#662d3ded46d53c4b6d144335719c50fc0adb2221"
 dependencies = [
  "proc-macro2",
  "quote",

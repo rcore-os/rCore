@@ -1,7 +1,6 @@
 //! System call
 
 use crate::arch::cpu;
-use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
 use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
@@ -15,6 +14,7 @@ use core::{fmt, slice, str};
 use num::FromPrimitive;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
 use rcore_memory::VMError;
+use trapframe::TrapFrame;
 use trapframe::{GeneralRegs, UserContext};
 
 pub use self::custom::*;

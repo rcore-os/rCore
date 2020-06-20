@@ -7,9 +7,9 @@ use num::FromPrimitive;
 mod action;
 
 pub use self::action::*;
-use crate::arch::interrupt::TrapFrame;
 use crate::arch::signal::MachineContext;
 use crate::arch::syscall::SYS_RT_SIGRETURN;
+use trapframe::TrapFrame;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {

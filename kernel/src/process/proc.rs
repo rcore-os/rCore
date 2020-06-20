@@ -2,7 +2,6 @@ use super::{
     abi::{self, ProcInitInfo},
     Futex, Tid,
 };
-use crate::arch::interrupt::TrapFrame;
 use crate::arch::paging::*;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
 use crate::ipc::SemProc;
@@ -33,6 +32,7 @@ use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
 use rcore_memory::{Page, PAGE_SIZE};
 use spin::RwLock;
+use trapframe::TrapFrame;
 use trapframe::UserContext;
 use xmas_elf::{
     header,

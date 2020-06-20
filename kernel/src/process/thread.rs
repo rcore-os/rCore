@@ -3,7 +3,7 @@ use super::{
     add_to_process_table, Pid, Process, PROCESSORS,
 };
 use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Timer};
-use crate::arch::interrupt::{get_trap_num, TrapFrame};
+use crate::arch::interrupt::get_trap_num;
 use crate::arch::{
     cpu,
     memory::{get_page_fault_addr, set_page_table},
@@ -39,6 +39,7 @@ use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
 use rcore_memory::{Page, PAGE_SIZE};
 use spin::RwLock;
+use trapframe::TrapFrame;
 use trapframe::UserContext;
 use xmas_elf::{
     header,

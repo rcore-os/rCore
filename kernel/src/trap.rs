@@ -1,11 +1,11 @@
 use crate::arch::cpu;
-use crate::arch::interrupt::TrapFrame;
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
 use crate::sync::SpinNoIrqLock as Mutex;
 use crate::{signal::SignalUserContext, sync::Condvar};
 use core::time::Duration;
 use naive_timer::Timer;
+use trapframe::TrapFrame;
 use trapframe::UserContext;
 
 pub static mut TICK: usize = 0;
