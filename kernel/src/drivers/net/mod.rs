@@ -5,7 +5,6 @@ use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address};
 
 pub mod e1000;
 pub mod ixgbe;
-pub mod router;
 pub mod virtio_net;
 
 pub trait NetDriver: Driver {

@@ -39,7 +39,6 @@ pub extern "C" fn trap_handler(scause: Scause, stval: usize, tf: &mut TrapFrame)
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::UserEnvCall) => syscall(tf),
         Trap::Exception(E::LoadPageFault) => page_fault(stval, tf),
         Trap::Exception(E::StorePageFault) => page_fault(stval, tf),
         Trap::Exception(E::InstructionPageFault) => page_fault(stval, tf),
@@ -65,18 +64,6 @@ fn ipi() {
 pub fn timer() {
     super::timer::set_next();
     crate::trap::timer();
-}
-
-pub fn syscall(tf: &mut TrapFrame) {
-    /*
-    tf.sepc += 4; // Must before syscall, because of fork.
-    let ret = crate::syscall::syscall(
-        tf.x[17],
-        [tf.x[10], tf.x[11], tf.x[12], tf.x[13], tf.x[14], tf.x[15]],
-        tf,
-    );
-    tf.x[10] = ret as usize;
-    */
 }
 
 fn page_fault(stval: usize, tf: &mut TrapFrame) {

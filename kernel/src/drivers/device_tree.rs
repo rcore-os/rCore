@@ -4,7 +4,6 @@ use core::slice;
 use device_tree::{DeviceTree, Node};
 
 use super::bus::virtio_mmio::virtio_probe;
-use super::net::router::router_init;
 use super::serial::uart16550;
 use super::CMDLINE;
 use crate::memory::phys_to_virt;
@@ -16,9 +15,6 @@ fn walk_dt_node(dt: &Node) {
         // TODO: query this from table
         if compatible == "virtio,mmio" {
             virtio_probe(dt);
-        }
-        if compatible == "rcore,router" {
-            router_init();
         }
         if compatible == "ns16550a" {
             let addr = dt.prop_u64("reg").unwrap() as usize;
