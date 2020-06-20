@@ -1,20 +1,21 @@
 //! System call
 
-use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{fmt, slice, str};
-
-use bitflags::bitflags;
-use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
-use rcore_memory::VMError;
-
 use crate::arch::cpu;
 use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
 use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
 use crate::util;
+use alloc::{string::String, sync::Arc, vec::Vec};
+use bitflags::bitflags;
+use core::{fmt, slice, str};
+use num::FromPrimitive;
+use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
+use rcore_memory::VMError;
+use trapframe::{GeneralRegs, UserContext};
 
 pub use self::custom::*;
 pub use self::fs::*;
@@ -42,12 +43,10 @@ mod signal;
 mod time;
 mod user;
 
-use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 #[cfg(feature = "profile")]
 use crate::sync::SpinNoIrqLock as Mutex;
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
-use trapframe::{GeneralRegs, UserContext};
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -561,6 +560,23 @@ impl Syscall<'_> {
             _ => return None,
         };
         Some(ret)
+    }
+
+    pub fn has_signal_to_do(&self) -> bool {
+        self.thread
+            .proc
+            .lock()
+            .sig_queue
+            .iter()
+            .find(|(info, tid)| {
+                let tid = *tid;
+                (tid == -1 || tid as usize == self.thread.tid)
+                    && !self
+                        .thread
+                        .sig_mask
+                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
+            })
+            .is_some()
     }
 }
 

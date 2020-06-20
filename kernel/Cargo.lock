@@ -186,11 +186,11 @@ dependencies = [
 [[package]]
 name = "executor"
 version = "0.6.0"
-source = "git+https://github.com/rcore-os/executor.git?rev=89b72e3#89b72e3933a5366e1e5b762fa4b786fb085b8e7b"
+source = "git+https://github.com/rcore-os/executor.git?rev=93d0d54#93d0d54f1785dbf620ab98554e5fa320402183bb"
 dependencies = [
  "executor-macros",
  "lazy_static",
- "riscv 0.5.4",
+ "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=d9794e)",
  "spin",
  "woke",
  "x86_64",
@@ -199,7 +199,7 @@ dependencies = [
 [[package]]
 name = "executor-macros"
 version = "0.0.1"
-source = "git+https://github.com/rcore-os/executor.git?rev=89b72e3#89b72e3933a5366e1e5b762fa4b786fb085b8e7b"
+source = "git+https://github.com/rcore-os/executor.git?rev=93d0d54#93d0d54f1785dbf620ab98554e5fa320402183bb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -481,7 +481,7 @@ dependencies = [
  "rcore-fs-ramfs",
  "rcore-fs-sfs",
  "rcore-memory",
- "riscv 0.5.6",
+ "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=38f3786)",
  "rlibc",
  "smoltcp",
  "spin",
@@ -598,16 +598,6 @@ dependencies = [
 
 [[package]]
 name = "riscv"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bb785ce81e0bd87b8d1d357266eeb03f081d9d5871a31e7f95b7e6fd67002eb"
-dependencies = [
- "bare-metal",
- "bit_field 0.9.0",
-]
-
-[[package]]
-name = "riscv"
 version = "0.5.6"
 source = "git+https://github.com/rcore-os/riscv?rev=38f3786#38f3786966ba15cc76977375162e3f3622a30f4b"
 dependencies = [
@@ -615,6 +605,17 @@ dependencies = [
  "bit_field 0.10.0",
  "bitflags",
  "log",
+ "riscv-target",
+]
+
+[[package]]
+name = "riscv"
+version = "0.5.6"
+source = "git+https://github.com/rcore-os/riscv?rev=d9794e#d9794e59142ee65267d178890f26c396382f56a4"
+dependencies = [
+ "bare-metal",
+ "bit_field 0.10.0",
+ "bitflags",
  "riscv-target",
 ]
 
@@ -721,11 +722,11 @@ checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 [[package]]
 name = "trapframe"
 version = "0.3.0"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=cd828e1#cd828e1457e57eeb6bddf65325cb9b72448d9b5e"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=7a3cd50#7a3cd505e9e0f5896b41772f156318c5d0e65c6f"
 dependencies = [
  "log",
  "raw-cpuid",
- "riscv 0.5.4",
+ "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=d9794e)",
  "x86_64",
 ]
 

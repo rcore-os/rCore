@@ -36,11 +36,11 @@ pub fn getchar() -> char {
     }
 }
 
-pub fn getchar_option() -> Option<char> {
+pub fn getchar_option() -> Option<u8> {
     let c = sbi::console_getchar() as isize;
     match c {
         -1 => None,
-        c => Some(c as u8 as char),
+        c => Some(c as u8),
     }
 }
 

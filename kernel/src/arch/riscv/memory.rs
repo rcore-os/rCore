@@ -3,7 +3,7 @@ use crate::memory::{init_heap, MemorySet, FRAME_ALLOCATOR};
 use core::mem;
 use log::*;
 use rcore_memory::PAGE_SIZE;
-use riscv::register::sstatus;
+use riscv::register::{satp, sstatus, stval};
 
 /// Initialize the memory management module
 pub fn init(dtb: usize) {
@@ -92,9 +92,9 @@ extern "C" {
 }
 
 pub fn get_page_fault_addr() -> usize {
-    riscv::registrs::stval::read()
+    stval::read()
 }
 
 pub fn set_page_table(vmtoken: usize) {
-    riscv::registrs::satp::write(vmtoken)
+    satp::write(vmtoken)
 }

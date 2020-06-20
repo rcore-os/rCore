@@ -1,3 +1,5 @@
+use trapframe;
+
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 pub mod board;
@@ -55,7 +57,9 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     );
 
     crate::logging::init();
-    interrupt::init();
+    unsafe {
+        trapframe::init();
+    }
     memory::init(device_tree_vaddr);
     timer::init();
     // FIXME: init driver on u540
@@ -73,7 +77,9 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 }
 
 fn others_main() -> ! {
-    interrupt::init();
+    unsafe {
+        trapframe::init();
+    }
     memory::init_other();
     timer::init();
     crate::kmain();
@@ -119,7 +125,6 @@ global_asm!(include_str!("boot/entry32.asm"));
 global_asm!(include_str!("boot/entry64.asm"));
 #[cfg(feature = "board_k210")]
 global_asm!(include_str!("boot/entry_k210.asm"));
-global_asm!(include_str!("boot/trap.asm"));
 
 pub fn get_sp() -> usize {
     let sp: usize;

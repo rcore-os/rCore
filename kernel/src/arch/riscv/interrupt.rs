@@ -2,30 +2,10 @@ pub use self::context::*;
 use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
+use trapframe::UserContext;
 
 #[path = "context.rs"]
 mod context;
-
-/// Initialize interrupt
-pub fn init() {
-    extern "C" {
-        fn trap_entry();
-    }
-    unsafe {
-        // Set sscratch register to 0, indicating to exception vector that we are
-        // presently executing in the kernel
-        sscratch::write(0);
-        // Set the exception vector address
-        stvec::write(trap_entry as usize, stvec::TrapMode::Direct);
-        // Enable IPI
-        sie::set_ssoft();
-        // Enable external interrupt
-        if super::cpu::id() == super::BOOT_HART_ID {
-            sie::set_sext();
-        }
-    }
-    info!("interrupt: init end");
-}
 
 /// Enable interrupt
 #[inline]
@@ -68,7 +48,7 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         Trap::Exception(E::LoadPageFault) => page_fault(tf),
         Trap::Exception(E::StorePageFault) => page_fault(tf),
         Trap::Exception(E::InstructionPageFault) => page_fault(tf),
-        _ => crate::trap::error(tf),
+        _ => panic!("unhandled trap"),
     }
     trace!("Interrupt end");
 }
@@ -113,6 +93,7 @@ fn timer() {
 }
 
 pub fn syscall(tf: &mut TrapFrame) {
+    /*
     tf.sepc += 4; // Must before syscall, because of fork.
     let ret = crate::syscall::syscall(
         tf.x[17],
@@ -120,22 +101,36 @@ pub fn syscall(tf: &mut TrapFrame) {
         tf,
     );
     tf.x[10] = ret as usize;
+    */
 }
 
 fn page_fault(tf: &mut TrapFrame) {
     let addr = tf.stval;
     trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    if !crate::memory::handle_page_fault(addr) {
-        extern "C" {
-            fn _copy_user_start();
-            fn _copy_user_end();
-        }
-        if tf.sepc >= _copy_user_start as usize && tf.sepc < _copy_user_end as usize {
-            debug!("fixup for addr {:x?}", addr);
-            tf.sepc = crate::memory::read_user_fixup as usize;
-            return;
-        }
-        crate::trap::error(tf);
+    if crate::memory::handle_page_fault(addr) {
+        return;
     }
+    extern "C" {
+        fn _copy_user_start();
+        fn _copy_user_end();
+    }
+    if tf.sepc >= _copy_user_start as usize && tf.sepc < _copy_user_end as usize {
+        debug!("fixup for addr {:x?}", addr);
+        tf.sepc = crate::memory::read_user_fixup as usize;
+        return;
+    }
+    panic!("unhandled page fault");
+}
+
+pub fn ack(irq: usize) {
+    // TODO
+}
+
+pub fn enable_irq(irq: usize) {
+    // TODO
+}
+
+pub fn get_trap_num(_context: &UserContext) -> usize {
+    scause::read().bits()
 }

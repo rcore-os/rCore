@@ -2,7 +2,7 @@ use super::{
     abi::{self, ProcInitInfo},
     add_to_process_table, Pid, Process, PROCESSORS,
 };
-use crate::arch::interrupt::TrapFrame;
+use crate::arch::interrupt::{get_trap_num, TrapFrame};
 use crate::arch::{
     cpu,
     memory::{get_page_fault_addr, set_page_table},
@@ -430,10 +430,7 @@ pub fn spawn(thread: Arc<Thread>) {
             trace!("go to user: {:#x?}", cx);
             cx.run();
             trace!("back from user: {:#x?}", cx);
-            let mut trap_num: usize = 0;
-            if cfg!(target_arch = "x86_64") {
-                trap_num = cx.trap_num;
-            }
+            let trap_num = get_trap_num(&cx);
 
             let mut exit = false;
             match trap_num {

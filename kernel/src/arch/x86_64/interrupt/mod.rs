@@ -4,7 +4,7 @@ mod handler;
 pub use self::handler::*;
 use crate::memory::phys_to_virt;
 use apic::*;
-pub use trapframe::TrapFrame;
+pub use trapframe::{TrapFrame, UserContext};
 
 #[inline(always)]
 pub unsafe fn enable() {
@@ -46,4 +46,8 @@ pub fn enable_irq(irq: usize) {
 pub fn ack(_irq: usize) {
     let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
     lapic.eoi();
+}
+
+pub fn get_trap_num(context: &UserContext) -> usize {
+    context.trap_num
 }
