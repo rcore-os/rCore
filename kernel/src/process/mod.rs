@@ -25,11 +25,6 @@ pub use futex::*;
 pub use proc::*;
 pub use structs::*;
 pub use thread::*;
-use x86_64::{
-    registers::control::{Cr2, Cr3, Cr3Flags},
-    structures::paging::PhysFrame,
-    PhysAddr,
-};
 
 pub fn init() {
     // create init process

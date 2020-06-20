@@ -90,3 +90,11 @@ extern "C" {
     fn bootstack();
     fn bootstacktop();
 }
+
+pub fn get_page_fault_addr() -> usize {
+    riscv::registrs::stval::read()
+}
+
+pub fn set_page_table(vmtoken: usize) {
+    riscv::registrs::satp::write(vmtoken)
+}

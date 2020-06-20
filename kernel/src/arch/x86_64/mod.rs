@@ -8,7 +8,6 @@ pub mod consts;
 pub mod cpu;
 pub mod driver;
 pub mod gdt;
-pub mod idt;
 pub mod interrupt;
 pub mod io;
 pub mod ipi;

@@ -261,8 +261,8 @@ impl Syscall<'_> {
         drop(proc);
 
         // Modify the TrapFrame
-        self.context.general.rip = entry_addr;
-        self.context.general.rsp = ustack_top;
+        self.context.set_ip(entry_addr);
+        self.context.set_sp(ustack_top);
 
         info!("exec:END: path: {:?}", path);
         Ok(0)

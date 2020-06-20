@@ -29,7 +29,7 @@ pub fn invoke_on_allcpu(f: impl Fn() + 'static, wait: bool) {
             func_clone();
             rest_clone.fetch_sub(1, Ordering::Relaxed);
         }));
-        apic.send_ipi(cpu.id() as u8, IPIFuncCall);
+        apic.send_ipi(cpu.id() as u8, IPIFuncCall as u8);
     }
     if wait {
         // spin if remote invocation do not complete

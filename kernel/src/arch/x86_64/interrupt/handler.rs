@@ -82,12 +82,12 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     );
 
     // Dispatch
-    match tf.trap_num as u8 {
+    match tf.trap_num {
         Breakpoint => breakpoint(),
         DoubleFault => double_fault(tf),
         PageFault => page_fault(tf),
         IRQ0..=63 => {
-            let irq = tf.trap_num as u8 - IRQ0;
+            let irq = tf.trap_num - IRQ0;
             super::ack(irq); // must ack before switching
             match irq {
                 Timer => {
@@ -103,7 +103,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
                 COM2 => com2(),
                 IDE => ide(),
                 _ => {
-                    if IRQ_MANAGER.read().try_handle_interrupt(Some(irq.into())) {
+                    if IRQ_MANAGER.read().try_handle_interrupt(Some(irq as u32)) {
                         debug!("driver processed interrupt");
                         return;
                     }
@@ -115,7 +115,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         InvalidOpcode => invalid_opcode(tf),
         DivideError | GeneralProtectionFault => error(tf),
         IPIFuncCall => {
-            let irq = tf.trap_num as u8 - IRQ0;
+            let irq = tf.trap_num - IRQ0;
             super::ack(irq); // must ack before switching
             super::super::gdt::Cpu::current().handle_ipi();
         }

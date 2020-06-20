@@ -36,14 +36,14 @@ pub fn no_interrupt(f: impl FnOnce()) {
 }
 
 #[inline(always)]
-pub fn enable_irq(irq: u8) {
+pub fn enable_irq(irq: usize) {
     let mut ioapic = unsafe { IoApic::new(phys_to_virt(IOAPIC_ADDR as usize)) };
-    ioapic.set_irq_vector(irq, consts::IRQ0 + irq);
-    ioapic.enable(irq, 0);
+    ioapic.set_irq_vector(irq as u8, (consts::IRQ0 + irq) as u8);
+    ioapic.enable(irq as u8, 0);
 }
 
 #[inline(always)]
-pub fn ack(_irq: u8) {
+pub fn ack(_irq: usize) {
     let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
     lapic.eoi();
 }

@@ -23,7 +23,6 @@ use alloc::{
     boxed::Box, collections::BTreeMap, collections::VecDeque, string::String, sync::Arc,
     sync::Weak, vec::Vec,
 };
-use apic::{LocalApic, XApic, LAPIC_ADDR};
 use bitflags::_core::cell::Ref;
 use core::fmt;
 use core::str;
@@ -277,9 +276,11 @@ impl Thread {
 
         // user context
         let mut context = UserContext::default();
-        context.general.set_ip(entry_addr);
-        context.general.set_sp(ustack_top);
-        context.general.rflags = 0x3202;
+        context.set_ip(entry_addr);
+        context.set_sp(ustack_top);
+        if cfg!(target_arch = "x86_64") {
+            context.general.rflags = 0x3202;
+        }
 
         let thread = Thread {
             tid: 0, // allocated below
@@ -328,7 +329,7 @@ impl Thread {
 
         /// context of new thread
         let mut context = tf.clone();
-        context.general.set_syscall_ret(0);
+        context.set_syscall_ret(0);
 
         let mut proc = self.proc.lock();
 
@@ -391,9 +392,9 @@ impl Thread {
     ) -> Arc<Thread> {
         let vm_token = self.vm.lock().token();
         let mut new_context = context.clone();
-        new_context.general.set_syscall_ret(0);
-        new_context.general.set_sp(stack_top);
-        new_context.general.set_tls(tls);
+        new_context.set_syscall_ret(0);
+        new_context.set_sp(stack_top);
+        new_context.set_tls(tls);
 
         let thread = Thread {
             tid: 0,
@@ -428,18 +429,20 @@ pub fn spawn(thread: Arc<Thread>) {
             trace!("go to user: {:#x?}", cx);
             cx.run();
             trace!("back from user: {:#x?}", cx);
+            let mut trap_num = 0;
+            if cfg!(target_arch = "x86_64") {
+                trap_num = cx.trap_num;
+            }
 
             let mut exit = false;
-            match cx.trap_num {
+            match trap_num {
                 0x100 => exit = handle_syscall(&thread, &mut cx).await,
                 0x20..=0x3f => {
-                    let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
-                    lapic.eoi();
-                    trace!("handle irq {}", cx.trap_num);
-                    if cx.trap_num == 0x20 {
+                    crate::arch::interrupt::ack(trap_num);
+                    trace!("handle irq {}", trap_num);
+                    if trap_num == 0x20 {
                         crate::trap::timer();
-                    }
-                    if cx.trap_num == 0x20 + 4 {
+                    } else if trap_num == 0x20 + 4 {
                         use crate::arch::driver::serial::*;
                         info!("\nInterupt: COM1");
                         crate::trap::serial(COM1.lock().receive());
