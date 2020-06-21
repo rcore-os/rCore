@@ -22,7 +22,6 @@ impl Driver for Plic {
         let pending: u32 = read(self.base + 0x1000);
         if pending != 0 {
             let claim: u32 = read(self.base + 0x201004);
-            info!("pending {:#x} claim {:#x}", pending, claim);
             let manager = self.manager.lock();
             let res = manager.try_handle_interrupt(Some(claim as usize));
             // complete
@@ -45,6 +44,10 @@ impl Driver for Plic {
 impl IntcDriver for Plic {
     /// Register interrupt controller local irq
     fn register_local_irq(&self, irq: usize, driver: Arc<dyn Driver>) {
+        // enable irq for context 1
+        write(self.base + 0x2080, 1 << irq);
+        // set priority to 7
+        write(self.base + irq * 4, 7);
         let mut manager = self.manager.lock();
         manager.register_irq(irq, driver);
     }
@@ -61,6 +64,9 @@ pub fn init_dt(dt: &Node) {
         base,
         manager: Mutex::new(IrqManager::new(false)),
     });
+    // set prio threshold to 0 for context 1
+    write(base + 0x201000, 0);
+
     DRIVERS.write().push(plic.clone());
     // register under root irq manager
     IRQ_MANAGER

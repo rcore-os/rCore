@@ -22,6 +22,7 @@ pub mod timer;
 
 use crate::memory::phys_to_virt;
 use core::sync::atomic::{AtomicBool, Ordering};
+use riscv::register::sie;
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
