@@ -7,7 +7,6 @@ use trapframe::TrapFrame;
 use aarch64::regs::*;
 use log::*;
 
-#[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Kind {
     Synchronous = 0,
@@ -16,7 +15,18 @@ pub enum Kind {
     SError = 3,
 }
 
-#[repr(u16)]
+impl Kind {
+    fn from(x: usize) -> Kind {
+        match x {
+            x if x == Kind::Synchronous as usize => Kind::Synchronous,
+            x if x == Kind::Irq as usize => Kind::Irq,
+            x if x == Kind::Fiq as usize => Kind::Fiq,
+            x if x == Kind::SError as usize => Kind::SError,
+            _ => panic!("bad kind"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Source {
     CurrentSpEl0 = 0,
@@ -25,7 +35,18 @@ pub enum Source {
     LowerAArch32 = 3,
 }
 
-#[repr(C)]
+impl Source {
+    fn from(x: usize) -> Source {
+        match x {
+            x if x == Source::CurrentSpEl0 as usize => Source::CurrentSpEl0,
+            x if x == Source::CurrentSpElx as usize => Source::CurrentSpElx,
+            x if x == Source::LowerAArch64 as usize => Source::LowerAArch64,
+            x if x == Source::LowerAArch32 as usize => Source::LowerAArch32,
+            _ => panic!("bad kind"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct Info {
     source: Source,
@@ -37,11 +58,17 @@ pub struct Info {
 /// the value of the exception syndrome register. Finally, `tf` is a pointer to
 /// the trap frame for the exception.
 #[no_mangle]
-pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
-    trace!(
-        "Exception @ CPU{}: {:?}, ELR: {:#x?}",
+pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
+    let info: Info = Info {
+        source: Source::from(tf.trap_num & 0xFFFF),
+        kind: Kind::from(tf.trap_num >> 16),
+    };
+    let esr = ESR_EL1.get() as u32;
+    info!(
+        "Exception @ CPU{}: {:?}, ESR: {:#x}, ELR: {:#x?}",
         crate::arch::cpu::id(),
         info,
+        esr,
         tf.elr
     );
     match info.kind {

@@ -1,21 +1,13 @@
 //! Interrupt and exception for aarch64.
 
-pub mod consts;
-mod handler;
-mod syndrome;
-
+pub use self::handler::*;
+use crate::arch::board::irq::is_timer_irq;
 use aarch64::regs::*;
 use trapframe::UserContext;
 
-pub use self::handler::*;
-
-/// Set the exception vector address
-pub fn init() {
-    extern "C" {
-        fn __vectors();
-    }
-    //VBAR_EL1.set(__vectors as u64);
-}
+pub mod consts;
+pub mod handler;
+mod syndrome;
 
 /// Enable the interrupt (only IRQ).
 #[inline(always)]
@@ -49,7 +41,10 @@ pub unsafe fn restore(flags: usize) {
 }
 
 pub fn timer() {
-    // TODO
+    if is_timer_irq() {
+        crate::arch::board::timer::set_next();
+        crate::trap::timer();
+    }
 }
 
 pub fn ack(_irq: usize) {
@@ -57,8 +52,9 @@ pub fn ack(_irq: usize) {
 }
 
 pub fn get_trap_num(cx: &UserContext) -> usize {
-    // TODO
-    0
+    // low 32bits: esr
+    // high 32bits: trap_num
+    (cx.trap_num << 32) | ESR_EL1.get() as usize
 }
 
 pub fn enable_irq(irq: usize) {

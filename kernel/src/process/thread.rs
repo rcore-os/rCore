@@ -281,6 +281,8 @@ impl Thread {
         let mut context = UserContext::default();
         context.set_ip(entry_addr);
         context.set_sp(ustack_top);
+
+        // arch specific
         #[cfg(target_arch = "x86_64")]
         {
             context.general.rflags = 0x3202;
@@ -289,6 +291,11 @@ impl Thread {
         {
             // SUM | FS | SPIE
             context.sstatus = 1 << 18 | 1 << 14 | 1 << 13 | 1 << 5;
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            // F | A | D | EL0
+            context.spsr = 0b1101_00_0000;
         }
 
         let thread = Thread {
@@ -439,8 +446,8 @@ pub fn spawn(thread: Arc<Thread>) {
             let mut cx = thread.begin_running();
             trace!("go to user: {:#x?}", cx);
             cx.run();
-            trace!("back from user: {:#x?}", cx);
             let trap_num = get_trap_num(&cx);
+            trace!("back from user: {:#x?} trap_num {:#x}", cx, trap_num);
 
             let mut exit = false;
             match trap_num {
@@ -450,16 +457,18 @@ pub fn spawn(thread: Arc<Thread>) {
                     trace!("handle irq {:#x}", trap_num);
                     if trap_num == Timer {
                         crate::arch::interrupt::timer();
-                    } else {
-                        IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
                     }
+                    IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
                 }
                 _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
                     debug!("page fault from user @ {:#x}", addr);
 
-                    thread.vm.lock().handle_page_fault(addr as usize);
+                    if !thread.vm.lock().handle_page_fault(addr as usize) {
+                        // TODO: SIGSEGV
+                        panic!("page fault handle failed");
+                    }
                 }
                 _ => {
                     panic!(

@@ -3,7 +3,7 @@
 [[package]]
 name = "aarch64"
 version = "3.0.1"
-source = "git+https://github.com/rcore-os/aarch64#f8d9a77a59d00f125dc73f942149ab09d9180b1c"
+source = "git+https://github.com/rcore-os/aarch64#9ec6f0585ae0e78ef089dfa10a5ed7330d6a6317"
 dependencies = [
  "bit_field 0.9.0",
  "bitflags",
@@ -723,7 +723,7 @@ checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 [[package]]
 name = "trapframe"
 version = "0.3.0"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=9fbb557#9fbb557f97bbc52975d7b1510ac180f60c5d7ab1"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=3e3f5ab#3e3f5ab99946b91b76ac79287ea37c1401728772"
 dependencies = [
  "aarch64",
  "raw-cpuid",

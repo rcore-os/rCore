@@ -31,9 +31,10 @@ pub extern "C" fn master_main() -> ! {
     unsafe { cpu::start_others() };
 
     crate::logging::init();
-    interrupt::init();
+    unsafe {
+        trapframe::init();
+    }
     memory::init();
-    //timer::init();
     crate::lkm::manager::ModuleManager::init();
     driver::init();
     println!("{}", LOGO);
@@ -54,7 +55,9 @@ pub extern "C" fn others_main() -> ! {
         spin_loop_hint();
     }
 
-    interrupt::init();
+    unsafe {
+        trapframe::init();
+    }
     memory::init_other();
     //timer::init();
     crate::kmain();

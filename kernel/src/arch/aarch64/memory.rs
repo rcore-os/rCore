@@ -4,6 +4,9 @@ use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
 use crate::sync::SpinNoIrqLock as Mutex;
+use aarch64::paging::frame::PhysFrame as Frame;
+use aarch64::regs::*;
+use aarch64::translation::{local_invalidate_tlb_all, ttbr_el1_write};
 use log::*;
 use rcore_memory::PAGE_SIZE;
 
@@ -131,10 +134,10 @@ extern "C" {
 }
 
 pub fn set_page_table(vmtoken: usize) {
-    // TODO
+    ttbr_el1_write(0, Frame::of_addr(vmtoken as u64));
+    local_invalidate_tlb_all();
 }
 
 pub fn get_page_fault_addr() -> usize {
-    // TODO
-    0
+    FAR_EL1.get() as usize
 }
