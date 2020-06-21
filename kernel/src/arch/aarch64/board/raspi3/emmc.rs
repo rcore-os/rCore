@@ -9,7 +9,6 @@
 
 use super::mailbox;
 use crate::sync::SpinNoIrqLock as Mutex;
-use crate::thread;
 use bcm2837::emmc::*;
 use core::mem;
 use core::slice;

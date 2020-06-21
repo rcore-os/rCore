@@ -186,8 +186,9 @@ dependencies = [
 [[package]]
 name = "executor"
 version = "0.6.0"
-source = "git+https://github.com/rcore-os/executor.git?rev=662d3de#662d3ded46d53c4b6d144335719c50fc0adb2221"
+source = "git+https://github.com/rcore-os/executor.git?rev=b8af982#b8af982dfe918e25fac303573c5f28dbf061fcb0"
 dependencies = [
+ "aarch64",
  "executor-macros",
  "lazy_static",
  "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=d9794e)",
@@ -199,7 +200,7 @@ dependencies = [
 [[package]]
 name = "executor-macros"
 version = "0.0.1"
-source = "git+https://github.com/rcore-os/executor.git?rev=662d3de#662d3ded46d53c4b6d144335719c50fc0adb2221"
+source = "git+https://github.com/rcore-os/executor.git?rev=b8af982#b8af982dfe918e25fac303573c5f28dbf061fcb0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -722,9 +723,9 @@ checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 [[package]]
 name = "trapframe"
 version = "0.3.0"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=9bf833f#9bf833fcf6a31a9e411f42e4ca1432cba9afe8f5"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=9fbb557#9fbb557f97bbc52975d7b1510ac180f60c5d7ab1"
 dependencies = [
- "log",
+ "aarch64",
  "raw-cpuid",
  "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=d9794e)",
  "x86_64",

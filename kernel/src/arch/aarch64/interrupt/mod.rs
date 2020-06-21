@@ -1,12 +1,12 @@
 //! Interrupt and exception for aarch64.
 
-mod context;
+pub mod consts;
 mod handler;
 mod syndrome;
 
 use aarch64::regs::*;
+use trapframe::UserContext;
 
-pub use self::context::*;
 pub use self::handler::*;
 
 /// Set the exception vector address
@@ -14,7 +14,7 @@ pub fn init() {
     extern "C" {
         fn __vectors();
     }
-    VBAR_EL1.set(__vectors as u64);
+    //VBAR_EL1.set(__vectors as u64);
 }
 
 /// Enable the interrupt (only IRQ).
@@ -46,4 +46,21 @@ pub unsafe fn disable_and_store() -> usize {
 #[inline(always)]
 pub unsafe fn restore(flags: usize) {
     DAIF.set(flags as u32);
+}
+
+pub fn timer() {
+    // TODO
+}
+
+pub fn ack(_irq: usize) {
+    // TODO
+}
+
+pub fn get_trap_num(cx: &UserContext) -> usize {
+    // TODO
+    0
+}
+
+pub fn enable_irq(irq: usize) {
+    // TODO
 }

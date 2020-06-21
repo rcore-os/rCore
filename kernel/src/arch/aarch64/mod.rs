@@ -33,7 +33,7 @@ pub extern "C" fn master_main() -> ! {
     crate::logging::init();
     interrupt::init();
     memory::init();
-    timer::init();
+    //timer::init();
     crate::lkm::manager::ModuleManager::init();
     driver::init();
     println!("{}", LOGO);
@@ -56,7 +56,7 @@ pub extern "C" fn others_main() -> ! {
 
     interrupt::init();
     memory::init_other();
-    timer::init();
+    //timer::init();
     crate::kmain();
 }
 

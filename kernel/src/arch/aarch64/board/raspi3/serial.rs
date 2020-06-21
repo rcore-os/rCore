@@ -74,7 +74,7 @@ impl fmt::Write for SerialPort {
 fn handle_serial_irq() {
     let serial = SERIAL_PORT.lock();
     if serial.interrupt_is_pending(MiniUartInterruptId::Recive) {
-        crate::trap::serial(serial.read_byte() as char)
+        crate::trap::serial(serial.read_byte() as u8)
     }
 }
 

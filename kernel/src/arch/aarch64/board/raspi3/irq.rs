@@ -1,6 +1,6 @@
-use crate::arch::interrupt::TrapFrame;
 use bcm2837::interrupt::Controller;
 use spin::RwLock;
+use trapframe::TrapFrame;
 
 pub use bcm2837::interrupt::Interrupt;
 

@@ -9,7 +9,9 @@ _start:
     # read cpu affinity, start core 0, halt rest
     mrs     x19, mpidr_el1
     and     x19, x19, #3
+    # compare and branch if non zero
     cbnz    x19, halt
+
     bl      el_setup
     bl      clear_bss
     bl      create_init_paging
@@ -43,7 +45,7 @@ switch_to_el2:
     mov     x0, #0x3c9
     msr     spsr_el3, x0
 
-    # switch
+    # switch to EL2
     adr     x0, switch_to_el1
     msr     elr_el3, x0
     eret
@@ -54,6 +56,7 @@ switch_to_el1:
 
     # at EL2
     # set the temporary stack for EL1 in lower VA range
+    # x19 is cpu id
     adrp    x0, _start
     sub     x0, x0, x19, lsl #16
     msr     sp_el1, x0
@@ -87,11 +90,12 @@ switch_to_el1:
     msr     cnthctl_el2, x0
     msr     cntvoff_el2, xzr
 
-    # switch
+    # switch to EL1
     msr     elr_el2, lr
     eret
 el_setup_end:
     # at EL1
+    # x19 is cpu id
     adrp    x0, _start
     sub     x0, x0, x19, lsl #16
     mov     sp, x0
@@ -119,6 +123,8 @@ slave_startup:
 jump_to_main:
     msr     ttbr0_el1, xzr
     ldr     x8, =bootstacktop
+
+    # x19 is cpu id
     sub     x8, x8, x19, lsl #18
     mov     sp, x8
     mov     x29, xzr

@@ -1,14 +1,11 @@
 //! Trap handler
 
-use super::context::TrapFrame;
 use super::syndrome::{Fault, Syndrome};
 use crate::arch::board::irq::{handle_irq, is_timer_irq};
+use trapframe::TrapFrame;
 
 use aarch64::regs::*;
 use log::*;
-
-global_asm!(include_str!("trap.S"));
-global_asm!(include_str!("vector.S"));
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -60,9 +57,9 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                     Fault::Translation | Fault::AccessFlag | Fault::Permission => {
                         handle_page_fault(tf)
                     }
-                    _ => crate::trap::error(tf),
+                    _ => panic!(), // crate::trap::error(tf),
                 },
-                _ => crate::trap::error(tf),
+                _ => panic!(), //crate::trap::error(tf),
             }
         }
         Kind::Irq => {
@@ -72,7 +69,7 @@ pub extern "C" fn rust_trap(info: Info, esr: u32, tf: &mut TrapFrame) {
                 handle_irq(tf)
             }
         }
-        _ => crate::trap::error(tf),
+        _ => panic!(),
     }
     trace!("Exception end");
 }
@@ -84,7 +81,8 @@ fn handle_break(_num: u16, tf: &mut TrapFrame) {
 
 fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     if num != 0 {
-        crate::trap::error(tf);
+        panic!()
+        //crate::trap::error(tf);
     }
 
     syscall(tf)
@@ -92,6 +90,7 @@ fn handle_syscall(num: u16, tf: &mut TrapFrame) {
 
 pub fn syscall(tf: &mut TrapFrame) {
     // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
+    /*
     let ret = crate::syscall::syscall(
         tf.x1to29[7] as usize,
         [
@@ -105,17 +104,17 @@ pub fn syscall(tf: &mut TrapFrame) {
         tf,
     );
     tf.x0 = ret as usize;
+    */
 }
 
 fn handle_timer() {
-    crate::arch::timer::set_next();
+    crate::arch::board::timer::set_next();
     crate::trap::timer();
 }
 
 fn handle_page_fault(tf: &mut TrapFrame) {
     let addr = FAR_EL1.get() as usize;
     if !crate::memory::handle_page_fault(addr) {
-        error!("\nEXCEPTION: Page Fault @ {:#x}", addr);
-        crate::trap::error(tf);
+        panic!("\nEXCEPTION: Page Fault @ {:#x}", addr);
     }
 }

@@ -129,3 +129,12 @@ extern "C" {
     fn _start();
     fn _end();
 }
+
+pub fn set_page_table(vmtoken: usize) {
+    // TODO
+}
+
+pub fn get_page_fault_addr() -> usize {
+    // TODO
+    0
+}
