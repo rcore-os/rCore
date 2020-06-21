@@ -34,12 +34,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 
     if hartid != BOOT_HART_ID {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {}
-        println!(
-            "Hello RISCV! in hart {}, device tree @ {:#x}",
-            hartid, device_tree_vaddr
-        );
-        others_main();
-        //other_main -> !
+        others_main(hartid);
     }
 
     unsafe {
@@ -70,12 +65,13 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     crate::kmain();
 }
 
-fn others_main() -> ! {
+fn others_main(hartid: usize) -> ! {
     unsafe {
         trapframe::init();
     }
     memory::init_other();
     timer::init();
+    info!("Hello RISCV! in hart {}", hartid);
     crate::kmain();
 }
 
