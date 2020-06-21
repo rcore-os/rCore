@@ -1,3 +1,4 @@
+use crate::arch::interrupt::consts::SupervisorExternal;
 use crate::drivers::IRQ_MANAGER;
 use log::*;
 use riscv::register::*;
@@ -53,7 +54,9 @@ fn external() {
         super::board::handle_external_interrupt();
     }
 
-    IRQ_MANAGER.read().try_handle_interrupt(None);
+    IRQ_MANAGER
+        .read()
+        .try_handle_interrupt(Some(SupervisorExternal));
 }
 
 fn ipi() {

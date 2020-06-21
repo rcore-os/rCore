@@ -1,7 +1,7 @@
 //! 16550 serial adapter driver for malta board
 
 use super::SerialDriver;
-use crate::drivers::device_tree::DEVICE_TREE_REGISTRY;
+use crate::drivers::device_tree::{DEVICE_TREE_INTC, DEVICE_TREE_REGISTRY};
 use crate::drivers::IRQ_MANAGER;
 use crate::drivers::SERIAL_DRIVERS;
 use crate::drivers::{DeviceType, Driver, DRIVERS};
@@ -64,6 +64,11 @@ impl SerialPort {
 
     /// non-blocking version of putchar()
     pub fn putchar(&self, c: u8) {
+        for _ in 0..100 {
+            if (read::<u8>(self.base + COM_LSR) & COM_LSR_TXRDY) == 0 {
+                break;
+            }
+        }
         write(self.base + COM_TX, c);
     }
 
@@ -122,17 +127,28 @@ const COM_LSR_DATA: u8 = 0x01; // Data available
 const COM_LSR_TXRDY: u8 = 0x20; // Transmit buffer avail
 const COM_LSR_TSRE: u8 = 0x40; // Transmitter off
 
-pub fn init(irq: Option<usize>, base: usize) {
-    info!("Init uart16550 at {:#x}", base);
-    let com = Arc::new(SerialPort::new(base));
-    DRIVERS.write().push(com.clone());
-    SERIAL_DRIVERS.write().push(com.clone());
-    IRQ_MANAGER.write().register_opt(irq, com);
-}
-
 pub fn init_dt(dt: &Node) {
     let addr = dt.prop_u64("reg").unwrap() as usize;
-    init(None, phys_to_virt(addr));
+    let base = phys_to_virt(addr);
+    info!("Init uart16550 at {:#x}", base);
+    let com = Arc::new(SerialPort::new(base));
+    let mut found = false;
+    let irq_opt = dt.prop_u32("interrupts").ok().map(|irq| irq as usize);
+    DRIVERS.write().push(com.clone());
+    SERIAL_DRIVERS.write().push(com.clone());
+    if let Ok(intc) = dt.prop_u32("interrupt-parent") {
+        if let Some(irq) = irq_opt {
+            if let Some(manager) = DEVICE_TREE_INTC.write().get_mut(&intc) {
+                manager.register_local_irq(irq, com.clone());
+                info!("registered uart16550 to intc");
+                found = true;
+            }
+        }
+    }
+    if !found {
+        info!("registered uart16550 to root");
+        IRQ_MANAGER.write().register_opt(irq_opt, com);
+    }
 }
 
 pub fn driver_init() {

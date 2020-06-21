@@ -449,8 +449,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     if trap_num == Timer {
                         crate::arch::interrupt::timer();
                     } else {
-                        // we don't know the actual irq
-                        IRQ_MANAGER.read().try_handle_interrupt(None);
+                        IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
                     }
                 }
                 _ if is_page_fault(trap_num) => {

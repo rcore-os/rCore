@@ -43,6 +43,7 @@ pub enum DeviceType {
     Block,
     Rtc,
     Serial,
+    Intc,
 }
 
 pub trait Driver: Send + Sync {
@@ -80,7 +81,7 @@ lazy_static! {
     pub static ref BLK_DRIVERS: RwLock<Vec<Arc<dyn BlockDriver>>> = RwLock::new(Vec::new());
     pub static ref RTC_DRIVERS: RwLock<Vec<Arc<dyn RtcDriver>>> = RwLock::new(Vec::new());
     pub static ref SERIAL_DRIVERS: RwLock<Vec<Arc<dyn SerialDriver>>> = RwLock::new(Vec::new());
-    pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new());
+    pub static ref IRQ_MANAGER: RwLock<irq::IrqManager> = RwLock::new(irq::IrqManager::new(true));
 }
 
 pub struct BlockDriverWrapper(pub Arc<dyn BlockDriver>);
@@ -114,6 +115,7 @@ lazy_static! {
 pub fn init(dtb: usize) {
     serial::uart16550::driver_init();
     bus::virtio_mmio::driver_init();
+    irq::plic::driver_init();
     device_tree::init(dtb);
 }
 

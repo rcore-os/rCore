@@ -7,8 +7,10 @@ use alloc::vec::Vec;
 
 pub mod plic;
 
-// Root Irq manager
+// Irq manager
 pub struct IrqManager {
+    // is root manager?
+    root: bool,
     // drivers that only respond to specific irq
     mapping: BTreeMap<usize, Vec<Arc<dyn Driver>>>,
     // drivers that respond to all irqs
@@ -16,15 +18,20 @@ pub struct IrqManager {
 }
 
 impl IrqManager {
-    pub fn new() -> IrqManager {
+    pub fn new(root: bool) -> IrqManager {
         IrqManager {
+            root,
             mapping: BTreeMap::new(),
             all: Vec::new(),
         }
     }
 
     pub fn register_irq(&mut self, irq: usize, driver: Arc<dyn Driver>) {
-        enable_irq(irq);
+        // for root manager, enable irq in arch
+        // for other interrupt controllers, enable irq before calling this function
+        if self.root {
+            enable_irq(irq);
+        }
         match self.mapping.entry(irq) {
             Entry::Occupied(mut e) => {
                 e.get_mut().push(driver);
@@ -82,5 +89,5 @@ impl IrqManager {
 // interrupt controller
 pub trait IntcDriver: Driver {
     /// Register interrupt controller local irq
-    fn register_local_irq(&mut self, irq: usize, driver: Arc<dyn Driver>);
+    fn register_local_irq(&self, irq: usize, driver: Arc<dyn Driver>);
 }
