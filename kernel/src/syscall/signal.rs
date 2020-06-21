@@ -16,6 +16,8 @@ impl Syscall<'_> {
                 (tid == -1 || tid as usize == self.thread.tid)
                     && !self
                         .thread
+                        .inner
+                        .lock()
                         .sig_mask
                         .contains(FromPrimitive::from_i32(info.signo).unwrap())
             })
@@ -123,21 +125,20 @@ impl Syscall<'_> {
         }
         if !oldset.is_null() {
             let oldset = unsafe { self.vm().check_write_ptr(oldset)? };
-            *oldset = self.thread.sig_mask;
+            *oldset = self.thread.inner.lock().sig_mask;
         }
         if !set.is_null() {
             let set = unsafe { self.vm().check_read_ptr(set)? };
+            info!("rt_sigprocmask: set: {:?}", set);
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
-            /*
             match how {
-                BLOCK => self.thread.sig_mask.add_set(set),
-                UNBLOCK => self.thread.sig_mask.remove_set(set),
-                SETMASK => self.thread.sig_mask = *set,
+                BLOCK => self.thread.inner.lock().sig_mask.add_set(set),
+                UNBLOCK => self.thread.inner.lock().sig_mask.remove_set(set),
+                SETMASK => self.thread.inner.lock().sig_mask = *set,
                 _ => return Err(EINVAL),
             }
-            */
         }
         return Ok(0);
     }

@@ -3,6 +3,7 @@ use crate::memory::{init_heap, MemorySet, FRAME_ALLOCATOR};
 use core::mem;
 use log::*;
 use rcore_memory::PAGE_SIZE;
+use riscv::asm::sfence_vma_all;
 use riscv::register::{satp, sstatus, stval};
 
 /// Initialize the memory management module
@@ -96,5 +97,6 @@ pub fn get_page_fault_addr() -> usize {
 }
 
 pub fn set_page_table(vmtoken: usize) {
-    satp::write(vmtoken)
+    satp::write(vmtoken);
+    unsafe { sfence_vma_all() }
 }

@@ -143,6 +143,8 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                 //if (tid == -1 || tid as usize == current().id())
                 if tid == -1
                     && !thread
+                        .inner
+                        .lock()
                         .sig_mask
                         .contains(FromPrimitive::from_i32(info.signo).unwrap())
                 {
@@ -221,7 +223,7 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                     link: 0,
                     stack,
                     mcontext: MachineContext::from_tf(tf),
-                    sig_mask: thread.sig_mask,
+                    sig_mask: thread.inner.lock().sig_mask,
                     _fpregs_mem: [0; 64],
                 };
                 if action_flags.contains(SignalActionFlags::RESTORER) {

@@ -59,6 +59,8 @@ pub struct ThreadInner {
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
+    /// Signal mask
+    pub sig_mask: Sigset,
 }
 
 #[allow(dead_code)]
@@ -71,8 +73,6 @@ pub struct Thread {
     pub proc: Arc<Mutex<Process>>,
     /// Thread id
     pub tid: Tid,
-    /// Signal mask
-    pub sig_mask: Sigset,
 }
 
 lazy_static! {
@@ -296,6 +296,7 @@ impl Thread {
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::from(context)),
                 clear_child_tid: 0,
+                sig_mask: Sigset::default(),
             }),
             vm: vm.clone(),
             proc: Arc::new(Mutex::new(Process {
@@ -317,7 +318,6 @@ impl Thread {
                 sigaltstack: SignalStack::default(),
                 eventbus: EventBus::new(),
             })),
-            sig_mask: Sigset::default(),
         };
 
         let res = thread.add_to_table();
@@ -367,15 +367,16 @@ impl Thread {
         // Each of the threads in a process has its own signal mask.
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
+        let sig_mask = self.inner.lock().sig_mask;
         let new_thread = Thread {
             tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::new(context)),
                 clear_child_tid: 0,
+                sig_mask,
             }),
             vm,
             proc: new_proc,
-            sig_mask: self.sig_mask,
         }
         .add_to_table();
 
@@ -405,15 +406,16 @@ impl Thread {
         new_context.set_sp(stack_top);
         new_context.set_tls(tls);
 
+        let sig_mask = self.inner.lock().sig_mask;
         let thread = Thread {
             tid: 0,
             inner: Mutex::new(ThreadInner {
                 clear_child_tid,
                 context: Some(Box::new(new_context)),
+                sig_mask,
             }),
             vm: self.vm.clone(),
             proc: self.proc.clone(),
-            sig_mask: self.sig_mask,
         };
         let res = thread.add_to_table();
         res.proc.lock().threads.push(res.tid);
