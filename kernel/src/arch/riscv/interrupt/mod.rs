@@ -33,8 +33,10 @@ pub unsafe fn restore(flags: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern "C" fn trap_handler(scause: Scause, stval: usize, tf: &mut TrapFrame) {
+pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
+    let scause = scause::read();
+    let stval = stval::read();
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), scause.cause());
     match scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => external(),
