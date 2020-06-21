@@ -1,13 +1,18 @@
 //! 16550 serial adapter driver for malta board
 
 use super::SerialDriver;
+use crate::drivers::device_tree::DEVICE_TREE_REGISTRY;
 use crate::drivers::IRQ_MANAGER;
 use crate::drivers::SERIAL_DRIVERS;
 use crate::drivers::{DeviceType, Driver, DRIVERS};
 use crate::sync::SpinLock as Mutex;
-use crate::util::{read, write};
+use crate::{
+    memory::phys_to_virt,
+    util::{read, write},
+};
 use alloc::{string::String, sync::Arc};
 use core::fmt::{Arguments, Result, Write};
+use device_tree::Node;
 
 pub struct SerialPort {
     base: usize,
@@ -123,4 +128,13 @@ pub fn init(irq: Option<usize>, base: usize) {
     DRIVERS.write().push(com.clone());
     SERIAL_DRIVERS.write().push(com.clone());
     IRQ_MANAGER.write().register_opt(irq, com);
+}
+
+pub fn init_dt(dt: &Node) {
+    let addr = dt.prop_u64("reg").unwrap() as usize;
+    init(None, phys_to_virt(addr));
+}
+
+pub fn driver_init() {
+    DEVICE_TREE_REGISTRY.write().insert("ns16550a", init_dt);
 }

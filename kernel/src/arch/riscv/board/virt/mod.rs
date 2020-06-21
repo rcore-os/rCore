@@ -19,9 +19,3 @@ pub unsafe fn init_external_interrupt() {
 
     sie::set_sext();
 }
-
-pub unsafe fn enable_serial_interrupt() {
-    const UART16550: *mut u8 = phys_to_virt(0x10000000) as *mut u8;
-    UART16550.add(4).write_volatile(0x0B);
-    UART16550.add(1).write_volatile(0x01);
-}

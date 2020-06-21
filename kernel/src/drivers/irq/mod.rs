@@ -5,6 +5,9 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+pub mod plic;
+
+// Root Irq manager
 pub struct IrqManager {
     // drivers that only respond to specific irq
     mapping: BTreeMap<usize, Vec<Arc<dyn Driver>>>,
@@ -74,4 +77,10 @@ impl IrqManager {
         }
         false
     }
+}
+
+// interrupt controller
+pub trait IntcDriver: Driver {
+    /// Register interrupt controller local irq
+    fn register_local_irq(&mut self, irq: usize, driver: Arc<dyn Driver>);
 }

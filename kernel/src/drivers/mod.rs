@@ -112,6 +112,8 @@ lazy_static! {
 
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
 pub fn init(dtb: usize) {
+    serial::uart16550::driver_init();
+    bus::virtio_mmio::driver_init();
     device_tree::init(dtb);
 }
 

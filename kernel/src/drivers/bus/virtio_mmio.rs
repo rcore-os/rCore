@@ -1,14 +1,14 @@
+use super::super::block::virtio_blk;
+use super::super::gpu::virtio_gpu;
+use super::super::input::virtio_input;
+use super::super::net::virtio_net;
+use crate::drivers::device_tree::DEVICE_TREE_REGISTRY;
+use crate::memory::phys_to_virt;
 use device_tree::util::SliceRead;
 use device_tree::Node;
 use log::*;
 use rcore_memory::PAGE_SIZE;
 use virtio_drivers::{DeviceType, VirtIOHeader};
-
-use super::super::block::virtio_blk;
-use super::super::gpu::virtio_gpu;
-use super::super::input::virtio_input;
-use super::super::net::virtio_net;
-use crate::memory::phys_to_virt;
 
 pub fn virtio_probe(node: &Node) {
     let reg = match node.prop_raw("reg") {
@@ -37,4 +37,10 @@ pub fn virtio_probe(node: &Node) {
         DeviceType::Input => virtio_input::init(header),
         t => warn!("Unrecognized virtio device: {:?}", t),
     }
+}
+
+pub fn driver_init() {
+    DEVICE_TREE_REGISTRY
+        .write()
+        .insert("virtio,mmio", virtio_probe);
 }
