@@ -316,9 +316,7 @@ impl Syscall<'_> {
     /// Get the current thread id
     pub fn sys_gettid(&mut self) -> SysResult {
         info!("gettid");
-        // use pid as tid for now
-        //Ok(thread::current().id())
-        Ok(0)
+        Ok(self.thread.tid)
     }
 
     /// Get the parent process id
