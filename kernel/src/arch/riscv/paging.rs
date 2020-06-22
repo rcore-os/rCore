@@ -7,6 +7,7 @@ use riscv::addr::*;
 use riscv::asm::{sfence_vma, sfence_vma_all};
 use riscv::paging::{FrameAllocator, FrameDeallocator};
 use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF};
+use riscv::register::satp;
 
 #[cfg(target_arch = "riscv32")]
 type TopLevelPageTable<'a> = riscv::paging::Rv32PageTable<'a>;
@@ -216,15 +217,11 @@ impl PageTableExt for PageTableImpl {
     }
 
     unsafe fn set_token(token: usize) {
-        llvm_asm!("csrw satp, $0" :: "r"(token) :: "volatile");
+        satp::write(token);
     }
 
     fn active_token() -> usize {
-        let mut token;
-        unsafe {
-            llvm_asm!("csrr $0, satp" : "=r"(token) ::: "volatile");
-        }
-        token
+        satp::read().bits()
     }
 
     fn flush_tlb() {

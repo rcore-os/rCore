@@ -3,12 +3,12 @@ use core::time::Duration;
 use log::*;
 use riscv::register::*;
 
-#[cfg(target_pointer_width = "64")]
+#[cfg(target_arch = "riscv64")]
 pub fn get_cycle() -> u64 {
     time::read() as u64
 }
 
-#[cfg(target_pointer_width = "32")]
+#[cfg(target_arch = "riscv32")]
 pub fn get_cycle() -> u64 {
     loop {
         let hi = timeh::read();

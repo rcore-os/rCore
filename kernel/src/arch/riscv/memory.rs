@@ -21,7 +21,8 @@ pub fn init(dtb: usize) {
 pub fn init_other() {
     unsafe {
         sstatus::set_sum(); // Allow user memory access
-        llvm_asm!("csrw satp, $0; sfence.vma" :: "r"(SATP) :: "volatile");
+        satp::write(SATP);
+        sfence_vma_all();
     }
 }
 
