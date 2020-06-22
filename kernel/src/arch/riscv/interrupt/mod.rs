@@ -91,11 +91,11 @@ fn page_fault(stval: usize, tf: &mut TrapFrame) {
 }
 
 pub fn ack(irq: usize) {
-    // TODO
+    // Handled in PLIC driver
 }
 
 pub fn enable_irq(irq: usize) {
-    // TODO
+    // Handled in PLIC driver
 }
 
 pub fn get_trap_num(_context: &UserContext) -> usize {

@@ -1,7 +1,6 @@
 //! Define the FrameAllocator for physical memory
 //! x86_64      --  64GB
 //! AARCH64/MIPS/RV --  1GB
-//! K210(rv64)  --  8MB
 //! NOTICE:
 //! type FrameAlloc = bitmap_allocator::BitAllocXXX
 //! KSTACK_SIZE         -- 16KB
@@ -32,20 +31,13 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 pub type FrameAlloc = bitmap_allocator::BitAlloc256M;
 
 // RISCV, ARM, MIPS has 1G memory
-#[cfg(all(
-    any(
-        target_arch = "riscv32",
-        target_arch = "riscv64",
-        target_arch = "aarch64",
-        target_arch = "mips"
-    ),
-    not(feature = "board_k210")
+#[cfg(any(
+    target_arch = "riscv32",
+    target_arch = "riscv64",
+    target_arch = "aarch64",
+    target_arch = "mips"
 ))]
 pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
-
-// K210 has 8M memory
-#[cfg(feature = "board_k210")]
-pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
 pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::DEFAULT);
 
