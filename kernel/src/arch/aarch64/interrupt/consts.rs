@@ -1,6 +1,10 @@
 use super::syndrome::{Fault, Syndrome};
 
 pub fn is_page_fault(trap: usize) -> bool {
+    // 2: from lower el, sync error
+    if (trap >> 32) != 0x2 {
+        return false;
+    }
     let syndrome = Syndrome::from(trap as u32);
     match syndrome {
         Syndrome::DataAbort { kind, level: _ } | Syndrome::InstructionAbort { kind, level: _ } => {
