@@ -5,6 +5,8 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+#[cfg(feature = "board_raspi3")]
+pub mod bcm2837;
 pub mod plic;
 
 // Irq manager

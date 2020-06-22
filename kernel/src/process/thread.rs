@@ -451,15 +451,7 @@ pub fn spawn(thread: Arc<Thread>) {
 
             let mut exit = false;
             match trap_num {
-                Syscall => exit = handle_syscall(&thread, &mut cx).await,
-                IrqMin..=IrqMax => {
-                    crate::arch::interrupt::ack(trap_num);
-                    trace!("handle irq {:#x}", trap_num);
-                    if trap_num == Timer {
-                        crate::arch::interrupt::timer();
-                    }
-                    IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
-                }
+                // must be first
                 _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
@@ -470,9 +462,18 @@ pub fn spawn(thread: Arc<Thread>) {
                         panic!("page fault handle failed");
                     }
                 }
+                Syscall => exit = handle_syscall(&thread, &mut cx).await,
+                IrqMin..=IrqMax => {
+                    crate::arch::interrupt::ack(trap_num);
+                    trace!("handle irq {:#x}", trap_num);
+                    if trap_num == Timer {
+                        crate::arch::interrupt::timer();
+                    }
+                    IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
+                }
                 _ => {
                     panic!(
-                        "unhandled trap in thread {} {} {:x?}",
+                        "unhandled trap in thread {} trap {:#x} {:x?}",
                         thread.tid, trap_num, cx
                     );
                 }

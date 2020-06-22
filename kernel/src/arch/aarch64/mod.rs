@@ -24,9 +24,6 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn master_main() -> ! {
-    board::init_serial_early();
-    println!("Hello {}! from CPU {}", board::BOARD_NAME, cpu::id());
-
     // start up other CPUs
     unsafe { cpu::start_others() };
 
@@ -35,6 +32,10 @@ pub extern "C" fn master_main() -> ! {
         trapframe::init();
     }
     memory::init();
+
+    board::init_serial_early();
+    println!("Hello {}! from CPU {}", board::BOARD_NAME, cpu::id());
+
     crate::lkm::manager::ModuleManager::init();
     driver::init();
     println!("{}", LOGO);

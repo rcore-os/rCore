@@ -1,11 +1,13 @@
 use super::syndrome::{Fault, Syndrome};
+use aarch64::regs::*;
 
 pub fn is_page_fault(trap: usize) -> bool {
     // 2: from lower el, sync error
-    if (trap >> 32) != 0x2 {
+    if trap != 0x2 {
         return false;
     }
-    let syndrome = Syndrome::from(trap as u32);
+    let esr = ESR_EL1.get() as u32;
+    let syndrome = Syndrome::from(esr);
     match syndrome {
         Syndrome::DataAbort { kind, level: _ } | Syndrome::InstructionAbort { kind, level: _ } => {
             match kind {
@@ -18,8 +20,9 @@ pub fn is_page_fault(trap: usize) -> bool {
 }
 
 // from el0, irq
-pub const IrqMax: usize = 0x10002_00000000;
-pub const IrqMin: usize = 0x10002_00000000;
-pub const Timer: usize = 0x10002_00000000;
+pub const IrqMax: usize = 0x10002;
+pub const IrqMin: usize = 0x10002;
+pub const Timer: usize = 0x10002;
 
-pub const Syscall: usize = 0b010001_000000;
+// from el0, sync
+pub const Syscall: usize = 0x00002;

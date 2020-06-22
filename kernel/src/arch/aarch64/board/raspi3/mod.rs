@@ -2,9 +2,7 @@
 
 use bcm2837::{addr::bus_to_phys, atags::Atags};
 
-pub mod irq;
 pub mod mailbox;
-pub mod serial;
 pub mod timer;
 
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo, FramebufferResult};
@@ -21,7 +19,7 @@ pub static CPU_SPIN_TABLE: [usize; CPU_NUM] = [0xd8, 0xe0, 0xe8, 0xf0];
 
 /// Initialize serial port before other initializations.
 pub fn init_serial_early() {
-    serial::init();
+    crate::drivers::serial::bcm2837::driver_init();
 }
 
 /// Initialize raspi3 drivers

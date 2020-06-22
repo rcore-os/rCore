@@ -1,7 +1,7 @@
 //! Interrupt and exception for aarch64.
 
 pub use self::handler::*;
-use crate::arch::board::irq::is_timer_irq;
+use crate::arch::board::timer::is_pending;
 use aarch64::regs::*;
 use trapframe::UserContext;
 
@@ -41,7 +41,7 @@ pub unsafe fn restore(flags: usize) {
 }
 
 pub fn timer() {
-    if is_timer_irq() {
+    if is_pending() {
         crate::arch::board::timer::set_next();
         crate::trap::timer();
     }
@@ -52,9 +52,7 @@ pub fn ack(_irq: usize) {
 }
 
 pub fn get_trap_num(cx: &UserContext) -> usize {
-    // low 32bits: esr
-    // high 32bits: trap_num
-    (cx.trap_num << 32) | ESR_EL1.get() as usize
+    cx.trap_num
 }
 
 pub fn enable_irq(irq: usize) {

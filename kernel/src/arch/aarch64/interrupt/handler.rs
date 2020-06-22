@@ -1,11 +1,11 @@
 //! Trap handler
 
 use super::syndrome::{Fault, Syndrome};
-use crate::arch::board::irq::{handle_irq, is_timer_irq};
-use trapframe::TrapFrame;
-
+use crate::arch::board::timer;
+use crate::drivers::IRQ_MANAGER;
 use aarch64::regs::*;
 use log::*;
+use trapframe::TrapFrame;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Kind {
@@ -90,10 +90,10 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
             }
         }
         Kind::Irq => {
-            if is_timer_irq() {
+            if timer::is_pending() {
                 handle_timer()
             } else {
-                handle_irq(tf)
+                IRQ_MANAGER.read().try_handle_interrupt(Some(tf.trap_num));
             }
         }
         _ => panic!(),
