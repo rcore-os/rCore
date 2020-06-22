@@ -8,10 +8,10 @@ Going to be the next generation teaching operating system.
 
 Supported architectures and boards:
 
-* x86_64: PC (i5/i7)
-* RISCV32/64: HiFive Unleashed, Kendryte K210, [FPGA running Rocket Chip](https://github.com/jiegec/fpga-zynq)
-* AArch64: Raspberry Pi 3B+
-* MIPS32: [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
+* x86_64: QEMU, PC (i5/i7)
+* RISCV32/64: QEMU, HiFive Unleashed
+* AArch64: QEMU, Raspberry Pi 3B+
+* MIPS32: QEMU, [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 
@@ -40,7 +40,7 @@ $ docker run -it -v $PWD:$PWD -w $PWD wangrunji0408/rcore
 ```bash
 $ git clone https://github.com/rcore-os/rCore.git --recursive
 $ cd rCore/user
-$ make sfsimg prebuilt=1 arch=x86_64
+$ make sfsimg PREBUILT=1 ARCH=x86_64
 $ cd ../kernel
 $ make run ARCH=x86_64 LOG=info
 ```
@@ -53,7 +53,7 @@ See [Makefile](kernel/Makefile) for more usages.
 |--------|-----------------------|
 | x86_64 | @wangrunji0408        |
 | RISC-V  | @jiegec               |
-| ARM (Raspi3) | @equation314    |
+| AArch64 (Raspi3) | @equation314    |
 | MIPS   | @Harry_Chen @miskcoo   |
 | Memory, Process, File System | @wangrunji0408          |
 | Network with drivers | @jiegec |
