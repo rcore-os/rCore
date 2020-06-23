@@ -23,7 +23,7 @@ impl Driver for Bcm2837Intc {
         for intr in Controller::new().pending_interrupts() {
             res |= manager.try_handle_interrupt(Some(intr as usize));
         }
-        true
+        res
     }
 
     fn device_type(&self) -> DeviceType {
@@ -65,6 +65,8 @@ fn init() -> Arc<Bcm2837Intc> {
     // register under root irq manager
     // 0x10002: from lower el, irq
     IRQ_MANAGER.write().register_irq(0x10002, intc.clone());
+    // 0x10001: from current el, irq
+    IRQ_MANAGER.write().register_irq(0x10001, intc.clone());
     intc
 }
 

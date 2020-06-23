@@ -54,7 +54,7 @@ bit_field = "0.10"
 buddy_system_allocator = "0.4.0"
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
 device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
-executor = { git = "https://github.com/rcore-os/executor.git", rev = "b8af982" }
+executor = { git = "https://github.com/rcore-os/executor.git", rev = "7cf7ac0" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
 log = "0.4"
@@ -74,7 +74,7 @@ rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47"
 rlibc = "1.0"
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 spin = "0.5"
-trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "3e3f5ab" }
+trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "3125cef" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 volatile = "0.2"
 woke = "0.0.2"

@@ -64,7 +64,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         kind: Kind::from(tf.trap_num >> 16),
     };
     let esr = ESR_EL1.get() as u32;
-    info!(
+    trace!(
         "Exception @ CPU{}: {:?}, ESR: {:#x}, ELR: {:#x?}",
         crate::arch::cpu::id(),
         info,

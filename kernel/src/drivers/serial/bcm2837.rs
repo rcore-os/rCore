@@ -19,6 +19,8 @@ impl Driver for Bcm2837Serial {
     fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         let mu = self.mu.lock();
         if mu.interrupt_is_pending(MiniUartInterruptId::Recive) {
+            // avoid deadlock
+            drop(mu);
             let c = self.read();
             crate::trap::serial(c);
             true
@@ -50,9 +52,9 @@ impl SerialDriver for Bcm2837Serial {
 }
 
 pub fn driver_init() {
-    let serial = Arc::new(Bcm2837Serial {
-        mu: Mutex::new(MiniUart::new()),
-    });
+    let mut mu = MiniUart::new();
+    mu.init();
+    let serial = Arc::new(Bcm2837Serial { mu: Mutex::new(mu) });
     DRIVERS.write().push(serial.clone());
     SERIAL_DRIVERS.write().push(serial.clone());
     BCM2837_INTC.register_local_irq(Interrupt::Aux as u8 as usize, serial);
