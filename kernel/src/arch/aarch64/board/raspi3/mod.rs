@@ -18,16 +18,21 @@ pub const CPU_NUM: usize = 4;
 pub static CPU_SPIN_TABLE: [usize; CPU_NUM] = [0xd8, 0xe0, 0xe8, 0xf0];
 
 /// Initialize serial port before other initializations.
-pub fn init_serial_early() {
+pub fn early_init() {
     crate::drivers::serial::bcm2837::driver_init();
 }
 
+pub fn early_final() {
+    // Do nothing
+}
+
 /// Initialize raspi3 drivers
-pub fn init_driver() {
+pub fn init() {
     if let Ok(fb_info) = probe_fb_info(0, 0, 0) {
         fb::init(fb_info);
     }
     bcm2835_sdhci::init();
+    crate::drivers::console::init();
 }
 
 /// Returns the (start address, end address) of the physical memory on this

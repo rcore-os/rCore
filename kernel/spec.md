@@ -49,3 +49,8 @@
 - fn early_init()：早期初始化串口等
 - fn early_final()：结束早期初始化串口
 - fn init()：初始化
+
+### mod
+
+- fn main_start()：第一个核的启动
+- fn others_start()：其他核的启动

@@ -5,7 +5,6 @@ use core::sync::atomic::{spin_loop_hint, AtomicBool, Ordering};
 mod boot;
 pub mod consts;
 pub mod cpu;
-pub mod driver;
 pub mod interrupt;
 pub mod io;
 pub mod memory;
@@ -23,7 +22,7 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 
 /// The entry point of kernel
 #[no_mangle] // don't mangle the name of this function
-pub extern "C" fn master_main() -> ! {
+pub extern "C" fn main_start() -> ! {
     // start up other CPUs
     unsafe { cpu::start_others() };
 
@@ -33,12 +32,12 @@ pub extern "C" fn master_main() -> ! {
     }
     memory::init();
 
-    board::init_serial_early();
+    board::early_init();
     println!("Hello {}! from CPU {}", board::BOARD_NAME, cpu::id());
 
+    board::early_final();
     crate::lkm::manager::ModuleManager::init();
-    driver::init();
-    println!("{}", LOGO);
+    board::init();
 
     crate::process::init();
 
@@ -49,7 +48,7 @@ pub extern "C" fn master_main() -> ! {
 }
 
 #[no_mangle]
-pub extern "C" fn others_main() -> ! {
+pub extern "C" fn others_start() -> ! {
     println!("Hello {}! from CPU {}", board::BOARD_NAME, cpu::id());
 
     while !AP_CAN_INIT.load(Ordering::Relaxed) {
@@ -63,14 +62,6 @@ pub extern "C" fn others_main() -> ! {
     //timer::init();
     crate::kmain();
 }
-
-const LOGO: &str = r#"
-    ____                __   ____  _____
-   / __ \ __  __ _____ / /_ / __ \/ ___/
-  / /_/ // / / // ___// __// / / /\__ \
- / _, _// /_/ /(__  )/ /_ / /_/ /___/ /
-/_/ |_| \__,_//____/ \__/ \____//____/
-"#;
 
 pub fn get_sp() -> usize {
     let sp: usize;

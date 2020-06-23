@@ -15,7 +15,7 @@ _start:
     bl      el_setup
     bl      clear_bss
     bl      create_init_paging
-    b       master_startup
+    b       boot_startup
 
 halt:
     # unreachable
@@ -102,24 +102,24 @@ el_setup_end:
     ret
 
 # primary CPU: enable paging, jump to upper VA range
-master_startup:
+boot_startup:
     bl      enable_mmu
-    ldr     x0, =master_main
+    ldr     x0, =main_start
     ldr     x8, =jump_to_main
     br      x8
 
 # other CPUs: jump to EL1, enable paging, jump to upper VA range
-.global slave_startup
-slave_startup:
+.global others_startup
+others_startup:
     mrs     x19, mpidr_el1
     and     x19, x19, #3
     bl      el_setup
     bl      enable_mmu
-    ldr     x0, =others_main
+    ldr     x0, =others_start
     ldr     x8, =jump_to_main
     br      x8
 
-# set-up kernel stack, jump to master_main/others_main
+# set-up kernel stack, jump to boot_start/others_main
 jump_to_main:
     msr     ttbr0_el1, xzr
     ldr     x8, =bootstacktop
