@@ -113,27 +113,6 @@ lazy_static! {
     pub static ref SOCKET_ACTIVITY: Condvar = Condvar::new();
 }
 
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
-pub fn init(dtb: usize) {
-    serial::uart16550::driver_init();
-    bus::virtio_mmio::driver_init();
-    irq::plic::driver_init();
-    device_tree::init(dtb);
-}
-
-#[cfg(target_arch = "x86_64")]
-pub fn init() {
-    bus::pci::init();
-    rtc::rtc_cmos::init();
-    serial::keyboard::init();
-    console::init();
-}
-
-#[cfg(target_arch = "x86_64")]
-pub fn early_init() {
-    serial::com::init();
-}
-
 lazy_static! {
     // Write only once at boot
     pub static ref CMDLINE: RwLock<String> = RwLock::new(String::new());

@@ -36,7 +36,7 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     crate::memory::init_heap();
 
     // serial
-    crate::drivers::early_init();
+    board::early_init();
 
     println!("Hello world! from CPU {}!", cpu_id);
 
@@ -62,9 +62,7 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     // now we can start LKM.
     crate::lkm::manager::ModuleManager::init();
     // init board
-    board::init_driver(boot_info);
-    // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
-    crate::drivers::init();
+    board::init(boot_info);
     // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
     // load acpi

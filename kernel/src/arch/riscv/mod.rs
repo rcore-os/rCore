@@ -54,7 +54,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     timer::init();
     // FIXME: init driver on u540
     #[cfg(not(any(feature = "board_u540")))]
-    crate::drivers::init(device_tree_vaddr);
+    board::init(device_tree_vaddr);
     unsafe {
         board::init_external_interrupt();
     }

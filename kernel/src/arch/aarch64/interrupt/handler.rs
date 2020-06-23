@@ -77,21 +77,23 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
             trace!("ESR: {:#x?}, Syndrome: {:?}", esr, syndrome);
             // syndrome is only valid with sync
             match syndrome {
-                Syndrome::Brk(brk) => handle_break(brk, tf),
-                Syndrome::Svc(svc) => handle_syscall(svc, tf),
                 Syndrome::DataAbort { kind, level: _ }
                 | Syndrome::InstructionAbort { kind, level: _ } => match kind {
                     Fault::Translation | Fault::AccessFlag | Fault::Permission => {
-                        handle_page_fault(tf)
+                        let addr = FAR_EL1.get() as usize;
+                        if !crate::memory::handle_page_fault(addr) {
+                            panic!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+                        }
                     }
-                    _ => panic!(), // crate::trap::error(tf),
+                    _ => panic!(),
                 },
-                _ => panic!(), //crate::trap::error(tf),
+                _ => panic!(),
             }
         }
         Kind::Irq => {
             if timer::is_pending() {
-                handle_timer()
+                crate::arch::board::timer::set_next();
+                crate::trap::timer();
             } else {
                 IRQ_MANAGER.read().try_handle_interrupt(Some(tf.trap_num));
             }
@@ -99,49 +101,4 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         _ => panic!(),
     }
     trace!("Exception end");
-}
-
-fn handle_break(_num: u16, tf: &mut TrapFrame) {
-    // Skip the current brk instruction (ref: J1.1.2, page 6147)
-    tf.elr += 4;
-}
-
-fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    if num != 0 {
-        panic!()
-        //crate::trap::error(tf);
-    }
-
-    syscall(tf)
-}
-
-pub fn syscall(tf: &mut TrapFrame) {
-    // svc instruction has been skipped in syscall (ref: J1.1.2, page 6152)
-    /*
-    let ret = crate::syscall::syscall(
-        tf.x1to29[7] as usize,
-        [
-            tf.x0,
-            tf.x1to29[0],
-            tf.x1to29[1],
-            tf.x1to29[2],
-            tf.x1to29[3],
-            tf.x1to29[4],
-        ],
-        tf,
-    );
-    tf.x0 = ret as usize;
-    */
-}
-
-fn handle_timer() {
-    crate::arch::board::timer::set_next();
-    crate::trap::timer();
-}
-
-fn handle_page_fault(tf: &mut TrapFrame) {
-    let addr = FAR_EL1.get() as usize;
-    if !crate::memory::handle_page_fault(addr) {
-        panic!("\nEXCEPTION: Page Fault @ {:#x}", addr);
-    }
 }

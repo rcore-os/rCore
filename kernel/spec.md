@@ -12,7 +12,7 @@
 
 路径：`src/arch/ISA`。其余的代码尽量不要出现平台相关的代码。
 
-### consts.rs
+### consts
 
 - KERNEL_OFFSET： 线性映射的偏移
 - ARCH：ISA 的名称
@@ -37,6 +37,10 @@
 - IrqMax：中断的最大 trap
 - Syscall：系统调用的 trap
 - Timer：时钟中断的 trap
+
+### interrupt/handler
+
+- fn trap_handler(tf: &mut TrapFrame)：处理来自内核的异常
 
 ### syscall
 

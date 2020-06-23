@@ -6,6 +6,8 @@ pub fn is_page_fault(trap: usize) -> bool {
     if trap != 0x2 {
         return false;
     }
+
+    // determine by esr
     let esr = ESR_EL1.get() as u32;
     let syndrome = Syndrome::from(esr);
     match syndrome {
