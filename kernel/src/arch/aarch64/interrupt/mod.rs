@@ -58,3 +58,13 @@ pub fn get_trap_num(cx: &UserContext) -> usize {
 pub fn enable_irq(irq: usize) {
     // TODO
 }
+
+pub fn wait_for_interrupt() {
+    use aarch64::regs::*;
+    let daif = DAIF.get();
+    unsafe {
+        llvm_asm!("msr daifclr, #2");
+    }
+    aarch64::asm::wfe();
+    DAIF.set(daif);
+}

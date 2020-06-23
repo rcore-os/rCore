@@ -55,3 +55,8 @@ pub fn ack(_irq: usize) {
 pub fn get_trap_num(context: &UserContext) -> usize {
     context.trap_num
 }
+
+pub fn wait_for_interrupt() {
+    x86_64::instructions::interrupts::enable_interrupts_and_hlt();
+    x86_64::instructions::interrupts::disable();
+}

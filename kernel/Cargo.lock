@@ -186,21 +186,18 @@ dependencies = [
 [[package]]
 name = "executor"
 version = "0.6.0"
-source = "git+https://github.com/rcore-os/executor.git?rev=7cf7ac0#7cf7ac0e9ff27086b41621ca7096520a1f3f6a57"
+source = "git+https://github.com/rcore-os/executor.git?rev=a2d02ee9#a2d02ee9567973209f557db53adc988dad2095e5"
 dependencies = [
- "aarch64",
  "executor-macros",
  "lazy_static",
- "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=d9794e)",
  "spin",
  "woke",
- "x86_64",
 ]
 
 [[package]]
 name = "executor-macros"
 version = "0.0.1"
-source = "git+https://github.com/rcore-os/executor.git?rev=7cf7ac0#7cf7ac0e9ff27086b41621ca7096520a1f3f6a57"
+source = "git+https://github.com/rcore-os/executor.git?rev=a2d02ee9#a2d02ee9567973209f557db53adc988dad2095e5"
 dependencies = [
  "proc-macro2",
  "quote",

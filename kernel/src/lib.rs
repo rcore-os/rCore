@@ -69,7 +69,10 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    executor::run();
+    loop {
+        executor::run_until_idle();
+        arch::interrupt::wait_for_interrupt();
+    }
 }
 
 /// Global heap allocator
