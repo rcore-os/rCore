@@ -8,7 +8,7 @@ dependencies = [
  "bit_field 0.9.0",
  "bitflags",
  "cast",
- "register 0.2.1",
+ "register",
  "usize_conversions",
  "ux",
 ]
@@ -161,15 +161,6 @@ dependencies = [
  "lazy_static",
  "log",
  "num-traits",
-]
-
-[[package]]
-name = "cortex-a"
-version = "3.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6467294dffa4f14094880a0f5dab0dfc8e163d808c305378669f68c6ff1fda0"
-dependencies = [
- "register 0.5.1",
 ]
 
 [[package]]
@@ -600,16 +591,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e10f31b6d2299e5620986ad9fcdd66463e125ad72af4f403f9aedf7592d5ccdb"
 dependencies = [
- "tock-registers 0.2.0",
-]
-
-[[package]]
-name = "register"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deaba5b0e477d21f61a57504bb5cef4a1e86de30300b457d38971c1cfc98b815"
-dependencies = [
- "tock-registers 0.5.0",
+ "tock-registers",
 ]
 
 [[package]]
@@ -725,17 +707,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 
 [[package]]
-name = "tock-registers"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70323afdb8082186c0986da0e10f6e4ed103d681c921c00597e98d9806dac20f"
-
-[[package]]
 name = "trapframe"
-version = "0.4.1"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=d7fcbed#d7fcbed1eb82e98b058d2796e8b5c0db719c9dd2"
+version = "0.4.2"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=5c6cc02#5c6cc0280e1fa6557d151b7060f6048b93ba7d18"
 dependencies = [
- "cortex-a",
  "raw-cpuid",
  "x86_64",
 ]
