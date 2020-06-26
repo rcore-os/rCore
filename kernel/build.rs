@@ -8,4 +8,14 @@ fn main() {
     if let Ok(user_img) = std::env::var("USER_IMG") {
         println!("cargo:rerun-if-changed={}", user_img);
     }
+
+    // for shorter #[cfg] check
+    let target = std::env::var("TARGET").unwrap();
+    if target.contains("riscv32") {
+        println!("cargo:rustc-cfg=riscv");
+        println!("cargo:rustc-cfg=riscv32");
+    } else if target.contains("riscv64") {
+        println!("cargo:rustc-cfg=riscv");
+        println!("cargo:rustc-cfg=riscv64");
+    }
 }

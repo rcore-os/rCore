@@ -13,7 +13,7 @@ pub fn fp() -> usize {
     unsafe {
         llvm_asm!("mov $0, x29" : "=r"(ptr));
     }
-    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    #[cfg(riscv)]
     unsafe {
         llvm_asm!("mv $0, s0" : "=r"(ptr));
     }
@@ -38,7 +38,7 @@ pub fn lr() -> usize {
     unsafe {
         llvm_asm!("mov $0, x30" : "=r"(ptr));
     }
-    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    #[cfg(riscv)]
     unsafe {
         llvm_asm!("mv $0, ra" : "=r"(ptr));
     }
@@ -97,7 +97,7 @@ pub fn backtrace() {
             }
 
             stack_num = stack_num + 1;
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            #[cfg(riscv)]
             {
                 current_fp = *(current_fp as *const usize).offset(-2);
                 current_pc = *(current_fp as *const usize).offset(-1);

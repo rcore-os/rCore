@@ -10,7 +10,7 @@ pub use self::x86_64::*;
 #[cfg(target_arch = "aarch64")]
 pub use self::aarch64::*;
 
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[cfg(riscv)]
 pub use self::riscv::*;
 
 #[cfg(target_arch = "mips")]

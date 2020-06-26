@@ -130,7 +130,7 @@ impl Thread {
             header::Machine::X86_64 => {}
             #[cfg(target_arch = "aarch64")]
             header::Machine::AArch64 => {}
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            #[cfg(riscv)]
             header::Machine::Other(243) => {}
             #[cfg(target_arch = "mips")]
             header::Machine::Mips => {}
@@ -287,7 +287,7 @@ impl Thread {
         {
             context.general.rflags = 0x3202;
         }
-        #[cfg(target_arch = "riscv64")]
+        #[cfg(riscv)]
         {
             // SUM | FS | SPIE
             context.sstatus = 1 << 18 | 1 << 14 | 1 << 13 | 1 << 5;

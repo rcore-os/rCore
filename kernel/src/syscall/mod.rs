@@ -57,7 +57,7 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let num = context.get_syscall_num();
     let args = context.get_syscall_args();
     // add before fork
-    #[cfg(target_arch = "riscv64")]
+    #[cfg(riscv)]
     {
         context.sepc = context.sepc + 4;
     }
