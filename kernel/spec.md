@@ -29,6 +29,7 @@
 
 - fn ack(trap: usize)：确认中断处理
 - fn timer()：处理时钟中断
+- fn wait_for_interrupt()：打开并等待中断
 
 ### interrupt/consts
 
