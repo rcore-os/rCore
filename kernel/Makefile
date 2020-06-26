@@ -21,7 +21,6 @@
 #   BOARD = qemu                Run on QEMU
 #         | pc                  [ x86_64 only] Run on real pc
 #         | u540                [riscv64 only] Run on HiFive U540, use Sv39
-#         | k210                [riscv64 only] Run on K210, use Sv39
 #         | rocket_chip         [riscv64 only] Run on Rocket Chip, use Sv39
 #         | raspi3              [aarch64 only] Run on Raspberry Pi 3 Model B/B+
 #   NET = on | off              [ x86_64 only] Enable NIC
@@ -299,9 +298,7 @@ endif
 kernel: $(DTB)
 	@echo Building $(ARCH) kernel
 ifeq ($(ARCH), $(filter $(ARCH), riscv32 riscv64))
-ifeq ($(BOARD), k210)
-	@cp src/arch/riscv/board/k210/linker.ld src/arch/riscv/boot/linker64.ld
-else ifeq ($(BOARD), rocket_chip)
+ifeq ($(BOARD), rocket_chip)
 	@cp src/arch/riscv/board/rocket_chip/linker.ld src/arch/riscv/boot/linker64.ld
 else
 	@cp src/arch/riscv/board/u540/linker.ld src/arch/riscv/boot/linker64.ld
@@ -348,14 +345,6 @@ install: $(kernel_img)
 	@$(objcopy) -S -O binary ../tools/opensbi/fu540.elf $(build_path)/bin
 	@dd if=$< of=$(build_path)/bin bs=0x20000 seek=16
 	@../tools/u540/mkimg.sh $(build_path)/bin $(build_path)/u540.img
-endif
-
-ifeq ($(BOARD), k210)
-.PHONY:
-install: $(kernel_img)
-	@$(objcopy) -S -O binary ../tools/opensbi/k210.elf $(build_path)/k210.img
-	@dd if=$< of=$(build_path)/k210.img bs=0x10000 seek=1
-	@python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
 endif
 
 .PHONY:

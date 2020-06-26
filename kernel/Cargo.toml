@@ -22,7 +22,6 @@ authors = [
 default = []
 board_qemu = []
 board_u540 = ["link_user"]
-board_k210 = ["link_user"]
 board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
