@@ -21,7 +21,6 @@
 #   BOARD = qemu                Run on QEMU
 #         | pc                  [ x86_64 only] Run on real pc
 #         | u540                [riscv64 only] Run on HiFive U540, use Sv39
-#         | rocket_chip         [riscv64 only] Run on Rocket Chip, use Sv39
 #         | raspi3              [aarch64 only] Run on Raspberry Pi 3 Model B/B+
 #   NET = on | off              [ x86_64 only] Enable NIC
 #   PCI_PASSTHRU = 0000:00:00.1 [ x86_64 only] Passthrough the specified PCI device
@@ -61,12 +60,9 @@ else
 BOARD ?= qemu
 endif
 
-# currently only mipsel architecture and rocket-chip need DTB linked to the kernel
+# currently only mipsel architecture need DTB linked to the kernel
 ifeq ($(ARCH), mipsel)
 DTB := src/arch/$(ARCH)/board/$(BOARD)/device.dtb
-endif
-ifeq ($(BOARD), rocket_chip)
-DTB := src/arch/riscv/board/$(BOARD)/device.dtb
 endif
 
 # mipssim does not support SMP
@@ -298,11 +294,7 @@ endif
 kernel: $(DTB)
 	@echo Building $(ARCH) kernel
 ifeq ($(ARCH), $(filter $(ARCH), riscv32 riscv64))
-ifeq ($(BOARD), rocket_chip)
-	@cp src/arch/riscv/board/rocket_chip/linker.ld src/arch/riscv/boot/linker64.ld
-else
 	@cp src/arch/riscv/board/u540/linker.ld src/arch/riscv/boot/linker64.ld
-endif
 	@-patch -p0 -N -b \
 		$(sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv/atomic.patch

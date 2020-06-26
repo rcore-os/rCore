@@ -22,7 +22,6 @@ authors = [
 default = []
 board_qemu = []
 board_u540 = ["link_user"]
-board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
 consolegraphic = []
@@ -71,7 +70,7 @@ rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47"
 rlibc = "1.0"
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 spin = "0.5"
-trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "5c6cc02" }
+trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "aaa0fa3" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 volatile = "0.2"
 woke = "0.0.2"
@@ -94,5 +93,5 @@ aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.1" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.5.1", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
-mips = "^0.2.0"
+mips = { git = "https://github.com/Harry-Chen/rust-mips", rev = "3b828a2" }
 paste = "0.1"

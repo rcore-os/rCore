@@ -266,11 +266,10 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "mips"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053a14b59d7b828efefebf92b557015d99383264f4714a959b1d970d8c6c32fb"
+version = "0.3.0"
+source = "git+https://github.com/Harry-Chen/rust-mips?rev=3b828a2#3b828a2afed97f2769a66cf9cd8239a285804dc0"
 dependencies = [
- "bit_field 0.9.0",
+ "bit_field 0.10.0",
  "bitflags",
 ]
 
@@ -708,8 +707,8 @@ checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 
 [[package]]
 name = "trapframe"
-version = "0.4.2"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=5c6cc02#5c6cc0280e1fa6557d151b7060f6048b93ba7d18"
+version = "0.4.3"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=aaa0fa3#aaa0fa341457833e08c4f82442a1efee5c480c01"
 dependencies = [
  "raw-cpuid",
  "x86_64",
