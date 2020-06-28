@@ -123,12 +123,7 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
-                        // TODO: signal
                         self.async_poll().await?;
-                        //if has_signal_to_do() {
-                        //return Err(Interrupted);
-                        //}
-                        //thread::yield_now();
                     }
                     Err(err) => {
                         return Err(err);

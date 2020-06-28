@@ -248,12 +248,12 @@ impl Syscall<'_> {
             SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
-                args[1] as *const Sigset,
-                args[2] as *mut Sigset,
+                UserInPtr::from(args[1]),
+                UserOutPtr::from(args[2]),
                 args[3],
             ),
             SYS_SIGALTSTACK => {
-                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+                self.sys_sigaltstack(UserInPtr::from(args[0]), UserOutPtr::from(args[1]))
             }
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 

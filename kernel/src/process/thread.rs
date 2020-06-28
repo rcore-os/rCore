@@ -35,6 +35,7 @@ use core::{
     task::{Context, Poll},
 };
 use log::*;
+use num::FromPrimitive;
 use pc_keyboard::KeyCode::BackTick;
 use rcore_fs::vfs::INode;
 use rcore_memory::{Page, PAGE_SIZE};
@@ -440,6 +441,25 @@ impl Thread {
 
     pub fn end_running(&self, cx: Box<UserContext>) {
         self.inner.lock().context = Some(cx);
+    }
+
+    /// this thread has signal to handle
+    pub fn has_signal_to_handle(&self) -> bool {
+        self.proc
+            .lock()
+            .sig_queue
+            .iter()
+            .find(|(info, tid)| {
+                let tid = *tid;
+                // targets me and not masked
+                (tid == -1 || tid as usize == self.tid)
+                    && !self
+                        .inner
+                        .lock()
+                        .sig_mask
+                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
+            })
+            .is_some()
     }
 }
 

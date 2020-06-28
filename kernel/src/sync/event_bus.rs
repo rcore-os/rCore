@@ -20,6 +20,7 @@ bitflags! {
         /// Process
         const PROCESS_QUIT                  = 1 << 10;
         const CHILD_PROCESS_QUIT            = 1 << 11;
+        const RECEIVE_SIGNAL                = 1 << 12;
     }
 }
 

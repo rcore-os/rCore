@@ -1,15 +1,15 @@
+use crate::arch::signal::MachineContext;
+use crate::arch::syscall::SYS_RT_SIGRETURN;
 use crate::process::{process, process_of, Process, Thread};
-use crate::sync::{MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
+use crate::sync::{Event, MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
 use bitflags::*;
 use num::FromPrimitive;
+use trapframe::TrapFrame;
 
 mod action;
 
 pub use self::action::*;
-use crate::arch::signal::MachineContext;
-use crate::arch::syscall::SYS_RT_SIGRETURN;
-use trapframe::TrapFrame;
 
 #[derive(Eq, PartialEq, FromPrimitive, Debug, Copy, Clone)]
 pub enum Signal {
@@ -98,17 +98,7 @@ pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
     }
     process.sig_queue.push_back((info, tid));
     process.pending_sigset.add(signal);
-    if tid == -1 {
-        info!("send {:?} to process {}", signal, process.pid.get());
-        for &tid in process.threads.iter() {
-            // TODO: check mask here
-            //thread_manager().wakeup(tid);
-        }
-    } else {
-        info!("send {:?} to thread {}", signal, tid);
-        // TODO: check mask here
-        //thread_manager().wakeup(tid as usize);
-    }
+    process.eventbus.lock().set(Event::RECEIVE_SIGNAL);
 }
 
 #[repr(C)]

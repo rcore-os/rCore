@@ -5,7 +5,7 @@ use crate::arch::timer::timer_now;
 use crate::fs::FileLike;
 use crate::signal::{send_signal, Signal};
 use crate::{
-    sync::{wait_for_event, Event},
+    sync::{wait_for_event, Event, EventBus, SpinNoIrqLock as Mutex},
     syscall::SysError::{EINTR, ESRCH},
     trap::NAIVE_TIMER,
 };
@@ -378,9 +378,8 @@ impl Syscall<'_> {
         let time = req.read()?;
         info!("nanosleep: time: {:#?},", time);
         if !time.is_zero() {
-            // TODO: handle wakeup
-            sleep_for(time.to_duration()).await;
-            if self.has_signal_to_do() {
+            self.sleep_for(time.to_duration()).await?;
+            if self.thread.has_signal_to_handle() {
                 return Err(EINTR);
             }
         }
@@ -396,13 +395,15 @@ impl Syscall<'_> {
         self.thread.inner.lock().clear_child_tid = tidptr as usize;
         Ok(self.thread.tid)
     }
-}
 
-// sleeping
-pub fn sleep_for(duration: Duration) -> impl Future {
-    SleepFuture {
-        deadline: timer_now() + duration,
-        duration,
+    // sleeping
+    pub fn sleep_for(&mut self, duration: Duration) -> impl Future<Output = SysResult> {
+        SleepFuture {
+            deadline: timer_now() + duration,
+            duration,
+            thread: self.thread.clone(),
+            eventbus: self.thread.proc.lock().eventbus.clone(),
+        }
     }
 }
 
@@ -410,22 +411,37 @@ pub fn sleep_for(duration: Duration) -> impl Future {
 pub struct SleepFuture {
     deadline: Duration,
     duration: Duration,
+    thread: Arc<Thread>,
+    eventbus: Arc<Mutex<EventBus>>,
 }
 
 impl Future for SleepFuture {
-    type Output = ();
+    type Output = SysResult;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        // check
         if timer_now() >= self.deadline {
-            return Poll::Ready(());
+            return Poll::Ready(Ok(0));
+        } else if self.thread.has_signal_to_handle() {
+            return Poll::Ready(Err(EINTR));
         }
-        // check infinity
+
+        // handle infinity
         if self.duration.as_nanos() < i64::max_value() as u128 {
             let waker = cx.waker().clone();
             NAIVE_TIMER
                 .lock()
                 .add(self.deadline, Box::new(move |_| waker.wake()));
         }
+
+        let waker = cx.waker().clone();
+        let mut eventbus = self.eventbus.lock();
+        eventbus.subscribe(Box::new({
+            move |_| {
+                waker.wake_by_ref();
+                true
+            }
+        }));
         Poll::Pending
     }
 }

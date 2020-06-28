@@ -6,26 +6,6 @@ use crate::syscall::{SysResult, Syscall};
 use num::FromPrimitive;
 
 impl Syscall<'_> {
-    pub fn has_signal_to_do(&self) -> bool {
-        self.thread
-            .proc
-            .lock()
-            .sig_queue
-            .iter()
-            .find(|(info, tid)| {
-                let tid = *tid;
-                // targets me and not masked
-                (tid == -1 || tid as usize == self.thread.tid)
-                    && !self
-                        .thread
-                        .inner
-                        .lock()
-                        .sig_mask
-                        .contains(FromPrimitive::from_i32(info.signo).unwrap())
-            })
-            .is_some()
-    }
-
     pub fn sys_rt_sigaction(
         &self,
         signum: usize,
@@ -51,7 +31,7 @@ impl Syscall<'_> {
                 }
                 if !act.is_null() {
                     let act = act.read()?;
-                    info!("new action: {:x?}", act);
+                    info!("new action: {:?} -> {:x?}", signal, act);
                     proc.dispositions[signum] = act;
                 }
                 Ok(0)
@@ -114,8 +94,8 @@ impl Syscall<'_> {
     pub fn sys_rt_sigprocmask(
         &mut self,
         how: usize,
-        set: *const Sigset,
-        oldset: *mut Sigset,
+        set: UserInPtr<Sigset>,
+        mut oldset: UserOutPtr<Sigset>,
         sigsetsize: usize,
     ) -> SysResult {
         info!(
@@ -126,19 +106,19 @@ impl Syscall<'_> {
             return Err(EINVAL);
         }
         if !oldset.is_null() {
-            let oldset = unsafe { self.vm().check_write_ptr(oldset)? };
-            *oldset = self.thread.inner.lock().sig_mask;
+            oldset.write(self.thread.inner.lock().sig_mask)?;
         }
         if !set.is_null() {
-            let set = unsafe { self.vm().check_read_ptr(set)? };
+            let set = set.read()?;
             info!("rt_sigprocmask: set: {:?}", set);
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
+            let mut inner = self.thread.inner.lock();
             match how {
-                BLOCK => self.thread.inner.lock().sig_mask.add_set(set),
-                UNBLOCK => self.thread.inner.lock().sig_mask.remove_set(set),
-                SETMASK => self.thread.inner.lock().sig_mask = *set,
+                BLOCK => inner.sig_mask.add_set(&set),
+                UNBLOCK => inner.sig_mask.remove_set(&set),
+                SETMASK => inner.sig_mask = set,
                 _ => return Err(EINVAL),
             }
         }
@@ -223,22 +203,25 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_sigaltstack(&self, ss: *const SignalStack, old_ss: *mut SignalStack) -> SysResult {
+    pub fn sys_sigaltstack(
+        &self,
+        ss: UserInPtr<SignalStack>,
+        mut old_ss: UserOutPtr<SignalStack>,
+    ) -> SysResult {
         info!("sigaltstack: ss: {:?}, old_ss: {:?}", ss, old_ss);
-        const MINSIGSTKSZ: usize = 2048;
         if !old_ss.is_null() {
-            let old_ss = unsafe { self.vm().check_write_ptr(old_ss)? };
-            *old_ss = self.thread.inner.lock().signal_alternate_stack;
+            old_ss.write(self.thread.inner.lock().signal_alternate_stack)?;
         }
         if !ss.is_null() {
-            let ss = unsafe { self.vm().check_read_ptr(ss)? };
+            let ss = ss.read()?;
             info!("new stack: {:?}", ss);
 
+            const MINSIGSTKSZ: usize = 2048;
             if ss.flags & 2 != 0 && ss.size < MINSIGSTKSZ {
                 return Err(ENOMEM);
             }
             // only allow SS_AUTODISARM or SS_DISABLE
-            if ss.flags ^ (ss.flags & 0x8000002) != 0 {
+            if ss.flags != ss.flags & 0x8000002 {
                 return Err(EINVAL);
             }
 
@@ -248,7 +231,7 @@ impl Syscall<'_> {
             if flags.contains(SignalStackFlags::ONSTACK) {
                 return Err(EPERM);
             }
-            *old_ss = *ss;
+            *old_ss = ss;
         }
         Ok(0)
     }
