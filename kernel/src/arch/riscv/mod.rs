@@ -85,17 +85,3 @@ const BOOT_HART_ID: usize = 1;
 global_asm!(include_str!("boot/entry32.asm"));
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("boot/entry64.asm"));
-
-pub fn get_sp() -> usize {
-    let sp: usize;
-    unsafe {
-        llvm_asm!("mv $0, sp" : "=r"(sp));
-    }
-    sp
-}
-
-pub fn set_sp(sp: usize) {
-    unsafe {
-        llvm_asm!("mv sp, $0" :: "r" (sp) : "memory");
-    }
-}

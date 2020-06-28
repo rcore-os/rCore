@@ -1,3 +1,4 @@
+use super::{UserInPtr, UserOutPtr};
 use crate::process::*;
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
@@ -13,6 +14,7 @@ impl Syscall<'_> {
             .iter()
             .find(|(info, tid)| {
                 let tid = *tid;
+                // targets me and not masked
                 (tid == -1 || tid as usize == self.thread.tid)
                     && !self
                         .thread
@@ -23,11 +25,12 @@ impl Syscall<'_> {
             })
             .is_some()
     }
+
     pub fn sys_rt_sigaction(
         &self,
         signum: usize,
-        act: *const SignalAction,
-        oldact: *mut SignalAction,
+        act: UserInPtr<SignalAction>,
+        mut oldact: UserOutPtr<SignalAction>,
         sigsetsize: usize,
     ) -> SysResult {
         if let Some(signal) = <Signal as FromPrimitive>::from_usize(signum) {
@@ -44,19 +47,18 @@ impl Syscall<'_> {
             } else {
                 let mut proc = self.process();
                 if !oldact.is_null() {
-                    let oldact = unsafe { self.vm().check_write_ptr(oldact)? };
-                    *oldact = proc.dispositions[signum];
+                    oldact.write(proc.dispositions[signum])?;
                 }
                 if !act.is_null() {
-                    let act = unsafe { self.vm().check_read_ptr(act)? };
+                    let act = act.read()?;
                     info!("new action: {:x?}", act);
-                    proc.dispositions[signum] = *act;
+                    proc.dispositions[signum] = act;
                 }
                 Ok(0)
             }
         } else {
             info!(
-                "rt_sigaction: sigal: UNKNOWN, act: {:?}, oldact: {:?}, sigsetsize: {}",
+                "rt_sigaction: signal: UNKNOWN, act: {:?}, oldact: {:?}, sigsetsize: {}",
                 act, oldact, sigsetsize
             );
             Err(EINVAL)
@@ -163,6 +165,7 @@ impl Syscall<'_> {
                     }
                 }
                 0 => {
+                    // to current process group
                     let pgid = self.process().pgid;
                     for process in process_group(pgid) {
                         send_signal(process, -1, info);
@@ -225,7 +228,7 @@ impl Syscall<'_> {
         const MINSIGSTKSZ: usize = 2048;
         if !old_ss.is_null() {
             let old_ss = unsafe { self.vm().check_write_ptr(old_ss)? };
-            *old_ss = self.process().sigaltstack;
+            *old_ss = self.thread.inner.lock().signal_alternate_stack;
         }
         if !ss.is_null() {
             let ss = unsafe { self.vm().check_read_ptr(ss)? };
@@ -239,7 +242,8 @@ impl Syscall<'_> {
                 return Err(EINVAL);
             }
 
-            let old_ss = &mut self.process().sigaltstack;
+            let mut inner = self.thread.inner.lock();
+            let old_ss = &mut inner.signal_alternate_stack;
             let flags = SignalStackFlags::from_bits_truncate(old_ss.flags);
             if flags.contains(SignalStackFlags::ONSTACK) {
                 return Err(EPERM);

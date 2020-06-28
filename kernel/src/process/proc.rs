@@ -117,8 +117,8 @@ pub struct Process {
     pub sig_queue: VecDeque<(Siginfo, isize)>,
     pub pending_sigset: Sigset,
 
+    /// signal actions
     pub dispositions: [SignalAction; Signal::RTMAX + 1],
-    pub sigaltstack: SignalStack,
 }
 
 lazy_static! {

@@ -62,17 +62,3 @@ pub extern "C" fn others_start() -> ! {
     //timer::init();
     crate::kmain();
 }
-
-pub fn get_sp() -> usize {
-    let sp: usize;
-    unsafe {
-        llvm_asm!("mov sp, $0" : "=r"(sp));
-    }
-    sp
-}
-
-pub fn set_sp(sp: usize) {
-    unsafe {
-        llvm_asm!("mov $0, sp" :: "r" (sp) : "memory");
-    }
-}

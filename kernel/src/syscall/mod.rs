@@ -241,8 +241,8 @@ impl Syscall<'_> {
             // signal
             SYS_RT_SIGACTION => self.sys_rt_sigaction(
                 args[0],
-                args[1] as *const SignalAction,
-                args[2] as *mut SignalAction,
+                UserInPtr::from(args[1]),
+                UserOutPtr::from(args[2]),
                 args[3],
             ),
             SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),

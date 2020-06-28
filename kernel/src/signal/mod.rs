@@ -191,8 +191,9 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
             }
             _ => {
                 info!("goto handler at {:#x}", action.handler);
-                process.sigaltstack.flags |= SignalStackFlags::ONSTACK.bits();
-                let stack = process.sigaltstack;
+                thread.inner.lock().signal_alternate_stack.flags |=
+                    SignalStackFlags::ONSTACK.bits();
+                let stack = thread.inner.lock().signal_alternate_stack;
                 let sig_sp = {
                     if action_flags.contains(SignalActionFlags::ONSTACK) {
                         let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);

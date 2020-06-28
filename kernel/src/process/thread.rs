@@ -61,6 +61,8 @@ pub struct ThreadInner {
     pub clear_child_tid: usize,
     /// Signal mask
     pub sig_mask: Sigset,
+    /// signal alternate stack
+    pub signal_alternate_stack: SignalStack,
 }
 
 #[allow(dead_code)]
@@ -304,6 +306,7 @@ impl Thread {
                 context: Some(Box::from(context)),
                 clear_child_tid: 0,
                 sig_mask: Sigset::default(),
+                signal_alternate_stack: SignalStack::default(),
             }),
             vm: vm.clone(),
             proc: Arc::new(Mutex::new(Process {
@@ -322,7 +325,6 @@ impl Thread {
                 pending_sigset: Sigset::empty(),
                 sig_queue: VecDeque::new(),
                 dispositions: [SignalAction::default(); Signal::RTMAX + 1],
-                sigaltstack: SignalStack::default(),
                 eventbus: EventBus::new(),
             })),
         };
@@ -365,7 +367,6 @@ impl Thread {
             pending_sigset: Sigset::empty(),
             sig_queue: VecDeque::new(),
             dispositions: proc.dispositions.clone(),
-            sigaltstack: Default::default(),
             eventbus: EventBus::new(),
         }));
 
@@ -375,12 +376,14 @@ impl Thread {
         // A child created via fork(2) inherits a copy of its parent's signal
         // mask; the signal mask is preserved across execve(2).
         let sig_mask = self.inner.lock().sig_mask;
+        let sigaltstack = self.inner.lock().signal_alternate_stack;
         let new_thread = Thread {
             tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
                 context: Some(Box::new(context)),
                 clear_child_tid: 0,
                 sig_mask,
+                signal_alternate_stack: sigaltstack,
             }),
             vm,
             proc: new_proc,
@@ -414,12 +417,14 @@ impl Thread {
         new_context.set_tls(tls);
 
         let sig_mask = self.inner.lock().sig_mask;
+        let sigaltstack = self.inner.lock().signal_alternate_stack;
         let thread = Thread {
             tid: 0,
             inner: Mutex::new(ThreadInner {
                 clear_child_tid,
                 context: Some(Box::new(new_context)),
                 sig_mask,
+                signal_alternate_stack: sigaltstack,
             }),
             vm: self.vm.clone(),
             proc: self.proc.clone(),
