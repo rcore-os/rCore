@@ -18,7 +18,7 @@ use crate::memory::{
 use crate::process::structs::ElfExt;
 use crate::sync::{Condvar, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
-    signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
+    signal::{handle_signal, Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
 };
 use alloc::{
@@ -503,6 +503,12 @@ pub fn spawn(thread: Arc<Thread>) {
                     );
                 }
             }
+
+            // check signals
+            if !exit {
+                exit = handle_signal(&thread, &mut cx);
+            }
+
             thread.end_running(cx);
             if exit {
                 break;

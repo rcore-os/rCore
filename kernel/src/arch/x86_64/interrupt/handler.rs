@@ -67,7 +67,6 @@
 use super::consts::*;
 use super::TrapFrame;
 use crate::drivers::IRQ_MANAGER;
-use crate::signal::do_signal;
 use bitflags::*;
 use log::*;
 use x86_64::registers::control::Cr2;
@@ -91,11 +90,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
             match tf.trap_num {
                 Timer => {
                     crate::trap::timer();
-                    /*
-                    if processor().tid_option().is_some() {
-                        do_signal(tf);
-                    }
-                    */
                 }
                 _ => {
                     if IRQ_MANAGER.read().try_handle_interrupt(Some(irq)) {

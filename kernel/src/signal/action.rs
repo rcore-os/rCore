@@ -21,6 +21,7 @@ pub const SI_KERNEL: i32 = 128;
 
 // yet there's a bug because of mismatching bits: https://sourceware.org/bugzilla/show_bug.cgi?id=25657
 // just support 64bits size sigset
+/// Linux struct sigset_t
 #[derive(Default, Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Sigset(u64);
@@ -48,6 +49,7 @@ impl Sigset {
     }
 }
 
+/// Linux struct sigaction
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct SignalAction {

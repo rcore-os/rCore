@@ -1,11 +1,10 @@
-use crate::arch::signal::MachineContext;
 use crate::arch::syscall::SYS_RT_SIGRETURN;
 use crate::process::{process, process_of, Process, Thread};
 use crate::sync::{Event, MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
 use bitflags::*;
 use num::FromPrimitive;
-use trapframe::TrapFrame;
+use trapframe::{TrapFrame, UserContext};
 
 mod action;
 
@@ -99,30 +98,35 @@ pub fn send_signal(process: Arc<Mutex<Process>>, tid: isize, info: Siginfo) {
     process.sig_queue.push_back((info, tid));
     process.pending_sigset.add(signal);
     process.eventbus.lock().set(Event::RECEIVE_SIGNAL);
+    info!(
+        "send signal {} to pid {} tid {}",
+        info.signo, process.pid, tid
+    )
 }
 
+/// See musl struct __ucontext
+/// Not exactly the same for now
 #[repr(C)]
 #[derive(Clone)]
 pub struct SignalUserContext {
     pub flags: usize,
     pub link: usize,
     pub stack: SignalStack,
-    pub mcontext: MachineContext,
+    pub context: UserContext,
     pub sig_mask: Sigset,
-    pub _fpregs_mem: [usize; 64],
 }
 
 #[repr(C)]
 #[derive(Clone)]
 pub struct SignalFrame {
     pub ret_code_addr: usize, // point to ret_code
-    pub tf: TrapFrame,
     pub info: Siginfo,
     pub ucontext: SignalUserContext, // adapt interface, a little bit waste
     pub ret_code: [u8; 7],           // call sys_sigreturn
 }
 
-pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
+/// return whether this thread exits
+pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
     let mut process = thread.proc.lock();
     while let Some((idx, info)) =
         process
@@ -130,7 +134,6 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
             .iter()
             .enumerate()
             .find_map(|(idx, &(info, tid))| {
-                //if (tid == -1 || tid as usize == current().id())
                 if tid == -1
                     && !thread
                         .inner
@@ -148,7 +151,7 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
         use Signal::*;
 
         let signal: Signal = <Signal as FromPrimitive>::from_i32(info.signo).unwrap();
-        info!("received signal: {:?}", signal);
+        info!("process {} received signal: {:?}", process.pid, signal);
 
         process.sig_queue.remove(idx);
         process.pending_sigset.remove(signal);
@@ -165,8 +168,7 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                         info!("default action: Term");
                         // FIXME: exit code ref please?
                         process.exit(info.signo as usize + 128);
-                        //yield_now();
-                        unreachable!()
+                        return true;
                     }
                     _ => (),
                 }
@@ -181,6 +183,7 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
             }
             _ => {
                 info!("goto handler at {:#x}", action.handler);
+
                 thread.inner.lock().signal_alternate_stack.flags |=
                     SignalStackFlags::ONSTACK.bits();
                 let stack = thread.inner.lock().signal_alternate_stack;
@@ -188,15 +191,16 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                     if action_flags.contains(SignalActionFlags::ONSTACK) {
                         let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
                         if stack_flags.contains(SignalStackFlags::DISABLE) {
-                            todo!()
+                            tf.get_sp()
                         } else {
+                            // top of stack
                             stack.sp + stack.size
                         }
                     } else {
-                        todo!()
-                        //tf.get_sp()
+                        tf.get_sp()
                     }
                 } - core::mem::size_of::<SignalFrame>();
+
                 let frame = if let Ok(frame) = unsafe {
                     process
                         .vm
@@ -207,15 +211,13 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                 } else {
                     unimplemented!()
                 };
-                frame.tf = tf.clone();
                 frame.info = info;
                 frame.ucontext = SignalUserContext {
                     flags: 0,
                     link: 0,
                     stack,
-                    mcontext: MachineContext::from_tf(tf),
+                    context: tf.clone(),
                     sig_mask: thread.inner.lock().sig_mask,
-                    _fpregs_mem: [0; 64],
                 };
                 if action_flags.contains(SignalActionFlags::RESTORER) {
                     frame.ret_code_addr = action.restorer; // legacy
@@ -233,19 +235,18 @@ pub fn do_signal(thread: &Arc<Thread>, tf: &mut TrapFrame) {
                 }
                 #[cfg(target_arch = "x86_64")]
                 {
-                    tf.rsp = sig_sp;
-                    tf.rip = action.handler;
+                    tf.general.rsp = sig_sp;
+                    tf.general.rip = action.handler;
 
                     // pass handler argument
-                    tf.rdi = info.signo as usize;
-                    tf.rsi = &frame.info as *const Siginfo as usize;
-                    // TODO: complete context
-                    tf.rdx = &frame.ucontext as *const SignalUserContext as usize;
+                    tf.general.rdi = info.signo as usize;
+                    tf.general.rsi = &frame.info as *const Siginfo as usize;
+                    tf.general.rdx = &frame.ucontext as *const SignalUserContext as usize;
                 }
-                return;
             }
         }
     }
+    return false;
 }
 
 bitflags! {
@@ -256,6 +257,7 @@ bitflags! {
     }
 }
 
+/// Linux struct stack_t
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct SignalStack {
