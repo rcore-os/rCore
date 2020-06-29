@@ -511,7 +511,10 @@ pub fn spawn(thread: Arc<Thread>) {
 
             thread.end_running(cx);
             if exit {
+                info!("thread {} stopped", thread.tid);
                 break;
+            } else {
+                yield_now().await;
             }
         }
     };
@@ -554,5 +557,30 @@ impl Future for PageTableSwitchWrapper {
             PROCESSORS[cpu_id] = None;
         }
         res
+    }
+}
+
+/// Yields execution back to the async runtime.
+pub fn yield_now() -> impl Future<Output = ()> {
+    YieldFuture::default()
+}
+
+#[must_use = "yield_now does nothing unless polled/`await`-ed"]
+#[derive(Default)]
+struct YieldFuture {
+    flag: bool,
+}
+
+impl Future for YieldFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if self.flag {
+            Poll::Ready(())
+        } else {
+            self.flag = true;
+            cx.waker().clone().wake();
+            Poll::Pending
+        }
     }
 }

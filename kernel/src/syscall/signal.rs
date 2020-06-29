@@ -110,15 +110,23 @@ impl Syscall<'_> {
         }
         if !set.is_null() {
             let set = set.read()?;
-            info!("rt_sigprocmask: set: {:?}", set);
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
             let mut inner = self.thread.inner.lock();
             match how {
-                BLOCK => inner.sig_mask.add_set(&set),
-                UNBLOCK => inner.sig_mask.remove_set(&set),
-                SETMASK => inner.sig_mask = set,
+                BLOCK => {
+                    info!("rt_sigprocmask: block: {:x?}", set);
+                    inner.sig_mask.add_set(&set);
+                }
+                UNBLOCK => {
+                    info!("rt_sigprocmask: unblock: {:x?}", set);
+                    inner.sig_mask.remove_set(&set)
+                }
+                SETMASK => {
+                    info!("rt_sigprocmask: set: {:x?}", set);
+                    inner.sig_mask = set;
+                }
                 _ => return Err(EINVAL),
             }
         }
