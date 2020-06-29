@@ -5,7 +5,10 @@
 #[derive(Debug, Copy, Clone, Default)]
 pub struct FpState {
     // 0
-    word1: u64,
+    fcw: u16,
+    fsw: u16,
+    ftw: u16,
+    fop: u16,
     word2: u64,
     // 16
     word3: u64,
@@ -23,8 +26,11 @@ impl FpState {
     pub fn new() -> Self {
         assert!(core::mem::size_of::<Self>() == 512);
         Self {
-            // default value
+            // default values
+            // intel manual 11.6.4 Initialization of SSE/SSE2 Extensions
             mxcsr: 0x1f80,
+            // intel manual 8.1.5 x87 FPU Control Word
+            fcw: 0x03f7,
             ..Self::default()
         }
     }
