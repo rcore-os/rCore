@@ -30,7 +30,7 @@ impl FpState {
             // intel manual 11.6.4 Initialization of SSE/SSE2 Extensions
             mxcsr: 0x1f80,
             // intel manual 8.1.5 x87 FPU Control Word
-            fcw: 0x03f7,
+            fcw: 0x037f,
             ..Self::default()
         }
     }
