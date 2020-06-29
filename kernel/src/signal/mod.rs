@@ -191,7 +191,7 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
                 let mut inner = thread.inner.lock();
                 let sig_mask = inner.sig_mask;
 
-                // update sig mask
+                // update sig mask (see man sigaction(2))
                 // 1. block current
                 // 2. block mask in disposition
                 inner.sig_mask.add(signal);

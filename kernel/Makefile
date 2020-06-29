@@ -77,7 +77,7 @@ qemu_net_opts :=
 
 ifeq ($(ARCH), x86_64)
 qemu_opts += \
-	-bios $(OVMF) \
+	-drive if=pflash,format=raw,readonly,file=$(OVMF) \
 	-drive format=raw,file=fat:rw:$(ESP) \
 	-serial mon:stdio \
 	-m 4G \
@@ -93,12 +93,14 @@ qemu_net_opts += \
 	-netdev type=tap,id=net0,script=no,downscript=no \
 	-device e1000e,netdev=net0
 else
-qemu_opts += \
-	-machine accel=kvm
 qemu_net_opts += \
 	-device vfio-pci,host=$(PCI_PASSTHRU)
 qemu_ui_opts += \
 	-vga std
+endif
+ifeq ($(shell uname), Darwin)
+qemu_opts += \
+	-machine accel=hvf
 endif
 ifeq ($(EXTRA_NIC), on)
 qemu_net_opts += \

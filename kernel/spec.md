@@ -59,3 +59,7 @@
 
 - fn main_start()：第一个核的启动
 - fn others_start()：其他核的启动
+
+### fp
+
+- struct FpState：浮点的状态

@@ -15,6 +15,17 @@ Supported architectures and boards:
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 
+## What's included
+
+rCore has the following features:
+
+* Linux compatible syscall interface: run Linux userspace programs
+* Network stack
+* Simple file system
+* Signal system
+* Async IO
+* Kernel module
+
 ## Building
 
 ### Environment

@@ -6,6 +6,7 @@ use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Tim
 use crate::arch::interrupt::get_trap_num;
 use crate::arch::{
     cpu,
+    fp::FpState,
     memory::{get_page_fault_addr, set_page_table},
     paging::*,
 };
@@ -51,12 +52,18 @@ use xmas_elf::{
 /// Tid type
 pub type Tid = usize;
 
+pub struct ThreadContext {
+    user: Box<UserContext>,
+    /// TODO: lazy fp
+    fp: Box<FpState>,
+}
+
 /// Mutable part of a thread struct
 #[derive(Default)]
 pub struct ThreadInner {
     /// user context
     /// None when thread is running in user
-    context: Option<Box<UserContext>>,
+    context: Option<ThreadContext>,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
@@ -304,7 +311,10 @@ impl Thread {
         let thread = Thread {
             tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
-                context: Some(Box::from(context)),
+                context: Some(ThreadContext {
+                    user: Box::from(context),
+                    fp: Box::new(FpState::new()),
+                }),
                 clear_child_tid: 0,
                 sig_mask: Sigset::default(),
                 signal_alternate_stack: SignalStack::default(),
@@ -381,7 +391,10 @@ impl Thread {
         let new_thread = Thread {
             tid: 0, // allocated below
             inner: Mutex::new(ThreadInner {
-                context: Some(Box::new(context)),
+                context: Some(ThreadContext {
+                    user: Box::new(context),
+                    fp: Box::new(FpState::new()),
+                }),
                 clear_child_tid: 0,
                 sig_mask,
                 signal_alternate_stack: sigaltstack,
@@ -416,6 +429,10 @@ impl Thread {
         new_context.set_syscall_ret(0);
         new_context.set_sp(stack_top);
         new_context.set_tls(tls);
+        let thread_context = ThreadContext {
+            user: Box::new(new_context),
+            fp: Box::new(FpState::new()),
+        };
 
         let sig_mask = self.inner.lock().sig_mask;
         let sigaltstack = self.inner.lock().signal_alternate_stack;
@@ -423,7 +440,7 @@ impl Thread {
             tid: 0,
             inner: Mutex::new(ThreadInner {
                 clear_child_tid,
-                context: Some(Box::new(new_context)),
+                context: Some(thread_context),
                 sig_mask,
                 signal_alternate_stack: sigaltstack,
             }),
@@ -435,11 +452,11 @@ impl Thread {
         res
     }
 
-    pub fn begin_running(&self) -> Box<UserContext> {
+    pub fn begin_running(&self) -> ThreadContext {
         self.inner.lock().context.take().unwrap()
     }
 
-    pub fn end_running(&self, cx: Box<UserContext>) {
+    pub fn end_running(&self, cx: ThreadContext) {
         self.inner.lock().context = Some(cx);
     }
 
@@ -468,9 +485,14 @@ pub fn spawn(thread: Arc<Thread>) {
     let temp = thread.clone();
     let future = async move {
         loop {
-            let mut cx = thread.begin_running();
+            let mut thread_context = thread.begin_running();
+            let cx = &mut thread_context.user;
+
             trace!("go to user: {:#x?}", cx);
+            thread_context.fp.restore();
             cx.run();
+            thread_context.fp.save();
+
             let trap_num = get_trap_num(&cx);
             trace!("back from user: {:#x?} trap_num {:#x}", cx, trap_num);
 
@@ -487,7 +509,7 @@ pub fn spawn(thread: Arc<Thread>) {
                         panic!("page fault handle failed");
                     }
                 }
-                Syscall => exit = handle_syscall(&thread, &mut cx).await,
+                Syscall => exit = handle_syscall(&thread, cx).await,
                 IrqMin..=IrqMax => {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {:#x}", trap_num);
@@ -506,10 +528,10 @@ pub fn spawn(thread: Arc<Thread>) {
 
             // check signals
             if !exit {
-                exit = handle_signal(&thread, &mut cx);
+                exit = handle_signal(&thread, cx);
             }
 
-            thread.end_running(cx);
+            thread.end_running(thread_context);
             if exit {
                 info!("thread {} stopped", thread.tid);
                 break;

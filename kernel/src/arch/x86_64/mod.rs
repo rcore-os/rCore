@@ -6,6 +6,7 @@ pub mod acpi;
 pub mod board;
 pub mod consts;
 pub mod cpu;
+pub mod fp;
 pub mod gdt;
 pub mod interrupt;
 pub mod io;
