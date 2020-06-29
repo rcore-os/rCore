@@ -47,42 +47,18 @@ impl Syscall<'_> {
 
     pub fn sys_rt_sigreturn(&mut self) -> SysResult {
         info!("rt_sigreturn");
-        // FIXME: adapt arch
-        //let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
-        let frame: SignalFrame = todo!();
-        // frame.info.signo
-        /*
-        {
-            let mut process = self.process();
-            process.sigaltstack.flags ^=
-                process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
-        }
-        */
+        // 8: return addr
+        let ptr: UserInPtr<SignalFrame> = UserInPtr::from(self.context.get_sp() - 8);
+        let frame: SignalFrame = ptr.read()?;
 
-        // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
-        todo!();
-        //*self.tf = frame.tf.clone();
-        /*
-        let mc = &frame.ucontext.mcontext;
-        self.tf.general.r15 = mc.r15;
-        self.tf.general.r14 = mc.r14;
-        self.tf.general.r13 = mc.r13;
-        self.tf.general.r12 = mc.r12;
-        self.tf.general.rbp = mc.rbp;
-        self.tf.general.rbx = mc.rbx;
-        self.tf.general.r11 = mc.r11;
-        self.tf.general.r10 = mc.r10;
-        self.tf.general.r9 = mc.r9;
-        self.tf.general.r8 = mc.r8;
-        self.tf.general.rsi = mc.rsi;
-        self.tf.general.rdi = mc.rdi;
-        self.tf.general.rdx = mc.rdx;
-        self.tf.general.rcx = mc.rcx;
-        self.tf.general.rax = mc.rax;
-        self.tf.general.rip = mc.rip;
-        self.tf.general.rsp = mc.rsp;
-        */
+        // restore signal alternate stack
+        let mut inner = self.thread.inner.lock();
+        inner.signal_alternate_stack = frame.ucontext.stack;
+        drop(inner);
 
+        *self.context = frame.ucontext.context;
+
+        // small hack: don't change ret when restoring
         let ret = self.context.get_syscall_ret() as isize;
         if ret >= 0 {
             Ok(ret as usize)
@@ -224,12 +200,17 @@ impl Syscall<'_> {
             let ss = ss.read()?;
             info!("new stack: {:?}", ss);
 
+            // check stack size when not disable
             const MINSIGSTKSZ: usize = 2048;
-            if ss.flags & 2 != 0 && ss.size < MINSIGSTKSZ {
+            if ss.flags & SignalStackFlags::DISABLE.bits() != 0 && ss.size < MINSIGSTKSZ {
                 return Err(ENOMEM);
             }
-            // only allow SS_AUTODISARM or SS_DISABLE
-            if ss.flags != ss.flags & 0x8000002 {
+
+            // only allow SS_AUTODISARM and SS_DISABLE
+            if ss.flags
+                != ss.flags
+                    & (SignalStackFlags::AUTODISARM.bits() | SignalStackFlags::DISABLE.bits())
+            {
                 return Err(EINVAL);
             }
 
@@ -237,6 +218,8 @@ impl Syscall<'_> {
             let old_ss = &mut inner.signal_alternate_stack;
             let flags = SignalStackFlags::from_bits_truncate(old_ss.flags);
             if flags.contains(SignalStackFlags::ONSTACK) {
+                // cannot change signal alternate stack when we are on it
+                // see man sigaltstack(2)
                 return Err(EPERM);
             }
             *old_ss = ss;

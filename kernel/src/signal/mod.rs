@@ -134,7 +134,7 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
             .iter()
             .enumerate()
             .find_map(|(idx, &(info, tid))| {
-                if tid == -1
+                if (tid == -1 || tid as usize == thread.tid)
                     && !thread
                         .inner
                         .lock()
@@ -184,15 +184,27 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
             _ => {
                 info!("goto handler at {:#x}", action.handler);
 
-                thread.inner.lock().signal_alternate_stack.flags |=
-                    SignalStackFlags::ONSTACK.bits();
+                // save original signal alternate stack
                 let stack = thread.inner.lock().signal_alternate_stack;
+
                 let sig_sp = {
+                    // use signal alternate stack when SA_ONSTACK is set
+                    // fallback to default stack when unavailable
+                    // man sigaction(2)
                     if action_flags.contains(SignalActionFlags::ONSTACK) {
                         let stack_flags = SignalStackFlags::from_bits_truncate(stack.flags);
                         if stack_flags.contains(SignalStackFlags::DISABLE) {
                             tf.get_sp()
                         } else {
+                            let mut inner = thread.inner.lock();
+                            inner.signal_alternate_stack.flags |= SignalStackFlags::ONSTACK.bits();
+
+                            // handle auto disarm
+                            if stack_flags.contains(SignalStackFlags::AUTODISARM) {
+                                inner.signal_alternate_stack.flags |=
+                                    SignalStackFlags::DISABLE.bits();
+                            }
+
                             // top of stack
                             stack.sp + stack.size
                         }
@@ -268,6 +280,7 @@ pub struct SignalStack {
 
 impl Default for SignalStack {
     fn default() -> Self {
+        // default to disabled
         SignalStack {
             sp: 0,
             flags: SignalStackFlags::DISABLE.bits,

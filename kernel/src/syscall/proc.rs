@@ -258,6 +258,11 @@ impl Syscall<'_> {
 
         // Modify exec path
         proc.exec_path = path.clone();
+
+        // reset disposition (man signal(7))
+        for d in proc.dispositions.iter_mut() {
+            *d = SignalAction::default();
+        }
         drop(proc);
 
         // Modify the TrapFrame
