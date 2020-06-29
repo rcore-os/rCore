@@ -56,7 +56,8 @@ impl Syscall<'_> {
         inner.signal_alternate_stack = frame.ucontext.stack;
         drop(inner);
 
-        *self.context = frame.ucontext.context;
+        // restore context
+        frame.ucontext.context.fill_tf(&mut self.context);
 
         // small hack: don't change ret when restoring
         let ret = self.context.get_syscall_ret() as isize;

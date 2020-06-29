@@ -1,4 +1,4 @@
-use crate::arch::syscall::SYS_RT_SIGRETURN;
+use crate::arch::{signal::MachineContext, syscall::SYS_RT_SIGRETURN};
 use crate::process::{process, process_of, Process, Thread};
 use crate::sync::{Event, MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
@@ -112,7 +112,7 @@ pub struct SignalUserContext {
     pub flags: usize,
     pub link: usize,
     pub stack: SignalStack,
-    pub context: UserContext,
+    pub context: MachineContext,
     pub sig_mask: Sigset,
 }
 
@@ -228,7 +228,7 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
                     flags: 0,
                     link: 0,
                     stack,
-                    context: tf.clone(),
+                    context: MachineContext::from_tf(tf),
                     sig_mask: thread.inner.lock().sig_mask,
                 };
                 if action_flags.contains(SignalActionFlags::RESTORER) {
