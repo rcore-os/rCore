@@ -60,12 +60,7 @@ impl Syscall<'_> {
         frame.ucontext.context.fill_tf(&mut self.context);
 
         // small hack: don't change ret when restoring
-        let ret = self.context.get_syscall_ret() as isize;
-        if ret >= 0 {
-            Ok(ret as usize)
-        } else {
-            Err(FromPrimitive::from_isize(-ret).unwrap())
-        }
+        Ok(self.context.get_syscall_ret())
     }
 
     pub fn sys_rt_sigprocmask(

@@ -151,7 +151,10 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
         use Signal::*;
 
         let signal: Signal = <Signal as FromPrimitive>::from_i32(info.signo).unwrap();
-        info!("process {} received signal: {:?}", process.pid, signal);
+        info!(
+            "process {} thread {} received signal: {:?}",
+            process.pid, thread.tid, signal
+        );
 
         process.sig_queue.remove(idx);
         process.pending_sigset.remove(signal);
@@ -184,8 +187,19 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
             _ => {
                 info!("goto handler at {:#x}", action.handler);
 
+                // save original sig mask
+                let mut inner = thread.inner.lock();
+                let sig_mask = inner.sig_mask;
+
+                // update sig mask
+                // 1. block current
+                // 2. block mask in disposition
+                inner.sig_mask.add(signal);
+                inner.sig_mask.add_set(&action.mask);
+
                 // save original signal alternate stack
-                let stack = thread.inner.lock().signal_alternate_stack;
+                let stack = inner.signal_alternate_stack;
+                drop(inner);
 
                 let sig_sp = {
                     // use signal alternate stack when SA_ONSTACK is set
@@ -229,7 +243,7 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
                     link: 0,
                     stack,
                     context: MachineContext::from_tf(tf),
-                    sig_mask: thread.inner.lock().sig_mask,
+                    sig_mask,
                 };
                 if action_flags.contains(SignalActionFlags::RESTORER) {
                     frame.ret_code_addr = action.restorer; // legacy
