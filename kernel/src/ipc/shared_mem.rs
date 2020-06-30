@@ -16,14 +16,15 @@ lazy_static! {
 #[derive(Clone)]
 pub struct ShmIdentifier {
     pub addr: VirtAddr,
-    pub sharedGuard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>,
+    pub shared_guard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>,
 }
 
 impl ShmIdentifier {
-    pub fn setAddr(&mut self, addr: VirtAddr) {
+    pub fn set_addr(&mut self, addr: VirtAddr) {
         self.addr = addr;
     }
-    pub fn new_sharedGuard(
+
+    pub fn new_shared_guard(
         key: usize,
         memsize: usize,
     ) -> Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>> {
@@ -35,12 +36,12 @@ impl ShmIdentifier {
                 return guard;
             }
         }
-        let mut sharedGuard = Arc::new(spin::Mutex::new(SharedGuard::new_with_size(
+        let mut shared_guard = Arc::new(spin::Mutex::new(SharedGuard::new_with_size(
             GlobalFrameAlloc,
             memsize,
         )));
         // insert to global map
-        key2shm.insert(key, Arc::downgrade(&sharedGuard));
-        sharedGuard
+        key2shm.insert(key, Arc::downgrade(&shared_guard));
+        shared_guard
     }
 }

@@ -105,13 +105,13 @@ impl Syscall<'_> {
     pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SysResult {
         info!("shmget: key: {}", key);
 
-        let sharedGuard = ShmIdentifier::new_sharedGuard(key, size);
-        let id = self.process().shm_identifiers.add(sharedGuard);
+        let shared_guard = ShmIdentifier::new_shared_guard(key, size);
+        let id = self.process().shm_identifiers.add(shared_guard);
         Ok(id)
     }
 
     pub fn sys_shmat(&self, id: usize, mut addr: VirtAddr, shmflg: usize) -> SysResult {
-        let mut shmIdentifier = self
+        let mut shm_identifier = self
             .process()
             .shm_identifiers
             .get(id)
@@ -124,18 +124,18 @@ impl Syscall<'_> {
             // so just skip it
             addr = PAGE_SIZE;
         }
-        let size = shmIdentifier.sharedGuard.lock().size;
+        let size = shm_identifier.shared_guard.lock().size;
         info!("shmat: id: {}, addr = {:#x}, size = {}", id, addr, size);
         addr = self.vm().find_free_area(addr, size);
         self.vm().push(
             addr,
             addr + size,
             MemoryAttr::default().user().execute().writable(),
-            Shared::new_with_guard(GlobalFrameAlloc, shmIdentifier.sharedGuard.clone()),
+            Shared::new_with_guard(GlobalFrameAlloc, shm_identifier.shared_guard.clone()),
             "shmat",
         );
-        shmIdentifier.addr = addr;
-        proc.shm_identifiers.set(id, shmIdentifier);
+        shm_identifier.addr = addr;
+        proc.shm_identifiers.set(id, shm_identifier);
         //self.process().shmIdentifiers.setVirtAddr(id, addr);
         return Ok(addr);
     }
@@ -143,8 +143,8 @@ impl Syscall<'_> {
     pub fn sys_shmdt(&self, id: usize, addr: VirtAddr, shmflg: usize) -> SysResult {
         info!("shmdt: addr={:#x}", addr);
         let mut proc = self.process();
-        let optId = proc.shm_identifiers.getId(addr);
-        if let Some(id) = optId {
+        let opt_id = proc.shm_identifiers.get_id(addr);
+        if let Some(id) = opt_id {
             proc.shm_identifiers.pop(id);
         }
         Ok(0)

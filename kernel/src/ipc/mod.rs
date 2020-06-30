@@ -86,13 +86,13 @@ impl Drop for SemProc {
 
 impl ShmProc {
     /// Insert the `SharedGuard` and return its ID
-    pub fn add(&mut self, sharedGuard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>) -> ShmId {
+    pub fn add(&mut self, shared_guard: Arc<spin::Mutex<SharedGuard<GlobalFrameAlloc>>>) -> ShmId {
         let id = self.get_free_id();
-        let shmIdentifier = ShmIdentifier {
+        let shm_identifier = ShmIdentifier {
             addr: 0,
-            sharedGuard: sharedGuard,
+            shared_guard: shared_guard,
         };
-        self.shm_identifiers.insert(id, shmIdentifier);
+        self.shm_identifiers.insert(id, shm_identifier);
         id
     }
     /// Get a free ID
@@ -105,12 +105,14 @@ impl ShmProc {
     pub fn get(&self, id: ShmId) -> Option<ShmIdentifier> {
         self.shm_identifiers.get(&id).map(|a| a.clone())
     }
+
     /// Used to set Virtual Addr
-    pub fn set(&mut self, id: ShmId, shmId: ShmIdentifier) {
-        self.shm_identifiers.insert(id, shmId);
+    pub fn set(&mut self, id: ShmId, shm_id: ShmIdentifier) {
+        self.shm_identifiers.insert(id, shm_id);
     }
+
     /// get id from virtaddr
-    pub fn getId(&self, addr: VirtAddr) -> Option<ShmId> {
+    pub fn get_id(&self, addr: VirtAddr) -> Option<ShmId> {
         for (key, value) in &self.shm_identifiers {
             if value.addr == addr {
                 return Some(*key);
