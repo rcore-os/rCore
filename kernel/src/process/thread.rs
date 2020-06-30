@@ -17,7 +17,7 @@ use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::process::structs::ElfExt;
-use crate::sync::{Condvar, EventBus, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{handle_signal, Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,

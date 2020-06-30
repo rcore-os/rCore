@@ -27,9 +27,9 @@ impl Syscall<'_> {
         Ok(id)
     }
 
-    pub fn sys_semop(&self, id: usize, ops: *const SemBuf, num_ops: usize) -> SysResult {
+    pub async fn sys_semop(&self, id: usize, ops: UserInPtr<SemBuf>, num_ops: usize) -> SysResult {
         info!("semop: id: {}", id);
-        let ops = unsafe { self.vm().check_read_array(ops, num_ops)? };
+        let ops = ops.read_array(num_ops)?;
 
         let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
         sem_array.otime();
@@ -42,7 +42,7 @@ impl Syscall<'_> {
 
             let _result = match op {
                 1 => sem.release(),
-                -1 => sem.acquire()?,
+                -1 => sem.acquire().await?,
                 _ => unimplemented!("Semaphore: semop.(Not 1/-1)"),
             };
             sem.set_pid(self.process().pid.get());

@@ -5,7 +5,7 @@ use crate::ipc::SemProc;
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
-use crate::sync::{Condvar, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,

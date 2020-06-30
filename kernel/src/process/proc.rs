@@ -9,7 +9,7 @@ use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
 use crate::process::thread::THREADS;
-use crate::sync::{Condvar, Event, EventBus, SpinLock, SpinNoIrqLock as Mutex};
+use crate::sync::{Event, EventBus, SpinLock, SpinNoIrqLock as Mutex};
 use crate::{
     signal::{Siginfo, Signal, SignalAction, SignalStack, Sigset},
     syscall::handle_syscall,
