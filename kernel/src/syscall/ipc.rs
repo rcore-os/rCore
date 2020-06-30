@@ -22,7 +22,7 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
 
-        let sem_array = SemArray::get_or_create(key, nsems, flags)?;
+        let sem_array = SemArray::get_or_create(key as u32, nsems, flags)?;
         let id = self.process().semaphores.add(sem_array);
         Ok(id)
     }
@@ -72,8 +72,8 @@ impl Syscall<'_> {
 
         match cmd {
             IPC_RMID => {
-                // arg is struct semid_ds
                 sem_array.remove();
+                self.process().semaphores.remove(id);
                 Ok(0)
             }
             IPC_SET => {
@@ -86,8 +86,9 @@ impl Syscall<'_> {
                 Ok(0)
             }
             IPC_STAT => {
-                *unsafe { self.vm().check_write_ptr(arg as *mut SemidDs)? } =
-                    *sem_array.semid_ds.lock();
+                // arg is struct semid_ds
+                let mut ptr = UserOutPtr::from(arg);
+                ptr.write(*sem_array.semid_ds.lock())?;
                 Ok(0)
             }
             _ => {

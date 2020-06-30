@@ -15,26 +15,34 @@ bitflags! {
 }
 
 // structure specifies the access permissions on the semaphore set
-// key_t?
+// struct ipc_perm
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct IpcPerm {
-    pub key: usize, /* Key supplied to semget(2) */
-    pub uid: u32,   /* Effective UID of owner */
-    pub gid: u32,   /* Effective GID of owner */
-    pub cuid: u32,  /* Effective UID of creator */
-    pub cgid: u32,  /* Effective GID of creator */
-    pub mode: u16,  /* Permissions */
-    pub __seq: u16, /* Sequence number */
+    // key_t is int
+    pub key: u32,  /* Key supplied to semget(2) */
+    pub uid: u32,  /* Effective UID of owner */
+    pub gid: u32,  /* Effective GID of owner */
+    pub cuid: u32, /* Effective UID of creator */
+    pub cgid: u32, /* Effective GID of creator */
+    // mode_t is unsigned int
+    pub mode: u32,  /* Permissions */
+    pub __seq: u32, /* Sequence number */
+    pub __pad1: usize,
+    pub __pad2: usize,
 }
 
 // semid data structure
 // struct semid_ds
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SemidDs {
     pub perm: IpcPerm, /* Ownership and permissions */
     pub otime: usize,  /* Last semop time */
-    pub ctime: usize,  /* Last change time */
-    pub nsems: usize,  /* number of semaphores in set */
+    __pad1: usize,
+    pub ctime: usize, /* Last change time */
+    __pad2: usize,
+    pub nsems: usize, /* number of semaphores in set */
 }
 
 /// A System V semaphore set
@@ -51,12 +59,15 @@ impl Index<usize> for SemArray {
 }
 
 lazy_static! {
-    static ref KEY2SEM: RwLock<BTreeMap<usize, Weak<SemArray>>> = RwLock::new(BTreeMap::new());
+    static ref KEY2SEM: RwLock<BTreeMap<u32, Weak<SemArray>>> = RwLock::new(BTreeMap::new());
 }
 
 impl SemArray {
     // remove semaphores
     pub fn remove(&self) {
+        let mut key2sem = KEY2SEM.write();
+        let key = self.semid_ds.lock().perm.key;
+        key2sem.remove(&key);
         for sem in self.sems.iter() {
             sem.remove();
         }
@@ -81,18 +92,14 @@ impl SemArray {
 
     /// Get the semaphore array with `key`.
     /// If not exist, create a new one with `nsems` elements.
-    pub fn get_or_create(
-        mut key: usize,
-        nsems: usize,
-        flags: usize,
-    ) -> Result<Arc<Self>, SysError> {
+    pub fn get_or_create(mut key: u32, nsems: usize, flags: usize) -> Result<Arc<Self>, SysError> {
         let mut key2sem = KEY2SEM.write();
         let flag = SemGetFlag::from_bits_truncate(flags);
 
         if key == 0 {
             // IPC_PRIVATE
             // find an empty key slot
-            key = (1usize..).find(|i| key2sem.get(i).is_none()).unwrap();
+            key = (1u32..).find(|i| key2sem.get(i).is_none()).unwrap();
         } else {
             // check existence
             if let Some(weak_array) = key2sem.get(&key) {
@@ -122,12 +129,16 @@ impl SemArray {
                     cuid: 0,
                     cgid: 0,
                     // least significant 9 bits
-                    mode: (flags as u16) & 0x1ff,
+                    mode: (flags as u32) & 0x1ff,
                     __seq: 0,
+                    __pad1: 0,
+                    __pad2: 0,
                 },
                 otime: 0,
                 ctime: TimeSpec::get_epoch().sec,
                 nsems,
+                __pad1: 0,
+                __pad2: 0,
             }),
             sems: semaphores,
         });

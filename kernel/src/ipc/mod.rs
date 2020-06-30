@@ -43,6 +43,11 @@ impl SemProc {
         id
     }
 
+    /// Remove an `array` by ID
+    pub fn remove(&mut self, id: SemId) {
+        self.arrays.remove(&id);
+    }
+
     /// Get a free ID
     fn get_free_id(&self) -> SemId {
         (0..).find(|i| self.arrays.get(i).is_none()).unwrap()
