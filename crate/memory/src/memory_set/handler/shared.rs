@@ -16,11 +16,12 @@ impl<T: FrameAllocator> SharedGuard<T> {
     pub fn new(allocator: T) -> Self {
         SharedGuard {
             allocator: allocator,
+            // size meaningful only for sys_shm
             size: 0,
             target: BTreeMap::new(),
         }
-        // size meaningful only for sys_shm
     }
+
     pub fn new_with_size(allocator: T, size: usize) -> Self {
         SharedGuard {
             allocator: allocator,
@@ -28,22 +29,24 @@ impl<T: FrameAllocator> SharedGuard<T> {
             target: BTreeMap::new(),
         }
     }
+
     pub fn alloc(&mut self, virt_addr: usize) -> Option<usize> {
         let phys_addr = self.allocator.alloc().expect("failed to allocate frame");
         self.target.insert(virt_addr, phys_addr);
         Some(phys_addr)
     }
+    
     pub fn dealloc(&mut self, virt_addr: usize) {
         let phys_addr = self.target.get(&virt_addr).unwrap().clone();
         self.allocator.dealloc(phys_addr);
         self.target.remove(&virt_addr);
     }
+
     pub fn get(&self, addr: usize) -> Option<usize> {
         match self.target.get(&addr) {
             Some(phys_addr) => Some(phys_addr.clone()),
             None => None,
         }
-        //Some(self.target.get(&addr).unwrap().clone())
     }
 }
 
@@ -131,7 +134,7 @@ impl<T: FrameAllocator> MemoryHandler for Shared<T> {
             entry.set_present(true);
             entry.update();
 
-            //init with zero for delay mmap mode
+            // init with zero for delay mmap mode
             let data = pt.get_page_slice_mut(addr);
             let len = data.len();
             for x in data {
@@ -157,6 +160,7 @@ impl<T: FrameAllocator> Shared<T> {
             guard: Arc::new(Mutex::new(SharedGuard::new(allocator))),
         }
     }
+
     pub fn new_with_guard(allocator: T, guard: Arc<Mutex<SharedGuard<T>>>) -> Self {
         Shared {
             allocator: allocator.clone(),

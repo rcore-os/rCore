@@ -363,11 +363,6 @@ impl Syscall<'_> {
             SYS_SHMAT => self.sys_shmat(args[0], args[1], args[2]),
             #[cfg(not(target_arch = "mips"))]
             SYS_SHMDT => self.sys_shmdt(args[0], args[1], args[2]),
-            /*SYS_SHMCTL => self.sys_shmctl(
-                args[0],
-                args[1],
-                args[2] /* should be shmid_ds *buf */
-            ),*/
             // system
             SYS_GETPID => self.sys_getpid(),
             SYS_GETTID => self.sys_gettid(),

@@ -42,14 +42,17 @@ impl SemProc {
         self.arrays.insert(id, array);
         id
     }
+
     /// Get a free ID
     fn get_free_id(&self) -> SemId {
         (0..).find(|i| self.arrays.get(i).is_none()).unwrap()
     }
+
     /// Get an semaphore set by `id`
     pub fn get(&self, id: SemId) -> Option<Arc<SemArray>> {
         self.arrays.get(&id).map(|a| a.clone())
     }
+
     /// Add an undo operation
     pub fn add_undo(&mut self, id: SemId, num: SemNum, op: SemOp) {
         let old_val = *self.undos.get(&(id, num)).unwrap_or(&0);
@@ -95,12 +98,14 @@ impl ShmProc {
         self.shm_identifiers.insert(id, shm_identifier);
         id
     }
+
     /// Get a free ID
     fn get_free_id(&self) -> ShmId {
         (0..)
             .find(|i| self.shm_identifiers.get(i).is_none())
             .unwrap()
     }
+
     /// Get an semaphore set by `id`
     pub fn get(&self, id: ShmId) -> Option<ShmIdentifier> {
         self.shm_identifiers.get(&id).map(|a| a.clone())
@@ -120,6 +125,7 @@ impl ShmProc {
         }
         None
     }
+
     /// Pop Shared Area
     pub fn pop(&mut self, id: ShmId) {
         self.shm_identifiers.remove(&id);
