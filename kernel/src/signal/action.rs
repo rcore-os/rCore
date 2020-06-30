@@ -15,10 +15,13 @@ pub const SI_MESGQ: i32 = -3;
 pub const SI_TIMER: i32 = -2;
 pub const SI_QUEUE: i32 = -1;
 pub const SI_USER: i32 = 0;
+/// from user
 pub const SI_KERNEL: i32 = 128;
+/// from kernel
 
 // yet there's a bug because of mismatching bits: https://sourceware.org/bugzilla/show_bug.cgi?id=25657
 // just support 64bits size sigset
+/// Linux struct sigset_t
 #[derive(Default, Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Sigset(u64);
@@ -46,6 +49,7 @@ impl Sigset {
     }
 }
 
+/// Linux struct sigaction
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct SignalAction {
@@ -58,10 +62,10 @@ pub struct SignalAction {
 impl Debug for SignalAction {
     fn fmt(&self, f: &mut Formatter) -> Result<(), core::fmt::Error> {
         f.debug_struct("signal action")
-            .field("handler", &format!("{:#x}", self.handler))
+            .field("handler", &self.handler)
             .field("mask", &self.mask)
             .field("flags", &SignalActionFlags::from_bits_truncate(self.flags))
-            .field("restorer", &format!("{:#x}", self.restorer))
+            .field("restorer", &self.restorer)
             .finish()
     }
 }

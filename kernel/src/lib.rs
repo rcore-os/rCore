@@ -1,17 +1,26 @@
 #![feature(lang_items)]
 #![feature(naked_functions)]
 #![feature(untagged_unions)]
-#![feature(asm)]
+#![feature(llvm_asm)]
 #![feature(optin_builtin_traits)]
 #![feature(panic_info_message)]
 #![feature(global_asm)]
 #![feature(negative_impls)]
 #![feature(alloc_prelude)]
 #![feature(const_fn)]
+#![feature(const_in_array_repeat_expressions)]
 #![deny(unused_must_use)]
 #![deny(stable_features)]
 #![deny(unused_unsafe)]
 #![deny(ellipsis_inclusive_range_patterns)]
+#![deny(unused_parens)]
+#![allow(non_upper_case_globals)]
+#![allow(dead_code)]
+#![allow(unused_mut)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unreachable_patterns)]
+#![allow(unused_assignments)]
 #![no_std]
 
 // just keep it ...
@@ -26,14 +35,13 @@ extern crate rlibc;
 #[macro_use]
 extern crate num_derive;
 
-pub use crate::process::{new_kernel_context, processor};
 pub use buddy_system_allocator::LockedHeapWithRescue;
-pub use rcore_thread::std_thread as thread;
 
 #[macro_use] // print!
 pub mod logging;
 #[macro_use]
 pub mod util;
+
 pub mod backtrace;
 pub mod consts;
 pub mod drivers;
@@ -59,7 +67,7 @@ pub mod arch;
 #[path = "arch/mipsel/mod.rs"]
 pub mod arch;
 
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[cfg(riscv)]
 #[path = "arch/riscv/mod.rs"]
 pub mod arch;
 
@@ -68,7 +76,10 @@ pub mod arch;
 pub mod arch;
 
 pub fn kmain() -> ! {
-    processor().run();
+    loop {
+        executor::run_until_idle();
+        arch::interrupt::wait_for_interrupt();
+    }
 }
 
 /// Global heap allocator

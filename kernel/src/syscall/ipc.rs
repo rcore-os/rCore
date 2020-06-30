@@ -106,14 +106,14 @@ impl Syscall<'_> {
         info!("shmget: key: {}", key);
 
         let sharedGuard = ShmIdentifier::new_sharedGuard(key, size);
-        let id = self.process().shmIdentifiers.add(sharedGuard);
+        let id = self.process().shm_identifiers.add(sharedGuard);
         Ok(id)
     }
 
     pub fn sys_shmat(&self, id: usize, mut addr: VirtAddr, shmflg: usize) -> SysResult {
         let mut shmIdentifier = self
             .process()
-            .shmIdentifiers
+            .shm_identifiers
             .get(id)
             .ok_or(SysError::EINVAL)?;
 
@@ -135,7 +135,7 @@ impl Syscall<'_> {
             "shmat",
         );
         shmIdentifier.addr = addr;
-        proc.shmIdentifiers.set(id, shmIdentifier);
+        proc.shm_identifiers.set(id, shmIdentifier);
         //self.process().shmIdentifiers.setVirtAddr(id, addr);
         return Ok(addr);
     }
@@ -143,9 +143,9 @@ impl Syscall<'_> {
     pub fn sys_shmdt(&self, id: usize, addr: VirtAddr, shmflg: usize) -> SysResult {
         info!("shmdt: addr={:#x}", addr);
         let mut proc = self.process();
-        let optId = proc.shmIdentifiers.getId(addr);
+        let optId = proc.shm_identifiers.getId(addr);
         if let Some(id) = optId {
-            proc.shmIdentifiers.pop(id);
+            proc.shm_identifiers.pop(id);
         }
         Ok(0)
     }

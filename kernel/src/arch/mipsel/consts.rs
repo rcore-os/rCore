@@ -4,9 +4,6 @@ pub use super::board::consts::*;
 
 pub const MEMORY_OFFSET: usize = 0x8000_0000;
 
-#[cfg(feature = "board_thinpad")]
-pub const KERNEL_OFFSET: usize = 0x8000_0000;
-#[cfg(not(feature = "board_thinpad"))]
 pub const KERNEL_OFFSET: usize = 0x8010_0000;
 
 pub const PHYSICAL_MEMORY_OFFSET: usize = 0x8000_0000;

@@ -100,6 +100,7 @@ impl INode for Fbdev {
             if area.offset + area.end_vaddr - area.start_vaddr > fb.framebuffer_size() {
                 return Err(FsError::NoDeviceSpace);
             }
+            /*
             let thread = unsafe { crate::process::current_thread() };
             thread.vm.lock().push(
                 area.start_vaddr,
@@ -108,6 +109,7 @@ impl INode for Fbdev {
                 Linear::new((fb.paddr() + area.offset - area.start_vaddr) as isize),
                 "mmap_file",
             );
+            */
             Ok(())
         } else {
             Err(FsError::NoDevice)

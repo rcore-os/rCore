@@ -1,21 +1,21 @@
 //! System call
 
-use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{fmt, slice, str};
-
-use bitflags::bitflags;
-use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
-use rcore_memory::VMError;
-
 use crate::arch::cpu;
-use crate::arch::interrupt::TrapFrame;
 use crate::arch::syscall::*;
 use crate::fs::epoll::EpollEvent;
 use crate::memory::{copy_from_user, MemorySet};
 use crate::process::*;
+use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, SignalUserContext, Sigset};
 use crate::sync::{Condvar, MutexGuard, SpinNoIrq};
-use crate::thread;
 use crate::util;
+use alloc::{string::String, sync::Arc, vec::Vec};
+use bitflags::bitflags;
+use core::{fmt, slice, str};
+use num::FromPrimitive;
+use rcore_fs::vfs::{FileType, FsError, INode, Metadata};
+use rcore_memory::VMError;
+use trapframe::TrapFrame;
+use trapframe::{GeneralRegs, UserContext};
 
 pub use self::custom::*;
 pub use self::fs::*;
@@ -25,9 +25,9 @@ pub use self::mem::*;
 pub use self::misc::*;
 pub use self::net::*;
 pub use self::proc::*;
-#[cfg(target_arch = "x86_64")]
 pub use self::signal::*;
 pub use self::time::*;
+pub use self::user::*;
 
 mod custom;
 mod fs;
@@ -37,16 +37,14 @@ mod mem;
 mod misc;
 mod net;
 mod proc;
-#[cfg(target_arch = "x86_64")]
 mod signal;
 mod time;
+mod user;
 
-use crate::signal::{Signal, SignalAction, SignalFrame, SignalStack, Sigset};
+#[cfg(feature = "profile")]
+use crate::sync::SpinNoIrqLock as Mutex;
 #[cfg(feature = "profile")]
 use alloc::collections::BTreeMap;
-use rcore_thread::std_thread::yield_now;
-#[cfg(feature = "profile")]
-use spin::Mutex;
 
 #[cfg(feature = "profile")]
 lazy_static! {
@@ -54,17 +52,32 @@ lazy_static! {
 }
 
 /// System call dispatcher
-pub fn syscall(id: usize, args: [usize; 6], tf: &mut TrapFrame) -> isize {
-    let thread = unsafe { current_thread() };
-    let mut syscall = Syscall { thread, tf };
-    let ret = syscall.syscall(id, args);
-    ret
+pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> bool {
+    let regs = &context.general;
+    let num = context.get_syscall_num();
+    let args = context.get_syscall_args();
+    // add before fork
+    #[cfg(riscv)]
+    {
+        context.sepc = context.sepc + 4;
+    }
+    let mut syscall = Syscall {
+        thread,
+        context,
+        exit: false,
+    };
+    let ret = syscall.syscall(num, args).await;
+    let exit = syscall.exit;
+    context.set_syscall_ret(ret as usize);
+    exit
 }
 
 /// All context needed for syscall
 struct Syscall<'a> {
-    thread: &'a mut Thread,
-    tf: &'a mut TrapFrame,
+    pub thread: &'a Arc<Thread>,
+    pub context: &'a mut UserContext,
+    /// Set `true` to exit current task.
+    pub exit: bool,
 }
 
 impl Syscall<'_> {
@@ -83,12 +96,12 @@ impl Syscall<'_> {
     // This #[deny(unreachable_patterns)] checks if each match arm is defined
     // See discussion in https://github.com/oscourse-tsinghua/rcore_plus/commit/17e644e54e494835f1a49b34b80c2c4f15ed0dbe.
     #[deny(unreachable_patterns)]
-    fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
+    async fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
         #[cfg(feature = "profile")]
         let begin_time = unsafe { core::arch::x86_64::_rdtsc() };
         let cid = cpu::id();
         let pid = self.process().pid.clone();
-        let tid = thread::current().id();
+        let tid = self.thread.tid;
         if !pid.is_init() {
             // we trust pid 0 process
             debug!("{}:{}:{} syscall id {} begin", cid, pid, tid, id);
@@ -99,7 +112,10 @@ impl Syscall<'_> {
         // And https://fedora.juszkiewicz.com.pl/syscalls.html.
         let ret = match id {
             // file
-            SYS_READ => self.sys_read(args[0], args[1] as *mut u8, args[2]),
+            SYS_READ => {
+                self.sys_read(args[0], UserOutPtr::from(args[1]), args[2])
+                    .await
+            }
             SYS_WRITE => self.sys_write(args[0], args[1] as *const u8, args[2]),
             SYS_OPENAT => self.sys_openat(args[0], args[1] as *const u8, args[2], args[3]),
             SYS_CLOSE => self.sys_close(args[0]),
@@ -109,18 +125,21 @@ impl Syscall<'_> {
             }
             SYS_LSEEK => self.sys_lseek(args[0], args[1] as i64, args[2] as u8),
             SYS_IOCTL => self.sys_ioctl(args[0], args[1], args[2], args[3], args[4]),
-            SYS_PREAD64 => self.sys_pread(args[0], args[1] as *mut u8, args[2], args[3]),
-            SYS_PWRITE64 => self.sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
-            SYS_READV => self.sys_readv(args[0], args[1] as *const IoVec, args[2]),
-            SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
-            SYS_SENDFILE => self.sys_sendfile(args[0], args[1], args[2] as *mut usize, args[3]),
-            SYS_FCNTL => {
-                info!(
-                    "SYS_FCNTL : {} {:#x} {} {}",
-                    args[0], args[1], args[2], args[3]
-                );
-                self.sys_fcntl(args[0], args[1], args[2])
+            SYS_PREAD64 => {
+                self.sys_pread(args[0], UserOutPtr::from(args[1]), args[2], args[3])
+                    .await
             }
+            SYS_PWRITE64 => self.sys_pwrite(args[0], args[1] as *const u8, args[2], args[3]),
+            SYS_READV => {
+                self.sys_readv(args[0], UserInPtr::from(args[1]), args[2])
+                    .await
+            }
+            SYS_WRITEV => self.sys_writev(args[0], args[1] as *const IoVec, args[2]),
+            SYS_SENDFILE => {
+                self.sys_sendfile(args[0], args[1], UserInOutPtr::from(args[2]), args[3])
+                    .await
+            }
+            SYS_FCNTL => self.sys_fcntl(args[0], args[1], args[2]),
             SYS_FLOCK => self.sys_flock(args[0], args[1]),
             SYS_FSYNC => self.sys_fsync(args[0]),
             SYS_FDATASYNC => self.sys_fdatasync(args[0]),
@@ -162,14 +181,17 @@ impl Syscall<'_> {
                 args[2] as *const TimeSpec,
                 args[3],
             ),
-            SYS_COPY_FILE_RANGE => self.sys_copy_file_range(
-                args[0],
-                args[1] as *mut usize,
-                args[2],
-                args[3] as *mut usize,
-                args[4],
-                args[5],
-            ),
+            SYS_COPY_FILE_RANGE => {
+                self.sys_copy_file_range(
+                    args[0],
+                    UserInOutPtr::from(args[1]),
+                    args[2],
+                    UserInOutPtr::from(args[3]),
+                    args[4],
+                    args[5],
+                )
+                .await
+            }
 
             // io multiplexing
             SYS_PSELECT6 => self.sys_pselect6(
@@ -181,7 +203,12 @@ impl Syscall<'_> {
                 args[5] as *const u32,
             ),
             SYS_PPOLL => {
-                self.sys_ppoll(args[0] as *mut PollFd, args[1], args[2] as *const TimeSpec)
+                self.sys_ppoll(
+                    UserInOutPtr::from(args[0]),
+                    args[1],
+                    UserInPtr::from(args[2]),
+                )
+                .await
             } // ignore sigmask
             SYS_EPOLL_CREATE1 => self.sys_epoll_create1(args[0]),
             SYS_EPOLL_CTL => {
@@ -212,27 +239,22 @@ impl Syscall<'_> {
             SYS_MADVISE => self.unimplemented("madvise", Ok(0)),
 
             // signal
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGACTION => self.sys_rt_sigaction(
                 args[0],
-                args[1] as *const SignalAction,
-                args[2] as *mut SignalAction,
+                UserInPtr::from(args[1]),
+                UserOutPtr::from(args[2]),
                 args[3],
             ),
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGRETURN => self.sys_rt_sigreturn(),
-            #[cfg(target_arch = "x86_64")]
             SYS_RT_SIGPROCMASK => self.sys_rt_sigprocmask(
                 args[0],
-                args[1] as *const Sigset,
-                args[2] as *mut Sigset,
+                UserInPtr::from(args[1]),
+                UserOutPtr::from(args[2]),
                 args[3],
             ),
-            #[cfg(target_arch = "x86_64")]
             SYS_SIGALTSTACK => {
-                self.sys_sigaltstack(args[0] as *const SignalStack, args[1] as *mut SignalStack)
+                self.sys_sigaltstack(UserInPtr::from(args[0]), UserOutPtr::from(args[1]))
             }
-            #[cfg(target_arch = "x86_64")]
             SYS_KILL => self.sys_kill(args[0] as isize, args[1]),
 
             // schedule
@@ -299,24 +321,29 @@ impl Syscall<'_> {
             ),
             SYS_EXIT => self.sys_exit(args[0] as usize),
             SYS_EXIT_GROUP => self.sys_exit_group(args[0]),
-            SYS_WAIT4 => self.sys_wait4(args[0] as isize, args[1] as *mut i32), // TODO: wait4
+            SYS_WAIT4 => {
+                self.sys_wait4(args[0] as isize, UserInOutPtr::from(args[1]))
+                    .await
+            } // TODO: wait4
             SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0] as *mut u32),
-            SYS_FUTEX => self.sys_futex(
-                args[0],
-                args[1] as u32,
-                args[2] as i32,
-                args[3] as *const TimeSpec,
-            ),
-            #[cfg(target_arch = "x86_64")]
+            SYS_FUTEX => {
+                self.sys_futex(
+                    args[0],
+                    args[1] as u32,
+                    args[2] as i32,
+                    UserInPtr::from(args[3]),
+                )
+                .await
+            }
             SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time
-            SYS_NANOSLEEP => self.sys_nanosleep(args[0] as *const TimeSpec),
+            SYS_NANOSLEEP => self.sys_nanosleep(UserInPtr::from(args[0])).await,
             SYS_SETITIMER => self.unimplemented("setitimer", Ok(0)),
             SYS_GETTIMEOFDAY => {
-                self.sys_gettimeofday(args[0] as *mut TimeVal, args[1] as *const u8)
+                self.sys_gettimeofday(UserOutPtr::from(args[0]), UserInPtr::from(args[1]))
             }
-            SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
+            SYS_CLOCK_GETTIME => self.sys_clock_gettime(args[0], UserOutPtr::from(args[1])),
 
             // sem
             #[cfg(not(target_arch = "mips"))]
@@ -406,7 +433,7 @@ impl Syscall<'_> {
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]
-                    () => self.x86_64_syscall(id, args),
+                    () => self.x86_64_syscall(id, args).await,
                     #[cfg(target_arch = "mips")]
                     () => self.mips_syscall(id, args),
                     #[cfg(all(not(target_arch = "x86_64"), not(target_arch = "mips")))]
@@ -416,7 +443,8 @@ impl Syscall<'_> {
                     ret
                 } else {
                     error!("unknown syscall id: {}, args: {:x?}", id, args);
-                    crate::trap::error(self.tf);
+                    todo!()
+                    //crate::trap::error(self.tf);
                 }
             }
         };
@@ -480,7 +508,7 @@ impl Syscall<'_> {
                 }
 
                 unsafe {
-                    asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
+                    llvm_asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
                     *(_cur_tls as *mut usize) = args[0];
                 }
                 Ok(0)
@@ -502,12 +530,15 @@ impl Syscall<'_> {
     }
 
     #[cfg(target_arch = "x86_64")]
-    fn x86_64_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
+    async fn x86_64_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
         let ret = match id {
             SYS_OPEN => self.sys_open(args[0] as *const u8, args[1], args[2]),
             SYS_STAT => self.sys_stat(args[0] as *const u8, args[1] as *mut Stat),
             SYS_LSTAT => self.sys_lstat(args[0] as *const u8, args[1] as *mut Stat),
-            SYS_POLL => self.sys_poll(args[0] as *mut PollFd, args[1], args[2]),
+            SYS_POLL => {
+                self.sys_poll(UserInOutPtr::from(args[0]), args[1], args[2])
+                    .await
+            }
             SYS_ACCESS => self.sys_access(args[0] as *const u8, args[1]),
             SYS_PIPE => self.sys_pipe(args[0] as *mut u32),
             SYS_SELECT => self.sys_select(

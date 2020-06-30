@@ -10,7 +10,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly-2020-04-06
+        toolchain: nightly-2020-06-04
         override: true
         components: rustfmt, clippy
     - name: Check code format
@@ -30,7 +30,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly-2020-04-06
+        toolchain: nightly-2020-06-04
         components: rust-src, llvm-tools-preview
 
     - name: Cache QEMU
@@ -56,6 +56,6 @@ jobs:
       run: brew install dtc
 
     - name: Download prebuilt user image
-      run: cd user && make sfsimg arch=${{ matrix.arch }} prebuilt=1 && cd ..
+      run: cd user && make sfsimg ARCH=${{ matrix.arch }} PREBUILT=1 && cd ..
     - name: Build kernel
       run: cd kernel && make build ARCH=${{ matrix.arch }} && cd ..

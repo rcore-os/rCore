@@ -1,6 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use rcore_fs::vfs::*;
+use rcore_fs::{dev::block_cache::BlockCache, vfs::*};
 use rcore_fs_devfs::{
     special::{NullINode, ZeroINode},
     DevFS,
@@ -11,11 +11,12 @@ use rcore_fs_sfs::{INodeImpl, SimpleFileSystem};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{ShmINode, STDIN, STDOUT, TTY};
+pub use self::devfs::{ShmINode, TTY};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
 pub use self::pseudo::*;
+use crate::drivers::{BlockDriver, BlockDriverWrapper};
 
 mod devfs;
 mod device;
@@ -47,24 +48,15 @@ lazy_static! {
     pub static ref ROOT_INODE: Arc<dyn INode> = {
         #[cfg(not(feature = "link_user"))]
         let device = {
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "x86_64"))]
-            {
-                use crate::drivers::BlockDriver;
-                use rcore_fs::dev::block_cache::BlockCache;
-                let driver = BlockDriver(
-                    crate::drivers::BLK_DRIVERS
-                        .read().iter()
-                        .next().expect("Block device not found")
-                        .clone()
-                );
-                // enable block cache
-                Arc::new(BlockCache::new(driver, 0x100))
-                // Arc::new(driver)
-            }
-            #[cfg(target_arch = "aarch64")]
-            {
-                unimplemented!()
-            }
+            let driver = BlockDriverWrapper(
+                crate::drivers::BLK_DRIVERS
+                    .read().iter()
+                    .next().expect("Block device not found")
+                    .clone()
+            );
+            // enable block cache
+            Arc::new(BlockCache::new(driver, 0x100))
+            // Arc::new(driver)
         };
         #[cfg(feature = "link_user")]
         let device = {

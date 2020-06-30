@@ -28,13 +28,11 @@
 
 use super::Condvar;
 use crate::arch::interrupt;
-use crate::processor;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use rcore_thread::std_thread::yield_now;
 
 pub type SpinLock<T> = Mutex<T, Spin>;
 pub type SpinNoIrqLock<T> = Mutex<T, SpinNoIrq>;
@@ -115,7 +113,8 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
             }
         }
         let cid = crate::arch::cpu::id();
-        let tid = processor().tid_option().unwrap_or(0);
+        //let tid = processor().tid_option().unwrap_or(0);
+        let tid = 0;
         unsafe { self.user.get().write((cid, tid)) };
     }
 
@@ -152,7 +151,7 @@ impl<T: ?Sized, S: MutexSupport> Mutex<T, S> {
             if let Some(x) = self.try_lock() {
                 break x;
             }
-            yield_now();
+            //yield_now();
         }
     }
 
@@ -267,14 +266,7 @@ impl MutexSupport for Spin {
         Spin
     }
     fn cpu_relax(&self) {
-        unsafe {
-            #[cfg(target_arch = "x86_64")]
-            asm!("pause" :::: "volatile");
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
-            asm!("nop" :::: "volatile");
-            #[cfg(target_arch = "aarch64")]
-            asm!("yield" :::: "volatile");
-        }
+        core::sync::atomic::spin_loop_hint();
     }
     fn before_lock() -> Self::GuardData {}
     fn after_unlock(&self) {}
@@ -305,14 +297,7 @@ impl MutexSupport for SpinNoIrq {
         SpinNoIrq
     }
     fn cpu_relax(&self) {
-        unsafe {
-            #[cfg(target_arch = "x86_64")]
-            asm!("pause" :::: "volatile");
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64", target_arch = "mips"))]
-            asm!("nop" :::: "volatile");
-            #[cfg(target_arch = "aarch64")]
-            asm!("yield" :::: "volatile");
-        }
+        core::sync::atomic::spin_loop_hint();
     }
     fn before_lock() -> Self::GuardData {
         FlagsGuard(unsafe { interrupt::disable_and_store() })

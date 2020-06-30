@@ -1,120 +1,47 @@
 pub use self::structs::*;
 use crate::arch::cpu;
-use crate::consts::{MAX_CPU_NUM, MAX_PROCESS_NUM};
+use crate::{
+    consts::{MAX_CPU_NUM, MAX_PROCESS_NUM},
+    memory::phys_to_virt,
+    syscall::handle_syscall,
+};
 use alloc::{boxed::Box, sync::Arc};
 use log::*;
-pub use rcore_thread::*;
+use trapframe::UserContext;
 
 mod abi;
+pub mod futex;
+pub mod proc;
 pub mod structs;
+pub mod thread;
+
+use crate::sync::SpinNoIrqLock as Mutex;
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+pub use futex::*;
+pub use proc::*;
+pub use structs::*;
+pub use thread::*;
 
 pub fn init() {
-    // NOTE: max_time_slice <= 5 to ensure 'priority' test pass
-    let scheduler = scheduler::RRScheduler::new(5);
-    let manager = Arc::new(ThreadPool::new(scheduler, MAX_PROCESS_NUM));
-
-    unsafe {
-        for cpu_id in 0..MAX_CPU_NUM {
-            PROCESSORS[cpu_id].init(cpu_id, Thread::new_init(), manager.clone());
-        }
-    }
-
+    // create init process
     crate::shell::add_user_shell();
 
     info!("process: init end");
 }
 
-static PROCESSORS: [Processor; MAX_CPU_NUM] = [
-    // TODO: More elegant ?
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-    Processor::new(),
-];
+static mut PROCESSORS: [Option<Arc<Thread>>; MAX_CPU_NUM] = [None; MAX_CPU_NUM];
 
 /// Get current thread
 ///
 /// `Thread` is a thread-local object.
 /// It is safe to call this once, and pass `&mut Thread` as a function argument.
-pub unsafe fn current_thread() -> &'static mut Thread {
-    // trick: force downcast from trait object
-    let (process, _): (&mut Thread, *const ()) = core::mem::transmute(processor().context());
-    process
-}
-
-/// Get global thread manager.
-pub fn thread_manager() -> &'static ThreadPool {
-    processor().manager()
-}
-
-// Implement dependencies for std::thread
-
-#[no_mangle]
-pub fn processor() -> &'static Processor {
-    &PROCESSORS[cpu::id()]
-}
-
-#[no_mangle]
-pub fn new_kernel_context(entry: extern "C" fn(usize) -> !, arg: usize) -> Box<dyn Context> {
-    Thread::new_kernel(entry, arg)
+///
+/// Don't use it unless necessary.
+pub fn current_thread() -> Option<Arc<Thread>> {
+    let cpu_id = cpu::id();
+    unsafe { PROCESSORS[cpu_id].clone() }
 }

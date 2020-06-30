@@ -277,7 +277,7 @@ unsafe impl FrameAllocator<Size4KiB> for FrameAllocatorForX86 {
 }
 
 impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
-    fn deallocate_frame(&mut self, frame: Frame) {
+    unsafe fn deallocate_frame(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_u64() as usize);
     }
 }

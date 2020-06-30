@@ -1,19 +1,6 @@
 //! Define the FrameAllocator for physical memory
-//! x86_64      --  64GB
-//! AARCH64/MIPS/RV --  1GB
-//! K210(rv64)  --  8MB
-//! NOTICE:
-//! type FrameAlloc = bitmap_allocator::BitAllocXXX
-//! KSTACK_SIZE         -- 16KB
-//!
-//! KERNEL_HEAP_SIZE:
-//! x86-64              -- 32MB
-//! AARCH64/RV64        -- 8MB
-//! MIPS/RV32           -- 2MB
-//! mipssim/malta(MIPS) -- 10MB
 
 use super::HEAP_ALLOCATOR;
-pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
 use crate::sync::SpinNoIrqLock;
@@ -22,9 +9,10 @@ use buddy_system_allocator::Heap;
 use core::mem;
 use core::mem::size_of;
 use log::*;
-pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::*;
 
+pub use crate::arch::paging::*;
+pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
 // x86_64 support up to 1T memory
@@ -32,20 +20,13 @@ pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 pub type FrameAlloc = bitmap_allocator::BitAlloc256M;
 
 // RISCV, ARM, MIPS has 1G memory
-#[cfg(all(
-    any(
-        target_arch = "riscv32",
-        target_arch = "riscv64",
-        target_arch = "aarch64",
-        target_arch = "mips"
-    ),
-    not(feature = "board_k210")
+#[cfg(any(
+    target_arch = "riscv32",
+    target_arch = "riscv64",
+    target_arch = "aarch64",
+    target_arch = "mips"
 ))]
 pub type FrameAlloc = bitmap_allocator::BitAlloc1M;
-
-// K210 has 8M memory
-#[cfg(feature = "board_k210")]
-pub type FrameAlloc = bitmap_allocator::BitAlloc4K;
 
 pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(FrameAlloc::DEFAULT);
 
@@ -139,10 +120,11 @@ impl Drop for KernelStack {
 /// Handle page fault at `addr`.
 /// Return true to continue, false to halt.
 pub fn handle_page_fault(addr: usize) -> bool {
-    debug!("page fault @ {:#x}", addr);
+    debug!("page fault from kernel @ {:#x}", addr);
 
-    let thread = unsafe { current_thread() };
-    thread.vm.lock().handle_page_fault(addr)
+    let thread = current_thread().unwrap();
+    let mut lock = thread.vm.lock();
+    lock.handle_page_fault(addr)
 }
 
 pub fn init_heap() {
@@ -155,7 +137,6 @@ pub fn init_heap() {
             .lock()
             .init(HEAP.as_ptr() as usize, HEAP_BLOCK * MACHINE_ALIGN);
     }
-    info!("heap init end");
 }
 
 pub fn enlarge_heap(heap: &mut Heap) {
@@ -211,5 +192,22 @@ pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
     match unsafe { read_user(&mut dst, addr) } {
         0 => Some(dst),
         _ => None,
+    }
+}
+
+pub fn copy_to_user<T>(addr: *mut T, src: *const T) -> bool {
+    #[naked]
+    #[inline(never)]
+    #[link_section = ".text.copy_user"]
+    unsafe extern "C" fn write_user<T>(dst: *mut T, src: *const T) -> usize {
+        dst.copy_from_nonoverlapping(src, 1);
+        0
+    }
+    if !access_ok(addr as usize, size_of::<T>()) {
+        return false;
+    }
+    match unsafe { write_user(addr, src) } {
+        0 => true,
+        _ => false,
     }
 }

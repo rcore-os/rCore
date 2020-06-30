@@ -1,8 +1,8 @@
 //! Framebuffer console display driver
 
 use super::gpu::fb::{Framebuffer, FRAME_BUFFER};
+use crate::sync::SpinLock as Mutex;
 use rcore_console::{Console, ConsoleOnGraphic};
-use spin::Mutex;
 
 // Console -> TextBuffer -> FrameBuffer
 type RCoreConsole = ConsoleOnGraphic<Framebuffer>;

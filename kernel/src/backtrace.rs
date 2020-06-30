@@ -1,3 +1,4 @@
+//! Provide backtrace upon panic
 use core::mem::size_of;
 
 extern "C" {
@@ -5,26 +6,26 @@ extern "C" {
     fn etext();
 }
 
-/// Returns the current frame pointer.or stack base pointer
+/// Returns the current frame pointer or stack base pointer
 #[inline(always)]
 pub fn fp() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        asm!("mov $0, x29" : "=r"(ptr));
+        llvm_asm!("mov $0, x29" : "=r"(ptr));
     }
-    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    #[cfg(riscv)]
     unsafe {
-        asm!("mv $0, s0" : "=r"(ptr));
+        llvm_asm!("mv $0, s0" : "=r"(ptr));
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
-        asm!("mov %rbp, $0" : "=r"(ptr));
+        llvm_asm!("mov %rbp, $0" : "=r"(ptr));
     }
     #[cfg(any(target_arch = "mips"))]
     unsafe {
         // read $sp
-        asm!("ori $0, $$29, 0" : "=r"(ptr));
+        llvm_asm!("ori $0, $$29, 0" : "=r"(ptr));
     }
 
     ptr
@@ -36,20 +37,20 @@ pub fn lr() -> usize {
     let ptr: usize;
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        asm!("mov $0, x30" : "=r"(ptr));
+        llvm_asm!("mov $0, x30" : "=r"(ptr));
     }
-    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    #[cfg(riscv)]
     unsafe {
-        asm!("mv $0, ra" : "=r"(ptr));
+        llvm_asm!("mv $0, ra" : "=r"(ptr));
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
-        asm!("movq 8(%rbp), $0" : "=r"(ptr));
+        llvm_asm!("movq 8(%rbp), $0" : "=r"(ptr));
     }
 
     #[cfg(target_arch = "mips")]
     unsafe {
-        asm!("ori $0, $$31, 0" : "=r"(ptr));
+        llvm_asm!("ori $0, $$31, 0" : "=r"(ptr));
     }
 
     ptr
@@ -97,7 +98,7 @@ pub fn backtrace() {
             }
 
             stack_num = stack_num + 1;
-            #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+            #[cfg(riscv)]
             {
                 current_fp = *(current_fp as *const usize).offset(-2);
                 current_pc = *(current_fp as *const usize).offset(-1);

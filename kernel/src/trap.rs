@@ -1,10 +1,12 @@
 use crate::arch::cpu;
-use crate::arch::interrupt::{syscall, TrapFrame};
 use crate::consts::INFORM_PER_MSEC;
 use crate::process::*;
-use crate::sync::Condvar;
-use rcore_thread::std_thread as thread;
-use rcore_thread::std_thread::current;
+use crate::sync::SpinNoIrqLock as Mutex;
+use crate::{signal::SignalUserContext, sync::Condvar};
+use core::time::Duration;
+use naive_timer::Timer;
+use trapframe::TrapFrame;
+use trapframe::UserContext;
 
 pub static mut TICK: usize = 0;
 
@@ -16,33 +18,20 @@ pub fn uptime_msec() -> usize {
     unsafe { crate::trap::TICK * crate::consts::USEC_PER_TICK / 1000 }
 }
 
+lazy_static! {
+    pub static ref NAIVE_TIMER: Mutex<Timer> = Mutex::new(Timer::default());
+}
+
 pub fn timer() {
-    if cpu::id() == 0 {
-        unsafe {
-            TICK += 1;
-            if uptime_msec() % INFORM_PER_MSEC == 0 {
-                TICK_ACTIVITY.notify_all();
-            }
-        }
-    }
-    processor().tick();
+    let now = crate::arch::timer::timer_now();
+    NAIVE_TIMER.lock().expire(now);
 }
 
-pub fn error(tf: &TrapFrame) -> ! {
-    error!("{:#x?}", tf);
-    unsafe {
-        let mut proc = current_thread().proc.lock();
-        proc.exit(0x100);
-    }
-    thread::yield_now();
-    unreachable!();
-}
-
-pub fn serial(c: char) {
-    if c == '\r' {
+pub fn serial(c: u8) {
+    if c == b'\r' {
         // in linux, we use '\n' instead
-        crate::fs::STDIN.push('\n');
+        crate::fs::TTY.push(b'\n');
     } else {
-        crate::fs::STDIN.push(c);
+        crate::fs::TTY.push(c);
     }
 }

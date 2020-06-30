@@ -7,15 +7,18 @@ use alloc::sync::Arc;
 
 use isomorphic_drivers::block::ahci::{AHCI, BLOCK_SIZE};
 
-use crate::drivers::provider::Provider;
+use crate::drivers::{provider::Provider, NetDriver};
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS};
+use super::{
+    super::{DeviceType, Driver, BLK_DRIVERS, DRIVERS},
+    BlockDriver,
+};
 
 pub struct AHCIDriver(Mutex<AHCI<Provider>>);
 
 impl Driver for AHCIDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         false
     }
 
@@ -27,6 +30,15 @@ impl Driver for AHCIDriver {
         format!("ahci")
     }
 
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        Some(self)
+    }
+
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        None
+    }
+}
+impl BlockDriver for AHCIDriver {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) -> bool {
         let mut driver = self.0.lock();
         driver.read_block(block_id, buf);
@@ -43,7 +55,7 @@ impl Driver for AHCIDriver {
     }
 }
 
-pub fn init(_irq: Option<u32>, header: usize, size: usize) -> Option<Arc<AHCIDriver>> {
+pub fn init(_irq: Option<usize>, header: usize, size: usize) -> Option<Arc<AHCIDriver>> {
     if let Some(ahci) = AHCI::new(header, size) {
         let driver = Arc::new(AHCIDriver(Mutex::new(ahci)));
         DRIVERS.write().push(driver.clone());

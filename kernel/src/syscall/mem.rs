@@ -59,14 +59,6 @@ impl Syscall<'_> {
                 );
                 return Ok(addr);
             }
-            self.vm().push(
-                addr,
-                addr + len,
-                prot.to_attr().execute(),
-                Delay::new(GlobalFrameAlloc),
-                "mmap_anon",
-            );
-            Ok(addr)
         } else {
             let file_like = proc.get_file_like(fd)?;
             let area = MMapArea {

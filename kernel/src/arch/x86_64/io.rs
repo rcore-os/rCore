@@ -1,21 +1,13 @@
-use super::driver::serial::*;
+use crate::drivers::SERIAL_DRIVERS;
 use core::fmt::{Arguments, Write};
-
-pub fn getchar() -> char {
-    unsafe {
-        COM1.force_unlock();
-    }
-    COM1.lock().receive() as char
-}
 
 pub fn putfmt(fmt: Arguments) {
     // output to serial
     #[cfg(not(feature = "board_pc"))]
     {
-        unsafe {
-            COM1.force_unlock();
-        }
-        COM1.lock().write_fmt(fmt).unwrap();
+        let mut drivers = SERIAL_DRIVERS.write();
+        let serial = drivers.first_mut().unwrap();
+        serial.write(format!("{}", fmt).as_bytes());
     }
 
     // print to graphic

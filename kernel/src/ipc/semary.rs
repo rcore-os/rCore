@@ -1,8 +1,9 @@
 use crate::sync::Semaphore;
+use crate::sync::SpinLock as Mutex;
 use crate::syscall::{SemBuf, SysResult, TimeSpec};
 use alloc::{collections::BTreeMap, sync::Arc, sync::Weak, vec::Vec};
 use core::ops::Index;
-use spin::{Mutex, RwLock};
+use spin::RwLock;
 
 // structure specifies the access permissions on the semaphore set
 // key_t?

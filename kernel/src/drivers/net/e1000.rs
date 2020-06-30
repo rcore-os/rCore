@@ -16,11 +16,14 @@ use isomorphic_drivers::net::ethernet::intel::e1000::E1000;
 use isomorphic_drivers::net::ethernet::structs::EthernetAddress as DriverEthernetAddress;
 use rcore_memory::PAGE_SIZE;
 
-use crate::drivers::provider::Provider;
+use crate::drivers::{provider::Provider, BlockDriver};
 use crate::net::SOCKETS;
 use crate::sync::SpinNoIrqLock as Mutex;
 
-use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY};
+use super::{
+    super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY},
+    NetDriver,
+};
 
 #[derive(Clone)]
 pub struct E1000Driver(Arc<Mutex<E1000<Provider>>>);
@@ -29,11 +32,11 @@ pub struct E1000Interface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, E1000Driver>>,
     driver: E1000Driver,
     name: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
 }
 
 impl Driver for E1000Interface {
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         if irq.is_some() && self.irq.is_some() && irq != self.irq {
             // not ours, skip it
             return false;
@@ -65,6 +68,16 @@ impl Driver for E1000Interface {
         String::from("e1000")
     }
 
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+}
+
+impl NetDriver for E1000Interface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }
@@ -173,7 +186,7 @@ impl phy::TxToken for E1000TxToken {
 }
 
 // JudgeDuck-OS/kern/e1000.c
-pub fn init(name: String, irq: Option<u32>, header: usize, size: usize, index: usize) {
+pub fn init(name: String, irq: Option<usize>, header: usize, size: usize, index: usize) {
     info!("Probing e1000 {}", name);
 
     // randomly generated

@@ -5,12 +5,15 @@ use virtio_drivers::{VirtIOGpu, VirtIOHeader};
 
 use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER};
 use crate::memory::virt_to_phys;
-use crate::sync::SpinNoIrqLock as Mutex;
+use crate::{
+    drivers::{BlockDriver, NetDriver},
+    sync::SpinNoIrqLock as Mutex,
+};
 
 struct VirtIOGpuDriver(Mutex<VirtIOGpu<'static>>);
 
 impl Driver for VirtIOGpuDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
         self.0.lock().ack_interrupt()
     }
 
@@ -20,6 +23,14 @@ impl Driver for VirtIOGpuDriver {
 
     fn get_id(&self) -> String {
         format!("virtio_gpu")
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        None
     }
 }
 

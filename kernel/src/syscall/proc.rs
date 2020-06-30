@@ -1,19 +1,30 @@
 //! Syscalls for process
 
 use super::*;
+use crate::arch::timer::timer_now;
 use crate::fs::FileLike;
-use crate::signal::{has_signal_to_do, send_signal, Signal};
-use crate::syscall::SysError::{EINTR, ESRCH};
+use crate::signal::{send_signal, Signal};
+use crate::{
+    sync::{wait_for_event, Event, EventBus, SpinNoIrqLock as Mutex},
+    syscall::SysError::{EINTR, ESRCH},
+    trap::NAIVE_TIMER,
+};
+use alloc::boxed::Box;
 use alloc::sync::Weak;
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 impl Syscall<'_> {
     /// Fork the current process. Return the child's PID.
     pub fn sys_fork(&mut self) -> SysResult {
-        let new_thread = self.thread.fork(self.tf);
+        let new_thread = self.thread.fork(self.context);
         let pid = new_thread.proc.lock().pid.get();
-        let tid = thread_manager().add(new_thread);
-        thread_manager().detach(tid);
         info!("fork: {} -> {}", self.process().pid, pid);
+        spawn(new_thread);
         Ok(pid)
     }
 
@@ -45,37 +56,36 @@ impl Syscall<'_> {
             return self.sys_fork();
         }
         if (flags != 0x7d0f00) && (flags != 0x5d0f00) {
-            //0x5d0f00 is the args from gcc of alpine linux
-            //warn!("sys_clone only support musl pthread_create");
-            panic!(
-                "sys_clone only support sys_fork OR musl pthread_create without flags{:x}",
+            // 0x5d0f00 is the args from gcc of alpine linux
+            warn!(
+                "sys_clone only support sys_fork or musl pthread_create without flags{:x}",
                 flags
             );
-            //return Err(SysError::ENOSYS);
+            return Err(SysError::ENOSYS);
         }
         let parent_tid_ref = unsafe { self.vm().check_write_ptr(parent_tid)? };
         // child_tid buffer should not be set because CLONE_CHILD_SETTID flag is not specified in the current implementation
-        // let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
+        let child_tid_ref = unsafe { self.vm().check_write_ptr(child_tid)? };
         let mut new_thread = self
             .thread
-            .clone(self.tf, newsp, newtls, child_tid as usize);
+            .new_clone(self.context, newsp, newtls, child_tid as usize);
         if clone_flags.contains(CloneFlags::CHILD_CLEARTID) {
-            new_thread.clear_child_tid = child_tid as usize;
+            new_thread.inner.lock().clear_child_tid = child_tid as usize;
         }
-        let tid = thread_manager().add(new_thread);
-        thread_manager().detach(tid);
-        info!("clone: {} -> {}", thread::current().id(), tid);
+        let tid: usize = new_thread.tid;
+        info!("clone: {} -> {}", self.thread.tid, tid);
         *parent_tid_ref = tid as u32;
-        // *child_tid_ref = tid as u32;
+        *child_tid_ref = tid as u32;
+        spawn(new_thread);
         Ok(tid)
     }
 
     /// Wait for the process exit.
     /// Return the PID. Store exit code to `wstatus` if it's not null.
-    pub fn sys_wait4(&mut self, pid: isize, wstatus: *mut i32) -> SysResult {
+    pub async fn sys_wait4(&mut self, pid: isize, wstatus: UserInOutPtr<i32>) -> SysResult {
         info!("wait4: pid: {}, code: {:?}", pid, wstatus);
         let wstatus = if !wstatus.is_null() {
-            Some(unsafe { self.vm().check_write_ptr(wstatus)? })
+            Some(wstatus)
         } else {
             None
         };
@@ -92,27 +102,56 @@ impl Syscall<'_> {
             _ => unimplemented!(),
         };
         loop {
+            info!("wait4 loop: pid: {}, code: {:?}", pid, wstatus);
             let mut proc = self.process();
-            // check child_exit_code
+
+            // check child state
             let find = match target {
-                WaitFor::AnyChild | WaitFor::AnyChildInGroup => proc
-                    .child_exit_code
-                    .iter()
-                    .next()
-                    .map(|(&pid, &code)| (pid, code)),
-                WaitFor::Pid(pid) => proc.child_exit_code.get(&pid).map(|&code| (pid, code)),
+                WaitFor::AnyChild | WaitFor::AnyChildInGroup => {
+                    let mut res = None;
+                    for (pid, child) in &proc.children {
+                        if let Some(c) = child.upgrade() {
+                            let p = c.lock();
+                            if p.exited() {
+                                res = Some((p.pid, p.exit_code));
+                                break;
+                            }
+                        } else {
+                            info!("wait: pid {} is missing", pid);
+                        }
+                    }
+                    res
+                }
+                WaitFor::Pid(pid) => {
+                    let mut res = None;
+                    if let Some(c) = process(pid) {
+                        let p = c.lock();
+                        if p.exited() {
+                            res = Some((p.pid, p.exit_code));
+                        }
+                    }
+                    res
+                }
             };
             // if found, return
             if let Some((pid, exit_code)) = find {
-                proc.child_exit_code.remove(&pid);
-                {
+                info!("wait: found pid {}", pid);
+
+                // write before removing to handle EFAULT
+                if let Some(mut wstatus) = wstatus {
+                    wstatus.write(exit_code as i32)?;
+                }
+
+                // remove from process table
+                if true {
                     let mut process_table = PROCESSES.write();
-                    process_table.remove(&pid);
+                    process_table.remove(&pid.get());
                 }
-                if let Some(wstatus) = wstatus {
-                    *wstatus = exit_code as i32;
-                }
-                return Ok(pid);
+
+                // remove from children
+                proc.children.retain(|(p, _)| *p != pid);
+
+                return Ok(pid.get());
             }
             // if not, check pid
             let invalid = {
@@ -133,15 +172,17 @@ impl Syscall<'_> {
                 }
             };
             if invalid {
+                info!("wait: no valid child proc");
                 return Err(SysError::ECHILD);
             }
-            info!(
-                "wait: thread {} -> {:?}, sleep",
-                thread::current().id(),
-                target
-            );
-            let condvar = proc.child_exit.clone();
-            condvar.wait(proc);
+
+            info!("wait: thread {} -> {:?}, sleep", self.thread.tid, target);
+
+            let eventbus = proc.eventbus.clone();
+            drop(proc);
+
+            wait_for_event(eventbus.clone(), Event::CHILD_PROCESS_QUIT).await;
+            eventbus.lock().clear(Event::CHILD_PROCESS_QUIT);
         }
     }
 
@@ -163,10 +204,7 @@ impl Syscall<'_> {
         argv: *const *const u8,
         envp: *const *const u8,
     ) -> SysResult {
-        info!(
-            "exec:BEG: path: {:?}, argv: {:?}, envp: {:?}",
-            path, argv, envp
-        );
+        info!("exec: path: {:?}, argv: {:?}, envp: {:?}", path, argv, envp);
         let mut proc = self.process();
         let path = check_and_clone_cstr(path)?;
         let args = check_and_clone_cstr_array(argv)?;
@@ -177,25 +215,20 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
 
-        info!(
-            "exec:STEP2: path: {:?}, args: {:?}, envs: {:?}",
-            path, args, envs
-        );
-
-        // Kill other threads
-        proc.threads.retain(|&tid| {
-            if tid != thread::current().id() {
-                thread_manager().exit(tid, 1);
-            }
-            tid == thread::current().id()
-        });
+        info!("exec: path: {:?}, args: {:?}, envs: {:?}", path, args, envs);
 
         // Read program file
         let inode = proc.lookup_inode(&path)?;
 
         // Make new Thread
-        let (mut vm, entry_addr, ustack_top) =
-            Thread::new_user_vm(&inode, &path, args, envs).map_err(|_| SysError::EINVAL)?;
+        // Re-create vm
+        let mut vm = self.vm();
+        let (entry_addr, ustack_top) =
+            Thread::new_user_vm(&inode, args, envs, &mut vm).map_err(|_| SysError::EINVAL)?;
+
+        // Kill other threads
+        // TODO: stop and wait until they are finished
+        proc.threads.retain(|&tid| tid == self.thread.tid);
 
         // close file that FD_CLOEXEC is set
         let close_fds = proc
@@ -218,24 +251,30 @@ impl Syscall<'_> {
         }
 
         // Activate new page table
-        core::mem::swap(&mut *self.vm(), &mut vm);
         unsafe {
-            self.vm().activate();
+            vm.activate();
         }
+        drop(vm);
 
         // Modify exec path
         proc.exec_path = path.clone();
+
+        // reset disposition (man signal(7))
+        for d in proc.dispositions.iter_mut() {
+            *d = SignalAction::default();
+        }
         drop(proc);
 
         // Modify the TrapFrame
-        *self.tf = TrapFrame::new_user_thread(entry_addr, ustack_top);
+        self.context.set_ip(entry_addr);
+        self.context.set_sp(ustack_top);
 
         info!("exec:END: path: {:?}", path);
         Ok(0)
     }
 
     pub fn sys_yield(&mut self) -> SysResult {
-        thread::yield_now();
+        //thread::yield_now();
         Ok(0)
     }
 
@@ -250,12 +289,11 @@ impl Syscall<'_> {
             pid = self.process().pid.get();
         }
         info!("getpgid: get pgid of process {}", pid);
+
         let process_table = PROCESSES.read();
-        // let process_table: BTreeMap<usize, Weak<Mutex<Process>>> = BTreeMap::new();
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
-            let lock = proc.upgrade().unwrap();
-            let proc = lock.lock();
+            let proc = proc.lock();
             Ok(proc.pgid as usize)
         } else {
             Err(ESRCH)
@@ -267,14 +305,13 @@ impl Syscall<'_> {
             pid = self.process().pid.get();
         }
         info!("setpgid: set pgid of process {} to {}", pid, pgid);
+
         let process_table = PROCESSES.read();
         let proc = process_table.get(&pid);
         if let Some(proc) = proc {
             // TODO: check process pid is the child of calling process
-            if let Some(proc) = proc.upgrade() {
-                let mut proc = proc.lock();
-                proc.pgid = pgid as i32;
-            }
+            let mut proc = proc.lock();
+            proc.pgid = pgid as Pgid;
             Ok(0)
         } else {
             Err(ESRCH)
@@ -284,8 +321,7 @@ impl Syscall<'_> {
     /// Get the current thread id
     pub fn sys_gettid(&mut self) -> SysResult {
         info!("gettid");
-        // use pid as tid for now
-        Ok(thread::current().id())
+        Ok(self.thread.tid)
     }
 
     /// Get the parent process id
@@ -300,9 +336,10 @@ impl Syscall<'_> {
     }
 
     /// Exit the current thread
-    pub fn sys_exit(&mut self, exit_code: usize) -> ! {
-        let tid = thread::current().id();
+    pub fn sys_exit(&mut self, exit_code: usize) -> SysResult {
+        let tid = self.thread.tid;
         info!("exit: {}, code: {}", tid, exit_code);
+
         let mut proc = self.process();
         proc.threads.retain(|&id| id != tid);
 
@@ -315,41 +352,39 @@ impl Syscall<'_> {
         // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
         // FIXME: do it in all possible ways a thread can exit
         //        it has memory access so we can't move it to Thread::drop?
-        let clear_child_tid = self.thread.clear_child_tid as *mut u32;
+        let clear_child_tid = self.thread.inner.lock().clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {
             info!("exit: futex {:#?} wake 1", clear_child_tid);
             if let Ok(clear_child_tid_ref) = unsafe { self.vm().check_write_ptr(clear_child_tid) } {
                 *clear_child_tid_ref = 0;
-                let queue = proc.get_futex(clear_child_tid as usize);
-                queue.notify_one();
+                let futex = proc.get_futex(clear_child_tid as usize);
+                futex.wake(1);
             }
         }
 
         drop(proc);
-
-        thread_manager().exit(tid, exit_code as usize);
-        thread::yield_now();
-        unreachable!();
+        self.exit = true;
+        Ok(0)
     }
 
     /// Exit the current thread group (i.e. process)
-    pub fn sys_exit_group(&mut self, exit_code: usize) -> ! {
+    pub fn sys_exit_group(&mut self, exit_code: usize) -> SysResult {
         let mut proc = self.process();
         info!("exit_group: {}, code: {}", proc.pid, exit_code);
 
         proc.exit(exit_code);
         drop(proc);
-        thread::yield_now();
-        unreachable!();
+        // TODO: quit other threads
+        self.exit = true;
+        Ok(0)
     }
 
-    pub fn sys_nanosleep(&mut self, req: *const TimeSpec) -> SysResult {
-        let time = unsafe { *self.vm().check_read_ptr(req)? };
-        info!("nanosleep: time: {:#?}", time);
+    pub async fn sys_nanosleep(&mut self, req: UserInPtr<TimeSpec>) -> SysResult {
+        let time = req.read()?;
+        info!("nanosleep: time: {:#?},", time);
         if !time.is_zero() {
-            // TODO: handle spurious wakeup
-            thread::sleep(time.to_duration());
-            if has_signal_to_do() {
+            self.sleep_for(time.to_duration()).await?;
+            if self.thread.has_signal_to_handle() {
                 return Err(EINTR);
             }
         }
@@ -357,15 +392,62 @@ impl Syscall<'_> {
     }
 
     pub fn sys_set_priority(&mut self, priority: usize) -> SysResult {
-        let pid = thread::current().id();
-        thread_manager().set_priority(pid, priority as u8);
         Ok(0)
     }
 
     pub fn sys_set_tid_address(&mut self, tidptr: *mut u32) -> SysResult {
         info!("set_tid_address: {:?}", tidptr);
-        self.thread.clear_child_tid = tidptr as usize;
-        Ok(thread::current().id())
+        self.thread.inner.lock().clear_child_tid = tidptr as usize;
+        Ok(self.thread.tid)
+    }
+
+    // sleeping
+    pub fn sleep_for(&mut self, duration: Duration) -> impl Future<Output = SysResult> {
+        SleepFuture {
+            deadline: timer_now() + duration,
+            duration,
+            thread: self.thread.clone(),
+            eventbus: self.thread.proc.lock().eventbus.clone(),
+        }
+    }
+}
+
+#[must_use = "future does nothing unless polled/`await`-ed"]
+pub struct SleepFuture {
+    deadline: Duration,
+    duration: Duration,
+    thread: Arc<Thread>,
+    eventbus: Arc<Mutex<EventBus>>,
+}
+
+impl Future for SleepFuture {
+    type Output = SysResult;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        // check
+        if timer_now() >= self.deadline {
+            return Poll::Ready(Ok(0));
+        } else if self.thread.has_signal_to_handle() {
+            return Poll::Ready(Err(EINTR));
+        }
+
+        // handle infinity
+        if self.duration.as_nanos() < i64::max_value() as u128 {
+            let waker = cx.waker().clone();
+            NAIVE_TIMER
+                .lock()
+                .add(self.deadline, Box::new(move |_| waker.wake()));
+        }
+
+        let waker = cx.waker().clone();
+        let mut eventbus = self.eventbus.lock();
+        eventbus.subscribe(Box::new({
+            move |_| {
+                waker.wake_by_ref();
+                true
+            }
+        }));
+        Poll::Pending
     }
 }
 

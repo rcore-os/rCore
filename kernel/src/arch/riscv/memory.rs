@@ -3,13 +3,12 @@ use crate::memory::{init_heap, MemorySet, FRAME_ALLOCATOR};
 use core::mem;
 use log::*;
 use rcore_memory::PAGE_SIZE;
-use riscv::register::sstatus;
+use riscv::asm::sfence_vma_all;
+use riscv::register::{satp, sstatus, stval};
 
 /// Initialize the memory management module
 pub fn init(dtb: usize) {
     // allow user memory access
-    // NOTE: In K210 priv v1.9.1, sstatus.SUM is PUM which has opposite meaning!
-    #[cfg(not(feature = "board_k210"))]
     unsafe {
         sstatus::set_sum();
     }
@@ -22,7 +21,8 @@ pub fn init(dtb: usize) {
 pub fn init_other() {
     unsafe {
         sstatus::set_sum(); // Allow user memory access
-        asm!("csrw satp, $0; sfence.vma" :: "r"(SATP) :: "volatile");
+        satp::write(SATP);
+        sfence_vma_all();
     }
 }
 
@@ -89,4 +89,13 @@ extern "C" {
     fn end();
     fn bootstack();
     fn bootstacktop();
+}
+
+pub fn get_page_fault_addr() -> usize {
+    stval::read()
+}
+
+pub fn set_page_table(vmtoken: usize) {
+    satp::write(vmtoken);
+    unsafe { sfence_vma_all() }
 }

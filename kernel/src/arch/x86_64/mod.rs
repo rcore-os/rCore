@@ -6,9 +6,8 @@ pub mod acpi;
 pub mod board;
 pub mod consts;
 pub mod cpu;
-pub mod driver;
+pub mod fp;
 pub mod gdt;
-pub mod idt;
 pub mod interrupt;
 pub mod io;
 pub mod ipi;
@@ -25,7 +24,6 @@ static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
     let cpu_id = cpu::id();
-    println!("Hello world! from CPU {}!", cpu_id);
 
     if cpu_id != 0 {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {
@@ -34,10 +32,14 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
         other_start();
     }
 
-    // init log, heap and graphic output
+    // init log and heap
     crate::logging::init();
     crate::memory::init_heap();
-    driver::init_graphic(boot_info);
+
+    // serial
+    board::early_init();
+
+    println!("Hello world! from CPU {}!", cpu_id);
 
     // check BootInfo from bootloader
     info!("{:#x?}", boot_info);
@@ -46,28 +48,22 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
         consts::PHYSICAL_MEMORY_OFFSET
     );
 
-    // setup fast syscall in x86_64
-    interrupt::fast_syscall::init();
-
     // Init physical memory management
     memory::init(boot_info);
 
-    // Init GDT
-    gdt::init();
-    // Init trap handling
-    // WARN: IDT must be initialized after GDT.
-    //       Because x86_64::IDT will use current CS segment in IDT entry.
-    idt::init();
-    // Init virtual space
+    // Init trap handler
+    unsafe {
+        trapframe::init();
+    }
+
+    // init virtual space
     memory::init_kernel_kseg2_map();
-    // get local apic id of cpu
+    // init local apic
     cpu::init();
     // now we can start LKM.
     crate::lkm::manager::ModuleManager::init();
-    // Use IOAPIC instead of PIC, use APIC Timer instead of PIT, init serial&keyboard in x86_64
-    driver::init(boot_info);
-    // init pci/bus-based devices ,e.g. Intel 10Gb NIC, ...
-    crate::drivers::init();
+    // init board
+    board::init(boot_info);
     // init cpu scheduler and process manager, and add user shell app in process manager
     crate::process::init();
     // load acpi
@@ -82,28 +78,12 @@ pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
 
 /// The entry point for other processors
 fn other_start() -> ! {
-    // init gdt
-    gdt::init();
     // init trap handling
-    idt::init();
+    unsafe {
+        trapframe::init();
+    }
     // init local apic
     cpu::init();
-    // setup fast syscall in x86_64
-    interrupt::fast_syscall::init();
     // call the first main function in kernel.
     crate::kmain();
-}
-
-pub fn get_sp() -> usize {
-    let sp: usize;
-    unsafe {
-        asm!("mov %rsp, $0" : "=r"(sp));
-    }
-    sp
-}
-
-pub fn set_sp(sp: usize) {
-    unsafe {
-        asm!("mov $0, %rsp" :: "r" (sp) : "memory");
-    }
 }

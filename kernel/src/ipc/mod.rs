@@ -22,7 +22,7 @@ pub struct SemProc {
 // TODO: Remove hack
 #[derive(Default)]
 pub struct ShmProc {
-    shmIdentifiers: BTreeMap<ShmId, ShmIdentifier>,
+    shm_identifiers: BTreeMap<ShmId, ShmIdentifier>,
 }
 
 /// Semaphore set identifier (in a process)
@@ -92,27 +92,27 @@ impl ShmProc {
             addr: 0,
             sharedGuard: sharedGuard,
         };
-        self.shmIdentifiers.insert(id, shmIdentifier);
+        self.shm_identifiers.insert(id, shmIdentifier);
         id
     }
     /// Get a free ID
     fn get_free_id(&self) -> ShmId {
         (0..)
-            .find(|i| self.shmIdentifiers.get(i).is_none())
+            .find(|i| self.shm_identifiers.get(i).is_none())
             .unwrap()
     }
     /// Get an semaphore set by `id`
     pub fn get(&self, id: ShmId) -> Option<ShmIdentifier> {
-        self.shmIdentifiers.get(&id).map(|a| a.clone())
+        self.shm_identifiers.get(&id).map(|a| a.clone())
     }
     /// Used to set Virtual Addr
     pub fn set(&mut self, id: ShmId, shmId: ShmIdentifier) {
-        self.shmIdentifiers.insert(id, shmId);
+        self.shm_identifiers.insert(id, shmId);
     }
     /// get id from virtaddr
     pub fn getId(&self, addr: VirtAddr) -> Option<ShmId> {
-        for (key, value) in &self.shmIdentifiers {
-            if (value.addr == addr) {
+        for (key, value) in &self.shm_identifiers {
+            if value.addr == addr {
                 return Some(*key);
             }
         }
@@ -120,7 +120,7 @@ impl ShmProc {
     }
     /// Pop Shared Area
     pub fn pop(&mut self, id: ShmId) {
-        self.shmIdentifiers.remove(&id);
+        self.shm_identifiers.remove(&id);
     }
 }
 
@@ -128,7 +128,7 @@ impl ShmProc {
 impl Clone for ShmProc {
     fn clone(&self) -> Self {
         ShmProc {
-            shmIdentifiers: self.shmIdentifiers.clone(),
+            shm_identifiers: self.shm_identifiers.clone(),
         }
     }
 }

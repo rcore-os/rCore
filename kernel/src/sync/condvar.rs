@@ -1,13 +1,10 @@
 use super::*;
 use crate::consts::{INFORM_PER_MSEC, USEC_PER_TICK};
-use crate::process::thread_manager;
-use crate::process::Process;
+use crate::process::{Process, Thread};
 use crate::syscall::TimeSpec;
-use crate::{processor, thread};
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use rcore_thread::std_thread::{sleep, Thread};
 
 pub struct RegisteredProcess {
     proc: Arc<SpinNoIrqLock<Process>>,
@@ -18,7 +15,7 @@ pub struct RegisteredProcess {
 
 #[derive(Default)]
 pub struct Condvar {
-    wait_queue: SpinNoIrqLock<VecDeque<Arc<thread::Thread>>>,
+    wait_queue: SpinNoIrqLock<VecDeque<Arc<Thread>>>,
     pub epoll_queue: SpinNoIrqLock<VecDeque<RegisteredProcess>>,
 }
 
@@ -38,14 +35,14 @@ impl Condvar {
         // So park current thread before wait queue lock is freed.
         // Avoid racing
         let lock = self.add_to_wait_queue();
-        thread::park_action(move || {
-            drop(lock);
-        });
+        //thread::park_action(move || {
+        //drop(lock);
+        //});
     }
 
-    fn add_to_wait_queue(&self) -> MutexGuard<VecDeque<Arc<thread::Thread>>, SpinNoIrq> {
+    fn add_to_wait_queue(&self) -> MutexGuard<VecDeque<Arc<Thread>>, SpinNoIrq> {
         let mut lock = self.wait_queue.lock();
-        lock.push_back(Arc::new(thread::current()));
+        //lock.push_back(Arc::new(thread::current()));
         return lock;
     }
 
@@ -56,12 +53,13 @@ impl Condvar {
 
     /// Wait for condvars until condition() returns Some
     pub fn wait_events<T>(condvars: &[&Condvar], mut condition: impl FnMut() -> Option<T>) -> T {
-        let thread = thread::current();
-        let tid = thread.id();
-        let token = Arc::new(thread);
+        //let thread = thread::current();
+        //let tid = thread.id();
+        let tid = 0;
+        //let token = Arc::new(thread);
         for condvar in condvars {
             let mut lock = condvar.wait_queue.lock();
-            lock.push_back(token.clone());
+            //lock.push_back(token.clone());
         }
         let mut locks = Vec::with_capacity(condvars.len());
         loop {
@@ -69,22 +67,22 @@ impl Condvar {
                 let lock = condvar.wait_queue.lock();
                 locks.push(lock);
             }
-            thread_manager().sleep(tid, 0);
+            //thread_manager().sleep(tid, 0);
             locks.clear();
 
             if let Some(res) = condition() {
                 let _ = FlagsGuard::no_irq_region();
-                thread_manager().cancel_sleeping(tid);
+                //thread_manager().cancel_sleeping(tid);
                 return res;
             } else {
                 for condvar in condvars {
                     let mut queue = condvar.wait_queue.lock();
-                    if queue.iter().find(|&t| Arc::ptr_eq(t, &token)).is_none() {
-                        queue.push_front(token.clone());
-                    }
+                    //if queue.iter().find(|&t| Arc::ptr_eq(t, &token)).is_none() {
+                    //queue.push_front(token.clone());
+                    //}
                 }
             }
-            thread::yield_now();
+            //thread::yield_now();
         }
     }
 
@@ -94,14 +92,14 @@ impl Condvar {
         S: MutexSupport,
     {
         let mutex = guard.mutex;
-        let token = Arc::new(thread::current());
+        //let token = Arc::new(thread::current());
         let mut lock = self.wait_queue.lock();
-        lock.push_back(token.clone());
+        //lock.push_back(token.clone());
 
-        thread::park_action(move || {
-            drop(lock);
-            drop(guard);
-        });
+        //thread::park_action(move || {
+        //drop(lock);
+        //drop(guard);
+        //});
         // let mut lock = self.wait_queue.lock();
         // lock.retain(|t| !Arc::ptr_eq(&t, &token));
         mutex.lock()
@@ -117,16 +115,16 @@ impl Condvar {
         S: MutexSupport,
     {
         let mutex = guard.mutex;
-        let token = Arc::new(thread::current());
+        //let token = Arc::new(thread::current());
         let mut lock = self.wait_queue.lock();
-        lock.push_back(token.clone());
+        //lock.push_back(token.clone());
         drop(lock);
         drop(guard);
 
         let timeout = core::time::Duration::new(timeout.sec as u64, timeout.nsec as u32);
         let begin = crate::trap::uptime_msec();
         if timeout.as_millis() != 0 {
-            sleep(timeout);
+            //sleep(timeout);
         }
         // let mut lock = self.wait_queue.lock();
         // lock.retain(|t| !Arc::ptr_eq(&t, &token));
@@ -143,7 +141,7 @@ impl Condvar {
         if let Some(t) = queue.front() {
             self.epoll_callback(t);
             // info!("nofity thread: {}", t.id());
-            t.unpark();
+            //t.unpark();
             queue.pop_front();
         }
     }
@@ -152,7 +150,7 @@ impl Condvar {
         let mut queue = self.wait_queue.lock();
         for t in queue.iter() {
             self.epoll_callback(t);
-            t.unpark();
+            //t.unpark();
         }
         queue.clear();
     }
@@ -167,7 +165,7 @@ impl Condvar {
                 break;
             }
             self.epoll_callback(t);
-            t.unpark();
+            //t.unpark();
             count += 1;
         }
         for _ in 0..count {
@@ -208,7 +206,8 @@ impl Condvar {
     fn epoll_callback(&self, thread: &Arc<Thread>) {
         let epoll_list = self.epoll_queue.lock();
         for ist in epoll_list.iter() {
-            if thread.id() == ist.tid {
+            //if thread.id() == ist.tid {
+            if true {
                 let proc = ist.proc.lock();
                 match proc.get_epoll_instance(ist.epfd) {
                     Ok(instacne) => {

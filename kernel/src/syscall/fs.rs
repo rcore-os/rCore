@@ -13,6 +13,10 @@ use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
 use crate::trap::TICK_ACTIVITY;
+use alloc::boxed::Box;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use bitvec::prelude::{BitSlice, BitVec, Lsb0};
 
@@ -21,22 +25,20 @@ use crate::fs::epoll::EpollInstance;
 use crate::fs::fcntl::{FD_CLOEXEC, F_SETFD, O_CLOEXEC, O_NONBLOCK};
 use crate::fs::FileLike;
 use crate::process::Process;
-use crate::signal::has_signal_to_do;
 use crate::syscall::SysError::{EINTR, EINVAL, ESPIPE};
 use rcore_fs::vfs::PollStatus;
-use rcore_thread::std_thread::current;
 
 impl Syscall<'_> {
-    pub fn sys_read(&mut self, fd: usize, base: *mut u8, len: usize) -> SysResult {
+    pub async fn sys_read(&mut self, fd: usize, base: UserOutPtr<u8>, len: usize) -> SysResult {
         let mut proc = self.process();
         if !proc.pid.is_init() {
             // we trust pid 0 process
             info!("read: fd: {}, base: {:?}, len: {:#x}", fd, base, len);
         }
-        let slice = unsafe { self.vm().check_write_array(base, len)? };
+        let slice = unsafe { self.vm().check_write_array(base.ptr(), len)? };
 
-        let file_like = unsafe { (*UnsafeCell::new(proc).get()).get_file_like(fd)? };
-        let len = file_like.read(slice)?;
+        let file_like = proc.get_file_like(fd)?;
+        let len = file_like.read(slice).await?;
         Ok(len)
     }
 
@@ -52,14 +54,20 @@ impl Syscall<'_> {
         Ok(len)
     }
 
-    pub fn sys_pread(&mut self, fd: usize, base: *mut u8, len: usize, offset: usize) -> SysResult {
+    pub async fn sys_pread(
+        &mut self,
+        fd: usize,
+        mut base: UserOutPtr<u8>,
+        len: usize,
+        offset: usize,
+    ) -> SysResult {
         info!(
             "pread: fd: {}, base: {:?}, len: {}, offset: {}",
             fd, base, len, offset
         );
         let mut proc = self.process();
-        let slice = unsafe { self.vm().check_write_array(base, len)? };
-        let len = proc.get_file(fd)?.read_at(offset, slice)?;
+        let slice = unsafe { self.vm().check_write_array(base.ptr(), len)? };
+        let len = proc.get_file(fd)?.read_at(offset, slice).await?;
         Ok(len)
     }
 
@@ -82,31 +90,36 @@ impl Syscall<'_> {
 
     /// sys_ppoll function is for handling the third argument of sys_poll.
 
-    pub fn sys_ppoll(
+    pub async fn sys_ppoll(
         &mut self,
-        ufds: *mut PollFd,
+        ufds: UserInOutPtr<PollFd>,
         nfds: usize,
-        timeout: *const TimeSpec,
+        timeout: UserInPtr<TimeSpec>,
     ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
             info!(
-                "ppoll: ufds: {:#x}, nfds: {}, timeout: {:#x}",
-                ufds as usize, nfds, timeout as usize
+                "ppoll: ufds: {:?} nfds: {}, timeout: {:?}",
+                ufds, nfds, timeout
             );
         }
         let timeout_msecs = if timeout.is_null() {
             1 << 31 // infinity
         } else {
-            let timeout = unsafe { self.vm().check_read_ptr(timeout)? };
+            let timeout = timeout.read().unwrap();
             timeout.to_msec()
         };
         drop(proc);
 
-        self.sys_poll(ufds, nfds, timeout_msecs as usize)
+        self.sys_poll(ufds, nfds, timeout_msecs as usize).await
     }
 
-    pub fn sys_poll(&mut self, ufds: *mut PollFd, nfds: usize, timeout_msecs: usize) -> SysResult {
+    pub async fn sys_poll(
+        &mut self,
+        ufds: UserInOutPtr<PollFd>,
+        nfds: usize,
+        timeout_msecs: usize,
+    ) -> SysResult {
         let proc = self.process();
         if !proc.pid.is_init() {
             // we trust pid 0 process
@@ -117,9 +130,9 @@ impl Syscall<'_> {
         }
 
         // check whether the fds is valid and is owned by this process
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
-        let polls = unsafe { self.vm().check_write_array(ufds, nfds)? };
+        let polls = ufds.read_array(nfds).unwrap();
 
         if !proc.pid.is_init() {
             info!("poll: fds: {:?}", polls);
@@ -127,55 +140,63 @@ impl Syscall<'_> {
 
         drop(proc);
 
-        let begin_time_ms = crate::trap::uptime_msec();
-        Condvar::wait_events(condvars.as_slice(), move || {
-            if has_signal_to_do() {
-                return Some(Err(EINTR));
-            }
+        #[must_use = "future does nothing unless polled/`await`-ed"]
+        struct PollFuture<'a> {
+            polls: Vec<PollFd>,
+            syscall: &'a Syscall<'a>,
+        }
 
-            use PollEvents as PE;
-            let proc = self.process();
-            let mut events = 0;
+        impl<'a> Future for PollFuture<'a> {
+            type Output = SysResult;
 
-            // iterate each poll to check whether it is ready
-            for poll in polls.iter_mut() {
-                poll.revents = PE::empty();
-                if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
-                    let status = match file_like.poll() {
-                        Ok(ret) => ret,
-                        Err(err) => return Some(Err(err)),
-                    };
-                    if status.error {
-                        poll.revents |= PE::HUP;
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                use PollEvents as PE;
+                let proc = self.syscall.process();
+                let mut events = 0;
+
+                // iterate each poll to check whether it is ready
+                for poll in self.as_mut().polls.iter_mut() {
+                    poll.revents = PE::empty();
+                    if let Some(file_like) = proc.files.get(&(poll.fd as usize)) {
+                        let mut fut = Box::pin(file_like.async_poll());
+                        let status = match fut.as_mut().poll(cx) {
+                            Poll::Ready(Ok(ret)) => ret,
+                            Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                            Poll::Pending => continue,
+                        };
+                        if status.error {
+                            poll.revents |= PE::HUP;
+                            events += 1;
+                        }
+                        if status.read && poll.events.contains(PE::IN) {
+                            poll.revents |= PE::IN;
+                            events += 1;
+                        }
+                        if status.write && poll.events.contains(PE::OUT) {
+                            poll.revents |= PE::OUT;
+                            events += 1;
+                        }
+                    } else {
+                        poll.revents |= PE::ERR;
                         events += 1;
                     }
-                    if status.read && poll.events.contains(PE::IN) {
-                        poll.revents |= PE::IN;
-                        events += 1;
-                    }
-                    if status.write && poll.events.contains(PE::OUT) {
-                        poll.revents |= PE::OUT;
-                        events += 1;
-                    }
-                } else {
-                    poll.revents |= PE::ERR;
-                    events += 1;
                 }
-            }
-            drop(proc);
+                drop(proc);
 
-            // some event happens, so evoke the process
-            if events > 0 {
-                return Some(Ok(events));
-            }
+                // some event happens, so evoke the process
+                if events > 0 {
+                    return Poll::Ready(Ok(events));
+                }
 
-            let current_time_ms = crate::trap::uptime_msec();
-            // time runs out, so the evoke the process
-            if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs {
-                return Some(Ok(0));
+                return Poll::Pending;
             }
-            return None;
-        })
+        }
+
+        let future = PollFuture {
+            polls,
+            syscall: self,
+        };
+        future.await
     }
 
     pub fn sys_pselect6(
@@ -217,7 +238,7 @@ impl Syscall<'_> {
             1 << 31
         };
 
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -382,22 +403,23 @@ impl Syscall<'_> {
                 Some(file_like) => {
                     match file_like {
                         FileLike::File(_file) => {
-                            &crate::fs::STDIN.pushed.register_epoll_list(
-                                self.thread.proc.clone(),
-                                thread::current().id(),
-                                epfd,
-                                *fd,
-                            );
-                            callbacks.push((0, thread::current().id(), epfd, *fd));
+                            callbacks.push((
+                                0, 0, // thread::current().id(),
+                                epfd, *fd,
+                            ));
                         }
                         FileLike::Socket(_socket) => {
                             &(*crate::drivers::SOCKET_ACTIVITY).register_epoll_list(
                                 self.thread.proc.clone(),
-                                thread::current().id(),
+                                0,
+                                //thread::current().id(),
                                 epfd,
                                 *fd,
                             );
-                            callbacks.push((1, thread::current().id(), epfd, *fd));
+                            callbacks.push((
+                                1, 0, //thread::current().id(),
+                                epfd, *fd,
+                            ));
                         }
                         FileLike::EpollInstance(_) => {
                             return Err(SysError::EINVAL);
@@ -409,7 +431,7 @@ impl Syscall<'_> {
             drop(proc);
         }
 
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &STDIN.pushed, &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         let begin_time_ms = crate::trap::uptime_msec();
         let condition = move || {
@@ -496,9 +518,6 @@ impl Syscall<'_> {
 
         for cb in callbacks.iter() {
             match cb.0 {
-                0 => &crate::fs::STDIN
-                    .pushed
-                    .unregister_epoll_list(cb.1, cb.2, cb.3),
                 1 => &(*crate::drivers::SOCKET_ACTIVITY).unregister_epoll_list(cb.1, cb.2, cb.3),
                 _ => panic!("cb error"),
             };
@@ -506,18 +525,24 @@ impl Syscall<'_> {
         Ok(num)
     }
 
-    pub fn sys_readv(&mut self, fd: usize, iov_ptr: *const IoVec, iov_count: usize) -> SysResult {
+    pub async fn sys_readv(
+        &mut self,
+        fd: usize,
+        iov_ptr: UserInPtr<IoVec>,
+        iov_count: usize,
+    ) -> SysResult {
         info!(
             "readv: fd: {}, iov: {:?}, count: {}",
             fd, iov_ptr, iov_count
         );
         let mut proc = self.process();
-        let mut iovs = unsafe { IoVecs::check_and_new(iov_ptr, iov_count, &self.vm(), true)? };
+        let mut iovs =
+            unsafe { IoVecs::check_and_new(iov_ptr.ptr(), iov_count, &self.vm(), true)? };
 
         // read all data to a buf
         let file_like = proc.get_file_like(fd)?;
         let mut buf = iovs.new_buf(true);
-        let len = file_like.read(buf.as_mut_slice())?;
+        let len = file_like.read(buf.as_mut_slice()).await?;
         // copy data to user
         iovs.write_all_from_slice(&buf[..len]);
         Ok(len)
@@ -1192,22 +1217,23 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_sendfile(
+    pub async fn sys_sendfile(
         &mut self,
         out_fd: usize,
         in_fd: usize,
-        offset_ptr: *mut usize,
+        offset_ptr: UserInOutPtr<usize>,
         count: usize,
     ) -> SysResult {
-        self.sys_copy_file_range(in_fd, offset_ptr, out_fd, 0 as *mut usize, count, 0)
+        self.sys_copy_file_range(in_fd, offset_ptr, out_fd, UserInOutPtr::from(0), count, 0)
+            .await
     }
 
-    pub fn sys_copy_file_range(
+    pub async fn sys_copy_file_range(
         &mut self,
         in_fd: usize,
-        in_offset: *mut usize,
+        mut in_offset: UserInOutPtr<usize>,
         out_fd: usize,
-        out_offset: *mut usize,
+        mut out_offset: UserInOutPtr<usize>,
         count: usize,
         flags: usize,
     ) -> SysResult {
@@ -1228,16 +1254,14 @@ impl Syscall<'_> {
         // non-null means update {in,out}_offset instead
 
         let mut read_offset = if !in_offset.is_null() {
-            unsafe { *self.vm().check_read_ptr(in_offset)? }
+            in_offset.read()?
         } else {
             in_file.seek(SeekFrom::Current(0))? as usize
         };
 
         let orig_out_file_offset = out_file.seek(SeekFrom::Current(0))?;
         let write_offset = if !out_offset.is_null() {
-            out_file.seek(SeekFrom::Start(
-                unsafe { *self.vm().check_read_ptr(out_offset)? } as u64,
-            ))? as usize
+            out_file.seek(SeekFrom::Start(out_offset.read()? as u64))? as usize
         } else {
             0
         };
@@ -1247,7 +1271,7 @@ impl Syscall<'_> {
         let mut total_written = 0;
         while bytes_read < count {
             let len = min(buffer.len(), count - bytes_read);
-            let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
+            let read_len = in_file.read_at(read_offset, &mut buffer[..len]).await?;
             if read_len == 0 {
                 break;
             }
@@ -1272,17 +1296,13 @@ impl Syscall<'_> {
         }
 
         if !in_offset.is_null() {
-            unsafe {
-                in_offset.write(read_offset);
-            }
+            in_offset.write(read_offset)?;
         } else {
             in_file.seek(SeekFrom::Current(bytes_read as i64))?;
         }
 
         if !out_offset.is_null() {
-            unsafe {
-                out_offset.write(write_offset + total_written);
-            }
+            out_offset.write(write_offset + total_written)?;
             out_file.seek(SeekFrom::Start(orig_out_file_offset))?;
         }
         info!(
