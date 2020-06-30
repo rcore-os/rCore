@@ -8,25 +8,16 @@ use smoltcp::wire::{EthernetAddress, Ipv4Address};
 use smoltcp::Result;
 use virtio_drivers::{VirtIOHeader, VirtIONet};
 
-use super::super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS};
-use crate::sync::SpinNoIrqLock as Mutex;
+use super::{
+    super::{DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS},
+    NetDriver,
+};
+use crate::{drivers::BlockDriver, sync::SpinNoIrqLock as Mutex};
 
 #[derive(Clone)]
 pub struct VirtIONetDriver(Arc<Mutex<VirtIONet<'static>>>);
 
-impl Driver for VirtIONetDriver {
-    fn try_handle_interrupt(&self, _irq: Option<u32>) -> bool {
-        self.0.lock().ack_interrupt()
-    }
-
-    fn device_type(&self) -> DeviceType {
-        DeviceType::Net
-    }
-
-    fn get_id(&self) -> String {
-        format!("virtio_net")
-    }
-
+impl NetDriver for VirtIONetDriver {
     fn get_mac(&self) -> EthernetAddress {
         EthernetAddress(self.0.lock().mac())
     }
@@ -41,6 +32,28 @@ impl Driver for VirtIONetDriver {
 
     fn poll(&self) {
         unimplemented!()
+    }
+}
+
+impl Driver for VirtIONetDriver {
+    fn try_handle_interrupt(&self, _irq: Option<usize>) -> bool {
+        self.0.lock().ack_interrupt()
+    }
+
+    fn device_type(&self) -> DeviceType {
+        DeviceType::Net
+    }
+
+    fn get_id(&self) -> String {
+        format!("virtio_net")
+    }
+
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
     }
 }
 

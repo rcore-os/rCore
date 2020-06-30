@@ -3,9 +3,12 @@
 use super::paging::MMIOType;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET};
 use crate::memory::{init_heap, kernel_offset, Linear, MemoryAttr, MemorySet, FRAME_ALLOCATOR};
+use crate::sync::SpinNoIrqLock as Mutex;
+use aarch64::paging::frame::PhysFrame as Frame;
+use aarch64::regs::*;
+use aarch64::translation::{local_invalidate_tlb_all, ttbr_el1_write};
 use log::*;
 use rcore_memory::PAGE_SIZE;
-use spin::Mutex;
 
 static KERNEL_MEMORY_SET: Mutex<Option<MemorySet>> = Mutex::new(None);
 
@@ -128,4 +131,13 @@ extern "C" {
     fn bootstacktop();
     fn _start();
     fn _end();
+}
+
+pub fn set_page_table(vmtoken: usize) {
+    ttbr_el1_write(0, Frame::of_addr(vmtoken as u64));
+    local_invalidate_tlb_all();
+}
+
+pub fn get_page_fault_addr() -> usize {
+    FAR_EL1.get() as usize
 }

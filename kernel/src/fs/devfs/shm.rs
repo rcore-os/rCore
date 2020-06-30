@@ -1,7 +1,6 @@
 use core::any::Any;
 use rcore_fs::vfs::*;
 
-pub use super::{STDIN, STDOUT};
 use rcore_fs::vfs::FsError::NotSupported;
 
 // try to create directory under /dev

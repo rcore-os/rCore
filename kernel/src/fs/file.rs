@@ -3,7 +3,6 @@
 use crate::memory::GlobalFrameAlloc;
 use crate::process::{current_thread, INodeForMap};
 use crate::syscall::{MmapProt, SysResult, TimeSpec};
-use crate::thread;
 use alloc::{string::String, sync::Arc};
 use core::fmt;
 
@@ -12,11 +11,9 @@ use rcore_fs::vfs::{FileType, FsError, INode, MMapArea, Metadata, PollStatus, Re
 use rcore_memory::memory_set::handler::File;
 
 use crate::fs::fcntl::{O_APPEND, O_NONBLOCK};
-use crate::signal::{do_signal, has_signal_to_do};
 use crate::sync::SpinLock as Mutex;
 use crate::syscall::SysError::{EAGAIN, ESPIPE};
 use bitflags::_core::cell::Cell;
-use rcore_thread::std_thread::current;
 use spin::RwLock;
 
 enum Flock {
@@ -106,13 +103,14 @@ impl FileHandle {
     // let mut ret = 0 as usize;
     // }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let len = self.read_at(self.description.read().offset as usize, buf)?;
+    pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let offset = self.description.read().offset as usize;
+        let len = self.read_at(offset, buf).await?;
         self.description.write().offset += len as u64;
         Ok(len)
     }
 
-    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         // let options = &self.description.read().options;
         if !self.description.read().options.read {
             return Err(FsError::InvalidParam); // FIXME: => EBADF
@@ -125,10 +123,7 @@ impl FileHandle {
                         return Ok(read_len);
                     }
                     Err(FsError::Again) => {
-                        if has_signal_to_do() {
-                            return Err(Interrupted);
-                        }
-                        thread::yield_now();
+                        self.async_poll().await?;
                     }
                     Err(err) => {
                         return Err(err);
@@ -222,6 +217,10 @@ impl FileHandle {
         self.inode.poll()
     }
 
+    pub async fn async_poll(&self) -> Result<PollStatus> {
+        self.inode.async_poll().await
+    }
+
     pub fn io_control(&self, cmd: u32, arg: usize) -> Result<usize> {
         self.inode.io_control(cmd, arg)
     }
@@ -231,7 +230,7 @@ impl FileHandle {
         match self.inode.metadata()?.type_ {
             FileType::File => {
                 let prot = MmapProt::from_bits_truncate(area.prot);
-                let thread = unsafe { current_thread() };
+                let thread = current_thread().unwrap();
                 thread.vm.lock().push(
                     area.start_vaddr,
                     area.end_vaddr,

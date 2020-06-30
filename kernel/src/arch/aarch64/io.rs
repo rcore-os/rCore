@@ -1,16 +1,15 @@
 //! Input/output for aarch64.
 
-use super::driver::serial::*;
+use crate::drivers::SERIAL_DRIVERS;
 use core::fmt::{Arguments, Write};
 
-pub fn getchar() -> char {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().receive() as char
-}
-
 pub fn putfmt(fmt: Arguments) {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().write_fmt(fmt).unwrap();
+    {
+        let mut drivers = SERIAL_DRIVERS.write();
+        if let Some(serial) = drivers.first_mut() {
+            serial.write(format!("{}", fmt).as_bytes());
+        }
+    }
 
     // print to graphic
     #[cfg(feature = "consolegraphic")]

@@ -26,9 +26,9 @@ impl FileLike {
         }
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> SysResult {
+    pub async fn read(&mut self, buf: &mut [u8]) -> SysResult {
         let len = match self {
-            FileLike::File(file) => file.read(buf)?,
+            FileLike::File(file) => file.read(buf).await?,
             FileLike::Socket(socket) => socket.read(buf).0?,
             FileLike::EpollInstance(_) => {
                 return Err(SysError::ENOSYS);
@@ -65,6 +65,19 @@ impl FileLike {
     pub fn poll(&self) -> Result<PollStatus, SysError> {
         let status = match self {
             FileLike::File(file) => file.poll()?,
+            FileLike::Socket(socket) => {
+                let (read, write, error) = socket.poll();
+                PollStatus { read, write, error }
+            }
+            FileLike::EpollInstance(_) => {
+                return Err(SysError::ENOSYS);
+            }
+        };
+        Ok(status)
+    }
+    pub async fn async_poll(&self) -> Result<PollStatus, SysError> {
+        let status = match self {
+            FileLike::File(file) => file.async_poll().await?,
             FileLike::Socket(socket) => {
                 let (read, write, error) = socket.poll();
                 PollStatus { read, write, error }

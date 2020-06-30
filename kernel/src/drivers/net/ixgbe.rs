@@ -17,10 +17,13 @@ use smoltcp::Result;
 
 use crate::net::SOCKETS;
 use crate::sync::FlagsGuard;
-use crate::sync::SpinNoIrqLock as Mutex;
+use crate::{drivers::BlockDriver, sync::SpinNoIrqLock as Mutex};
 
-use super::super::{
-    provider::Provider, DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY,
+use super::{
+    super::{
+        provider::Provider, DeviceType, Driver, DRIVERS, IRQ_MANAGER, NET_DRIVERS, SOCKET_ACTIVITY,
+    },
+    NetDriver,
 };
 
 #[derive(Clone)]
@@ -35,12 +38,12 @@ pub struct IXGBEInterface {
     iface: Mutex<EthernetInterface<'static, 'static, 'static, IXGBEDriver>>,
     driver: IXGBEDriver,
     ifname: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
     id: String,
 }
 
 impl Driver for IXGBEInterface {
-    fn try_handle_interrupt(&self, irq: Option<u32>) -> bool {
+    fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         if irq.is_some() && self.irq.is_some() && irq != self.irq {
             // not ours, skip it
             return false;
@@ -75,6 +78,16 @@ impl Driver for IXGBEInterface {
         self.ifname.clone()
     }
 
+    fn as_net(&self) -> Option<&dyn NetDriver> {
+        Some(self)
+    }
+
+    fn as_block(&self) -> Option<&dyn BlockDriver> {
+        None
+    }
+}
+
+impl NetDriver for IXGBEInterface {
     fn get_mac(&self) -> EthernetAddress {
         self.iface.lock().ethernet_addr()
     }
@@ -183,7 +196,7 @@ impl phy::TxToken for IXGBETxToken {
 
 pub fn ixgbe_init(
     name: String,
-    irq: Option<u32>,
+    irq: Option<usize>,
     header: usize,
     size: usize,
     index: usize,

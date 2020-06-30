@@ -1,8 +1,13 @@
 use crate::drivers::gpu::fb::{self, ColorDepth, ColorFormat, FramebufferInfo};
+use crate::drivers::*;
 use crate::memory::phys_to_virt;
 use rboot::BootInfo;
 
-pub fn init_driver(boot_info: &BootInfo) {
+pub fn early_init() {
+    serial::com::init();
+}
+
+pub fn init(boot_info: &BootInfo) {
     let info = &boot_info.graphic_info;
     let width = info.mode.resolution().0 as u32;
     let height = info.mode.resolution().1 as u32;
@@ -21,4 +26,9 @@ pub fn init_driver(boot_info: &BootInfo) {
         screen_size: info.fb_size as usize,
     };
     fb::init(fb_info);
+
+    bus::pci::init();
+    rtc::rtc_cmos::init();
+    serial::keyboard::init();
+    console::init();
 }

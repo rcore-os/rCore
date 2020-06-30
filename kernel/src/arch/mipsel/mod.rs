@@ -15,10 +15,6 @@ use mips::registers::cp0;
 #[path = "board/malta/mod.rs"]
 pub mod board;
 
-#[cfg(feature = "board_thinpad")]
-#[path = "board/thinpad/mod.rs"]
-pub mod board;
-
 #[cfg(feature = "board_mipssim")]
 #[path = "board/mipssim/mod.rs"]
 pub mod board;

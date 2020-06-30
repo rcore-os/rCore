@@ -1,8 +1,8 @@
 //! naive serial adapter driver for thinpad
 
+use crate::sync::SpinLock as Mutex;
 use crate::util::{read, write};
 use core::fmt::{Arguments, Result, Write};
-use spin::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SerialPort {

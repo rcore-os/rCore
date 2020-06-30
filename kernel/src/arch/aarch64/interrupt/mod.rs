@@ -1,21 +1,13 @@
 //! Interrupt and exception for aarch64.
 
-mod context;
-mod handler;
-mod syndrome;
-
-use aarch64::regs::*;
-
-pub use self::context::*;
 pub use self::handler::*;
+use crate::arch::board::timer::is_pending;
+use aarch64::regs::*;
+use trapframe::UserContext;
 
-/// Set the exception vector address
-pub fn init() {
-    extern "C" {
-        fn __vectors();
-    }
-    VBAR_EL1.set(__vectors as u64);
-}
+pub mod consts;
+pub mod handler;
+mod syndrome;
 
 /// Enable the interrupt (only IRQ).
 #[inline(always)]
@@ -46,4 +38,33 @@ pub unsafe fn disable_and_store() -> usize {
 #[inline(always)]
 pub unsafe fn restore(flags: usize) {
     DAIF.set(flags as u32);
+}
+
+pub fn timer() {
+    if is_pending() {
+        crate::arch::board::timer::set_next();
+        crate::trap::timer();
+    }
+}
+
+pub fn ack(_irq: usize) {
+    // TODO
+}
+
+pub fn get_trap_num(cx: &UserContext) -> usize {
+    cx.trap_num
+}
+
+pub fn enable_irq(irq: usize) {
+    // TODO
+}
+
+pub fn wait_for_interrupt() {
+    use aarch64::regs::*;
+    let daif = DAIF.get();
+    unsafe {
+        llvm_asm!("msr daifclr, #2");
+    }
+    aarch64::asm::wfe();
+    DAIF.set(daif);
 }

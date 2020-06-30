@@ -45,8 +45,13 @@ pub const FIOCLEX: usize = 0x6601;
 
 // rustc using pipe and ioctl pipe file with this request id
 // for non-blocking/blocking IO control setting
+#[cfg(not(target_arch = "mips"))]
 pub const FIONBIO: usize = 0x5421;
+#[cfg(target_arch = "mips")]
+pub const FIONBIO: usize = 0x667E;
 
+// ref: https://www.man7.org/linux/man-pages/man3/termios.3.html
+// c_lflag constants
 bitflags! {
     pub struct LocalModes : u32 {
         const ISIG = 0o000001;
@@ -71,7 +76,7 @@ bitflags! {
 // Ref: https://www.man7.org/linux/man-pages/man3/termios.3.html
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct Termois {
+pub struct Termios {
     pub iflag: u32,
     pub oflag: u32,
     pub cflag: u32,
@@ -82,17 +87,37 @@ pub struct Termois {
     pub ospeed: u32,
 }
 
-impl Default for Termois {
+impl Default for Termios {
     fn default() -> Self {
-        Termois {
-            iflag: 27906,
-            oflag: 5,
-            cflag: 1215,
-            lflag: 35387,
+        Termios {
+            // IMAXBEL | IUTF8 | IXON | IXANY | ICRNL | BRKINT
+            iflag: 0o66402,
+            // OPOST | ONLCR
+            oflag: 0o5,
+            // HUPCL | CREAD | CSIZE | EXTB
+            cflag: 0o2277,
+            // IEXTEN | ECHOTCL | ECHOKE ECHO | ECHOE | ECHOK | ISIG | ICANON
+            lflag: 0o105073,
             line: 0,
             cc: [
-                3, 28, 127, 21, 4, 0, 1, 0, 17, 19, 26, 255, 18, 15, 23, 22, 255, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0,
+                3,   // VINTR Ctrl-C
+                28,  // VQUIT
+                127, // VERASE
+                21,  // VKILL
+                4,   // VEOF Ctrl-D
+                0,   // VTIME
+                1,   // VMIN
+                0,   // VSWTC
+                17,  // VSTART
+                19,  // VSTOP
+                26,  // VSUSP Ctrl-Z
+                255, // VEOL
+                18,  // VREPAINT
+                15,  // VDISCARD
+                23,  // VWERASE
+                22,  // VLNEXT
+                255, // VEOL2
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             ispeed: 0,
             ospeed: 0,

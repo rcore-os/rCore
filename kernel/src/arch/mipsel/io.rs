@@ -4,12 +4,12 @@ use super::driver::serial::*;
 use crate::drivers::console::CONSOLE;
 use core::fmt::{Arguments, Write};
 
-pub fn getchar() -> char {
+pub fn getchar() -> u8 {
     unsafe { SERIAL_PORT.force_unlock() }
     SERIAL_PORT.lock().getchar()
 }
 
-pub fn getchar_option() -> Option<char> {
+pub fn getchar_option() -> Option<u8> {
     unsafe { SERIAL_PORT.force_unlock() }
     SERIAL_PORT.lock().getchar_option()
 }

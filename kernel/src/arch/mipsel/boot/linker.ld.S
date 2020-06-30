@@ -4,11 +4,7 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-#ifdef board_thinpad
-BASE_ADDRESS = 0x80000000;
-#else
 BASE_ADDRESS = 0x80100000;
-#endif
 
 SECTIONS
 {

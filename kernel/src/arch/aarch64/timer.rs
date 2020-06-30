@@ -1,5 +1,6 @@
-pub use super::board::timer::{get_cycle, init, set_next};
+use core::time::Duration;
 
-pub fn read_epoch() -> u64 {
-    0
+pub fn timer_now() -> Duration {
+    // TODO
+    Duration::from_nanos(0)
 }

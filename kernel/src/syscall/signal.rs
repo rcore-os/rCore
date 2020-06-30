@@ -1,5 +1,5 @@
-use crate::process::{current_thread, process_of, thread_manager, PROCESSES};
-use crate::process::{process, process_group};
+use super::{UserInPtr, UserOutPtr};
+use crate::process::*;
 use crate::signal::*;
 use crate::syscall::SysError::{EINVAL, ENOMEM, EPERM, ESRCH};
 use crate::syscall::{SysResult, Syscall};
@@ -9,8 +9,8 @@ impl Syscall<'_> {
     pub fn sys_rt_sigaction(
         &self,
         signum: usize,
-        act: *const SignalAction,
-        oldact: *mut SignalAction,
+        act: UserInPtr<SignalAction>,
+        mut oldact: UserOutPtr<SignalAction>,
         sigsetsize: usize,
     ) -> SysResult {
         if let Some(signal) = <Signal as FromPrimitive>::from_usize(signum) {
@@ -27,19 +27,18 @@ impl Syscall<'_> {
             } else {
                 let mut proc = self.process();
                 if !oldact.is_null() {
-                    let oldact = unsafe { self.vm().check_write_ptr(oldact)? };
-                    *oldact = proc.dispositions[signum];
+                    oldact.write(proc.dispositions[signum])?;
                 }
                 if !act.is_null() {
-                    let act = unsafe { self.vm().check_read_ptr(act)? };
-                    info!("new action: {:?}", act);
-                    proc.dispositions[signum] = *act;
+                    let act = act.read()?;
+                    info!("new action: {:?} -> {:x?}", signal, act);
+                    proc.dispositions[signum] = act;
                 }
                 Ok(0)
             }
         } else {
             info!(
-                "rt_sigaction: sigal: UNKNOWN, act: {:?}, oldact: {:?}, sigsetsize: {}",
+                "rt_sigaction: signal: UNKNOWN, act: {:?}, oldact: {:?}, sigsetsize: {}",
                 act, oldact, sigsetsize
             );
             Err(EINVAL)
@@ -48,49 +47,27 @@ impl Syscall<'_> {
 
     pub fn sys_rt_sigreturn(&mut self) -> SysResult {
         info!("rt_sigreturn");
-        // FIXME: adapt arch
-        let frame = unsafe { &*((self.tf.get_sp() - 8) as *mut SignalFrame) };
-        // frame.info.signo
-        {
-            let mut process = self.process();
-            process.sigaltstack.flags ^=
-                process.sigaltstack.flags & SignalStackFlags::ONSTACK.bits();
-        }
+        // 8: return addr
+        let ptr: UserInPtr<SignalFrame> = UserInPtr::from(self.context.get_sp() - 8);
+        let frame: SignalFrame = ptr.read()?;
 
-        // *self.tf = TrapFrame::from_mcontext(&frame.ucontext.mcontext);
-        *self.tf = frame.tf.clone();
-        let mc = &frame.ucontext.mcontext;
-        self.tf.r15 = mc.r15;
-        self.tf.r14 = mc.r14;
-        self.tf.r13 = mc.r13;
-        self.tf.r12 = mc.r12;
-        self.tf.rbp = mc.rbp;
-        self.tf.rbx = mc.rbx;
-        self.tf.r11 = mc.r11;
-        self.tf.r10 = mc.r10;
-        self.tf.r9 = mc.r9;
-        self.tf.r8 = mc.r8;
-        self.tf.rsi = mc.rsi;
-        self.tf.rdi = mc.rdi;
-        self.tf.rdx = mc.rdx;
-        self.tf.rcx = mc.rcx;
-        self.tf.rax = mc.rax;
-        self.tf.rip = mc.rip;
-        self.tf.rsp = mc.rsp;
+        // restore signal alternate stack
+        let mut inner = self.thread.inner.lock();
+        inner.signal_alternate_stack = frame.ucontext.stack;
+        drop(inner);
 
-        let ret = self.tf.rax as isize;
-        if ret >= 0 {
-            Ok(ret as usize)
-        } else {
-            Err(FromPrimitive::from_isize(-ret).unwrap())
-        }
+        // restore context
+        frame.ucontext.context.fill_tf(&mut self.context);
+
+        // small hack: don't change ret when restoring
+        Ok(self.context.get_syscall_ret())
     }
 
     pub fn sys_rt_sigprocmask(
         &mut self,
         how: usize,
-        set: *const Sigset,
-        oldset: *mut Sigset,
+        set: UserInPtr<Sigset>,
+        mut oldset: UserOutPtr<Sigset>,
         sigsetsize: usize,
     ) -> SysResult {
         info!(
@@ -101,18 +78,27 @@ impl Syscall<'_> {
             return Err(EINVAL);
         }
         if !oldset.is_null() {
-            let oldset = unsafe { self.vm().check_write_ptr(oldset)? };
-            *oldset = self.thread.sig_mask;
+            oldset.write(self.thread.inner.lock().sig_mask)?;
         }
         if !set.is_null() {
-            let set = unsafe { self.vm().check_read_ptr(set)? };
+            let set = set.read()?;
             const BLOCK: usize = 0;
             const UNBLOCK: usize = 1;
             const SETMASK: usize = 2;
+            let mut inner = self.thread.inner.lock();
             match how {
-                BLOCK => self.thread.sig_mask.add_set(set),
-                UNBLOCK => self.thread.sig_mask.remove_set(set),
-                SETMASK => self.thread.sig_mask = *set,
+                BLOCK => {
+                    info!("rt_sigprocmask: block: {:x?}", set);
+                    inner.sig_mask.add_set(&set);
+                }
+                UNBLOCK => {
+                    info!("rt_sigprocmask: unblock: {:x?}", set);
+                    inner.sig_mask.remove_set(&set)
+                }
+                SETMASK => {
+                    info!("rt_sigprocmask: set: {:x?}", set);
+                    inner.sig_mask = set;
+                }
                 _ => return Err(EINVAL),
             }
         }
@@ -139,6 +125,7 @@ impl Syscall<'_> {
                     }
                 }
                 0 => {
+                    // to current process group
                     let pgid = self.process().pgid;
                     for process in process_group(pgid) {
                         send_signal(process, -1, info);
@@ -150,14 +137,12 @@ impl Syscall<'_> {
                     // sig is sent to every process for which the calling process
                     // has permission to send signals, except for process 1 (init)
                     for process in PROCESSES.read().values() {
-                        if let Some(process) = process.upgrade() {
-                            send_signal(process, -1, info);
-                        }
+                        send_signal(process.clone(), -1, info);
                     }
                     Ok(0)
                 }
                 _ => {
-                    let process_group = process_group((-pid) as i32);
+                    let process_group = process_group((-pid) as Pgid);
                     if process_group.is_empty() {
                         Err(ESRCH)
                     } else {
@@ -198,31 +183,42 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_sigaltstack(&self, ss: *const SignalStack, old_ss: *mut SignalStack) -> SysResult {
+    pub fn sys_sigaltstack(
+        &self,
+        ss: UserInPtr<SignalStack>,
+        mut old_ss: UserOutPtr<SignalStack>,
+    ) -> SysResult {
         info!("sigaltstack: ss: {:?}, old_ss: {:?}", ss, old_ss);
-        const MINSIGSTKSZ: usize = 2048;
         if !old_ss.is_null() {
-            let old_ss = unsafe { self.vm().check_write_ptr(old_ss)? };
-            *old_ss = self.process().sigaltstack;
+            old_ss.write(self.thread.inner.lock().signal_alternate_stack)?;
         }
         if !ss.is_null() {
-            let ss = unsafe { self.vm().check_read_ptr(ss)? };
+            let ss = ss.read()?;
             info!("new stack: {:?}", ss);
 
-            if ss.flags & 2 != 0 && ss.size < MINSIGSTKSZ {
+            // check stack size when not disable
+            const MINSIGSTKSZ: usize = 2048;
+            if ss.flags & SignalStackFlags::DISABLE.bits() != 0 && ss.size < MINSIGSTKSZ {
                 return Err(ENOMEM);
             }
-            // only allow SS_AUTODISARM or SS_DISABLE
-            if ss.flags ^ (ss.flags & 0x8000002) != 0 {
+
+            // only allow SS_AUTODISARM and SS_DISABLE
+            if ss.flags
+                != ss.flags
+                    & (SignalStackFlags::AUTODISARM.bits() | SignalStackFlags::DISABLE.bits())
+            {
                 return Err(EINVAL);
             }
 
-            let old_ss = &mut self.process().sigaltstack;
+            let mut inner = self.thread.inner.lock();
+            let old_ss = &mut inner.signal_alternate_stack;
             let flags = SignalStackFlags::from_bits_truncate(old_ss.flags);
             if flags.contains(SignalStackFlags::ONSTACK) {
+                // cannot change signal alternate stack when we are on it
+                // see man sigaltstack(2)
                 return Err(EPERM);
             }
-            *old_ss = *ss;
+            *old_ss = ss;
         }
         Ok(0)
     }

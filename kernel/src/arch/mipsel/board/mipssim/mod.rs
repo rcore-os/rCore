@@ -1,5 +1,5 @@
 pub mod consts;
-#[path = "../../../../drivers/serial/16550_reg.rs"]
+#[path = "../../../../drivers/serial/uart16550.rs"]
 pub mod serial;
 
 /// Device tree bytes

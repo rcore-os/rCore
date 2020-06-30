@@ -43,10 +43,13 @@ pub fn init() {
     // enable FPU, the manual Volume 3 Chapter 13
     unsafe {
         Cr4::update(|cr4| {
+            // enable fxsave/fxrstor
             cr4.insert(Cr4Flags::OSFXSR);
+            // sse
             cr4.insert(Cr4Flags::OSXMMEXCPT_ENABLE);
         });
         Cr0::update(|cr0| {
+            // enable fpu
             cr0.remove(Cr0Flags::EMULATE_COPROCESSOR);
             cr0.insert(Cr0Flags::MONITOR_COPROCESSOR);
         });

@@ -25,9 +25,6 @@ pub fn init() {
     status.enable_soft_int1();
     // Enable clock interrupt
     status.enable_hard_int5();
-    // Enable serial interrupt
-    #[cfg(feature = "board_thinpad")]
-    status.enable_hard_int0();
 
     cp0::status::write(status);
     info!("interrupt: init end");
@@ -149,12 +146,6 @@ fn syscall(tf: &mut TrapFrame) {
         arguments,
         tf.epc
     );
-
-    // temporary solution for ThinPad
-    if tf.v0 == 0 {
-        warn!("Syscall ID = 0");
-        tf.v0 = unsafe { *((tf.sp + 28) as *const usize) };
-    }
 
     let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
     // comply with mips n32 abi, always return a positive value

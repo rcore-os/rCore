@@ -1,6 +1,5 @@
 use crate::drivers::NET_DRIVERS;
 use crate::net::SOCKETS;
-use crate::thread;
 use alloc::vec;
 use core::fmt::Write;
 use smoltcp::socket::*;
@@ -8,7 +7,7 @@ use smoltcp::socket::*;
 pub extern "C" fn server(_arg: usize) -> ! {
     if NET_DRIVERS.read().len() < 1 {
         loop {
-            thread::yield_now();
+            //thread::yield_now();
         }
     }
 
@@ -78,6 +77,6 @@ pub extern "C" fn server(_arg: usize) -> ! {
             }
         }
 
-        thread::yield_now();
+        //thread::yield_now();
     }
 }

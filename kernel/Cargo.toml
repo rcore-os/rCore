@@ -22,17 +22,13 @@ authors = [
 default = []
 board_qemu = []
 board_u540 = ["link_user"]
-board_k210 = ["link_user"]
-board_rocket_chip = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
 consolegraphic = []
-board_raspi3 = ["bcm2837", "link_user"]
+board_raspi3 = ["bcm2837"]
 # for qemu machine
 board_malta = ["link_user"]
 board_mipssim = ["link_user"]
-# for thinpad
-board_thinpad = ["link_user"]
 # for x86 PC
 board_pc = ["link_user"]
 # Hard link user program
@@ -47,55 +43,55 @@ profile = []
 opt-level = 2
 
 [dependencies]
-rlibc = "1.0"
-log = "0.4"
-spin = "0.5"
-xmas-elf = "0.7"
 bitflags = "1.2"
-bit_field = "0.10"
-volatile = "0.2"
-bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
-buddy_system_allocator = "0.4.0"
-pci = { git = "https://github.com/rcore-os/pci-rs", rev = "a4e7cea6" }
-device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
-isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
-virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
-lazy_static = { version = "1.4", features = ["spin_no_std"] }
-smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 bitmap-allocator = { git = "https://github.com/rcore-os/bitmap-allocator", rev = "03bd9909" }
-rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
-rcore-memory = { path = "../crate/memory" }
-rcore-thread = { git = "https://github.com/rcore-os/rcore-thread", rev = "e00f5ed" }
-rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
-rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
-rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
-rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
-rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "1fb7c0ee" }
+bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
+bit_field = "0.10"
+buddy_system_allocator = "0.4.0"
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
+device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
+executor = { git = "https://github.com/rcore-os/executor.git", rev = "a2d02ee9" }
+isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
+log = "0.4"
+naive-timer = { git = "https://github.com/rcore-os/naive-timer.git", rev = "d0cfe04" }
 num = { version = "0.2.1", default-features = false }
 num-traits = { version = "0.2.11", default-features = false }
 num-derive = "0.3"
+pci = { git = "https://github.com/rcore-os/pci-rs", rev = "a4e7cea6" }
 pc-keyboard = "0.5"
+rcore-console = { git = "https://github.com/rcore-os/rcore-console", rev = "b7bacf9", default-features = false }
+rcore-memory = { path = "../crate/memory" }
+rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
+rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
+rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
+rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
+rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
+rlibc = "1.0"
+smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
+spin = "0.5"
+trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "b7fb4ff" }
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
+volatile = "0.2"
+woke = "0.0.2"
+xmas-elf = "0.7"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-rboot = { path = "../rboot", default-features = false }
 apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
-x86_64 = "0.11"
-raw-cpuid = "8.0"
-uart_16550 = "0.2.7"
 acpi = "0.4"
 aml = "0.4"
+raw-cpuid = "8.0"
+rboot = { path = "../rboot", default-features = false }
+uart_16550 = "0.2.7"
+x86_64 = "0.11"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv", rev = "1c5bc80", features = ["inline-asm"] }
+riscv = { git = "https://github.com/rcore-os/riscv", rev = "38f3786", features = ["inline-asm"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.1" }
 bcm2837 = { git = "https://github.com/rcore-os/bcm2837", version = "2.5.1", optional = true }
 
 [target.'cfg(target_arch = "mips")'.dependencies]
-mips = "^0.2.0"
+mips = { git = "https://github.com/Harry-Chen/rust-mips", rev = "3b828a2" }
 paste = "0.1"
-
-[build-dependencies]
-cc = "1.0"

@@ -1,12 +1,10 @@
 pub mod consts;
-pub mod fast_syscall;
 mod handler;
-mod trapframe;
 
 pub use self::handler::*;
-pub use self::trapframe::*;
 use crate::memory::phys_to_virt;
 use apic::*;
+use trapframe::{TrapFrame, UserContext};
 
 #[inline(always)]
 pub unsafe fn enable() {
@@ -38,14 +36,27 @@ pub fn no_interrupt(f: impl FnOnce()) {
 }
 
 #[inline(always)]
-pub fn enable_irq(irq: u8) {
+pub fn enable_irq(irq: usize) {
     let mut ioapic = unsafe { IoApic::new(phys_to_virt(IOAPIC_ADDR as usize)) };
-    ioapic.set_irq_vector(irq, consts::IRQ0 + irq);
-    ioapic.enable(irq, 0);
+    ioapic.set_irq_vector(irq as u8, (consts::IrqMin + irq) as u8);
+    ioapic.enable(irq as u8, 0);
+}
+
+pub fn timer() {
+    crate::trap::timer();
 }
 
 #[inline(always)]
-pub fn ack(_irq: u8) {
+pub fn ack(_irq: usize) {
     let mut lapic = unsafe { XApic::new(phys_to_virt(LAPIC_ADDR)) };
     lapic.eoi();
+}
+
+pub fn get_trap_num(context: &UserContext) -> usize {
+    context.trap_num
+}
+
+pub fn wait_for_interrupt() {
+    x86_64::instructions::interrupts::enable_interrupts_and_hlt();
+    x86_64::instructions::interrupts::disable();
 }
