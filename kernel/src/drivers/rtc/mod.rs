@@ -3,6 +3,8 @@ use super::RTC_DRIVERS;
 
 #[cfg(target_arch = "x86_64")]
 pub mod rtc_cmos;
+#[cfg(riscv)]
+pub mod rtc_goldfish;
 
 pub trait RtcDriver: Driver {
     // read seconds since epoch

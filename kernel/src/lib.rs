@@ -13,7 +13,11 @@
 #![deny(stable_features)]
 #![deny(unused_unsafe)]
 #![deny(ellipsis_inclusive_range_patterns)]
-#![allow(warnings)]
+#![allow(non_upper_case_globals)]
+#![allow(dead_code)]
+#![allow(unused_mut)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 #![no_std]
 
 // just keep it ...

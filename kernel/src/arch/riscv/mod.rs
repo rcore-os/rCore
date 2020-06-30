@@ -10,6 +10,7 @@ pub mod board;
 pub mod compiler_rt;
 pub mod consts;
 pub mod cpu;
+pub mod fp;
 pub mod interrupt;
 pub mod io;
 pub mod memory;

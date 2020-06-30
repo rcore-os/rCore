@@ -55,7 +55,7 @@ impl IntcDriver for Plic {
 
 pub const SupervisorExternal: usize = usize::MAX / 2 + 1 + 8;
 
-pub fn init_dt(dt: &Node) {
+fn init_dt(dt: &Node) {
     let addr = dt.prop_u64("reg").unwrap() as usize;
     let phandle = dt.prop_u32("phandle").unwrap();
     info!("Found riscv plic at {:#x}", addr);

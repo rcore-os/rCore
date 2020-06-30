@@ -11,5 +11,6 @@ pub fn init(dtb: usize) {
     serial::uart16550::driver_init();
     bus::virtio_mmio::driver_init();
     irq::plic::driver_init();
+    rtc::rtc_goldfish::driver_init();
     device_tree::init(dtb);
 }

@@ -232,7 +232,7 @@ impl Thread {
         args: Vec<String>,
         envs: Vec<String>,
     ) -> Arc<Thread> {
-        /// get virtual memory info
+        // get virtual memory info
         let mut vm = MemorySet::new();
         let (entry_addr, ustack_top) = Self::new_user_vm(inode, args, envs, &mut vm).unwrap();
 
@@ -351,12 +351,12 @@ impl Thread {
     /// Fork a new process from current one
     /// Only current process is persisted
     pub fn fork(&self, tf: &UserContext) -> Arc<Thread> {
-        /// clone virtual memory
+        // clone virtual memory
         let vm = self.vm.lock().clone();
         let vm_token = vm.token();
         let vm = Arc::new(Mutex::new(vm));
 
-        /// context of new thread
+        // context of new thread
         let mut context = tf.clone();
         context.set_syscall_ret(0);
 
