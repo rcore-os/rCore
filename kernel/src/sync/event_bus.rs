@@ -21,6 +21,10 @@ bitflags! {
         const PROCESS_QUIT                  = 1 << 10;
         const CHILD_PROCESS_QUIT            = 1 << 11;
         const RECEIVE_SIGNAL                = 1 << 12;
+
+        /// Semaphore
+        const SEMAPHORE_REMOVED             = 1 << 20;
+        const SEMAPHORE_CAN_ACQUIRE         = 1 << 21;
     }
 }
 
@@ -58,6 +62,10 @@ impl EventBus {
 
     pub fn subscribe(&mut self, callback: EventHandler) {
         self.callbacks.push(callback);
+    }
+
+    pub fn get_callback_len(&self) -> usize {
+        self.callbacks.len()
     }
 }
 

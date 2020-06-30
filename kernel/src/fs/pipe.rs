@@ -1,6 +1,5 @@
 //! Implement INode for Pipe
 
-use crate::sync::Condvar;
 use crate::sync::{Event, EventBus, SpinNoIrqLock as Mutex};
 use crate::syscall::SysError::EAGAIN;
 use alloc::boxed::Box;

@@ -2,23 +2,27 @@
 //!
 //! Same as [std::sync::Semaphore at rust 1.7.0](https://docs.rs/std-semaphore/0.1.0/std_semaphore/)
 
-use super::Condvar;
-use super::SpinNoIrqLock as Mutex;
+use super::{Event, EventBus, SpinNoIrqLock as Mutex};
 use crate::syscall::SysError;
+use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::cell::Cell;
+use core::future::Future;
 use core::ops::Deref;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 /// A counting, blocking, semaphore.
 pub struct Semaphore {
     // value and removed
-    lock: Mutex<SemaphoreInner>,
-    cvar: Condvar,
+    lock: Arc<Mutex<SemaphoreInner>>,
 }
 
 struct SemaphoreInner {
     count: isize,
     pid: usize,
     removed: bool,
+    eventbus: EventBus,
 }
 
 /// An RAII guard which will release a resource acquired from a semaphore when
@@ -35,18 +39,19 @@ impl Semaphore {
     /// available. It is valid to initialize a semaphore with a negative count.
     pub fn new(count: isize) -> Semaphore {
         Semaphore {
-            lock: Mutex::new(SemaphoreInner {
+            lock: Arc::new(Mutex::new(SemaphoreInner {
                 count,
                 removed: false,
                 pid: 0,
-            }),
-            cvar: Condvar::new(),
+                eventbus: EventBus::default(),
+            })),
         }
     }
 
     pub fn remove(&self) {
-        self.lock.lock().removed = false;
-        self.cvar.notify_all();
+        let mut inner = self.lock.lock();
+        inner.removed = true;
+        inner.eventbus.set(Event::SEMAPHORE_REMOVED);
     }
 
     /// Acquires a resource of this semaphore, blocking the current thread until
@@ -54,17 +59,43 @@ impl Semaphore {
     ///
     /// This method will block until the internal count of the semaphore is at
     /// least 1.
-    pub fn acquire(&self) -> Result<(), SysError> {
-        let mut inner = self.lock.lock();
-        while !inner.removed && inner.count <= 0 {
-            inner = self.cvar.wait(inner);
+    pub async fn acquire(&self) -> Result<(), SysError> {
+        #[must_use = "future does nothing unless polled/`await`-ed"]
+        struct SemaphoreFuture {
+            inner: Arc<Mutex<SemaphoreInner>>,
         }
-        if inner.removed {
-            Err(SysError::EIDRM)
-        } else {
-            inner.count -= 1;
-            Ok(())
+
+        impl<'a> Future for SemaphoreFuture {
+            type Output = Result<(), SysError>;
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                let mut inner = self.inner.lock();
+                if inner.removed {
+                    return Poll::Ready(Err(SysError::EIDRM));
+                } else if inner.count >= 1 {
+                    inner.count -= 1;
+                    if inner.count < 1 {
+                        inner.eventbus.clear(Event::SEMAPHORE_CAN_ACQUIRE);
+                    }
+                    return Poll::Ready(Ok(()));
+                }
+
+                let waker = cx.waker().clone();
+                inner.eventbus.subscribe(Box::new({
+                    move |_| {
+                        waker.wake_by_ref();
+                        true
+                    }
+                }));
+
+                return Poll::Pending;
+            }
         }
+
+        let future = SemaphoreFuture {
+            inner: self.lock.clone(),
+        };
+        future.await
     }
 
     /// Release a resource from this semaphore.
@@ -72,8 +103,11 @@ impl Semaphore {
     /// This will increment the number of resources in this semaphore by 1 and
     /// will notify any pending waiters in `acquire` or `access` if necessary.
     pub fn release(&self) {
-        self.lock.lock().count += 1;
-        self.cvar.notify_one();
+        let mut inner = self.lock.lock();
+        inner.count += 1;
+        if inner.count >= 1 {
+            inner.eventbus.set(Event::SEMAPHORE_CAN_ACQUIRE);
+        }
     }
 
     /// Acquires a resource of this semaphore, returning an RAII guard to
@@ -81,8 +115,8 @@ impl Semaphore {
     ///
     /// This function is semantically equivalent to an `acquire` followed by a
     /// `release` when the guard returned is dropped.
-    pub fn access(&self) -> Result<SemaphoreGuard, SysError> {
-        self.acquire()?;
+    pub async fn access(&self) -> Result<SemaphoreGuard<'_>, SysError> {
+        self.acquire().await?;
         Ok(SemaphoreGuard { sem: self })
     }
 
@@ -90,44 +124,26 @@ impl Semaphore {
     pub fn get(&self) -> isize {
         self.lock.lock().count
     }
+
     pub fn get_ncnt(&self) -> usize {
-        self.cvar.wait_queue_len()
+        self.lock.lock().eventbus.get_callback_len()
     }
 
     pub fn get_pid(&self) -> usize {
         self.lock.lock().pid
     }
+
     pub fn set_pid(&self, pid: usize) {
         self.lock.lock().pid = pid;
     }
 
     /// Set the current count
     pub fn set(&self, value: isize) {
-        self.lock.lock().count = value;
-    }
-
-    /// Modify by k atomically. when wait is false avoid waiting. unused
-    pub fn modify(&self, k: isize, wait: bool) -> Result<usize, ()> {
-        if k > 0 {
-            self.lock.lock().count += k;
-            self.cvar.notify_one();
-        } else if k <= 0 {
-            let mut inner = self.lock.lock();
-            let mut temp_k = k;
-            while inner.count + temp_k < 0 {
-                if wait == false {
-                    return Err(());
-                }
-                temp_k += inner.count;
-                inner.count = 0;
-                inner = self.cvar.wait(inner);
-            }
-            inner.count += temp_k;
-            if inner.count > 0 {
-                self.cvar.notify_one();
-            }
+        let mut inner = self.lock.lock();
+        inner.count = value;
+        if inner.count >= 1 {
+            inner.eventbus.set(Event::SEMAPHORE_CAN_ACQUIRE);
         }
-        Ok(0)
     }
 }
 
