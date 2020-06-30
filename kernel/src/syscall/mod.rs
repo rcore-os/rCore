@@ -347,14 +347,22 @@ impl Syscall<'_> {
 
             // sem
             #[cfg(not(target_arch = "mips"))]
-            SYS_SEMGET => self.sys_semget(args[0], args[1] as isize, args[2]),
+            SYS_SEMGET => self.sys_semget(args[0], args[1], args[2]),
             #[cfg(not(target_arch = "mips"))]
             SYS_SEMOP => self.sys_semop(args[0], args[1] as *const SemBuf, args[2]),
             #[cfg(not(target_arch = "mips"))]
-            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3] as isize),
+            SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3]),
             SYS_MSGGET => self.unimplemented("msgget", Ok(0)),
+            #[cfg(target_arch = "mips")]
             SYS_SHMGET => self.unimplemented("shmget", Ok(0)),
 
+            // shm
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SHMGET => self.sys_shmget(args[0], args[1], args[2]),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SHMAT => self.sys_shmat(args[0], args[1], args[2]),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_SHMDT => self.sys_shmdt(args[0], args[1], args[2]),
             // system
             SYS_GETPID => self.sys_getpid(),
             SYS_GETTID => self.sys_gettid(),
@@ -431,7 +439,6 @@ impl Syscall<'_> {
                 } else {
                     error!("unknown syscall id: {}, args: {:x?}", id, args);
                     todo!()
-                    //crate::trap::error(self.tf);
                 }
             }
         };
@@ -503,7 +510,7 @@ impl Syscall<'_> {
             SYS_IPC => match args[0] {
                 1 => self.sys_semop(args[1], args[2] as *const SemBuf, args[3]),
                 2 => self.sys_semget(args[1], args[2] as isize, args[3]),
-                3 => self.sys_semctl(args[1], args[2], args[3], args[4] as isize),
+                3 => self.sys_semctl(args[1], args[2], args[3], args[4]),
                 _ => return None,
             },
             SYS_EPOLL_CREATE => self.sys_epoll_create(args[0]),

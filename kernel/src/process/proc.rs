@@ -4,7 +4,7 @@ use super::{
 };
 use crate::arch::paging::*;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::ipc::SemProc;
+use crate::ipc::{SemProc, ShmProc};
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -119,6 +119,9 @@ pub struct Process {
 
     /// signal actions
     pub dispositions: [SignalAction; Signal::RTMAX + 1],
+
+    /// shared memory
+    pub shm_identifiers: ShmProc,
 }
 
 lazy_static! {

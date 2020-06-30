@@ -14,6 +14,7 @@
 #![deny(unused_unsafe)]
 #![deny(ellipsis_inclusive_range_patterns)]
 #![deny(unused_parens)]
+#![deny(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(dead_code)]
 #![allow(unused_mut)]

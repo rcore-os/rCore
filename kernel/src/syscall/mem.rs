@@ -1,5 +1,5 @@
 use rcore_fs::vfs::MMapArea;
-use rcore_memory::memory_set::handler::Delay;
+use rcore_memory::memory_set::handler::{Delay, File, Linear, Shared};
 use rcore_memory::memory_set::MemoryAttr;
 use rcore_memory::PAGE_SIZE;
 
@@ -41,16 +41,24 @@ impl Syscall<'_> {
 
         if flags.contains(MmapFlags::ANONYMOUS) {
             if flags.contains(MmapFlags::SHARED) {
-                return Err(SysError::EINVAL);
+                self.vm().push(
+                    addr,
+                    addr + len,
+                    prot.to_attr(),
+                    Shared::new(GlobalFrameAlloc),
+                    "mmap_anon_shared",
+                );
+                return Ok(addr);
+            } else {
+                self.vm().push(
+                    addr,
+                    addr + len,
+                    prot.to_attr(),
+                    Delay::new(GlobalFrameAlloc),
+                    "mmap_anon",
+                );
+                return Ok(addr);
             }
-            self.vm().push(
-                addr,
-                addr + len,
-                prot.to_attr().execute(),
-                Delay::new(GlobalFrameAlloc),
-                "mmap_anon",
-            );
-            Ok(addr)
         } else {
             let file_like = proc.get_file_like(fd)?;
             let area = MMapArea {

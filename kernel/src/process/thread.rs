@@ -12,7 +12,7 @@ use crate::arch::{
 };
 use crate::drivers::IRQ_MANAGER;
 use crate::fs::{FileHandle, FileLike, OpenOptions, FOLLOW_MAX_DEPTH};
-use crate::ipc::SemProc;
+use crate::ipc::{SemProc, ShmProc};
 use crate::memory::{
     phys_to_virt, ByFrame, Delay, File, GlobalFrameAlloc, KernelStack, MemoryAttr, MemorySet, Read,
 };
@@ -337,6 +337,7 @@ impl Thread {
                 sig_queue: VecDeque::new(),
                 dispositions: [SignalAction::default(); Signal::RTMAX + 1],
                 eventbus: EventBus::new(),
+                shm_identifiers: ShmProc::default(),
             })),
         };
 
@@ -379,6 +380,7 @@ impl Thread {
             sig_queue: VecDeque::new(),
             dispositions: proc.dispositions.clone(),
             eventbus: EventBus::new(),
+            shm_identifiers: proc.shm_identifiers.clone(),
         }));
 
         // new thread

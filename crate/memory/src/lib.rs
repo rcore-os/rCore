@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(nll)]
+#![deny(non_snake_case)]
 
 // import macros from log
 use log::*;
