@@ -68,7 +68,7 @@ rcore-fs-ramfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47"
 rcore-fs-mountfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
 rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47" }
 rlibc = "1.0"
-smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
+smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "32e219d", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 spin = "0.5"
 trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "b7fb4ff" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }

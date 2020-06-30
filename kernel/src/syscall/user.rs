@@ -134,7 +134,7 @@ impl<P: Read> UserPtr<u8, P> {
 }
 
 impl<T, P: Write> UserPtr<T, P> {
-    pub fn write(&mut self, value: T) -> Result<()> {
+    pub fn write(&self, value: T) -> Result<()> {
         if copy_to_user(self.ptr, &value) {
             Ok(())
         } else {
@@ -149,7 +149,7 @@ impl<T, P: Write> UserPtr<T, P> {
         self.write(value)
     }
 
-    pub fn write_array(&mut self, values: &[T]) -> Result<()> {
+    pub fn write_array(&self, values: &[T]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }

@@ -194,14 +194,17 @@ impl Syscall<'_> {
             }
 
             // io multiplexing
-            SYS_PSELECT6 => self.sys_pselect6(
-                args[0],
-                args[1] as *mut u32,
-                args[2] as *mut u32,
-                args[3] as *mut u32,
-                args[4] as *const TimeVal,
-                args[5] as *const u32,
-            ),
+            SYS_PSELECT6 => {
+                self.sys_pselect6(
+                    args[0],
+                    UserInOutPtr::from(args[1]),
+                    UserInOutPtr::from(args[2]),
+                    UserInOutPtr::from(args[3]),
+                    UserInPtr::from(args[4]),
+                    UserInPtr::from(args[5]),
+                )
+                .await
+            }
             SYS_PPOLL => {
                 self.sys_ppoll(
                     UserInOutPtr::from(args[0]),
@@ -538,13 +541,16 @@ impl Syscall<'_> {
             }
             SYS_ACCESS => self.sys_access(args[0] as *const u8, args[1]),
             SYS_PIPE => self.sys_pipe(args[0] as *mut u32),
-            SYS_SELECT => self.sys_select(
-                args[0],
-                args[1] as *mut u32,
-                args[2] as *mut u32,
-                args[3] as *mut u32,
-                args[4] as *const TimeVal,
-            ),
+            SYS_SELECT => {
+                self.sys_select(
+                    args[0],
+                    UserInOutPtr::from(args[1]),
+                    UserInOutPtr::from(args[2]),
+                    UserInOutPtr::from(args[3]),
+                    UserInPtr::from(args[4]),
+                )
+                .await
+            }
             SYS_DUP2 => self.sys_dup2(args[0], args[1]),
             SYS_ALARM => self.unimplemented("alarm", Ok(0)),
             SYS_FORK => self.sys_fork(),

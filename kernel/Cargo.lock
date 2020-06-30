@@ -659,8 +659,8 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "smoltcp"
-version = "0.5.0"
-source = "git+https://github.com/rcore-os/smoltcp?rev=5bd87c7c#5bd87c7cf01e0a36eb92102e4b52876a9e0ba889"
+version = "0.6.0"
+source = "git+https://github.com/rcore-os/smoltcp?rev=32e219d#32e219df41a88f33c608f16ebb4a36e5056889cd"
 dependencies = [
  "bitflags",
  "byteorder",

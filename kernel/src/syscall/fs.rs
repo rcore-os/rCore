@@ -199,25 +199,25 @@ impl Syscall<'_> {
         future.await
     }
 
-    pub fn sys_pselect6(
+    pub async fn sys_pselect6(
         &mut self,
         nfds: usize,
-        read: *mut u32,
-        write: *mut u32,
-        err: *mut u32,
-        timeout: *const TimeVal,
-        _sigset: *const u32,
+        read: UserInOutPtr<u32>,
+        write: UserInOutPtr<u32>,
+        err: UserInOutPtr<u32>,
+        timeout: UserInPtr<TimeVal>,
+        _sigset: UserInPtr<u32>,
     ) -> SysResult {
-        self.sys_select(nfds, read, write, err, timeout)
+        self.sys_select(nfds, read, write, err, timeout).await
     }
 
-    pub fn sys_select(
+    pub async fn sys_select(
         &mut self,
         nfds: usize,
-        read: *mut u32,
-        write: *mut u32,
-        err: *mut u32,
-        timeout: *const TimeVal,
+        read: UserInOutPtr<u32>,
+        write: UserInOutPtr<u32>,
+        err: UserInOutPtr<u32>,
+        timeout: UserInPtr<TimeVal>,
     ) -> SysResult {
         info!(
             "select: nfds: {}, read: {:?}, write: {:?}, err: {:?}, timeout: {:?}",
@@ -227,18 +227,16 @@ impl Syscall<'_> {
             return Ok(0);
         }
         let proc = self.process();
-        let mut read_fds = FdSet::new(&self.vm(), read, nfds)?;
-        let mut write_fds = FdSet::new(&self.vm(), write, nfds)?;
-        let mut err_fds = FdSet::new(&self.vm(), err, nfds)?;
+        let mut read_fds = FdSet::read(&read, nfds)?;
+        let mut write_fds = FdSet::read(&write, nfds)?;
+        let mut err_fds = FdSet::read(&err, nfds)?;
         let timeout_msecs = if !timeout.is_null() {
-            let timeout = unsafe { self.vm().check_read_ptr(timeout)? };
+            let timeout = timeout.read()?;
             timeout.to_msec()
         } else {
             // infinity
             1 << 31
         };
-
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         // for debugging
         if cfg!(debug_assertions) {
@@ -246,54 +244,79 @@ impl Syscall<'_> {
         }
         drop(proc);
 
-        let begin_time_ms = crate::trap::uptime_msec();
-        Condvar::wait_events(condvars.as_slice(), move || {
-            let proc = self.process();
-            let mut events = 0;
-            for (&fd, file_like) in proc.files.iter() {
-                //                if fd >= nfds {
-                //                    continue;
-                //                }
-                if !err_fds.contains(fd) && !read_fds.contains(fd) && !write_fds.contains(fd) {
-                    continue;
-                }
-                let status = match file_like.poll() {
-                    Ok(ret) => ret,
-                    Err(err) => return Some(Err(err)),
-                };
-                if status.error && err_fds.contains(fd) {
-                    err_fds.set(fd);
-                    events += 1;
-                }
-                if status.read && read_fds.contains(fd) {
-                    read_fds.set(fd);
-                    events += 1;
-                }
-                if status.write && write_fds.contains(fd) {
-                    write_fds.set(fd);
-                    events += 1;
-                }
-            }
-            drop(proc);
+        #[must_use = "future does nothing unless polled/`await`-ed"]
+        struct SelectFuture<'a> {
+            read_fds: FdSet,
+            write_fds: FdSet,
+            err_fds: FdSet,
+            nfds: usize,
+            read: UserInOutPtr<u32>,
+            write: UserInOutPtr<u32>,
+            err: UserInOutPtr<u32>,
+            syscall: &'a Syscall<'a>,
+        }
 
-            if events > 0 {
-                return Some(Ok(events));
-            }
+        impl<'a> Future for SelectFuture<'a> {
+            type Output = SysResult;
 
-            if timeout_msecs == 0 {
-                // no timeout, return now;
-                return Some(Ok(0));
-            }
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                let proc = self.syscall.process();
+                let mut events = 0;
 
-            let current_time_ms = crate::trap::uptime_msec();
-            // infinity check
-            if timeout_msecs < (1 << 31) && current_time_ms - begin_time_ms > timeout_msecs as usize
-            {
-                return Some(Ok(0));
-            }
+                // iterate each poll to check whether it is ready
+                for (&fd, file_like) in proc.files.iter() {
+                    if !self.err_fds.contains(fd)
+                        && !self.read_fds.contains(fd)
+                        && !self.write_fds.contains(fd)
+                    {
+                        continue;
+                    }
 
-            return None;
-        })
+                    let mut fut = Box::pin(file_like.async_poll());
+                    let status = match fut.as_mut().poll(cx) {
+                        Poll::Ready(Ok(ret)) => ret,
+                        Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                        Poll::Pending => continue,
+                    };
+
+                    if status.error && self.err_fds.contains(fd) {
+                        self.err_fds.set(fd);
+                        events += 1;
+                    }
+                    if status.read && self.read_fds.contains(fd) {
+                        self.read_fds.set(fd);
+                        events += 1;
+                    }
+                    if status.write && self.write_fds.contains(fd) {
+                        self.write_fds.set(fd);
+                        events += 1;
+                    }
+                }
+                drop(proc);
+
+                // some event happens
+                if events > 0 {
+                    self.read_fds.write(&self.read, self.nfds)?;
+                    self.write_fds.write(&self.write, self.nfds)?;
+                    self.err_fds.write(&self.err, self.nfds)?;
+                    return Poll::Ready(Ok(events));
+                }
+
+                return Poll::Pending;
+            }
+        }
+
+        let future = SelectFuture {
+            read_fds,
+            write_fds,
+            err_fds,
+            nfds,
+            read,
+            write,
+            err,
+            syscall: self,
+        };
+        future.await
     }
 
     pub fn sys_epoll_create(&mut self, size: usize) -> SysResult {
@@ -1978,17 +2001,19 @@ const FD_PER_ITEM: usize = 8 * size_of::<u32>();
 const MAX_FDSET_SIZE: usize = 1024 / FD_PER_ITEM;
 
 struct FdSet {
-    bitset: &'static mut BitSlice<Lsb0, u32>,
+    /// ready fd
+    bitset: BitVec<Lsb0, u32>,
+    /// all fds
     origin: BitVec<Lsb0, u32>,
 }
 
 impl FdSet {
     /// Initialize a `FdSet` from pointer and number of fds
     /// Check if the array is large enough
-    fn new(vm: &MemorySet, addr: *mut u32, nfds: usize) -> Result<FdSet, SysError> {
+    fn read(addr: &UserInOutPtr<u32>, nfds: usize) -> Result<FdSet, SysError> {
         if addr.is_null() {
             Ok(FdSet {
-                bitset: BitSlice::empty_mut(),
+                bitset: BitVec::new(),
                 origin: BitVec::new(),
             })
         } else {
@@ -1996,16 +2021,23 @@ impl FdSet {
             if len > MAX_FDSET_SIZE {
                 return Err(SysError::EINVAL);
             }
-            let slice = unsafe { vm.check_write_array(addr, len)? };
-            let bitset: &'static mut BitSlice<Lsb0, u32> = slice.into();
-            debug!("bitset {:?}", bitset);
+            let origin = addr.read_array(len)?;
+            let origin = BitVec::from(origin.as_slice());
+            debug!("bitset {:?}", origin);
 
-            // save the fdset, and clear it
-            use alloc::borrow::ToOwned;
-            let origin = bitset.to_owned();
-            bitset.set_all(false);
-            Ok(FdSet { bitset, origin })
+            Ok(FdSet {
+                bitset: BitVec::repeat(false, nfds),
+                origin,
+            })
         }
+    }
+
+    fn write(&self, addr: &UserInOutPtr<u32>, nfds: usize) -> Result<(), SysError> {
+        if !addr.is_null() {
+            let len = (nfds + FD_PER_ITEM - 1) / FD_PER_ITEM;
+            addr.write_array(self.bitset.as_slice())?;
+        }
+        Ok(())
     }
 
     /// Try to set fd in `FdSet`
