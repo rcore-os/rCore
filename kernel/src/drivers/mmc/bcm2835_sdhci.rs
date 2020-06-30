@@ -15,25 +15,25 @@ use core::time::Duration;
 pub const BLOCK_SIZE: usize = 512;
 
 const SD_CMD_TYPE_NORMAL: u32 = 0x0;
-const SD_CMD_TYPE_SUSPEND: u32 = (1 << 22);
-const SD_CMD_TYPE_RESUME: u32 = (2 << 22);
-const SD_CMD_TYPE_ABORT: u32 = (3 << 22);
-const SD_CMD_TYPE_MASK: u32 = (3 << 22);
-const SD_CMD_ISDATA: u32 = (1 << 21);
-const SD_CMD_IXCHK_EN: u32 = (1 << 20);
-const SD_CMD_CRCCHK_EN: u32 = (1 << 19);
+const SD_CMD_TYPE_SUSPEND: u32 = 1 << 22;
+const SD_CMD_TYPE_RESUME: u32 = 2 << 22;
+const SD_CMD_TYPE_ABORT: u32 = 3 << 22;
+const SD_CMD_TYPE_MASK: u32 = 3 << 22;
+const SD_CMD_ISDATA: u32 = 1 << 21;
+const SD_CMD_IXCHK_EN: u32 = 1 << 20;
+const SD_CMD_CRCCHK_EN: u32 = 1 << 19;
 const SD_CMD_RSPNS_TYPE_NONE: u32 = 0; // For no response
-const SD_CMD_RSPNS_TYPE_136: u32 = (1 << 16); // For response R2 (with CRC), R3,4 (no CRC)
-const SD_CMD_RSPNS_TYPE_48: u32 = (2 << 16); // For responses R1, R5, R6, R7 (with CRC)
-const SD_CMD_RSPNS_TYPE_48B: u32 = (3 << 16); // For responses R1b, R5b (with CRC)
-const SD_CMD_RSPNS_TYPE_MASK: u32 = (3 << 16);
-const SD_CMD_MULTI_BLOCK: u32 = (1 << 5);
+const SD_CMD_RSPNS_TYPE_136: u32 = 1 << 16; // For response R2 (with CRC), R3,4 (no CRC)
+const SD_CMD_RSPNS_TYPE_48: u32 = 2 << 16; // For responses R1, R5, R6, R7 (with CRC)
+const SD_CMD_RSPNS_TYPE_48B: u32 = 3 << 16; // For responses R1b, R5b (with CRC)
+const SD_CMD_RSPNS_TYPE_MASK: u32 = 3 << 16;
+const SD_CMD_MULTI_BLOCK: u32 = 1 << 5;
 const SD_CMD_DAT_DIR_HC: u32 = 0;
-const SD_CMD_DAT_DIR_CH: u32 = (1 << 4);
+const SD_CMD_DAT_DIR_CH: u32 = 1 << 4;
 const SD_CMD_AUTO_CMD_EN_NONE: u32 = 0;
-const SD_CMD_AUTO_CMD_EN_CMD12: u32 = (1 << 2);
-const SD_CMD_AUTO_CMD_EN_CMD23: u32 = (2 << 2);
-const SD_CMD_BLKCNT_EN: u32 = (1 << 1);
+const SD_CMD_AUTO_CMD_EN_CMD12: u32 = 1 << 2;
+const SD_CMD_AUTO_CMD_EN_CMD23: u32 = 2 << 2;
+const SD_CMD_BLKCNT_EN: u32 = 1 << 1;
 const SD_CMD_DMA: u32 = 1;
 
 const SD_ERR_BASE: u32 = 16;
@@ -50,13 +50,13 @@ const SD_ERR_ADMA: u32 = 9; // !(not supported)
 const SD_ERR_TUNING: u32 = 10; // !(not supported)
 const SD_ERR_RSVD: u32 = 11; // !(not supported)
 
-const SD_ERR_MASK_CMD_TIMEOUT: u32 = (1 << (16 + SD_ERR_CMD_TIMEOUT));
-const SD_ERR_MASK_CMD_CRC: u32 = (1 << (16 + SD_ERR_CMD_CRC));
-const SD_ERR_MASK_CMD_END_BIT: u32 = (1 << (16 + SD_ERR_CMD_END_BIT));
-const SD_ERR_MASK_CMD_INDEX: u32 = (1 << (16 + SD_ERR_CMD_INDEX));
-const SD_ERR_MASK_DATA_TIMEOUT: u32 = (1 << (16 + SD_ERR_CMD_TIMEOUT));
-const SD_ERR_MASK_DATA_CRC: u32 = (1 << (16 + SD_ERR_CMD_CRC));
-const SD_ERR_MASK_DATA_END_BIT: u32 = (1 << (16 + SD_ERR_CMD_END_BIT));
+const SD_ERR_MASK_CMD_TIMEOUT: u32 = 1 << (16 + SD_ERR_CMD_TIMEOUT);
+const SD_ERR_MASK_CMD_CRC: u32 = 1 << (16 + SD_ERR_CMD_CRC);
+const SD_ERR_MASK_CMD_END_BIT: u32 = 1 << (16 + SD_ERR_CMD_END_BIT);
+const SD_ERR_MASK_CMD_INDEX: u32 = 1 << (16 + SD_ERR_CMD_INDEX);
+const SD_ERR_MASK_DATA_TIMEOUT: u32 = 1 << (16 + SD_ERR_CMD_TIMEOUT);
+const SD_ERR_MASK_DATA_CRC: u32 = 1 << (16 + SD_ERR_CMD_CRC);
+const SD_ERR_MASK_DATA_END_BIT: u32 = 1 << (16 + SD_ERR_CMD_END_BIT);
 // const SD_ERR_MASK_CURRENT_LIMIT: u32 = (1 << (16 + SD_ERR_CMD_CURRENT_LIMIT));
 // const SD_ERR_MASK_AUTO_CMD12: u32 = (1 << (16 + SD_ERR_CMD_AUTO_CMD12));
 // const SD_ERR_MASK_ADMA: u32 = (1 << (16 + SD_ERR_CMD_ADMA));
@@ -73,18 +73,18 @@ const SD_CARD_REMOVAL: u32 = 1 << 7;
 const SD_CARD_INTERRUPT: u32 = 1 << 8;
 
 const SD_RESP_NONE: u32 = SD_CMD_RSPNS_TYPE_NONE;
-const SD_RESP_R1: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
-const SD_RESP_R1b: u32 = (SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN);
-const SD_RESP_R2: u32 = (SD_CMD_RSPNS_TYPE_136 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R1: u32 = SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN;
+const SD_RESP_R1b: u32 = SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN;
+const SD_RESP_R2: u32 = SD_CMD_RSPNS_TYPE_136 | SD_CMD_CRCCHK_EN;
 const SD_RESP_R3: u32 = SD_CMD_RSPNS_TYPE_48;
 const SD_RESP_R4: u32 = SD_CMD_RSPNS_TYPE_136;
-const SD_RESP_R5: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
-const SD_RESP_R5b: u32 = (SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN);
-const SD_RESP_R6: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
-const SD_RESP_R7: u32 = (SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN);
+const SD_RESP_R5: u32 = SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN;
+const SD_RESP_R5b: u32 = SD_CMD_RSPNS_TYPE_48B | SD_CMD_CRCCHK_EN;
+const SD_RESP_R6: u32 = SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN;
+const SD_RESP_R7: u32 = SD_CMD_RSPNS_TYPE_48 | SD_CMD_CRCCHK_EN;
 
-const SD_DATA_READ: u32 = (SD_CMD_ISDATA | SD_CMD_DAT_DIR_CH);
-const SD_DATA_WRITE: u32 = (SD_CMD_ISDATA | SD_CMD_DAT_DIR_HC);
+const SD_DATA_READ: u32 = SD_CMD_ISDATA | SD_CMD_DAT_DIR_CH;
+const SD_DATA_WRITE: u32 = SD_CMD_ISDATA | SD_CMD_DAT_DIR_HC;
 
 const SD_VER_UNKNOWN: u32 = 0;
 const SD_VER_1: u32 = 1;
@@ -277,17 +277,17 @@ macro_rules! ACMD {
         (($a) | (IS_APP_CMD))
     };
 }
-const SET_BUS_WIDTH: u32 = (6 | IS_APP_CMD);
-const SD_STATUS: u32 = (13 | IS_APP_CMD);
-const SEND_NUM_WR_BLOCKS: u32 = (22 | IS_APP_CMD);
-const SET_WR_BLK_ERASE_COUNT: u32 = (23 | IS_APP_CMD);
-const SD_SEND_OP_COND: u32 = (41 | IS_APP_CMD);
-const SET_CLR_CARD_DETECT: u32 = (42 | IS_APP_CMD);
-const SEND_SCR: u32 = (51 | IS_APP_CMD);
+const SET_BUS_WIDTH: u32 = 6 | IS_APP_CMD;
+const SD_STATUS: u32 = 13 | IS_APP_CMD;
+const SEND_NUM_WR_BLOCKS: u32 = 22 | IS_APP_CMD;
+const SET_WR_BLK_ERASE_COUNT: u32 = 23 | IS_APP_CMD;
+const SD_SEND_OP_COND: u32 = 41 | IS_APP_CMD;
+const SET_CLR_CARD_DETECT: u32 = 42 | IS_APP_CMD;
+const SEND_SCR: u32 = 51 | IS_APP_CMD;
 
-const SD_RESET_CMD: u32 = (1 << 25);
-const SD_RESET_DAT: u32 = (1 << 26);
-const SD_RESET_ALL: u32 = (1 << 24);
+const SD_RESET_CMD: u32 = 1 << 25;
+const SD_RESET_DAT: u32 = 1 << 26;
+const SD_RESET_ALL: u32 = 1 << 24;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -483,15 +483,10 @@ impl EmmcCtl {
     }
 
     pub fn sd_get_clock_divider(&mut self, base_clock: u32, target_rate: u32) -> u32 {
-        let targetted_divisor: u32 = if (target_rate > base_clock) {
+        let targetted_divisor: u32 = if target_rate > base_clock {
             1
         } else {
-            base_clock / target_rate
-                - if (base_clock % target_rate != 0) {
-                    1
-                } else {
-                    0
-                }
+            base_clock / target_rate - if base_clock % target_rate != 0 { 1 } else { 0 }
         };
 
         let mut divisor = 31;
@@ -548,7 +543,7 @@ impl EmmcCtl {
         usleep(2000);
 
         // Enable the SD clock
-        control1 |= (1 << 2);
+        control1 |= 1 << 2;
         self.emmc.registers.CONTROL1.write(control1);
         usleep(2000);
 
@@ -776,7 +771,7 @@ impl EmmcCtl {
             );
             if self.sd_issue_command_int_pre(command, 0, timeout) {
                 let mut buf = &mut self.sd_scr.scr;
-                let mut wr_irpt = (1 << 5);
+                let mut wr_irpt = 1 << 5;
                 let mut finished = true;
                 for cur_block in 0..count {
                     timeout_wait!(
@@ -793,7 +788,7 @@ impl EmmcCtl {
                         break;
                     }
                     let mut cur_word_no = 0;
-                    while (cur_word_no < blocks_size_u32) {
+                    while cur_word_no < blocks_size_u32 {
                         let word = self.emmc.registers.DATA.read();
                         debug!(
                             "EmmcCtl: block#{}, word#{} = 0x{:08X}, pos = {}",
@@ -886,7 +881,7 @@ impl EmmcCtl {
 
         let mut control0 = self.emmc.registers.CONTROL0.read();
         let mut control1 = self.emmc.registers.CONTROL1.read();
-        control1 |= (1 << 24);
+        control1 |= 1 << 24;
         // Disable clock
         control1 &= !(1 << 2);
         control1 &= !(1 << 0);
@@ -919,7 +914,7 @@ impl EmmcCtl {
         let f_id = self.sd_get_clock_divider(base_clock, 400000);
         control1 |= f_id;
 
-        control1 |= (7 << 16); // data timeout = TMCLK * 2^10
+        control1 |= 7 << 16; // data timeout = TMCLK * 2^10
 
         self.emmc.registers.CONTROL1.write(control1);
 
@@ -1006,9 +1001,9 @@ impl EmmcCtl {
 
         while card_is_busy {
             let v2_flags = if v2_later {
-                (1 << 30)
+                1 << 30
                     | if self.failed_voltage_switch == 0 {
-                        (1 << 24)
+                        1 << 24
                     } else {
                         0
                     }
@@ -1043,7 +1038,7 @@ impl EmmcCtl {
 
         // Switch to 1.8V mode if possible
         debug!("EmmcCtl: card_supports_18v = {}", self.card_supports_18v);
-        if (self.card_supports_18v) {
+        if self.card_supports_18v {
             // As per HCSS 3.6.1
             debug!("EmmcCtl: Switch to 1.8v mode.");
             // Send VOLTAGE_SWITCH
@@ -1068,7 +1063,7 @@ impl EmmcCtl {
 
             // Set 1.8V signal enable to 1
             control0 = self.emmc.registers.CONTROL0.read();
-            control0 |= (1 << 8);
+            control0 |= 1 << 8;
             self.emmc.registers.CONTROL0.write(control0);
 
             usleep(5000);
@@ -1083,7 +1078,7 @@ impl EmmcCtl {
 
             // Re-enable SD clock
             control1 = self.emmc.registers.CONTROL1.read();
-            control1 |= (1 << 2);
+            control1 |= 1 << 2;
             self.emmc.registers.CONTROL1.write(control1);
 
             // Wait 1 ms
@@ -1170,7 +1165,7 @@ impl EmmcCtl {
 
         self.block_size = 512;
         let mut controller_block_size = self.emmc.registers.BLKSIZECNT.read();
-        controller_block_size &= (!0xfff);
+        controller_block_size &= !0xfff;
         controller_block_size |= 0x200;
         self.emmc.registers.BLKSIZECNT.write(controller_block_size);
 
@@ -1292,7 +1287,7 @@ impl EmmcCtl {
                 // send command
                 self.last_cmd = command;
                 if self.sd_issue_command_int_pre(sd_commands[command as usize], block_no, 500000) {
-                    let mut wr_irpt = (1 << 5);
+                    let mut wr_irpt = 1 << 5;
                     let mut finished = true;
                     for cur_block in 0..count {
                         timeout_wait!(
@@ -1308,7 +1303,7 @@ impl EmmcCtl {
                             break;
                         }
                         let mut cur_word_no = 0;
-                        while (cur_word_no < blocks_size_u32) {
+                        while cur_word_no < blocks_size_u32 {
                             buf[(cur_block as usize) * blocks_size_u32 + cur_word_no] =
                                 self.emmc.registers.DATA.read();
                             cur_word_no += 1;
@@ -1350,7 +1345,7 @@ impl EmmcCtl {
                 // send command
                 self.last_cmd = command;
                 if self.sd_issue_command_int_pre(sd_commands[command as usize], block_no, 500000) {
-                    let mut wr_irpt = (1 << 4);
+                    let mut wr_irpt = 1 << 4;
                     let mut finished = true;
                     for cur_block in 0..count {
                         timeout_wait!(
@@ -1366,7 +1361,7 @@ impl EmmcCtl {
                             break;
                         }
                         let mut cur_word_no = 0;
-                        while (cur_word_no < blocks_size_u32) {
+                        while cur_word_no < blocks_size_u32 {
                             self.emmc
                                 .registers
                                 .DATA

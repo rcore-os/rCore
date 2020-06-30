@@ -5,6 +5,7 @@ use core::sync::atomic::{spin_loop_hint, AtomicBool, Ordering};
 mod boot;
 pub mod consts;
 pub mod cpu;
+pub mod fp;
 pub mod interrupt;
 pub mod io;
 pub mod memory;

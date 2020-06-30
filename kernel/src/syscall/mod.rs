@@ -335,7 +335,6 @@ impl Syscall<'_> {
                 )
                 .await
             }
-            #[cfg(target_arch = "x86_64")]
             SYS_TKILL => self.sys_tkill(args[0], args[1]),
 
             // time
