@@ -12,18 +12,17 @@ use rcore_memory::{PhysAddr, VirtAddr, PAGE_SIZE};
 use super::*;
 
 impl Syscall<'_> {
-    pub fn sys_semget(&self, key: usize, nsems: isize, flags: usize) -> SysResult {
-        info!("semget: key: {}", key);
+    pub fn sys_semget(&self, key: usize, nsems: usize, flags: usize) -> SysResult {
+        info!("semget: key: {} nsems: {} flags: {:#x}", key, nsems, flags);
 
         /// The maximum semaphores per semaphore set
         const SEMMSL: usize = 256;
 
-        if nsems < 0 || nsems as usize > SEMMSL {
+        if nsems > SEMMSL {
             return Err(SysError::EINVAL);
         }
-        let nsems = nsems as usize;
 
-        let sem_array = SemArray::get_or_create(key, nsems, flags);
+        let sem_array = SemArray::get_or_create(key, nsems, flags)?;
         let id = self.process().semaphores.add(sem_array);
         Ok(id)
     }
@@ -54,8 +53,11 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_semctl(&self, id: usize, num: usize, cmd: usize, arg: isize) -> SysResult {
-        info!("semctl: id: {}, num: {}, cmd: {}", id, num, cmd);
+    pub fn sys_semctl(&self, id: usize, num: usize, cmd: usize, arg: usize) -> SysResult {
+        info!(
+            "semctl: id: {}, num: {}, cmd: {} arg: {:#x}",
+            id, num, cmd, arg
+        );
         let sem_array = self.process().semaphores.get(id).ok_or(SysError::EINVAL)?;
         const IPC_RMID: usize = 0;
         const IPC_SET: usize = 1;
@@ -70,11 +72,16 @@ impl Syscall<'_> {
 
         match cmd {
             IPC_RMID => {
+                // arg is struct semid_ds
                 sem_array.remove();
                 Ok(0)
             }
             IPC_SET => {
-                // TODO: update IpcPerm
+                // arg is struct semid_ds
+                let ptr = UserInPtr::from(arg);
+                let ds: SemidDs = ptr.read()?;
+                // update IpcPerm
+                sem_array.set(&ds);
                 sem_array.ctime();
                 Ok(0)
             }
@@ -91,7 +98,7 @@ impl Syscall<'_> {
                     GETNCNT => Ok(sem.get_ncnt()),
                     GETZCNT => Ok(0),
                     SETVAL => {
-                        sem.set(arg);
+                        sem.set(arg as isize);
                         sem.set_pid(self.process().pid.get());
                         sem_array.ctime();
                         Ok(0)
