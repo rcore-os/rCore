@@ -1,3 +1,5 @@
+//! SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
 #[derive(Debug, Copy, Clone, Default)]
 pub struct FpState {}
 

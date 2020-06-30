@@ -1,3 +1,5 @@
+use crate::signal::Siginfo;
+use crate::signal::SignalUserContext;
 use trapframe::UserContext;
 
 // mcontext_t
@@ -78,4 +80,24 @@ impl MachineContext {
     }
 
     pub fn fill_tf(&self, ctx: &mut UserContext) {}
+}
+
+// TODO
+pub const RET_CODE: [u8; 7] = [0; 7];
+
+pub fn set_signal_handler(
+    tf: &mut UserContext,
+    sp: usize,
+    handler: usize,
+    signo: usize,
+    siginfo: *const Siginfo,
+    ucontext: *const SignalUserContext,
+) {
+    tf.general.sp = sp;
+    tf.sepc = handler;
+
+    // pass handler argument
+    tf.general.a0 = signo as usize;
+    tf.general.a1 = siginfo as usize;
+    tf.general.a2 = ucontext as usize;
 }

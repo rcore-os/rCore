@@ -1,4 +1,7 @@
-use crate::arch::{signal::MachineContext, syscall::SYS_RT_SIGRETURN};
+use crate::arch::{
+    signal::{set_signal_handler, MachineContext, RET_CODE},
+    syscall::SYS_RT_SIGRETURN,
+};
 use crate::process::{process, process_of, Process, Thread};
 use crate::sync::{Event, MutexGuard, SpinNoIrq, SpinNoIrqLock as Mutex};
 use alloc::sync::Arc;
@@ -250,25 +253,16 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
                 } else {
                     frame.ret_code_addr = frame.ret_code.as_ptr() as usize;
                     // mov SYS_RT_SIGRETURN, %eax
-                    frame.ret_code[0] = 0xb8;
-                    // TODO: ref plz
-                    unsafe {
-                        *(frame.ret_code.as_ptr().add(1) as *mut u32) = SYS_RT_SIGRETURN as u32;
-                    }
-                    // syscall
-                    frame.ret_code[5] = 0x0f;
-                    frame.ret_code[6] = 0x05;
+                    frame.ret_code.copy_from_slice(&RET_CODE);
                 }
-                #[cfg(target_arch = "x86_64")]
-                {
-                    tf.general.rsp = sig_sp;
-                    tf.general.rip = action.handler;
-
-                    // pass handler argument
-                    tf.general.rdi = info.signo as usize;
-                    tf.general.rsi = &frame.info as *const Siginfo as usize;
-                    tf.general.rdx = &frame.ucontext as *const SignalUserContext as usize;
-                }
+                set_signal_handler(
+                    tf,
+                    sig_sp,
+                    action.handler,
+                    info.signo as usize,
+                    &frame.info as *const Siginfo,
+                    &frame.ucontext as *const SignalUserContext,
+                );
             }
         }
     }

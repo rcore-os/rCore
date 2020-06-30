@@ -63,3 +63,9 @@
 ### fp
 
 - struct FpState：浮点的状态
+
+### signal
+
+- struct MachineContext：和 Linux 中的 mcontext 一致
+- RETCODE：调用 rt_sigreturn syscall 的指令
+- set_signal_handler：设置 signal handler

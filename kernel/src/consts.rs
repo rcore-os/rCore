@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-
+//! Global constants
 pub use crate::arch::consts::*;
 
 pub const MAX_CPU_NUM: usize = 64;

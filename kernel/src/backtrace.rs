@@ -1,3 +1,4 @@
+//! Provide backtrace upon panic
 use core::mem::size_of;
 
 extern "C" {

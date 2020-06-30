@@ -1,18 +1,6 @@
 //! Define the FrameAllocator for physical memory
-//! x86_64      --  64GB
-//! AARCH64/MIPS/RV --  1GB
-//! NOTICE:
-//! type FrameAlloc = bitmap_allocator::BitAllocXXX
-//! KSTACK_SIZE         -- 16KB
-//!
-//! KERNEL_HEAP_SIZE:
-//! x86-64              -- 32MB
-//! AARCH64/RV64        -- 8MB
-//! MIPS/RV32           -- 2MB
-//! mipssim/malta(MIPS) -- 10MB
 
 use super::HEAP_ALLOCATOR;
-pub use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_OFFSET, PHYSICAL_MEMORY_OFFSET};
 use crate::process::current_thread;
 use crate::sync::SpinNoIrqLock;
@@ -21,9 +9,10 @@ use buddy_system_allocator::Heap;
 use core::mem;
 use core::mem::size_of;
 use log::*;
-pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 use rcore_memory::*;
 
+pub use crate::arch::paging::*;
+pub use rcore_memory::memory_set::{handler::*, MemoryArea, MemoryAttr};
 pub type MemorySet = rcore_memory::memory_set::MemorySet<PageTableImpl>;
 
 // x86_64 support up to 1T memory

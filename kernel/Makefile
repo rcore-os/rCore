@@ -145,6 +145,7 @@ qemu_net_opts += \
 	-device virtio-net-device,netdev=net0
 
 else ifeq ($(ARCH), aarch64)
+# raspi must have at least 4 cpus
 qemu_opts += \
 	-machine $(BOARD) \
 	-smp 4 \

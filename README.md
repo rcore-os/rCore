@@ -8,10 +8,10 @@ Going to be the next generation teaching operating system.
 
 Supported architectures and boards:
 
-* x86_64: QEMU, PC (i5/i7)
-* RISCV32/64: QEMU, HiFive Unleashed
-* AArch64: QEMU, Raspberry Pi 3B+
-* MIPS32: QEMU, [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
+* x86_64(Tier 1): QEMU, PC (i5/i7)
+* RISCV32/64(Tier 2): QEMU, HiFive Unleashed
+* AArch64(Tier 2): QEMU, Raspberry Pi 3B+
+* MIPS32(Tier 3): QEMU, [TrivialMIPS](https://github.com/Harry-Chen/TrivialMIPS)
 
 ![demo](./docs/2_OSLab/os2atc/demo.png)
 
@@ -74,7 +74,7 @@ See [Makefile](kernel/Makefile) for more usages.
 
 This is a project of THU courses:
 
-* [Operating System (2018 Spring) ](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
+* [Operating System (2018 Spring)](http://os.cs.tsinghua.edu.cn/oscourse/OS2018spring/projects/g11)
 * [Comprehensive Experiment of Computer System (2018 Summer)](http://os.cs.tsinghua.edu.cn/oscourse/csproject2018/group05)
 * [Operating System Train (2018 Autumn)](http://os.cs.tsinghua.edu.cn/oscourse/OsTrain2018)
 * [Operating System (2019 Spring)](http://os.cs.tsinghua.edu.cn/oscourse/OS2019spring/projects)

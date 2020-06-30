@@ -1,3 +1,4 @@
+use crate::signal::{Siginfo, SignalUserContext};
 use trapframe::{GeneralRegs, UserContext};
 
 /// struct mcontext
@@ -94,4 +95,28 @@ impl MachineContext {
         ctx.trap_num = self.trapno;
         ctx.error_code = self.err;
     }
+}
+
+pub const RET_CODE: [u8; 7] = [
+    // mov SYS_RT_SIGRETURN, %eax
+    0xb8, // SYS_RT_SIGRETURN
+    15, 0, 0, 0, // syscall
+    0x0f, 0x05,
+];
+
+pub fn set_signal_handler(
+    tf: &mut UserContext,
+    sp: usize,
+    handler: usize,
+    signo: usize,
+    siginfo: *const Siginfo,
+    ucontext: *const SignalUserContext,
+) {
+    tf.general.rsp = sp;
+    tf.general.rip = handler;
+
+    // pass handler argument
+    tf.general.rdi = signo as usize;
+    tf.general.rsi = siginfo as usize;
+    tf.general.rdx = ucontext as usize;
 }
