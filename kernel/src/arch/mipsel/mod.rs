@@ -1,11 +1,13 @@
 pub mod consts;
 pub mod cpu;
 pub mod driver;
+pub mod fp;
 pub mod interrupt;
 pub mod io;
 pub mod memory;
 pub mod paging;
 pub mod rand;
+pub mod signal;
 pub mod syscall;
 pub mod timer;
 
@@ -49,7 +51,7 @@ pub extern "C" fn rust_main() -> ! {
 
     println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 
-    crate::drivers::init(dtb_start);
+    //crate::drivers::init(dtb_start);
     crate::process::init();
 
     // TODO: start other CPU

@@ -516,7 +516,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {:#x}", trap_num);
                     if trap_num == Timer {
-                        crate::arch::interrupt::timer();
+                        //crate::arch::interrupt::timer();
                     }
                     IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
                 }

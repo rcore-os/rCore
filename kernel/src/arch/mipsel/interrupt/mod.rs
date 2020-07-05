@@ -1,4 +1,3 @@
-pub use self::context::*;
 use crate::arch::paging::get_root_page_table_ptr;
 use crate::drivers::IRQ_MANAGER;
 use log::*;
@@ -6,9 +5,9 @@ use mips::addr::*;
 use mips::interrupts;
 use mips::paging::PageTable as MIPSPageTable;
 use mips::registers::cp0;
+use trapframe::{TrapFrame, UserContext};
 
-#[path = "context.rs"]
-mod context;
+pub mod consts;
 
 /// Initialize interrupt
 pub fn init() {
@@ -61,7 +60,7 @@ pub extern "C" fn stack_pointer_not_aligned(sp: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     use cp0::cause::Exception as E;
     trace!("Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
     match tf.cause.cause() {
@@ -73,7 +72,6 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         E::ReservedInstruction => {
             if !reserved_inst(tf) {
                 error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-                crate::trap::error(tf)
             } else {
                 tf.epc = tf.epc + 4;
             }
@@ -83,7 +81,6 @@ pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
         }
         _ => {
             error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-            crate::trap::error(tf)
         }
     }
     trace!("Interrupt end");
@@ -147,7 +144,8 @@ fn syscall(tf: &mut TrapFrame) {
         tf.epc
     );
 
-    let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
+    //let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
+    let ret = 0;
     // comply with mips n32 abi, always return a positive value
     // https://git.musl-libc.org/cgit/musl/tree/arch/mipsn32/syscall_arch.h
     if ret < 0 {
@@ -194,7 +192,7 @@ fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
         31 => tf.ra = val,
         _ => {
             error!("Unknown register {:?} ", rt);
-            crate::trap::error(tf)
+            //crate::trap::error(tf)
         }
     }
 }
@@ -266,7 +264,7 @@ fn page_fault(tf: &mut TrapFrame) {
                         tf.epc = crate::memory::read_user_fixup as usize;
                         return;
                     }
-                    crate::trap::error(tf);
+                    //crate::trap::error(tf);
                 }
             }
 
@@ -283,8 +281,24 @@ fn page_fault(tf: &mut TrapFrame) {
                     tf.epc = crate::memory::read_user_fixup as usize;
                     return;
                 }
-                crate::trap::error(tf);
+                //crate::trap::error(tf);
             }
         }
     }
+}
+
+pub fn enable_irq(irq: usize) {
+    // TODO
+}
+
+pub fn get_trap_num(cx: &UserContext) -> usize {
+    cx.cause
+}
+
+pub fn ack(_irq: usize) {
+    // TODO
+}
+
+pub fn wait_for_interrupt() {
+    // TODO
 }

@@ -69,3 +69,11 @@ extern "C" {
     fn bootstack();
     fn bootstacktop();
 }
+
+pub fn set_page_table(vmtoken: usize) {
+    // TODO
+}
+
+pub fn get_page_fault_addr() -> usize {
+    // TODO
+}
