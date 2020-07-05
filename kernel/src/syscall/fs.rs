@@ -12,7 +12,6 @@ use crate::drivers::SOCKET_ACTIVITY;
 use crate::fs::*;
 use crate::memory::MemorySet;
 use crate::sync::Condvar;
-use crate::trap::TICK_ACTIVITY;
 use alloc::boxed::Box;
 use core::future::Future;
 use core::pin::Pin;
@@ -128,9 +127,6 @@ impl Syscall<'_> {
                 ufds, nfds, timeout_msecs
             );
         }
-
-        // check whether the fds is valid and is owned by this process
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
         let polls = ufds.read_array(nfds).unwrap();
 
@@ -454,7 +450,7 @@ impl Syscall<'_> {
             drop(proc);
         }
 
-        let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
+        let condvars = alloc::vec![&(*SOCKET_ACTIVITY)];
 
         let begin_time_ms = crate::trap::uptime_msec();
         let condition = move || {

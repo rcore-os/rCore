@@ -10,10 +10,6 @@ use trapframe::UserContext;
 
 pub static mut TICK: usize = 0;
 
-lazy_static! {
-    pub static ref TICK_ACTIVITY: Condvar = Condvar::new();
-}
-
 pub fn uptime_msec() -> usize {
     unsafe { crate::trap::TICK * crate::consts::USEC_PER_TICK / 1000 }
 }

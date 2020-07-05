@@ -4,7 +4,6 @@ use super::*;
 use crate::arch::cpu;
 use crate::consts::{ARCH, USER_STACK_SIZE};
 use crate::syscall::SysError::ETIMEDOUT;
-use crate::trap::TICK_ACTIVITY;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicI32, Ordering};
 
