@@ -76,4 +76,5 @@ pub fn set_page_table(vmtoken: usize) {
 
 pub fn get_page_fault_addr() -> usize {
     // TODO
+    0
 }

@@ -39,7 +39,7 @@ impl SerialPort {
     }
 
     /// blocking version of getchar()
-    pub fn getchar(&mut self) -> char {
+    pub fn getchar(&mut self) -> u8 {
         loop {
             if (read::<u8>(self.base + COM_LSR) & 0x01) == 0 {
                 break;
@@ -47,16 +47,16 @@ impl SerialPort {
         }
         let c = read::<u8>(self.base + COM_RX);
         match c {
-            255 => '\0', // null
-            c => c as char,
+            255 => 0, // null
+            c => c,
         }
     }
 
     /// non-blocking version of getchar()
-    pub fn getchar_option(&mut self) -> Option<char> {
+    pub fn getchar_option(&mut self) -> Option<u8> {
         match read::<u8>(self.base + COM_LSR) & 0x01 {
             0 => None,
-            _ => Some(read::<u8>(self.base + COM_RX) as u8 as char),
+            _ => Some(read::<u8>(self.base + COM_RX) as u8),
         }
     }
 

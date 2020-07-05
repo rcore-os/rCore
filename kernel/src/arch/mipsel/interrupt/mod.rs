@@ -62,8 +62,11 @@ pub extern "C" fn stack_pointer_not_aligned(sp: usize) {
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     use cp0::cause::Exception as E;
-    trace!("Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-    match tf.cause.cause() {
+    let cause = cp0::cause::Cause {
+        bits: tf.cause as u32,
+    };
+    trace!("Exception @ CPU{}: {:?} ", 0, cause.cause());
+    match cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),
         E::TLBModification => page_fault(tf),
@@ -71,7 +74,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         E::TLBStoreMiss => page_fault(tf),
         E::ReservedInstruction => {
             if !reserved_inst(tf) {
-                error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
+                error!("Unhandled Exception @ CPU{}: {:?} ", 0, cause.cause());
             } else {
                 tf.epc = tf.epc + 4;
             }
@@ -80,13 +83,14 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
             tf.epc = tf.epc + 4;
         }
         _ => {
-            error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
+            error!("Unhandled Exception @ CPU{}: {:?} ", 0, cause.cause());
         }
     }
     trace!("Interrupt end");
 }
 
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
+    /*
     let pint = tf.cause.pending_interrupt();
     trace!("  Interrupt {:08b} ", pint);
     if (pint & 0b100_000_00) != 0 {
@@ -96,6 +100,7 @@ fn interrupt_dispatcher(tf: &mut TrapFrame) {
     } else {
         ipi();
     }
+    */
 }
 
 fn external() {
@@ -136,60 +141,62 @@ fn timer() {
 
 fn syscall(tf: &mut TrapFrame) {
     tf.epc += 4; // Must before syscall, because of fork.
-    let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
-    trace!(
-        "MIPS syscall {} invoked with {:x?}, epc = {:x?}",
-        tf.v0,
-        arguments,
-        tf.epc
-    );
+                 /*
+                 let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
+                 trace!(
+                     "MIPS syscall {} invoked with {:x?}, epc = {:x?}",
+                     tf.v0,
+                     arguments,
+                     tf.epc
+                 );
+                 */
 
     //let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
-    let ret = 0;
+    let ret = 0 as isize;
     // comply with mips n32 abi, always return a positive value
     // https://git.musl-libc.org/cgit/musl/tree/arch/mipsn32/syscall_arch.h
     if ret < 0 {
-        tf.v0 = (-ret) as usize;
-        tf.a3 = 1;
+        tf.general.v0 = (-ret) as usize;
+        tf.general.a3 = 1;
     } else {
-        tf.v0 = ret as usize;
-        tf.a3 = 0;
+        tf.general.v0 = ret as usize;
+        tf.general.a3 = 0;
     }
 }
 
 fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
     match rt {
-        1 => tf.at = val,
-        2 => tf.v0 = val,
-        3 => tf.v1 = val,
-        4 => tf.a0 = val,
-        5 => tf.a1 = val,
-        6 => tf.a2 = val,
-        7 => tf.a3 = val,
-        8 => tf.t0 = val,
-        9 => tf.t1 = val,
-        10 => tf.t2 = val,
-        11 => tf.t3 = val,
-        12 => tf.t4 = val,
-        13 => tf.t5 = val,
-        14 => tf.t6 = val,
-        15 => tf.t7 = val,
-        16 => tf.s0 = val,
-        17 => tf.s1 = val,
-        18 => tf.s2 = val,
-        19 => tf.s3 = val,
-        20 => tf.s4 = val,
-        21 => tf.s5 = val,
-        22 => tf.s6 = val,
-        23 => tf.s7 = val,
-        24 => tf.t8 = val,
-        25 => tf.t9 = val,
-        26 => tf.k0 = val,
-        27 => tf.k1 = val,
-        28 => tf.gp = val,
-        29 => tf.sp = val,
-        30 => tf.fp = val,
-        31 => tf.ra = val,
+        1 => tf.general.at = val,
+        2 => tf.general.v0 = val,
+        3 => tf.general.v1 = val,
+        4 => tf.general.a0 = val,
+        5 => tf.general.a1 = val,
+        6 => tf.general.a2 = val,
+        7 => tf.general.a3 = val,
+        8 => tf.general.t0 = val,
+        9 => tf.general.t1 = val,
+        10 => tf.general.t2 = val,
+        11 => tf.general.t3 = val,
+        12 => tf.general.t4 = val,
+        13 => tf.general.t5 = val,
+        14 => tf.general.t6 = val,
+        15 => tf.general.t7 = val,
+        16 => tf.general.s0 = val,
+        17 => tf.general.s1 = val,
+        18 => tf.general.s2 = val,
+        19 => tf.general.s3 = val,
+        20 => tf.general.s4 = val,
+        21 => tf.general.s5 = val,
+        22 => tf.general.s6 = val,
+        23 => tf.general.s7 = val,
+        24 => tf.general.t8 = val,
+        25 => tf.general.t9 = val,
+        26 => tf.general.k0 = val,
+        27 => tf.general.k1 = val,
+        28 => tf.general.gp = val,
+        29 => tf.general.sp = val,
+        30 => tf.general.fp = val,
+        31 => tf.general.ra = val,
         _ => {
             error!("Unknown register {:?} ", rt);
             //crate::trap::error(tf)

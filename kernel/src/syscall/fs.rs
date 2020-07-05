@@ -1194,7 +1194,7 @@ impl Syscall<'_> {
             if times[0].nsec == UTIME_NOW {
                 times[0] = TimeSpec::get_epoch();
             }
-            metadata.atime = Timespec {
+            metadata.atime = rcore_fs::vfs::Timespec {
                 sec: times[0].sec as i64,
                 nsec: times[0].nsec as i32,
             };
@@ -1203,7 +1203,7 @@ impl Syscall<'_> {
             if times[1].nsec == UTIME_NOW {
                 times[1] = TimeSpec::get_epoch();
             }
-            metadata.mtime = Timespec {
+            metadata.mtime = rcore_fs::vfs::Timespec {
                 sec: times[1].sec as i64,
                 nsec: times[1].nsec as i32,
             };
