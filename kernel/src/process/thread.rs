@@ -307,6 +307,11 @@ impl Thread {
             // F | A | D | EL0
             context.spsr = 0b1101_00_0000;
         }
+        #[cfg(target_arch = "mips")]
+        {
+            // UM
+            context.status = 1 << 4;
+        }
 
         let thread = Thread {
             tid: 0, // allocated below

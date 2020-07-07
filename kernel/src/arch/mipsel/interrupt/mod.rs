@@ -11,12 +11,9 @@ pub mod consts;
 
 /// Initialize interrupt
 pub fn init() {
-    extern "C" {
-        fn trap_entry();
+    unsafe {
+        trapframe::init();
     }
-    // Set the exception vector address
-    cp0::ebase::write_u32(trap_entry as u32);
-    println!("Set ebase = {:x}", trap_entry as u32);
 
     let mut status = cp0::status::read();
     // Enable IPI

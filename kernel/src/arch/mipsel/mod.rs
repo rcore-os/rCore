@@ -28,7 +28,6 @@ pub extern "C" fn rust_main() -> ! {
     if cpu_id != BOOT_CPU_ID {
         // TODO: run others_main on other CPU
         // while unsafe { !cpu::has_started(hartid) }  { }
-        // println!("Hello RISCV! in hart {}, dtb @ {:#x}", hartid, dtb);
         // others_main();
         loop {}
     }
@@ -45,7 +44,7 @@ pub extern "C" fn rust_main() -> ! {
     timer::init();
     driver::init();
 
-    println!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
+    info!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 
     //crate::drivers::init(dtb_start);
     crate::process::init();

@@ -709,7 +709,7 @@ checksum = "3a385d94f3f62e60445a0adb9ff8d9621faa272234530d4c0f848ec98f88e316"
 [[package]]
 name = "trapframe"
 version = "0.4.3"
-source = "git+https://github.com/rcore-os/trapframe-rs?rev=e58d975#e58d9755f181de24431b5ff9437f396ac71e8429"
+source = "git+https://github.com/rcore-os/trapframe-rs?rev=e9a2164#e9a21646169f23934facdcf2299490732dbc6a7f"
 dependencies = [
  "raw-cpuid",
  "x86_64",

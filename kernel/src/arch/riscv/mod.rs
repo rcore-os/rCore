@@ -42,7 +42,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         memory::clear_bss();
     }
 
-    println!(
+    info!(
         "Hello RISCV! in hart {}, device tree @ {:#x}",
         hartid, device_tree_vaddr
     );
