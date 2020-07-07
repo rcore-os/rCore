@@ -62,7 +62,7 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     {
         context.sepc = context.sepc + 4;
     }
-    #[cfg(mips)]
+    #[cfg(mipsel)]
     {
         context.epc = context.epc + 4;
     }
