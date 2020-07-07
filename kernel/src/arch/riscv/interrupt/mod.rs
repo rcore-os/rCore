@@ -119,3 +119,7 @@ pub fn wait_for_interrupt() {
 pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
     thread.vm.lock().handle_page_fault(addr)
 }
+
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
+    false
+}

@@ -71,16 +71,6 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         E::TLBModification => page_fault(tf),
         E::TLBLoadMiss => page_fault(tf),
         E::TLBStoreMiss => page_fault(tf),
-        E::ReservedInstruction => {
-            if !reserved_inst(tf) {
-                error!("Unhandled Exception @ CPU{}: {:?} ", 0, cause.cause());
-            } else {
-                tf.epc = tf.epc + 4;
-            }
-        }
-        E::CoprocessorUnusable => {
-            tf.epc = tf.epc + 4;
-        }
         _ => {
             error!("Unhandled Exception @ CPU{}: {:?} ", 0, cause.cause());
         }
@@ -163,7 +153,7 @@ fn syscall(tf: &mut TrapFrame) {
     }
 }
 
-fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
+fn set_trapframe_register(rt: usize, val: usize, tf: &mut UserContext) {
     match rt {
         1 => tf.general.at = val,
         2 => tf.general.v0 = val,
@@ -203,7 +193,7 @@ fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
     }
 }
 
-fn reserved_inst(tf: &mut TrapFrame) -> bool {
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
     let inst = unsafe { *(tf.epc as *const usize) };
 
     let opcode = inst >> 26;
@@ -214,20 +204,18 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
 
     if inst == 0x42000020 {
         // ignore WAIT
+        tf.epc = tf.epc + 4;
         return true;
     }
 
     if opcode == 0b011111 && format == 0b111011 {
-        // RDHWR
+        // RDHWR UserLocal
         if rd == 29 && sel == 0 {
-            extern "C" {
-                fn _cur_tls();
-            }
-
-            let tls = unsafe { *(_cur_tls as *const usize) };
+            let tls = tf.tls;
 
             set_trapframe_register(rt, tls, tf);
-            debug!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
+            debug!("Read TLS by rdhwr {:x} to register {:?}", tls, rt);
+            tf.epc = tf.epc + 4;
             return true;
         } else {
             return false;

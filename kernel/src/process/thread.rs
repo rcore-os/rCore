@@ -2,8 +2,10 @@ use super::{
     abi::{self, ProcInitInfo},
     add_to_process_table, Pid, Process, PROCESSORS,
 };
-use crate::arch::interrupt::consts::{is_intr, is_page_fault, is_syscall, is_timer_intr};
-use crate::arch::interrupt::{get_trap_num, handle_user_page_fault};
+use crate::arch::interrupt::consts::{
+    is_intr, is_page_fault, is_reserved_inst, is_syscall, is_timer_intr,
+};
+use crate::arch::interrupt::{get_trap_num, handle_reserved_inst, handle_user_page_fault};
 use crate::arch::{
     cpu,
     fp::FpState,
@@ -524,6 +526,14 @@ pub fn spawn(thread: Arc<Thread>) {
                         crate::arch::interrupt::timer();
                     }
                     IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
+                }
+                _ if is_reserved_inst(trap_num) => {
+                    if !handle_reserved_inst(cx) {
+                        panic!(
+                            "unhandled reserved intr in thread {} trap {:#x} {:x?}",
+                            thread.tid, trap_num, cx
+                        );
+                    }
                 }
                 _ => {
                     panic!(

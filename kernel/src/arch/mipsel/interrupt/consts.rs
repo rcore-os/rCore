@@ -37,3 +37,12 @@ pub fn is_timer_intr(trap: usize) -> bool {
         _ => false,
     }
 }
+
+pub fn is_reserved_inst(trap: usize) -> bool {
+    use cp0::cause::Exception as E;
+    let cause = cp0::cause::Cause { bits: trap as u32 };
+    match cause.cause() {
+        E::ReservedInstruction => true,
+        _ => false,
+    }
+}

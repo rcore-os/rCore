@@ -61,3 +61,7 @@ pub fn is_intr(trap: usize) -> bool {
 pub fn is_timer_intr(trap: usize) -> bool {
     trap == Timer
 }
+
+pub fn is_reserved_inst(trap: usize) -> bool {
+    false
+}
