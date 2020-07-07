@@ -327,5 +327,6 @@ pub fn ack(_irq: usize) {
 }
 
 pub fn wait_for_interrupt() {
-    // TODO
+    cp0::status::enable_interrupt();
+    cp0::status::disable_interrupt();
 }
