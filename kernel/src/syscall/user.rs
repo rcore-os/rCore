@@ -38,7 +38,7 @@ impl<T, P: Policy> Debug for UserPtr<T, P> {
     }
 }
 
-// FIXME: this is a workaround for `clear_child_tid`.
+// TODO: this is a workaround for `clear_child_tid`.
 unsafe impl<T, P: Policy> Send for UserPtr<T, P> {}
 unsafe impl<T, P: Policy> Sync for UserPtr<T, P> {}
 

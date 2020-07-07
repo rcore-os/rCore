@@ -172,7 +172,7 @@ pub fn handle_signal(thread: &Arc<Thread>, tf: &mut UserContext) -> bool {
                 match signal {
                     SIGALRM | SIGHUP | SIGINT => {
                         info!("default action: Term");
-                        // FIXME: exit code ref please?
+                        // TODO: exit code ref please?
                         process.exit(info.signo as usize + 128);
                         return true;
                     }

@@ -527,7 +527,7 @@ impl Socket for UdpSocketState {
         match request {
             // SIOCGARP
             0x8954 => {
-                // FIXME: check addr
+                // TODO: check addr
                 let req = unsafe { &mut *(arg1 as *mut ArpReq) };
                 if let AddressFamily::Internet = AddressFamily::from(req.arp_pa.family) {
                     let name = req.arp_dev.as_ptr();

@@ -1,5 +1,7 @@
 use crate::arch::paging::get_root_page_table_ptr;
 use crate::drivers::IRQ_MANAGER;
+use crate::process::thread::Thread;
+use alloc::sync::Arc;
 use log::*;
 use mips::addr::*;
 use mips::interrupts;
@@ -233,6 +235,39 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
     }
 
     false
+}
+
+pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
+    let virt_addr = VirtAddr::new(addr);
+    let root_table = unsafe { &mut *(get_root_page_table_ptr() as *mut MIPSPageTable) };
+    let tlb_result = root_table.lookup(addr);
+    match tlb_result {
+        Ok(tlb_entry) => {
+            trace!(
+                "PhysAddr = {:x}/{:x}",
+                tlb_entry.entry_lo0.get_pfn() << 12,
+                tlb_entry.entry_lo1.get_pfn() << 12
+            );
+
+            let tlb_valid = if virt_addr.page_number() & 1 == 0 {
+                tlb_entry.entry_lo0.valid()
+            } else {
+                tlb_entry.entry_lo1.valid()
+            };
+
+            if !tlb_valid {
+                if !thread.vm.lock().handle_page_fault(addr) {
+                    return false;
+                }
+            }
+
+            tlb_entry.write_random();
+            true
+        }
+        Err(()) => {
+            return thread.vm.lock().handle_page_fault(addr);
+        }
+    }
 }
 
 fn page_fault(tf: &mut TrapFrame) {

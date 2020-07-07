@@ -81,7 +81,7 @@ impl Syscall<'_> {
         );
         let _attr = prot.to_attr();
 
-        // FIXME: properly set the attribute of the area
+        // TODO: properly set the attribute of the area
         //        now some mut ptr check is fault
         let vm = self.vm();
         let memory_area = vm
@@ -147,7 +147,7 @@ impl MmapProt {
         if self.contains(MmapProt::EXEC) {
             attr = attr.execute();
         }
-        // FIXME: see sys_mprotect
+        // TODO: see sys_mprotect
         //        if !self.contains(MmapProt::WRITE) { attr = attr.readonly(); }
         attr
     }

@@ -1,6 +1,7 @@
 use crate::arch::paging::*;
 use crate::consts::{KERNEL_OFFSET, MEMORY_END, MEMORY_OFFSET};
 use crate::memory::{init_heap, FRAME_ALLOCATOR};
+use mips::registers::cp0;
 use rcore_memory::PAGE_SIZE;
 
 /// Initialize the memory management module
@@ -9,13 +10,12 @@ pub fn init() {
     init_frame_allocator();
     init_heap();
 
+    // for debugging
     set_root_page_table_ptr(0xFFFF_FFFF);
     extern "C" {
         fn _root_page_table_buffer();
         fn _root_page_table_ptr();
     }
-
-    println!("_root_page_table_ptr {:x}", _root_page_table_ptr as usize);
 }
 
 pub fn init_other() {
@@ -72,10 +72,11 @@ extern "C" {
 }
 
 pub fn set_page_table(vmtoken: usize) {
-    // TODO
+    if get_root_page_table_ptr() != vmtoken {
+        set_root_page_table_ptr(vmtoken);
+    }
 }
 
 pub fn get_page_fault_addr() -> usize {
-    // TODO
-    0
+    cp0::bad_vaddr::read_u32() as usize
 }

@@ -3,7 +3,7 @@ use super::{
     add_to_process_table, Pid, Process, PROCESSORS,
 };
 use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Timer};
-use crate::arch::interrupt::get_trap_num;
+use crate::arch::interrupt::{get_trap_num, handle_user_page_fault};
 use crate::arch::{
     cpu,
     fp::FpState,
@@ -511,7 +511,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     let addr = get_page_fault_addr();
                     debug!("page fault from user @ {:#x}", addr);
 
-                    if !thread.vm.lock().handle_page_fault(addr as usize) {
+                    if !handle_user_page_fault(&thread, addr) {
                         // TODO: SIGSEGV
                         panic!("page fault handle failed");
                     }
