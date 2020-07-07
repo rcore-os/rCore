@@ -309,8 +309,8 @@ impl Thread {
         }
         #[cfg(target_arch = "mips")]
         {
-            // UM
-            context.status = 1 << 4;
+            // UM | CP1
+            context.status = 1 << 4 | 1 << 29;
         }
 
         let thread = Thread {
