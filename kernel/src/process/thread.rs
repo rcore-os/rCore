@@ -2,7 +2,7 @@ use super::{
     abi::{self, ProcInitInfo},
     add_to_process_table, Pid, Process, PROCESSORS,
 };
-use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Timer};
+use crate::arch::interrupt::consts::{is_intr, is_page_fault, is_syscall};
 use crate::arch::interrupt::{get_trap_num, handle_user_page_fault};
 use crate::arch::{
     cpu,
@@ -516,13 +516,10 @@ pub fn spawn(thread: Arc<Thread>) {
                         panic!("page fault handle failed");
                     }
                 }
-                Syscall => exit = handle_syscall(&thread, cx).await,
-                IrqMin..=IrqMax => {
+                _ if is_syscall(trap_num) => exit = handle_syscall(&thread, cx).await,
+                _ if is_intr(trap_num) => {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {:#x}", trap_num);
-                    if trap_num == Timer {
-                        //crate::arch::interrupt::timer();
-                    }
                     IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
                 }
                 _ => {

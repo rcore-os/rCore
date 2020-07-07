@@ -64,7 +64,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     let cause = cp0::cause::Cause {
         bits: tf.cause as u32,
     };
-    trace!("Exception @ CPU{}: {:?} ", 0, cause.cause());
+    debug!("Exception @ CPU{}: {:?} ", 0, cause.cause());
     match cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),

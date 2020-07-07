@@ -35,10 +35,8 @@
 ### interrupt/consts
 
 - fn is_page_fault(trap: usize)：是否缺页
-- IrqMin：中断的最小 trap
-- IrqMax：中断的最大 trap
-- Syscall：系统调用的 trap
-- Timer：时钟中断的 trap
+- fn is_syscall(trap: usize)：是否系统调用
+- fn is_intr(trap: usize)：是否中断
 
 ### interrupt/handler
 

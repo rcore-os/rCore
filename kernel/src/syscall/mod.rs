@@ -56,11 +56,17 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let regs = &context.general;
     let num = context.get_syscall_num();
     let args = context.get_syscall_args();
+
     // add before fork
     #[cfg(riscv)]
     {
         context.sepc = context.sepc + 4;
     }
+    #[cfg(mips)]
+    {
+        context.epc = context.epc + 4;
+    }
+
     let mut syscall = Syscall {
         thread,
         context,
@@ -505,14 +511,7 @@ impl Syscall<'_> {
             SYS_FCNTL64 => self.unimplemented("fcntl64", Ok(0)),
             SYS_SET_THREAD_AREA => {
                 info!("set_thread_area: tls: 0x{:x}", args[0]);
-                extern "C" {
-                    fn _cur_tls();
-                }
-
-                unsafe {
-                    llvm_asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
-                    *(_cur_tls as *mut usize) = args[0];
-                }
+                self.context.tls = args[0];
                 Ok(0)
             }
             SYS_IPC => match args[0] {
