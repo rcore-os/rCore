@@ -38,3 +38,14 @@ bootstack:
     .space 4096 * 16 * 8
     .global bootstacktop
 bootstacktop:
+
+    .align 12  #PGSHIFT
+    .global _root_page_table_buffer
+_root_page_table_buffer:
+    .space 1024 * 64 # 64KB
+    .global _root_page_table_ptr
+_root_page_table_ptr:
+    .space 4 # 4bytes
+    .global _cur_tls
+_cur_tls:
+    .space 4 # 4bytes

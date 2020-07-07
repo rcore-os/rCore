@@ -1,6 +1,7 @@
 use super::Driver;
 
 pub mod ahci;
+pub mod ide;
 pub mod virtio_blk;
 
 pub trait BlockDriver: Driver {

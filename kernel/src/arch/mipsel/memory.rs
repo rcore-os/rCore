@@ -37,6 +37,7 @@ fn init_frame_allocator() {
 
     /// Transform memory area `[start, end)` to integer range for `FrameAllocator`
     fn to_range(start: usize, end: usize) -> Range<usize> {
+        info!("frame allocator: start {:#x} end {:#x}", start, end);
         let page_start = (start - MEMORY_OFFSET) / PAGE_SIZE;
         let page_end = (end - MEMORY_OFFSET - 1) / PAGE_SIZE + 1;
         assert!(page_start < page_end, "illegal range for frame allocator");

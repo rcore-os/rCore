@@ -17,10 +17,6 @@ use mips::registers::cp0;
 #[path = "board/malta/mod.rs"]
 pub mod board;
 
-#[cfg(feature = "board_mipssim")]
-#[path = "board/mipssim/mod.rs"]
-pub mod board;
-
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
     // unsafe { cpu::set_cpu_id(hartid); }
@@ -70,6 +66,4 @@ fn others_main() -> ! {
 
 const BOOT_CPU_ID: u32 = 0;
 
-global_asm!(include_str!("boot/context.gen.s"));
 global_asm!(include_str!("boot/entry.gen.s"));
-global_asm!(include_str!("boot/trap.gen.s"));

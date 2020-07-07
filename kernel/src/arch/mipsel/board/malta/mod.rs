@@ -1,3 +1,4 @@
+use crate::drivers::block::ide;
 use crate::drivers::bus::pci;
 use crate::drivers::gpu::fb::{self, FramebufferInfo};
 use mips::registers::cp0;
@@ -42,4 +43,5 @@ pub fn init_driver() {
         screen_size: 800 * 600,
     };
     fb::init(fb_info);
+    ide::init();
 }

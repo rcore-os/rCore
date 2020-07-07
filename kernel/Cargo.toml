@@ -27,8 +27,7 @@ nographic = []
 consolegraphic = []
 board_raspi3 = ["bcm2837"]
 # for qemu machine
-board_malta = ["link_user"]
-board_mipssim = ["link_user"]
+board_malta = []
 # for x86 PC
 board_pc = ["link_user"]
 # Hard link user program
@@ -70,7 +69,7 @@ rcore-fs-devfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "517af47"
 rlibc = "1.0"
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 spin = "0.5"
-trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "063a844" }
+trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "e58d975" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
 volatile = "0.2"
 woke = "0.0.2"
