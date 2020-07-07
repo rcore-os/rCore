@@ -36,3 +36,7 @@ pub fn is_syscall(trap: usize) -> bool {
 pub fn is_intr(trap: usize) -> bool {
     IrqMin <= trap && trap <= IrqMax
 }
+
+pub fn is_timer_intr(trap: usize) -> bool {
+    trap == Timer
+}

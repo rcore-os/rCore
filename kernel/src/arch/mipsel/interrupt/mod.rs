@@ -133,7 +133,7 @@ fn ipi() {
     cp0::cause::reset_soft_int1();
 }
 
-fn timer() {
+pub fn timer() {
     super::timer::set_next();
     crate::trap::timer();
 }
