@@ -23,7 +23,12 @@ pub fn init() {
     status.enable_soft_int1();
     // Enable clock interrupt
     status.enable_hard_int5();
-
+    // status.enable_hard_int4();
+    // status.enable_hard_int3();
+    // status.enable_hard_int2();
+    // status.enable_hard_int1();
+    // status.enable_hard_int0();
+    // error!("{:#x?}", status);
     cp0::status::write(status);
     info!("interrupt: init end");
 }
@@ -79,9 +84,11 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
 }
 
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
-    /*
-    let pint = tf.cause.pending_interrupt();
-    trace!("  Interrupt {:08b} ", pint);
+    let cause = cp0::cause::Cause {
+        bits: tf.cause as u32,
+    };
+    let pint = cause.pending_interrupt();
+    // trace!("  Interrupt {:08b} ", pint);
     if (pint & 0b100_000_00) != 0 {
         timer();
     } else if (pint & 0b011_111_00) != 0 {
@@ -89,7 +96,6 @@ fn interrupt_dispatcher(tf: &mut TrapFrame) {
     } else {
         ipi();
     }
-    */
 }
 
 fn external() {
@@ -242,6 +248,22 @@ pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
             } else {
                 tlb_entry.entry_lo1.valid()
             };
+            // thread.vm.lock().handle_page_fault(addr);
+            // if !crate::memory::handle_page_fault(addr) {
+            //     extern "C" {
+            //         fn _copy_user_start();
+            //         fn _copy_user_end();
+            //     }
+            //     let mut inner = thread.inner.lock();
+            //     if let Some(tf) = &mut inner.context {
+            //         let mut tf = &mut tf.user;
+            //         if tf.epc >= _copy_user_start as usize && tf.epc < _copy_user_end as usize {
+            //             debug!("fixup for addr {:x?}", addr);
+            //             tf.epc = crate::memory::read_user_fixup as usize;
+            //             return true;
+            //         }
+            //     }
+            // }
 
             if !tlb_valid {
                 if !thread.vm.lock().handle_page_fault(addr) {
@@ -261,7 +283,7 @@ pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
 fn page_fault(tf: &mut TrapFrame) {
     // TODO: set access/dirty bit
     let addr = tf.vaddr;
-    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    // info!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     let virt_addr = VirtAddr::new(addr);
     let root_table = unsafe { &mut *(get_root_page_table_ptr() as *mut MIPSPageTable) };
@@ -330,3 +352,5 @@ pub fn wait_for_interrupt() {
     cp0::status::enable_interrupt();
     cp0::status::disable_interrupt();
 }
+
+//2ea84

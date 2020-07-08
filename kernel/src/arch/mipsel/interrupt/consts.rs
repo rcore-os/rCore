@@ -4,9 +4,10 @@ pub fn is_page_fault(trap: usize) -> bool {
     use cp0::cause::Exception as E;
     let cause = cp0::cause::Cause { bits: trap as u32 };
     match cause.cause() {
-        E::TLBModification => true,
-        E::TLBLoadMiss => true,
-        E::TLBStoreMiss => true,
+        E::TLBModification | E::TLBLoadMiss | E::TLBStoreMiss => {
+            info!("{:#?}", cause.cause());
+            true
+        }
         _ => false,
     }
 }

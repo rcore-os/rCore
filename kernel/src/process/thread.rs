@@ -55,7 +55,7 @@ use xmas_elf::{
 pub type Tid = usize;
 
 pub struct ThreadContext {
-    user: Box<UserContext>,
+    pub user: Box<UserContext>,
     /// TODO: lazy fp
     fp: Box<FpState>,
 }
@@ -65,7 +65,7 @@ pub struct ThreadContext {
 pub struct ThreadInner {
     /// user context
     /// None when thread is running in user
-    context: Option<ThreadContext>,
+    pub context: Option<ThreadContext>,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,
@@ -311,8 +311,12 @@ impl Thread {
         }
         #[cfg(target_arch = "mips")]
         {
-            // UM | CP1
-            context.status = 1 << 4 | 1 << 29;
+            // UM | CP1 | IE
+            context.status = 1 << 4 | 1 << 29 | 1;
+            // IM1..IM0
+            context.status |= 1 << 8 | 1 << 9;
+            // IPL(IM5..IM2)
+            context.status |= 1 << 15 | 1 << 14 | 1 << 13 | 1 << 12;
         }
 
         let thread = Thread {
@@ -511,7 +515,7 @@ pub fn spawn(thread: Arc<Thread>) {
                 _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
-                    debug!("page fault from user @ {:#x}", addr);
+                    info!("page fault from user @ {:#x}", addr);
 
                     if !handle_user_page_fault(&thread, addr) {
                         // TODO: SIGSEGV
