@@ -22,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         # we will bring back mipsel later
-        arch: [x86_64, riscv32, riscv64, aarch64]
+        arch: [x86_64, riscv32, riscv64, aarch64, mipsel]
     steps:
     - uses: actions/checkout@v2
     - name: Checkout submodules
