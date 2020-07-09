@@ -13,7 +13,7 @@ pub const TCGETS: usize = 0x540D;
 #[cfg(not(target_arch = "mips"))]
 pub const TCSETS: usize = 0x5402;
 #[cfg(target_arch = "mips")]
-pub const TCGETS: usize = 0x540E;
+pub const TCSETS: usize = 0x540E;
 
 #[cfg(not(target_arch = "mips"))]
 pub const TIOCGPGRP: usize = 0x540F;

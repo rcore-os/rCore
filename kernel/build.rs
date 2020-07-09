@@ -17,5 +17,11 @@ fn main() {
     } else if target.contains("riscv64") {
         println!("cargo:rustc-cfg=riscv");
         println!("cargo:rustc-cfg=riscv64");
+    } else if target.contains("mipsel") {
+        println!("cargo:rustc-cfg=mipsel");
+    } else if target.contains("aarch64") {
+        println!("cargo:rustc-cfg=aarch64");
+    } else if target.contains("x86_64") {
+        println!("cargo:rustc-cfg=x86_64");
     }
 }

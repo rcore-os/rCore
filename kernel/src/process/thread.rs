@@ -2,8 +2,10 @@ use super::{
     abi::{self, ProcInitInfo},
     add_to_process_table, Pid, Process, PROCESSORS,
 };
-use crate::arch::interrupt::consts::{is_page_fault, IrqMax, IrqMin, Syscall, Timer};
-use crate::arch::interrupt::get_trap_num;
+use crate::arch::interrupt::consts::{
+    is_intr, is_page_fault, is_reserved_inst, is_syscall, is_timer_intr,
+};
+use crate::arch::interrupt::{get_trap_num, handle_reserved_inst, handle_user_page_fault};
 use crate::arch::{
     cpu,
     fp::FpState,
@@ -307,6 +309,15 @@ impl Thread {
             // F | A | D | EL0
             context.spsr = 0b1101_00_0000;
         }
+        #[cfg(target_arch = "mips")]
+        {
+            // UM | CP1 | IE
+            context.status = 1 << 4 | 1 << 29 | 1;
+            // IM1..IM0
+            context.status |= 1 << 8 | 1 << 9;
+            // IPL(IM5..IM2)
+            context.status |= 1 << 15 | 1 << 14 | 1 << 13 | 1 << 12;
+        }
 
         let thread = Thread {
             tid: 0, // allocated below
@@ -499,26 +510,36 @@ pub fn spawn(thread: Arc<Thread>) {
             trace!("back from user: {:#x?} trap_num {:#x}", cx, trap_num);
 
             let mut exit = false;
+            let mut do_yield = false;
             match trap_num {
                 // must be first
                 _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
-                    debug!("page fault from user @ {:#x}", addr);
+                    info!("page fault from user @ {:#x}", addr);
 
-                    if !thread.vm.lock().handle_page_fault(addr as usize) {
+                    if !handle_user_page_fault(&thread, addr) {
                         // TODO: SIGSEGV
                         panic!("page fault handle failed");
                     }
                 }
-                Syscall => exit = handle_syscall(&thread, cx).await,
-                IrqMin..=IrqMax => {
+                _ if is_syscall(trap_num) => exit = handle_syscall(&thread, cx).await,
+                _ if is_intr(trap_num) => {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {:#x}", trap_num);
-                    if trap_num == Timer {
+                    if is_timer_intr(trap_num) {
+                        do_yield = true;
                         crate::arch::interrupt::timer();
                     }
                     IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
+                }
+                _ if is_reserved_inst(trap_num) => {
+                    if !handle_reserved_inst(cx) {
+                        panic!(
+                            "unhandled reserved intr in thread {} trap {:#x} {:x?}",
+                            thread.tid, trap_num, cx
+                        );
+                    }
                 }
                 _ => {
                     panic!(
@@ -537,7 +558,7 @@ pub fn spawn(thread: Arc<Thread>) {
             if exit {
                 info!("thread {} stopped", thread.tid);
                 break;
-            } else {
+            } else if do_yield {
                 yield_now().await;
             }
         }

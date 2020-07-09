@@ -28,3 +28,19 @@ pub const Timer: usize = 0x10002;
 
 // from el0, sync
 pub const Syscall: usize = 0x00002;
+
+pub fn is_syscall(trap: usize) -> bool {
+    trap == Syscall
+}
+
+pub fn is_intr(trap: usize) -> bool {
+    IrqMin <= trap && trap <= IrqMax
+}
+
+pub fn is_timer_intr(trap: usize) -> bool {
+    trap == Timer
+}
+
+pub fn is_reserved_inst(trap: usize) -> bool {
+    false
+}

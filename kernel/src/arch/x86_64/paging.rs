@@ -284,7 +284,7 @@ impl FrameDeallocator<Size4KiB> for FrameAllocatorForX86 {
 
 /// Flush TLB for `vaddr` on all CPU
 fn flush_tlb_all(_vaddr: usize) {
-    // FIXME: too slow, disable now.
+    // TODO: too slow, disable now.
     return;
     // if !super::AP_CAN_INIT.load(Ordering::Relaxed) {
     //     return;

@@ -113,7 +113,7 @@ impl FileHandle {
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         // let options = &self.description.read().options;
         if !self.description.read().options.read {
-            return Err(FsError::InvalidParam); // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // TODO: => EBADF
         }
         if !self.description.read().options.nonblock {
             // block
@@ -150,7 +150,7 @@ impl FileHandle {
 
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         if !self.description.read().options.write {
-            return Err(FsError::InvalidParam); // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // TODO: => EBADF
         }
         let len = self.inode.write_at(offset, buf)?;
         TimeSpec::update(&self.inode);
@@ -169,7 +169,7 @@ impl FileHandle {
 
     pub fn set_len(&mut self, len: u64) -> Result<()> {
         if !self.description.read().options.write {
-            return Err(FsError::InvalidParam); // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // TODO: => EBADF
         }
         self.inode.resize(len as usize)?;
         Ok(())
@@ -194,7 +194,7 @@ impl FileHandle {
     pub fn read_entry(&mut self) -> Result<String> {
         let mut description = self.description.write();
         if !description.options.read {
-            return Err(FsError::InvalidParam); // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // TODO: => EBADF
         }
         let mut offset = &mut description.offset;
         let name = self.inode.get_entry(*offset as usize)?;
@@ -205,7 +205,7 @@ impl FileHandle {
     pub fn read_entry_with_metadata(&mut self) -> Result<(Metadata, String)> {
         let mut description = self.description.write();
         if !description.options.read {
-            return Err(FsError::InvalidParam); // FIXME: => EBADF
+            return Err(FsError::InvalidParam); // TODO: => EBADF
         }
         let mut offset = &mut description.offset;
         let ret = self.inode.get_entry_with_metadata(*offset as usize)?;

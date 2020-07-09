@@ -65,11 +65,6 @@ ifeq ($(ARCH), mipsel)
 DTB := src/arch/$(ARCH)/board/$(BOARD)/device.dtb
 endif
 
-# mipssim does not support SMP
-ifeq ($(BOARD), mipssim)
-SMP := 1
-endif
-
 ### qemu options ###
 qemu_opts := \
 	-smp cores=$(SMP)
@@ -157,13 +152,8 @@ else ifeq ($(ARCH), mipsel)
 ifeq ($(BOARD), malta)
 qemu_opts += \
 	-machine $(BOARD) -device VGA \
+	-hda $(USER_QCOW2) \
 	-serial null -serial null -serial mon:stdio \
-	-kernel $(kernel_img)
-endif
-ifeq ($(BOARD), mipssim)
-qemu_opts += \
-	-machine $(BOARD) \
-	-serial mon:stdio \
 	-kernel $(kernel_img)
 endif
 endif
@@ -302,7 +292,7 @@ ifeq ($(ARCH), $(filter $(ARCH), riscv32 riscv64))
 		$(sysroot)/lib/rustlib/src/rust/src/libcore/sync/atomic.rs \
 		src/arch/riscv/atomic.patch
 else ifeq ($(ARCH), mipsel)
-	@for file in context entry trap ; do \
+	@for file in entry ; do \
 	    $(hostcc) -Dboard_$(BOARD) -E src/arch/$(ARCH)/boot/$${file}.S -o src/arch/$(ARCH)/boot/$${file}.gen.s ; \
 	done
 	$(hostcc) -Dboard_$(BOARD) -E src/arch/$(ARCH)/boot/linker.ld.S -o src/arch/$(ARCH)/boot/linker.ld

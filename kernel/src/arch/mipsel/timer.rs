@@ -1,3 +1,4 @@
+use core::time::Duration;
 use log::*;
 use mips::registers::cp0;
 
@@ -16,4 +17,9 @@ pub fn set_next() {
     let timebase = 250000;
     cp0::count::write_u32(0);
     cp0::compare::write_u32(timebase);
+}
+
+pub fn timer_now() -> Duration {
+    // TODO
+    Duration::from_nanos(0)
 }

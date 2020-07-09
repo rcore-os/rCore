@@ -42,7 +42,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         memory::clear_bss();
     }
 
-    println!(
+    info!(
         "Hello RISCV! in hart {}, device tree @ {:#x}",
         hartid, device_tree_vaddr
     );
@@ -53,7 +53,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     }
     memory::init(device_tree_vaddr);
     timer::init();
-    // FIXME: init driver on u540
+    // TODO: init driver on u540
     #[cfg(not(any(feature = "board_u540")))]
     board::init(device_tree_vaddr);
     unsafe {

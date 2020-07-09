@@ -2,7 +2,9 @@
 
 pub use self::handler::*;
 use crate::arch::board::timer::is_pending;
+use crate::process::thread::Thread;
 use aarch64::regs::*;
+use alloc::sync::Arc;
 use trapframe::UserContext;
 
 pub mod consts;
@@ -67,4 +69,12 @@ pub fn wait_for_interrupt() {
     }
     aarch64::asm::wfe();
     DAIF.set(daif);
+}
+
+pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
+    thread.vm.lock().handle_page_fault(addr)
+}
+
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
+    false
 }

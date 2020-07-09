@@ -3,6 +3,8 @@ mod handler;
 
 pub use self::handler::*;
 use crate::memory::phys_to_virt;
+use crate::process::thread::Thread;
+use alloc::sync::Arc;
 use apic::*;
 use trapframe::{TrapFrame, UserContext};
 
@@ -59,4 +61,12 @@ pub fn get_trap_num(context: &UserContext) -> usize {
 pub fn wait_for_interrupt() {
     x86_64::instructions::interrupts::enable_interrupts_and_hlt();
     x86_64::instructions::interrupts::disable();
+}
+
+pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
+    thread.vm.lock().handle_page_fault(addr)
+}
+
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
+    false
 }

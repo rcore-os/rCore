@@ -1,5 +1,7 @@
 use crate::arch::interrupt::consts::SupervisorExternal;
 use crate::drivers::IRQ_MANAGER;
+use crate::process::thread::Thread;
+use alloc::sync::Arc;
 use log::*;
 use riscv::register::*;
 use riscv::register::{scause::Scause, sscratch, stvec};
@@ -112,4 +114,12 @@ pub fn wait_for_interrupt() {
             riscv::register::sstatus::clear_sie();
         }
     }
+}
+
+pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
+    thread.vm.lock().handle_page_fault(addr)
+}
+
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
+    false
 }

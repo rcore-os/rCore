@@ -30,14 +30,13 @@
 - fn ack(trap: usize)：确认中断处理
 - fn timer()：处理时钟中断
 - fn wait_for_interrupt()：打开并等待中断
+- fn handle_user_page_fault(thread: &Arc\<Thread\>, addr: usize)：处理用户态的缺页异常
 
 ### interrupt/consts
 
 - fn is_page_fault(trap: usize)：是否缺页
-- IrqMin：中断的最小 trap
-- IrqMax：中断的最大 trap
-- Syscall：系统调用的 trap
-- Timer：时钟中断的 trap
+- fn is_syscall(trap: usize)：是否系统调用
+- fn is_intr(trap: usize)：是否中断
 
 ### interrupt/handler
 

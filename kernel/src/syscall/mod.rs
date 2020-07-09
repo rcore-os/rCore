@@ -56,11 +56,17 @@ pub async fn handle_syscall(thread: &Arc<Thread>, context: &mut UserContext) -> 
     let regs = &context.general;
     let num = context.get_syscall_num();
     let args = context.get_syscall_args();
+
     // add before fork
     #[cfg(riscv)]
     {
         context.sepc = context.sepc + 4;
     }
+    #[cfg(mipsel)]
+    {
+        context.epc = context.epc + 4;
+    }
+
     let mut syscall = Syscall {
         thread,
         context,
@@ -355,9 +361,12 @@ impl Syscall<'_> {
             }
             #[cfg(not(target_arch = "mips"))]
             SYS_SEMCTL => self.sys_semctl(args[0], args[1], args[2], args[3]),
+
+            // msg
+            #[cfg(not(target_arch = "mips"))]
             SYS_MSGGET => self.unimplemented("msgget", Ok(0)),
-            #[cfg(target_arch = "mips")]
-            SYS_SHMGET => self.unimplemented("shmget", Ok(0)),
+            #[cfg(not(target_arch = "mips"))]
+            SYS_MSGCTL => self.unimplemented("msgctl", Ok(0)),
 
             // shm
             #[cfg(not(target_arch = "mips"))]
@@ -426,14 +435,13 @@ impl Syscall<'_> {
             SYS_GET_PADDR => {
                 self.sys_get_paddr(args[0] as *const u64, args[1] as *mut u64, args[2])
             }
-            SYS_MSGCTL => self.unimplemented("msgctl", Ok(0)),
 
             _ => {
                 let ret = match () {
                     #[cfg(target_arch = "x86_64")]
                     () => self.x86_64_syscall(id, args).await,
                     #[cfg(target_arch = "mips")]
-                    () => self.mips_syscall(id, args),
+                    () => self.mips_syscall(id, args).await,
                     #[cfg(all(not(target_arch = "x86_64"), not(target_arch = "mips")))]
                     () => None,
                 };
@@ -474,10 +482,13 @@ impl Syscall<'_> {
     }
 
     #[cfg(target_arch = "mips")]
-    fn mips_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
+    async fn mips_syscall(&mut self, id: usize, args: [usize; 6]) -> Option<SysResult> {
         let ret = match id {
             SYS_OPEN => self.sys_open(args[0] as *const u8, args[1], args[2]),
-            SYS_POLL => self.sys_poll(args[0] as *mut PollFd, args[1], args[2]),
+            SYS_POLL => {
+                self.sys_poll(UserInOutPtr::from(args[0]), args[1], args[2])
+                    .await
+            }
             SYS_DUP2 => self.sys_dup2(args[0], args[1]),
             SYS_FORK => self.sys_fork(),
             SYS_MMAP2 => self.sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5] * 4096),
@@ -489,10 +500,10 @@ impl Syscall<'_> {
                 match self.sys_pipe(fd_ptr) {
                     Ok(_code) => {
                         unsafe {
-                            self.tf.v0 = *fd_ptr as usize;
-                            self.tf.v1 = *(fd_ptr.add(1)) as usize;
+                            self.context.general.v0 = *fd_ptr as usize;
+                            self.context.general.v1 = *(fd_ptr.add(1)) as usize;
                         }
-                        Ok(self.tf.v0)
+                        Ok(self.context.general.v0)
                     }
                     Err(err) => Err(err),
                 }
@@ -500,19 +511,15 @@ impl Syscall<'_> {
             SYS_FCNTL64 => self.unimplemented("fcntl64", Ok(0)),
             SYS_SET_THREAD_AREA => {
                 info!("set_thread_area: tls: 0x{:x}", args[0]);
-                extern "C" {
-                    fn _cur_tls();
-                }
-
-                unsafe {
-                    llvm_asm!("mtc0 $0, $$4, 2": :"r"(args[0]));
-                    *(_cur_tls as *mut usize) = args[0];
-                }
+                self.context.tls = args[0];
                 Ok(0)
             }
             SYS_IPC => match args[0] {
-                1 => self.sys_semop(args[1], UserInPtr::from(args[2]), args[3]),
-                2 => self.sys_semget(args[1], args[2] as isize, args[3]),
+                1 => {
+                    self.sys_semop(args[1], UserInPtr::from(args[2]), args[3])
+                        .await
+                }
+                2 => self.sys_semget(args[1], args[2], args[3]),
                 3 => self.sys_semctl(args[1], args[2], args[3], args[4]),
                 _ => return None,
             },

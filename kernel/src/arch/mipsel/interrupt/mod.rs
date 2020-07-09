@@ -1,23 +1,21 @@
-pub use self::context::*;
 use crate::arch::paging::get_root_page_table_ptr;
 use crate::drivers::IRQ_MANAGER;
+use crate::process::thread::Thread;
+use alloc::sync::Arc;
 use log::*;
 use mips::addr::*;
 use mips::interrupts;
 use mips::paging::PageTable as MIPSPageTable;
 use mips::registers::cp0;
+use trapframe::{TrapFrame, UserContext};
 
-#[path = "context.rs"]
-mod context;
+pub mod consts;
 
 /// Initialize interrupt
 pub fn init() {
-    extern "C" {
-        fn trap_entry();
+    unsafe {
+        trapframe::init();
     }
-    // Set the exception vector address
-    cp0::ebase::write_u32(trap_entry as u32);
-    println!("Set ebase = {:x}", trap_entry as u32);
 
     let mut status = cp0::status::read();
     // Enable IPI
@@ -61,69 +59,42 @@ pub extern "C" fn stack_pointer_not_aligned(sp: usize) {
 ///
 /// This function is called from `trap.asm`.
 #[no_mangle]
-pub extern "C" fn rust_trap(tf: &mut TrapFrame) {
+pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     use cp0::cause::Exception as E;
-    trace!("Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-    match tf.cause.cause() {
+    let cause = cp0::cause::Cause {
+        bits: tf.cause as u32,
+    };
+    trace!("Exception @ CPU{}: {:?} ", 0, cause.cause());
+    match cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),
         E::TLBModification => page_fault(tf),
         E::TLBLoadMiss => page_fault(tf),
         E::TLBStoreMiss => page_fault(tf),
-        E::ReservedInstruction => {
-            if !reserved_inst(tf) {
-                error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-                crate::trap::error(tf)
-            } else {
-                tf.epc = tf.epc + 4;
-            }
-        }
-        E::CoprocessorUnusable => {
-            tf.epc = tf.epc + 4;
-        }
         _ => {
-            error!("Unhandled Exception @ CPU{}: {:?} ", 0, tf.cause.cause());
-            crate::trap::error(tf)
+            error!("Unhandled Exception @ CPU{}: {:?} ", 0, cause.cause());
         }
     }
     trace!("Interrupt end");
 }
 
 fn interrupt_dispatcher(tf: &mut TrapFrame) {
-    let pint = tf.cause.pending_interrupt();
+    let cause = cp0::cause::Cause {
+        bits: tf.cause as u32,
+    };
+    let pint = cause.pending_interrupt();
     trace!("  Interrupt {:08b} ", pint);
     if (pint & 0b100_000_00) != 0 {
         timer();
     } else if (pint & 0b011_111_00) != 0 {
-        external();
+        for i in 0..6 {
+            if (pint & (1 << i)) != 0 {
+                IRQ_MANAGER.read().try_handle_interrupt(Some(i));
+            }
+        }
     } else {
         ipi();
     }
-}
-
-fn external() {
-    // true means handled, false otherwise
-    let handlers = [try_process_serial, try_process_drivers];
-    for handler in handlers.iter() {
-        if handler() == true {
-            break;
-        }
-    }
-}
-
-fn try_process_serial() -> bool {
-    match super::io::getchar_option() {
-        Some(ch) => {
-            trace!("Get char {} from serial", ch);
-            crate::trap::serial(ch);
-            true
-        }
-        None => false,
-    }
-}
-
-fn try_process_drivers() -> bool {
-    IRQ_MANAGER.read().try_handle_interrupt(None)
 }
 
 fn ipi() {
@@ -132,74 +103,77 @@ fn ipi() {
     cp0::cause::reset_soft_int1();
 }
 
-fn timer() {
+pub fn timer() {
     super::timer::set_next();
     crate::trap::timer();
 }
 
 fn syscall(tf: &mut TrapFrame) {
     tf.epc += 4; // Must before syscall, because of fork.
-    let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
-    trace!(
-        "MIPS syscall {} invoked with {:x?}, epc = {:x?}",
-        tf.v0,
-        arguments,
-        tf.epc
-    );
+                 /*
+                 let arguments = [tf.a0, tf.a1, tf.a2, tf.a3, tf.t0, tf.t1];
+                 trace!(
+                     "MIPS syscall {} invoked with {:x?}, epc = {:x?}",
+                     tf.v0,
+                     arguments,
+                     tf.epc
+                 );
+                 */
 
-    let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
+    //let ret = crate::syscall::syscall(tf.v0, arguments, tf) as isize;
+    let ret = 0 as isize;
     // comply with mips n32 abi, always return a positive value
     // https://git.musl-libc.org/cgit/musl/tree/arch/mipsn32/syscall_arch.h
     if ret < 0 {
-        tf.v0 = (-ret) as usize;
-        tf.a3 = 1;
+        tf.general.v0 = (-ret) as usize;
+        tf.general.a3 = 1;
     } else {
-        tf.v0 = ret as usize;
-        tf.a3 = 0;
+        tf.general.v0 = ret as usize;
+        tf.general.a3 = 0;
     }
 }
 
-fn set_trapframe_register(rt: usize, val: usize, tf: &mut TrapFrame) {
+fn set_trapframe_register(rt: usize, val: usize, tf: &mut UserContext) {
     match rt {
-        1 => tf.at = val,
-        2 => tf.v0 = val,
-        3 => tf.v1 = val,
-        4 => tf.a0 = val,
-        5 => tf.a1 = val,
-        6 => tf.a2 = val,
-        7 => tf.a3 = val,
-        8 => tf.t0 = val,
-        9 => tf.t1 = val,
-        10 => tf.t2 = val,
-        11 => tf.t3 = val,
-        12 => tf.t4 = val,
-        13 => tf.t5 = val,
-        14 => tf.t6 = val,
-        15 => tf.t7 = val,
-        16 => tf.s0 = val,
-        17 => tf.s1 = val,
-        18 => tf.s2 = val,
-        19 => tf.s3 = val,
-        20 => tf.s4 = val,
-        21 => tf.s5 = val,
-        22 => tf.s6 = val,
-        23 => tf.s7 = val,
-        24 => tf.t8 = val,
-        25 => tf.t9 = val,
-        26 => tf.k0 = val,
-        27 => tf.k1 = val,
-        28 => tf.gp = val,
-        29 => tf.sp = val,
-        30 => tf.fp = val,
-        31 => tf.ra = val,
+        1 => tf.general.at = val,
+        2 => tf.general.v0 = val,
+        3 => tf.general.v1 = val,
+        4 => tf.general.a0 = val,
+        5 => tf.general.a1 = val,
+        6 => tf.general.a2 = val,
+        7 => tf.general.a3 = val,
+        8 => tf.general.t0 = val,
+        9 => tf.general.t1 = val,
+        10 => tf.general.t2 = val,
+        11 => tf.general.t3 = val,
+        12 => tf.general.t4 = val,
+        13 => tf.general.t5 = val,
+        14 => tf.general.t6 = val,
+        15 => tf.general.t7 = val,
+        16 => tf.general.s0 = val,
+        17 => tf.general.s1 = val,
+        18 => tf.general.s2 = val,
+        19 => tf.general.s3 = val,
+        20 => tf.general.s4 = val,
+        21 => tf.general.s5 = val,
+        22 => tf.general.s6 = val,
+        23 => tf.general.s7 = val,
+        24 => tf.general.t8 = val,
+        25 => tf.general.t9 = val,
+        26 => tf.general.k0 = val,
+        27 => tf.general.k1 = val,
+        28 => tf.general.gp = val,
+        29 => tf.general.sp = val,
+        30 => tf.general.fp = val,
+        31 => tf.general.ra = val,
         _ => {
             error!("Unknown register {:?} ", rt);
-            crate::trap::error(tf)
+            //crate::trap::error(tf)
         }
     }
 }
 
-fn reserved_inst(tf: &mut TrapFrame) -> bool {
+pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
     let inst = unsafe { *(tf.epc as *const usize) };
 
     let opcode = inst >> 26;
@@ -210,20 +184,18 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
 
     if inst == 0x42000020 {
         // ignore WAIT
+        tf.epc = tf.epc + 4;
         return true;
     }
 
     if opcode == 0b011111 && format == 0b111011 {
-        // RDHWR
+        // RDHWR UserLocal
         if rd == 29 && sel == 0 {
-            extern "C" {
-                fn _cur_tls();
-            }
-
-            let tls = unsafe { *(_cur_tls as *const usize) };
+            let tls = tf.tls;
 
             set_trapframe_register(rt, tls, tf);
-            debug!("Read TLS by rdhdr {:x} to register {:?}", tls, rt);
+            trace!("Read TLS by rdhwr {:x} to register {:?}", tls, rt);
+            tf.epc = tf.epc + 4;
             return true;
         } else {
             return false;
@@ -233,10 +205,43 @@ fn reserved_inst(tf: &mut TrapFrame) -> bool {
     false
 }
 
+pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
+    let virt_addr = VirtAddr::new(addr);
+    let root_table = unsafe { &mut *(get_root_page_table_ptr() as *mut MIPSPageTable) };
+    let tlb_result = root_table.lookup(addr);
+    match tlb_result {
+        Ok(tlb_entry) => {
+            trace!(
+                "PhysAddr = {:x}/{:x}",
+                tlb_entry.entry_lo0.get_pfn() << 12,
+                tlb_entry.entry_lo1.get_pfn() << 12
+            );
+
+            let tlb_valid = if virt_addr.page_number() & 1 == 0 {
+                tlb_entry.entry_lo0.valid()
+            } else {
+                tlb_entry.entry_lo1.valid()
+            };
+
+            if !tlb_valid {
+                if !thread.vm.lock().handle_page_fault(addr) {
+                    return false;
+                }
+            }
+
+            tlb_entry.write_random();
+            true
+        }
+        Err(()) => {
+            return thread.vm.lock().handle_page_fault(addr);
+        }
+    }
+}
+
 fn page_fault(tf: &mut TrapFrame) {
     // TODO: set access/dirty bit
     let addr = tf.vaddr;
-    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    // info!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     let virt_addr = VirtAddr::new(addr);
     let root_table = unsafe { &mut *(get_root_page_table_ptr() as *mut MIPSPageTable) };
@@ -266,7 +271,7 @@ fn page_fault(tf: &mut TrapFrame) {
                         tf.epc = crate::memory::read_user_fixup as usize;
                         return;
                     }
-                    crate::trap::error(tf);
+                    //crate::trap::error(tf);
                 }
             }
 
@@ -283,8 +288,25 @@ fn page_fault(tf: &mut TrapFrame) {
                     tf.epc = crate::memory::read_user_fixup as usize;
                     return;
                 }
-                crate::trap::error(tf);
+                //crate::trap::error(tf);
             }
         }
     }
+}
+
+pub fn enable_irq(irq: usize) {
+    // TODO
+}
+
+pub fn get_trap_num(cx: &UserContext) -> usize {
+    cx.cause
+}
+
+pub fn ack(_irq: usize) {
+    // TODO
+}
+
+pub fn wait_for_interrupt() {
+    cp0::status::enable_interrupt();
+    cp0::status::disable_interrupt();
 }

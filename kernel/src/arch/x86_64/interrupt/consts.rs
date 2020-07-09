@@ -49,3 +49,19 @@ pub const IPIFuncCall: usize = 0xfc;
 pub fn is_page_fault(trap: usize) -> bool {
     trap == PageFault
 }
+
+pub fn is_syscall(trap: usize) -> bool {
+    trap == Syscall
+}
+
+pub fn is_intr(trap: usize) -> bool {
+    IrqMin <= trap && trap <= IrqMax
+}
+
+pub fn is_timer_intr(trap: usize) -> bool {
+    trap == Timer
+}
+
+pub fn is_reserved_inst(trap: usize) -> bool {
+    false
+}

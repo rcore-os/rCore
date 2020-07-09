@@ -350,7 +350,7 @@ impl Syscall<'_> {
 
         // perform futex wake 1
         // ref: http://man7.org/linux/man-pages/man2/set_tid_address.2.html
-        // FIXME: do it in all possible ways a thread can exit
+        // TODO: do it in all possible ways a thread can exit
         //        it has memory access so we can't move it to Thread::drop?
         let clear_child_tid = self.thread.inner.lock().clear_child_tid as *mut u32;
         if !clear_child_tid.is_null() {

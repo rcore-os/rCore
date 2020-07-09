@@ -14,3 +14,5 @@ pub const USER_STACK_SIZE: usize = 0x10000;
 pub const MAX_DTB_SIZE: usize = 0x2000;
 
 pub const KSEG2_START: usize = 0xfe80_0000;
+
+pub const ARCH: &'static str = "mipsel";

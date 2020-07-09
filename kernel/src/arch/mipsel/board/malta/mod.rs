@@ -1,10 +1,10 @@
+use crate::drivers::block::ide;
 use crate::drivers::bus::pci;
 use crate::drivers::gpu::fb::{self, FramebufferInfo};
+use crate::drivers::*;
 use mips::registers::cp0;
 
 pub mod consts;
-#[path = "../../../../drivers/serial/ti_16c550c.rs"]
-pub mod serial;
 #[path = "../../../../drivers/gpu/qemu_stdvga.rs"]
 pub mod vga;
 
@@ -12,19 +12,18 @@ pub mod vga;
 pub static DTB: &'static [u8] = include_bytes!("device.dtb");
 
 /// Initialize serial port first
-pub fn init_serial_early() {
-    // initialize serial driver
-    serial::init(0xbf000900);
+pub fn early_init() {
     // Enable serial interrupt
     let mut status = cp0::status::read();
     status.enable_hard_int2();
     cp0::status::write(status);
-    println!("Hello QEMU Malta!");
+    info!("Hello QEMU Malta!");
 }
 
 /// Initialize other board drivers
-pub fn init_driver() {
+pub fn init(dtb: usize) {
     // TODO: add possibly more drivers
+    serial::uart16550::driver_init();
     vga::init(0xbbe00000, 0xb2050000, 800, 600);
     pci::init();
 
@@ -42,4 +41,6 @@ pub fn init_driver() {
         screen_size: 800 * 600,
     };
     fb::init(fb_info);
+    ide::init();
+    device_tree::init(dtb);
 }

@@ -25,19 +25,11 @@
 		reg = <0x00000000 0x10000000>;
 	};
 
-	uart0: serial@b80003f8 {
-		compatible = "ns16550a";
-		reg = <0xb80003f8 0x8>;
-		clock-frequency = <1843200>;
-	};
-
 	uart2: serial@bf000900 {
 		compatible = "ns16550a";
 		reg = <0xbf000900 0x40>;
 		reg-shift = <3>;
 		clock-frequency = <1843200>;
-        /* The CBUS UART is attached to the MIPS CPU INT2 pin, ie interrupt 4 */
-        interrupt-parent = <&cpu_intc>;
         interrupts = <4>;
 	};
 
