@@ -194,7 +194,7 @@ pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {
             let tls = tf.tls;
 
             set_trapframe_register(rt, tls, tf);
-            debug!("Read TLS by rdhwr {:x} to register {:?}", tls, rt);
+            trace!("Read TLS by rdhwr {:x} to register {:?}", tls, rt);
             tf.epc = tf.epc + 4;
             return true;
         } else {

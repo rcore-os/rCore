@@ -510,6 +510,7 @@ pub fn spawn(thread: Arc<Thread>) {
             trace!("back from user: {:#x?} trap_num {:#x}", cx, trap_num);
 
             let mut exit = false;
+            let mut do_yield = false;
             match trap_num {
                 // must be first
                 _ if is_page_fault(trap_num) => {
@@ -527,6 +528,7 @@ pub fn spawn(thread: Arc<Thread>) {
                     crate::arch::interrupt::ack(trap_num);
                     trace!("handle irq {:#x}", trap_num);
                     if is_timer_intr(trap_num) {
+                        do_yield = true;
                         crate::arch::interrupt::timer();
                     }
                     IRQ_MANAGER.read().try_handle_interrupt(Some(trap_num));
@@ -556,7 +558,7 @@ pub fn spawn(thread: Arc<Thread>) {
             if exit {
                 info!("thread {} stopped", thread.tid);
                 break;
-            } else {
+            } else if do_yield {
                 yield_now().await;
             }
         }
