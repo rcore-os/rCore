@@ -64,7 +64,7 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
     let cause = cp0::cause::Cause {
         bits: tf.cause as u32,
     };
-    debug!("Exception @ CPU{}: {:?} ", 0, cause.cause());
+    trace!("Exception @ CPU{}: {:?} ", 0, cause.cause());
     match cause.cause() {
         E::Interrupt => interrupt_dispatcher(tf),
         E::Syscall => syscall(tf),
@@ -83,28 +83,18 @@ fn interrupt_dispatcher(tf: &mut TrapFrame) {
         bits: tf.cause as u32,
     };
     let pint = cause.pending_interrupt();
-    // trace!("  Interrupt {:08b} ", pint);
+    trace!("  Interrupt {:08b} ", pint);
     if (pint & 0b100_000_00) != 0 {
         timer();
     } else if (pint & 0b011_111_00) != 0 {
-        external();
+        for i in 0..6 {
+            if (pint & (1 << i)) != 0 {
+                IRQ_MANAGER.read().try_handle_interrupt(Some(i));
+            }
+        }
     } else {
         ipi();
     }
-}
-
-fn external() {
-    // true means handled, false otherwise
-    let handlers = [try_process_drivers];
-    for handler in handlers.iter() {
-        if handler() == true {
-            break;
-        }
-    }
-}
-
-fn try_process_drivers() -> bool {
-    IRQ_MANAGER.read().try_handle_interrupt(None)
 }
 
 fn ipi() {

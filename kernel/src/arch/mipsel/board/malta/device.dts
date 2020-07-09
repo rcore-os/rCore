@@ -30,8 +30,6 @@
 		reg = <0xbf000900 0x40>;
 		reg-shift = <3>;
 		clock-frequency = <1843200>;
-        /* The CBUS UART is attached to the MIPS CPU INT2 pin, ie interrupt 4 */
-        interrupt-parent = <&cpu_intc>;
         interrupts = <4>;
 	};
 

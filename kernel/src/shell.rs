@@ -13,10 +13,6 @@ pub fn add_user_shell() {
     // This one can transfer env vars!
     // Why???
 
-    #[cfg(target_arch = "mips")]
-    let init_shell = "/rust/sh"; //from docker-library
-
-    #[cfg(not(target_arch = "mips"))]
     let init_shell = "/busybox"; //from docker-library
 
     #[cfg(target_arch = "x86_64")]
