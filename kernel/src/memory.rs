@@ -32,8 +32,20 @@ pub static FRAME_ALLOCATOR: SpinNoIrqLock<FrameAlloc> = SpinNoIrqLock::new(Frame
 
 /// Convert physical address to virtual address
 #[inline]
+#[cfg(not(mipsel))]
 pub const fn phys_to_virt(paddr: usize) -> usize {
     PHYSICAL_MEMORY_OFFSET + paddr
+}
+
+/// MIPS is special
+#[inline]
+#[cfg(mipsel)]
+pub const fn phys_to_virt(paddr: usize) -> usize {
+    if paddr <= PHYSICAL_MEMORY_OFFSET {
+        PHYSICAL_MEMORY_OFFSET + paddr
+    } else {
+        paddr
+    }
 }
 
 /// Convert virtual address to physical address

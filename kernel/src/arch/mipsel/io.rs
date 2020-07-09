@@ -1,22 +1,14 @@
 //! Input/output for mipsel.
 
-use super::driver::serial::*;
-use crate::drivers::console::CONSOLE;
+use crate::drivers::{console::CONSOLE, SERIAL_DRIVERS};
 use core::fmt::{Arguments, Write};
 
-pub fn getchar() -> u8 {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().getchar()
-}
-
-pub fn getchar_option() -> Option<u8> {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().getchar_option()
-}
-
 pub fn putfmt(fmt: Arguments) {
-    unsafe { SERIAL_PORT.force_unlock() }
-    SERIAL_PORT.lock().write_fmt(fmt).unwrap();
+    // output to serial
+    let mut drivers = SERIAL_DRIVERS.write();
+    if let Some(serial) = drivers.first_mut() {
+        serial.write(format!("{}", fmt).as_bytes());
+    }
 
     unsafe { CONSOLE.force_unlock() }
     if let Some(console) = CONSOLE.lock().as_mut() {

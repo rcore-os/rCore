@@ -1,6 +1,5 @@
 pub mod consts;
 pub mod cpu;
-pub mod driver;
 pub mod fp;
 pub mod interrupt;
 pub mod io;
@@ -36,13 +35,13 @@ pub extern "C" fn rust_main() -> ! {
         memory::clear_bss();
     }
 
-    board::init_serial_early();
+    board::early_init();
     crate::logging::init();
 
     interrupt::init();
     memory::init();
     timer::init();
-    driver::init();
+    board::init(dtb_start);
 
     info!("Hello MIPS 32 from CPU {}, dtb @ {:#x}", cpu_id, dtb_start);
 

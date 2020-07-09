@@ -16,6 +16,7 @@ use device_tree::Node;
 
 pub struct SerialPort {
     base: usize,
+    multiplier: usize,
 }
 
 impl Driver for SerialPort {
@@ -38,8 +39,11 @@ impl Driver for SerialPort {
 }
 
 impl SerialPort {
-    fn new(base: usize) -> SerialPort {
-        let mut res = SerialPort { base: 0 };
+    fn new(base: usize, shift: usize) -> SerialPort {
+        let mut res = SerialPort {
+            base: 0,
+            multiplier: 1 << shift,
+        };
         res.init(base);
         res
     }
@@ -47,39 +51,42 @@ impl SerialPort {
     pub fn init(&mut self, base: usize) {
         self.base = base;
         // Turn off the FIFO
-        write(self.base + COM_FCR, 0 as u8);
+        write(self.base + COM_FCR * self.multiplier, 0 as u8);
         // Set speed; requires DLAB latch
-        write(self.base + COM_LCR, COM_LCR_DLAB);
-        write(self.base + COM_DLL, (115200 / 9600) as u8);
-        write(self.base + COM_DLM, 0 as u8);
+        write(self.base + COM_LCR * self.multiplier, COM_LCR_DLAB);
+        //write(self.base + COM_DLL * self.multiplier, (115200 / 9600) as u8);
+        //write(self.base + COM_DLM * self.multiplier, 0 as u8);
 
         // 8 data bits, 1 stop bit, parity off; turn off DLAB latch
-        write(self.base + COM_LCR, COM_LCR_WLEN8 & !COM_LCR_DLAB);
+        write(
+            self.base + COM_LCR * self.multiplier,
+            COM_LCR_WLEN8 & !COM_LCR_DLAB,
+        );
 
         // No modem controls
-        write(self.base + COM_MCR, 0 as u8);
+        write(self.base + COM_MCR * self.multiplier, 0 as u8);
         // Enable rcv interrupts
-        write(self.base + COM_IER, COM_IER_RDI);
+        write(self.base + COM_IER * self.multiplier, COM_IER_RDI);
     }
 
     /// non-blocking version of putchar()
     pub fn putchar(&self, c: u8) {
         for _ in 0..100 {
-            if (read::<u8>(self.base + COM_LSR) & COM_LSR_TXRDY) == 0 {
+            if (read::<u8>(self.base + COM_LSR * self.multiplier) & COM_LSR_TXRDY) == 0 {
                 break;
             }
         }
-        write(self.base + COM_TX, c);
+        write(self.base + COM_TX * self.multiplier, c);
     }
 
     /// blocking version of getchar()
     pub fn getchar(&mut self) -> u8 {
         loop {
-            if (read::<u8>(self.base + COM_LSR) & COM_LSR_DATA) == 0 {
+            if (read::<u8>(self.base + COM_LSR * self.multiplier) & COM_LSR_DATA) == 0 {
                 break;
             }
         }
-        let c = read::<u8>(self.base + COM_RX);
+        let c = read::<u8>(self.base + COM_RX * self.multiplier);
         match c {
             255 => b'\0', // null
             c => c,
@@ -88,9 +95,9 @@ impl SerialPort {
 
     /// non-blocking version of getchar()
     pub fn getchar_option(&self) -> Option<u8> {
-        match read::<u8>(self.base + COM_LSR) & COM_LSR_DATA {
+        match read::<u8>(self.base + COM_LSR * self.multiplier) & COM_LSR_DATA {
             0 => None,
-            _ => Some(read::<u8>(self.base + COM_RX) as u8),
+            _ => Some(read::<u8>(self.base + COM_RX * self.multiplier) as u8),
         }
     }
 }
@@ -128,10 +135,11 @@ const COM_LSR_TXRDY: u8 = 0x20; // Transmit buffer avail
 const COM_LSR_TSRE: u8 = 0x40; // Transmitter off
 
 pub fn init_dt(dt: &Node) {
-    let addr = dt.prop_u64("reg").unwrap() as usize;
+    let addr = dt.prop_usize("reg").unwrap();
+    let shift = dt.prop_u32("reg-shift").unwrap_or(0) as usize;
     let base = phys_to_virt(addr);
     info!("Init uart16550 at {:#x}", base);
-    let com = Arc::new(SerialPort::new(base));
+    let com = Arc::new(SerialPort::new(base, shift));
     let mut found = false;
     let irq_opt = dt.prop_u32("interrupts").ok().map(|irq| irq as usize);
     DRIVERS.write().push(com.clone());

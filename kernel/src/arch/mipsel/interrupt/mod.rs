@@ -23,12 +23,7 @@ pub fn init() {
     status.enable_soft_int1();
     // Enable clock interrupt
     status.enable_hard_int5();
-    // status.enable_hard_int4();
-    // status.enable_hard_int3();
-    // status.enable_hard_int2();
-    // status.enable_hard_int1();
-    // status.enable_hard_int0();
-    // error!("{:#x?}", status);
+
     cp0::status::write(status);
     info!("interrupt: init end");
 }
@@ -100,22 +95,11 @@ fn interrupt_dispatcher(tf: &mut TrapFrame) {
 
 fn external() {
     // true means handled, false otherwise
-    let handlers = [try_process_serial, try_process_drivers];
+    let handlers = [try_process_drivers];
     for handler in handlers.iter() {
         if handler() == true {
             break;
         }
-    }
-}
-
-fn try_process_serial() -> bool {
-    match super::io::getchar_option() {
-        Some(ch) => {
-            trace!("Get char {} from serial", ch);
-            crate::trap::serial(ch);
-            true
-        }
-        None => false,
     }
 }
 
@@ -248,22 +232,6 @@ pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
             } else {
                 tlb_entry.entry_lo1.valid()
             };
-            // thread.vm.lock().handle_page_fault(addr);
-            // if !crate::memory::handle_page_fault(addr) {
-            //     extern "C" {
-            //         fn _copy_user_start();
-            //         fn _copy_user_end();
-            //     }
-            //     let mut inner = thread.inner.lock();
-            //     if let Some(tf) = &mut inner.context {
-            //         let mut tf = &mut tf.user;
-            //         if tf.epc >= _copy_user_start as usize && tf.epc < _copy_user_end as usize {
-            //             debug!("fixup for addr {:x?}", addr);
-            //             tf.epc = crate::memory::read_user_fixup as usize;
-            //             return true;
-            //         }
-            //     }
-            // }
 
             if !tlb_valid {
                 if !thread.vm.lock().handle_page_fault(addr) {
@@ -352,5 +320,3 @@ pub fn wait_for_interrupt() {
     cp0::status::enable_interrupt();
     cp0::status::disable_interrupt();
 }
-
-//2ea84

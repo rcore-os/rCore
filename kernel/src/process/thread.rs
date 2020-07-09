@@ -55,7 +55,7 @@ use xmas_elf::{
 pub type Tid = usize;
 
 pub struct ThreadContext {
-    pub user: Box<UserContext>,
+    user: Box<UserContext>,
     /// TODO: lazy fp
     fp: Box<FpState>,
 }
@@ -65,7 +65,7 @@ pub struct ThreadContext {
 pub struct ThreadInner {
     /// user context
     /// None when thread is running in user
-    pub context: Option<ThreadContext>,
+    context: Option<ThreadContext>,
     /// Kernel performs futex wake when thread exits.
     /// Ref: [http://man7.org/linux/man-pages/man2/set_tid_address.2.html]
     pub clear_child_tid: usize,

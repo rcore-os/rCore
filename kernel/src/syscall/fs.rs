@@ -664,11 +664,11 @@ impl Syscall<'_> {
         let flags = AtFlags::from_bits_truncate(flags);
         if !proc.pid.is_init() {
             // we trust pid 0 process
+            info!(
+                "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
+                dirfd as isize, path, mode, flags
+            );
         }
-        info!(
-            "faccessat: dirfd: {}, path: {:?}, mode: {:#o}, flags: {:?}",
-            dirfd as isize, path, mode, flags
-        );
         let _inode =
             proc.lookup_inode_at(dirfd, &path, !flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
         Ok(0)

@@ -48,7 +48,7 @@ bitvec = { version = "0.17", default-features = false, features = ["alloc"] }
 bit_field = "0.10"
 buddy_system_allocator = "0.4.0"
 compression = { version = "0.1.4", default-features = false, features = ["gzip"] }
-device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "2fa8411c" }
+device_tree = { git = "https://github.com/rcore-os/device_tree-rs", rev = "eee2c23" }
 executor = { git = "https://github.com/rcore-os/executor.git", rev = "a2d02ee9" }
 isomorphic_drivers = { git = "https://github.com/rcore-os/isomorphic_drivers", rev = "fcf694d2", features = ["log"] }
 lazy_static = { version = "1.4", features = ["spin_no_std"] }

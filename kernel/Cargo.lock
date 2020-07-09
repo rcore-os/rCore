@@ -166,7 +166,7 @@ dependencies = [
 [[package]]
 name = "device_tree"
 version = "1.0.3"
-source = "git+https://github.com/rcore-os/device_tree-rs?rev=2fa8411c#2fa8411c421c6b4761992fd3d1a9b2427bf0cfc4"
+source = "git+https://github.com/rcore-os/device_tree-rs?rev=eee2c23#eee2c23d50a2cdacb7777429d71e00691b361978"
 
 [[package]]
 name = "either"
