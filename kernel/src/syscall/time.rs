@@ -18,7 +18,12 @@ impl Syscall<'_> {
             return Err(SysError::EINVAL);
         }
 
-        let timeval = TimeVal::get_epoch();
+        // let timeval = TimeVal::get_epoch();
+        let curr = crate::arch::timer::timer_now();
+        let timeval = TimeVal {
+            sec: curr.as_secs() as usize,
+            usec: (curr.subsec_nanos() / 1000) as usize,
+        };
         tv.write(timeval)?;
         Ok(0)
     }
