@@ -93,15 +93,29 @@ lazy_static! {
         RwLock::new(BTreeMap::new());
 }
 
+/// next thread's id
+pub static ALLOC_ID: Mutex<usize> = Mutex::new(1);
+
+fn alloc_tid() -> Tid {
+    // let tid = (Pid::INIT..)
+    //     .find(|i| thread_table.get(i).is_none())
+    //     .unwrap();
+    let mut w = ALLOC_ID.lock();
+    let tid = *w;
+    *w += 1;
+    if *w > 1000 {
+        *w = 1;
+    }
+    tid
+}
+
 impl Thread {
     /// Assign a tid and put itself to global thread table.
     pub fn add_to_table(mut self) -> Arc<Self> {
         let mut thread_table = THREADS.write();
 
         // assign tid, do not start from 0
-        let tid = (Pid::INIT..)
-            .find(|i| thread_table.get(i).is_none())
-            .unwrap();
+        let tid = alloc_tid();
         self.tid = tid;
 
         // put to thread table
@@ -343,6 +357,7 @@ impl Thread {
                 parent: (Pid::new(), Weak::new()),
                 children: Vec::new(),
                 threads: Vec::new(),
+                exit_threads: Vec::new(),
                 exit_code: 0,
                 pending_sigset: Sigset::empty(),
                 sig_queue: VecDeque::new(),
@@ -386,6 +401,7 @@ impl Thread {
             parent: (proc.pid.clone(), Arc::downgrade(&self.proc)),
             children: Vec::new(),
             threads: Vec::new(),
+            exit_threads: Vec::new(),
             exit_code: 0,
             pending_sigset: Sigset::empty(),
             sig_queue: VecDeque::new(),
@@ -516,7 +532,7 @@ pub fn spawn(thread: Arc<Thread>) {
                 _ if is_page_fault(trap_num) => {
                     // page fault
                     let addr = get_page_fault_addr();
-                    info!("page fault from user @ {:#x}", addr);
+                    // info!("page fault from user @ {:#x}", addr);
 
                     if !handle_user_page_fault(&thread, addr) {
                         // TODO: SIGSEGV

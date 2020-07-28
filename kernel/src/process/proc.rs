@@ -106,6 +106,10 @@ pub struct Process {
     /// threads in the same process
     pub threads: Vec<Tid>,
 
+    /// Threads
+    /// threads in the same process, witch has exit, wait release
+    pub exit_threads: Vec<Tid>,
+
     /// Events like exiting
     pub eventbus: Arc<Mutex<EventBus>>,
 
@@ -217,7 +221,11 @@ impl Process {
         for tid in self.threads.iter() {
             thread_table.remove(tid);
         }
+        for tid in self.exit_threads.iter() {
+            thread_table.remove(tid);
+        }
         self.threads.clear();
+        self.exit_threads.clear();
 
         info!("process {} exit with {}", self.pid.get(), exit_code);
     }

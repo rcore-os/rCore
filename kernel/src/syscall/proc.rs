@@ -342,6 +342,7 @@ impl Syscall<'_> {
 
         let mut proc = self.process();
         proc.threads.retain(|&id| id != tid);
+        proc.exit_threads.push(tid);
 
         // for last thread, exit the process
         if proc.threads.len() == 0 {
