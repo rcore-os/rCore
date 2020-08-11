@@ -29,13 +29,19 @@ See [Travis script](./.travis.yml) for details.
 
 ### How to run
 
+Install appropriate dependencies to Host:
+
 ```bash
 $ rustup component add rust-src llvm-tools-preview
-$ cargo install cargo-binutils
-$ cargo install cargo-xbuild --force
-$ cargo install bootimage --version 0.5.7 --force
+$ cargo install cargo-binutils --version 0.1.7
+$ cargo install bootimage --version 0.5.7
+
+#git clone cargo-xbuild from github, then checkout tag v0.5.6. Apply patch: https://github.com/rust-osdev/cargo-xbuild/pull/75/commits/eede1a1d4c08064763f1943c0920de2270260b33
+#When `cargo xbuild`, you can use a local `rust-src`: `export XARGO_RUST_SRC=~/.rustup/toolchains/nightly-2019-03-05-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src/`
+$ cargo install cargo-xbuild --path /path/to/cargo-xbuild/
 ```
 
+Run rCore:
 ```bash
 $ git clone https://github.com/rcore-os/rCore.git --recursive
 $ cd rCore/user
@@ -43,6 +49,15 @@ $ make sfsimg arch={riscv32,riscv64,x86_64,aarch64,mipsel} # requires $(arch)-li
 $ cd ../kernel
 $ make run arch={riscv32,riscv64,x86_64,aarch64,mipsel} mode=release
 $ make run arch=x86_64 mode=release pci_passthru=0000:00:00.1 # for ixgbe real nic, find its pci (bus, dev, func) first
+
+#eg: QEMU
+$ make run arch=riscv32
+#OR
+$ make run arch=riscv64
+
+#eg: k210 riscv64
+$ make install arch=riscv64 board=k210 mode=debug
+
 ```
 
 ## Maintainers

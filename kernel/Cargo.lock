@@ -84,8 +84,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitvec"
-version = "0.11.0"
-source = "git+https://github.com/myrrlyn/bitvec.git#ed2aec38bfb5b1116e3585b1574c50655b9c85ec"
+version = "0.11.1"
+source = "git+https://github.com/myrrlyn/bitvec.git#41d9f268733dadd8205dfc589d2e115b237c4861"
 
 [[package]]
 name = "bootloader"
@@ -370,7 +370,7 @@ dependencies = [
  "bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
- "bitvec 0.11.0 (git+https://github.com/myrrlyn/bitvec.git)",
+ "bitvec 0.11.1 (git+https://github.com/myrrlyn/bitvec.git)",
  "bootloader 0.4.0 (git+https://github.com/rcore-os/bootloader)",
  "buddy_system_allocator 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -664,7 +664,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)" = "<none>"
-"checksum bitvec 0.11.0 (git+https://github.com/myrrlyn/bitvec.git)" = "<none>"
+"checksum bitvec 0.11.1 (git+https://github.com/myrrlyn/bitvec.git)" = "<none>"
 "checksum bitvec 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cfadef5c4e2c2e64067b9ecc061179f12ac7ec65ba613b1f60f3972bbada1f5b"
 "checksum bootloader 0.4.0 (git+https://github.com/rcore-os/bootloader)" = "<none>"
 "checksum buddy_system_allocator 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2ed828f1e227d6e32b998d6375b67fd63ac5389d50b23f258ce151d22b6cc595"

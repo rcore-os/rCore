@@ -210,6 +210,8 @@ build_args := --target targets/$(target).json --features "$(features)"
 
 ifeq ($(mode), release)
 build_args += --release
+else ifeq ($(mode), debug)
+build_args += --verbose
 endif
 
 ### prefix ###
@@ -376,8 +378,8 @@ ifeq ($(board), k210)
 .PHONY:
 install: $(kernel_img)
 	@$(objcopy) -S -O binary ../tools/opensbi/k210.elf $(build_path)/k210.img
-	@dd if=$< of=$(build_path)/k210.img bs=0x10000 seek=1
-	@python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
+	@dd if=$< of=$(build_path)/k210.img bs=65536 seek=1
+	@echo Flash firmware to Kendryte K210: python3 ../tools/k210/kflash.py -b 600000 $(build_path)/k210.img
 endif
 
 .PHONY:
