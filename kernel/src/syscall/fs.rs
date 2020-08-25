@@ -116,7 +116,7 @@ impl Syscall<'_> {
 
     pub async fn sys_poll(
         &mut self,
-        ufds: UserInOutPtr<PollFd>,
+        mut ufds: UserInOutPtr<PollFd>,
         nfds: usize,
         timeout_msecs: usize,
     ) -> SysResult {
@@ -132,7 +132,7 @@ impl Syscall<'_> {
         // check whether the fds is valid and is owned by this process
         let condvars = alloc::vec![&(*TICK_ACTIVITY), &(*SOCKET_ACTIVITY)];
 
-        let polls = ufds.read_array(nfds).unwrap();
+        let mut polls = ufds.read_array(nfds).unwrap();
 
         if !proc.pid.is_init() {
             info!("poll: fds: {:?}", polls);
@@ -142,7 +142,7 @@ impl Syscall<'_> {
 
         #[must_use = "future does nothing unless polled/`await`-ed"]
         struct PollFuture<'a> {
-            polls: Vec<PollFd>,
+            polls: &'a mut Vec<PollFd>,
             syscall: &'a Syscall<'a>,
         }
 
@@ -193,10 +193,12 @@ impl Syscall<'_> {
         }
 
         let future = PollFuture {
-            polls,
+            polls: &mut polls,
             syscall: self,
         };
-        future.await
+        let res = future.await;
+        ufds.write_array(&polls)?;
+        res
     }
 
     pub fn sys_pselect6(
