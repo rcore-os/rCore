@@ -21,8 +21,6 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
 #![allow(unused_imports)]
-#![allow(unreachable_patterns)]
-#![allow(unused_assignments)]
 #![no_std]
 
 // just keep it ...
@@ -54,6 +52,8 @@ pub mod lkm;
 pub mod memory;
 pub mod net;
 pub mod process;
+#[cfg(feature = "hypervisor")]
+pub mod rvm;
 pub mod shell;
 pub mod signal;
 pub mod sync;

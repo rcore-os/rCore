@@ -36,6 +36,8 @@ link_user = []
 run_cmdline = []
 # Add performance profiling
 profile = []
+# Rcore Virtual machine
+hypervisor = ["rvm"]
 
 [profile.dev]
 # MUST >= 2 : Enable RVO to avoid stack overflow
@@ -74,6 +76,7 @@ virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "df
 volatile = "0.2"
 woke = "0.0.2"
 xmas-elf = "0.7"
+rvm = { git = "https://github.com/rcore-os/RVM", rev = "939eb0a", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
