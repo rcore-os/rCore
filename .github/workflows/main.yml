@@ -57,5 +57,9 @@ jobs:
 
     - name: Download prebuilt user image
       run: cd user && make sfsimg ARCH=${{ matrix.arch }} PREBUILT=1 && cd ..
+
     - name: Build kernel
       run: cd kernel && make build ARCH=${{ matrix.arch }} && cd ..
+    - name: Build kernel with hypervisor
+      if: runner.os == 'Linux' && matrix.arch == 'x86_64'
+      run: cd kernel && make build ARCH=${{ matrix.arch }} HYPERVISOR=on && cd ..

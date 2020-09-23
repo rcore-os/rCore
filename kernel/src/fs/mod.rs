@@ -83,6 +83,9 @@ lazy_static! {
         devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
         devfs.add("shm", Arc::new(ShmINode::default())).expect("failed to mkdir shm");
 
+        #[cfg(feature = "hypervisor")]
+        devfs.add("rvm", Arc::new(crate::rvm::RvmINode::new())).expect("failed to mknod /dev/rvm");
+
         // mount DevFS at /dev
         let dev = root.find(true, "dev").unwrap_or_else(|_| {
             root.create("dev", FileType::Dir, 0o666).expect("failed to mkdir /dev")

@@ -26,6 +26,8 @@
 #   PCI_PASSTHRU = 0000:00:00.1 [ x86_64 only] Passthrough the specified PCI device
 #   INIT = /bin/ls              [riscv64 only] Run specified program instead of user shell
 #   EXTRA_NIC = on | off        [ x86_64 only] Add an additional e1000 nic
+#   ACCEL = on | off            [ x86_64 only] Enable/disable kvm/hvf acceleration
+#   HYPERVISOR = on | off       [ x86_64 only] Enable/disable the RVM hypervisor, and set ACCEL to on
 #   FEATURES = profile | ...    Add additional features
 
 ARCH ?= riscv64
@@ -36,6 +38,8 @@ SMP  ?= 4
 PCI_PASSTHRU ?=
 INIT ?=
 EXTRA_NIC ?= off
+ACCEL ?= off
+HYPERVISOR ?= off
 
 qemu := qemu-system-$(ARCH)
 target := $(ARCH)
@@ -92,10 +96,6 @@ qemu_net_opts += \
 	-device vfio-pci,host=$(PCI_PASSTHRU)
 qemu_ui_opts += \
 	-vga std
-endif
-ifeq ($(shell uname), Darwin)
-qemu_opts += \
-	-machine accel=hvf
 endif
 ifeq ($(EXTRA_NIC), on)
 qemu_net_opts += \
@@ -169,6 +169,19 @@ endif
 ifeq ($(NET), on)
 qemu_opts += $(qemu_net_opts)
 qemu := sudo $(qemu)
+endif
+
+ifeq ($(HYPERVISOR), on)
+FEATURES += hypervisor
+ACCEL = on
+endif
+
+ifeq ($(ACCEL), on)
+ifeq ($(shell uname), Darwin)
+qemu_opts += -accel hvf
+else
+qemu_opts += -accel kvm -cpu host
+endif
 endif
 
 ### build args ###
