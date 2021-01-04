@@ -140,6 +140,7 @@ qemu_opts += \
 	-kernel ../tools/opensbi/fu540.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img)
 else
+# Old version Qemu? Qemu v4.x
 qemu_opts += \
 	-machine virt \
 	-kernel ../tools/opensbi/virt_rv64.elf \
@@ -234,7 +235,7 @@ endif
 
 gdb := $(prefix)gdb
 objdump := cargo objdump -- -arch-name=$(subst _,-,$(arch))
-objcopy := cargo objcopy -- --binary-architecture=$(subst _,-,$(arch))
+objcopy := rust-objcopy --binary-architecture=$(subst _,-,$(arch))
 strip := cargo strip --
 dtc := dtc
 hostcc := gcc

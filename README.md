@@ -36,8 +36,12 @@ $ rustup component add rust-src llvm-tools-preview
 $ cargo install cargo-binutils --version 0.1.7
 $ cargo install bootimage --version 0.5.7
 
-#git clone cargo-xbuild from github, then checkout tag v0.5.6. Apply patch: https://github.com/rust-osdev/cargo-xbuild/pull/75/commits/eede1a1d4c08064763f1943c0920de2270260b33
-#When `cargo xbuild`, you can use a local `rust-src`: `export XARGO_RUST_SRC=~/.rustup/toolchains/nightly-2019-03-05-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src/`
+#git clone cargo-xbuild from github, then checkout tag v0.5.6. 
+#Apply patch: https://github.com/rust-osdev/cargo-xbuild/pull/75/commits/eede1a1d4c08064763f1943c0920de2270260b33
+#OR just pull: https://github.com/elliott10/cargo-xbuild.git
+
+#When `cargo xbuild`, you can use a local `rust-src`: 
+#`export XARGO_RUST_SRC=~/.rustup/toolchains/nightly-2019-03-05-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src/`
 $ cargo install cargo-xbuild --path /path/to/cargo-xbuild/
 ```
 
