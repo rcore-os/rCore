@@ -2,14 +2,14 @@
 #![allow(dead_code)]
 
 #[derive(Clone, Copy, Debug)]
-pub struct SBIRet{
+pub struct SBIRet {
     error: isize,
-    value: usize
+    value: usize,
 }
 #[derive(Clone, Copy, Debug)]
-pub struct SBICall{
+pub struct SBICall {
     eid: usize,
-    fid: usize
+    fid: usize,
 }
 #[inline(always)]
 fn sbi_call(which: SBICall, arg0: usize, arg1: usize, arg2: usize) -> SBIRet {
@@ -22,24 +22,46 @@ fn sbi_call(which: SBICall, arg0: usize, arg1: usize, arg2: usize) -> SBIRet {
             : "memory"
             : "volatile");
     }
-    SBIRet{
+    SBIRet {
         error: ret1,
-        value: ret2
+        value: ret2,
     }
 }
 
-pub fn sbi_hart_start(hartid: usize, start_addr: usize, opaque: usize)->SBIRet{
-    sbi_call(SBICall{eid: SBI_EID_HSM, fid: SBI_FID_HSM_START}, hartid, start_addr as usize, opaque)
+pub fn sbi_hart_start(hartid: usize, start_addr: usize, opaque: usize) -> SBIRet {
+    sbi_call(
+        SBICall {
+            eid: SBI_EID_HSM,
+            fid: SBI_FID_HSM_START,
+        },
+        hartid,
+        start_addr as usize,
+        opaque,
+    )
 }
-pub fn sbi_hart_stop()->!{
-    sbi_call(SBICall{eid: SBI_EID_HSM, fid: SBI_FID_HSM_STOP}, 0, 0, 0);
+pub fn sbi_hart_stop() -> ! {
+    sbi_call(
+        SBICall {
+            eid: SBI_EID_HSM,
+            fid: SBI_FID_HSM_STOP,
+        },
+        0,
+        0,
+        0,
+    );
     unreachable!();
 }
-pub fn sbi_hart_get_status(hartid: usize)->SBIRet{
-    sbi_call(SBICall{eid: SBI_EID_HSM, fid: SBI_FID_HSM_START}, hartid, 0, 0)
+pub fn sbi_hart_get_status(hartid: usize) -> SBIRet {
+    sbi_call(
+        SBICall {
+            eid: SBI_EID_HSM,
+            fid: SBI_FID_HSM_START,
+        },
+        hartid,
+        0,
+        0,
+    )
 }
-
-
 
 const SBI_SUCCESS: isize = 0;
 const SBI_ERR_FAILED: isize = -1;
@@ -55,7 +77,6 @@ const SBI_FID_HSM_STOP: usize = 1;
 const SBI_FID_HSM_STATUS: usize = 2;
 
 /// Legacy calls.
-
 
 #[inline(always)]
 fn sbi_call_legacy(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {

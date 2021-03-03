@@ -22,15 +22,15 @@ pub mod syscall;
 pub mod timer;
 
 use crate::memory::phys_to_virt;
-use core::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use riscv::register::sie;
 
-fn start_all_harts(){
+fn start_all_harts() {
     // simply wake up the first 64 harts.
     use sbi::sbi_hart_start;
-    for i in 0..64{
-        let ret=sbi_hart_start(i, 0x80200000usize , i);
-        info!("Start {}: {:?}",i,ret);
+    for i in 0..64 {
+        let ret = sbi_hart_start(i, 0x80200000usize, i);
+        info!("Start {}: {:?}", i, ret);
     }
 }
 
@@ -42,7 +42,10 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         cpu::set_cpu_id(hartid);
     }
 
-    if FIRST_HART.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok(){
+    if FIRST_HART
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
         LOTTERY_HART_ID.store(hartid, Ordering::SeqCst);
         start_all_harts();
     }
@@ -56,9 +59,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         memory::clear_bss();
     }
     crate::logging::init();
-    
 
-    
     unsafe {
         trapframe::init();
     }
@@ -76,7 +77,7 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         hartid, device_tree_vaddr
     );
     AP_CAN_INIT.store(true, Ordering::Relaxed);
-    
+
     crate::kmain();
 }
 
