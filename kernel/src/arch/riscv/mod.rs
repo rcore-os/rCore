@@ -22,8 +22,17 @@ pub mod syscall;
 pub mod timer;
 
 use crate::memory::phys_to_virt;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
 use riscv::register::sie;
+
+fn start_all_harts(){
+    // simply wake up the first 64 harts.
+    use sbi::sbi_hart_start;
+    for i in 0..64{
+        let ret=sbi_hart_start(i, 0x80200000usize , i);
+        info!("Start {}: {:?}",i,ret);
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
@@ -33,7 +42,12 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         cpu::set_cpu_id(hartid);
     }
 
-    if hartid != BOOT_HART_ID {
+    if FIRST_HART.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok(){
+        LOTTERY_HART_ID.store(hartid, Ordering::SeqCst);
+        start_all_harts();
+    }
+    let main_hart = LOTTERY_HART_ID.load(Ordering::SeqCst);
+    if hartid != main_hart {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {}
         others_main(hartid);
     }
@@ -41,13 +55,10 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
     unsafe {
         memory::clear_bss();
     }
-
-    info!(
-        "Hello RISCV! in hart {}, device tree @ {:#x}",
-        hartid, device_tree_vaddr
-    );
-
     crate::logging::init();
+    
+
+    
     unsafe {
         trapframe::init();
     }
@@ -60,8 +71,12 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         board::init_external_interrupt();
     }
     crate::process::init();
-
+    info!(
+        "Hello RISCV! in hart {}, device tree @ {:#x}",
+        hartid, device_tree_vaddr
+    );
     AP_CAN_INIT.store(true, Ordering::Relaxed);
+    
     crate::kmain();
 }
 
@@ -76,6 +91,8 @@ fn others_main(hartid: usize) -> ! {
 }
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
+static FIRST_HART: AtomicBool = AtomicBool::new(false);
+static LOTTERY_HART_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(not(feature = "board_u540"))]
 const BOOT_HART_ID: usize = 0;
