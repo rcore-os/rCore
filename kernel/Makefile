@@ -128,7 +128,7 @@ else
 qemu_opts += \
 	-machine virt \
 	-serial mon:stdio \
-	-bios default \
+	-bios ../tools/opensbi/fw_jump.elf  \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
