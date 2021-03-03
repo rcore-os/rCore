@@ -89,7 +89,7 @@ fn map_kernel() {
         super::board::PERIPHERALS_START,
         super::board::PERIPHERALS_END,
         MemoryAttr::default().mmio(MMIOType::Device as u8),
-        Linear::new(offset),
+        Linear::new(0),
         "peripherals",
     );
 
