@@ -530,7 +530,6 @@ dependencies = [
 [[package]]
 name = "rcore-fs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=517af47#517af47ff3f632f05b91b9ea73a047aa8df363f3"
 dependencies = [
  "filetime",
  "spin",
@@ -540,7 +539,6 @@ dependencies = [
 [[package]]
 name = "rcore-fs-devfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=517af47#517af47ff3f632f05b91b9ea73a047aa8df363f3"
 dependencies = [
  "log",
  "rcore-fs",
@@ -550,7 +548,6 @@ dependencies = [
 [[package]]
 name = "rcore-fs-mountfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=517af47#517af47ff3f632f05b91b9ea73a047aa8df363f3"
 dependencies = [
  "lazy_static",
  "log",
@@ -561,7 +558,6 @@ dependencies = [
 [[package]]
 name = "rcore-fs-ramfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=517af47#517af47ff3f632f05b91b9ea73a047aa8df363f3"
 dependencies = [
  "log",
  "rcore-fs",
@@ -571,7 +567,6 @@ dependencies = [
 [[package]]
 name = "rcore-fs-sfs"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/rcore-fs?rev=517af47#517af47ff3f632f05b91b9ea73a047aa8df363f3"
 dependencies = [
  "bitvec",
  "log",
