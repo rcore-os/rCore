@@ -21,6 +21,7 @@ SECTIONS {
   .data : {
     sdata = .;
     *(.data .data.* .gnu.linkonce.d*)
+    *(.sdata .sdata.*)
     . = ALIGN(4K);
     edata = .;
   }

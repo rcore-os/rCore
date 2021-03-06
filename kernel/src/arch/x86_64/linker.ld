@@ -24,6 +24,7 @@ SECTIONS {
   .data ALIGN(4K):
   {
     *(.data .data.*)
+    *(.sdata .sdata.*)
   }
 
   .got ALIGN(4K):

@@ -35,6 +35,7 @@ SECTIONS
     .data : {
         sdata = .;
         *(.data .data.*)
+        *(.sdata .sdata.*)
         edata = .;
     }
 
