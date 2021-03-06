@@ -20,9 +20,6 @@ pub fn cpu_tick()->usize{
 pub fn do_tick(){
     if crate::arch::cpu::id() == 0 {
         let ret=TICK.fetch_add(1, Ordering::Relaxed);
-        if ret%100==0{
-            info!("{}", ret);
-        }
         
     }
     TICK_ALL_PROCESSORS.fetch_add(1, Ordering::Relaxed);

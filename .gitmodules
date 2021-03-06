@@ -7,3 +7,12 @@
 [submodule "submodules/rcore-fs"]
 	path = submodules/rcore-fs
 	url = https://github.com/rcore-os/rcore-fs
+[submodule "submodules/RVM"]
+	path = submodules/RVM
+	url = https://github.com/rcore-riscv-hypervisor-dev/RVM
+[submodule "submodules/riscv"]
+	path = submodules/riscv
+	url = https://github.com/rcore-riscv-hypervisor-dev/riscv
+[submodule "submodules/riscv-hypervisor-extension"]
+	path = submodules/riscv-hypervisor-extension
+	url = https://github.com/rcore-riscv-hypervisor-dev/riscv-hypervisor-extension

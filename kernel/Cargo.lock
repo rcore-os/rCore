@@ -504,7 +504,7 @@ dependencies = [
  "rcore-fs-ramfs",
  "rcore-fs-sfs",
  "rcore-memory",
- "riscv",
+ "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=38f3786)",
  "rlibc",
  "rvm",
  "smoltcp",
@@ -629,6 +629,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "riscv"
+version = "0.5.6"
+dependencies = [
+ "bare-metal",
+ "bit_field 0.10.1",
+ "bitflags",
+ "log",
+ "riscv-target",
+]
+
+[[package]]
 name = "riscv-target"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -667,7 +678,6 @@ dependencies = [
 [[package]]
 name = "rvm"
 version = "1.0.1"
-source = "git+https://github.com/rcore-os/RVM?rev=939eb0a#939eb0aafd100e9944e4f2fe90eebfa8149d2b85"
 dependencies = [
  "bit-set",
  "bit_field 0.10.1",
@@ -677,6 +687,7 @@ dependencies = [
  "log",
  "numeric-enum-macro",
  "raw-cpuid",
+ "riscv 0.5.6",
  "rvm_macros",
  "spin",
  "x86",
@@ -686,7 +697,6 @@ dependencies = [
 [[package]]
 name = "rvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/RVM?rev=939eb0a#939eb0aafd100e9944e4f2fe90eebfa8149d2b85"
 dependencies = [
  "quote",
  "syn",
