@@ -46,6 +46,7 @@ SECTIONS
     .bss : {
         sbss = .;
         *(.bss .bss.*)
+        *(.sbss .sbss.*)
         ebss = .;
     }
 

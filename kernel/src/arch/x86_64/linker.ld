@@ -34,5 +34,6 @@ SECTIONS {
   .bss ALIGN(4K):
   {
     *(.bss .bss.*)
+    *(.sbss .sbss.*)
   }
 }

@@ -34,6 +34,7 @@ SECTIONS {
     . = ALIGN(32);
     sbss = .;
     *(.bss .bss.*)
+    *(.sbss .sbss.*)
     *(COMMON)
     . = ALIGN(4K);
     ebss = .;
