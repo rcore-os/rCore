@@ -40,6 +40,7 @@ SECTIONS
     .data : {
         sdata = .;
         *(.data .data.*)
+        *(.sdata .sdata.*)
         edata = .;
     }
 
@@ -50,6 +51,7 @@ SECTIONS
     .bss : {
         sbss = .;
         *(.bss .bss.*)
+        *(.sbss .sbss.*)
         ebss = .;
     }
 
