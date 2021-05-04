@@ -5,7 +5,9 @@ use log::*;
 use rcore_memory::paging::*;
 use riscv::addr::*;
 use riscv::asm::{sfence_vma, sfence_vma_all};
-use riscv::paging::{FrameAllocator, FrameDeallocator};
+use riscv::paging::MapperFlushable;
+use riscv::paging::PTE;
+use riscv::paging::{FrameAllocatorFor, FrameDeallocatorFor};
 use riscv::paging::{Mapper, PageTable as RvPageTable, PageTableEntry, PageTableFlags as EF};
 use riscv::register::satp;
 
@@ -13,6 +15,13 @@ use riscv::register::satp;
 type TopLevelPageTable<'a> = riscv::paging::Rv32PageTable<'a>;
 #[cfg(target_arch = "riscv64")]
 type TopLevelPageTable<'a> = riscv::paging::Rv39PageTable<'a>;
+
+use riscv::use_sv32;
+use riscv::use_sv39;
+#[cfg(target_arch = "riscv32")]
+use_sv32!();
+#[cfg(target_arch = "riscv64")]
+use_sv39!();
 
 pub struct PageTableImpl {
     page_table: TopLevelPageTable<'static>,
@@ -29,7 +38,7 @@ impl PageTable for PageTableImpl {
         // map the 4K `page` to the 4K `frame` with `flags`
         let flags = EF::VALID | EF::READABLE | EF::WRITABLE;
         let page = Page::of_addr(VirtAddr::new(addr));
-        let frame = Frame::of_addr(PhysAddr::new(target));
+        let frame = Frame::of_addr(PhysAddr::new_u64(target as u64));
         // we may need frame allocator to alloc frame for new page table(first/second)
         self.page_table
             .map_to(page, frame, flags, &mut FrameAllocatorForRiscv)
@@ -99,11 +108,11 @@ impl Entry for PageEntry {
         self.0.flags_mut().set(EF::VALID | EF::READABLE, value);
     }
     fn target(&self) -> usize {
-        self.0.addr().as_usize()
+        self.0.addr::<PhysAddr>().as_usize()
     }
     fn set_target(&mut self, target: usize) {
         let flags = self.0.flags();
-        let frame = Frame::of_addr(PhysAddr::new(target));
+        let frame = Frame::of_addr(PhysAddr::new_u64(target as u64));
         self.0.set(frame, flags);
     }
     fn writable_shared(&self) -> bool {
@@ -153,7 +162,7 @@ impl PageTableImpl {
         #[cfg(target_arch = "riscv64")]
         let mask = 0x0fffffff_ffffffff;
         let frame = Frame::of_ppn(PageTableImpl::active_token() & mask);
-        let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET);
+        let table = frame.as_kernel_mut(PHYSICAL_MEMORY_OFFSET as u64);
         ManuallyDrop::new(PageTableImpl {
             page_table: TopLevelPageTable::new(table, PHYSICAL_MEMORY_OFFSET),
             root_frame: frame,
@@ -170,7 +179,7 @@ impl PageTableImpl {
 impl PageTableExt for PageTableImpl {
     fn new_bare() -> Self {
         let target = alloc_frame().expect("failed to allocate frame");
-        let frame = Frame::of_addr(PhysAddr::new(target));
+        let frame = Frame::of_addr(PhysAddr::new_u64(target as u64));
 
         let table = unsafe { &mut *(phys_to_virt(target) as *mut RvPageTable) };
         table.zero();
@@ -202,8 +211,8 @@ impl PageTableExt for PageTableImpl {
             }
             let flags =
                 EF::VALID | EF::READABLE | EF::WRITABLE | EF::EXECUTABLE | EF::ACCESSED | EF::DIRTY;
-            let frame = Frame::of_addr(PhysAddr::new(
-                (0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET,
+            let frame = Frame::of_addr(PhysAddr::new_u64(
+                ((0xFFFFFF80_00000000 + (i << 30)) - PHYSICAL_MEMORY_OFFSET) as u64,
             ));
             table[i].set(frame, flags);
         }
@@ -239,13 +248,13 @@ impl Drop for PageTableImpl {
 
 struct FrameAllocatorForRiscv;
 
-impl FrameAllocator for FrameAllocatorForRiscv {
+impl FrameAllocatorFor<PhysAddr> for FrameAllocatorForRiscv {
     fn alloc(&mut self) -> Option<Frame> {
-        alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new(addr)))
+        alloc_frame().map(|addr| Frame::of_addr(PhysAddr::new_u64(addr as u64)))
     }
 }
 
-impl FrameDeallocator for FrameAllocatorForRiscv {
+impl FrameDeallocatorFor<PhysAddr> for FrameAllocatorForRiscv {
     fn dealloc(&mut self, frame: Frame) {
         dealloc_frame(frame.start_address().as_usize());
     }

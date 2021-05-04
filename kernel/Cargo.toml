@@ -19,7 +19,7 @@ authors = [
 ]
 
 [features]
-default = ["hypervisor"]
+default = []
 board_qemu = []
 board_u540 = ["link_user"]
 # (for aarch64 RaspberryPi3)
@@ -88,7 +88,7 @@ uart_16550 = "0.2.7"
 x86_64 = "0.11"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv", rev = "38f3786", features = ["inline-asm"] }
+riscv = { path = "../submodules/riscv" ,  features = ["inline-asm", "hypervisor"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.1" }

@@ -127,6 +127,7 @@ qemu_opts += \
 else
 qemu_opts += \
 	-machine virt \
+	-cpu rv64,x-h=true \
 	-serial mon:stdio \
 	-bios ../tools/opensbi/fw_jump.elf  \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
@@ -257,6 +258,8 @@ debug: $(kernel) $(kernel_img)
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
+justdebug:
+	@$(qemu) $(qemu_opts) -s -S
 build: $(kernel_img)
 
 asm:

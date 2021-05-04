@@ -39,5 +39,5 @@ pub fn set_next() {
 
 pub fn timer_now() -> Duration {
     let time = get_cycle();
-    Duration::from_nanos(time * 100 )
+    Duration::from_nanos(time * 100)
 }

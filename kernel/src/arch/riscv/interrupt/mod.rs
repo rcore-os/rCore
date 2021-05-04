@@ -36,6 +36,11 @@ pub unsafe fn restore(flags: usize) {
 /// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
+    trap_handler_no_frame(&mut tf.sepc);
+}
+
+#[inline]
+pub fn trap_handler_no_frame(sepc: &mut usize) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
     let scause = scause::read();
     let stval = stval::read();
@@ -44,9 +49,9 @@ pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::LoadPageFault) => page_fault(stval, tf),
-        Trap::Exception(E::StorePageFault) => page_fault(stval, tf),
-        Trap::Exception(E::InstructionPageFault) => page_fault(stval, tf),
+        Trap::Exception(E::LoadPageFault) => page_fault(stval, sepc),
+        Trap::Exception(E::StorePageFault) => page_fault(stval, sepc),
+        Trap::Exception(E::InstructionPageFault) => page_fault(stval, sepc),
         _ => panic!("unhandled trap {:?}", scause.cause()),
     }
     trace!("Interrupt end");
@@ -73,9 +78,9 @@ pub fn timer() {
     crate::trap::timer();
 }
 
-fn page_fault(stval: usize, tf: &mut TrapFrame) {
+fn page_fault(stval: usize, sepc: &mut usize) {
     let addr = stval;
-    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    info!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
     if crate::memory::handle_page_fault(addr) {
         return;
@@ -84,9 +89,9 @@ fn page_fault(stval: usize, tf: &mut TrapFrame) {
         fn _copy_user_start();
         fn _copy_user_end();
     }
-    if tf.sepc >= _copy_user_start as usize && tf.sepc < _copy_user_end as usize {
-        debug!("fixup for addr {:x?}", addr);
-        tf.sepc = crate::memory::read_user_fixup as usize;
+    if *sepc >= _copy_user_start as usize && *sepc < _copy_user_end as usize {
+        info!("fixup for addr {:x?}", addr);
+        *sepc = crate::memory::read_user_fixup as usize;
         return;
     }
     panic!("unhandled page fault");

@@ -85,6 +85,7 @@ impl<T: FrameAllocator> MemoryHandler for RvmPageTableHandlerDelay<T> {
         if target == 0 {
             target = self.allocator.alloc().expect("failed to alloc frame");
         }
+        info!("guest_paddr={}, target={}", guest_paddr, target);
         rvm_pt
             .map(guest_paddr, target, GuestMemoryAttr::default())
             .expect("failed to create GPA -> HPA mapping");

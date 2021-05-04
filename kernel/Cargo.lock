@@ -89,9 +89,9 @@ dependencies = [
 
 [[package]]
 name = "bit-vec"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0dc55f2d8a1a85650ac47858bb001b4c0dd73d79e3c455a842925e68d29cd3"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bit_field"
@@ -164,9 +164,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.60"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef611cc68ff783f18535d77ddd080185275713d852c4f5cbb6122c462a7a825c"
+checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
 
 [[package]]
 name = "cfg-if"
@@ -504,7 +504,7 @@ dependencies = [
  "rcore-fs-ramfs",
  "rcore-fs-sfs",
  "rcore-memory",
- "riscv 0.5.6 (git+https://github.com/rcore-os/riscv?rev=38f3786)",
+ "riscv",
  "rlibc",
  "rvm",
  "smoltcp",
@@ -618,19 +618,7 @@ dependencies = [
 
 [[package]]
 name = "riscv"
-version = "0.5.6"
-source = "git+https://github.com/rcore-os/riscv?rev=38f3786#38f3786966ba15cc76977375162e3f3622a30f4b"
-dependencies = [
- "bare-metal",
- "bit_field 0.10.1",
- "bitflags",
- "log",
- "riscv-target",
-]
-
-[[package]]
-name = "riscv"
-version = "0.5.6"
+version = "0.6.0"
 dependencies = [
  "bare-metal",
  "bit_field 0.10.1",
@@ -687,7 +675,7 @@ dependencies = [
  "log",
  "numeric-enum-macro",
  "raw-cpuid",
- "riscv 0.5.6",
+ "riscv",
  "rvm_macros",
  "spin",
  "x86",

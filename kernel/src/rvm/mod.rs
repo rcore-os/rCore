@@ -38,6 +38,16 @@ mod rvm_extern_fn {
     fn rvm_dealloc_frame(paddr: usize) {
         dealloc_frame(paddr)
     }
+    #[rvm::extern_fn(alloc_frame_x4)]
+    fn rvm_alloc_frame_x4() -> Option<usize> {
+        use crate::memory::alloc_frame_contiguous;
+        alloc_frame_contiguous(4, 2)
+    }
+
+    #[rvm::extern_fn(dealloc_frame_x4)]
+    fn rvm_dealloc_frame_x4(paddr: usize) {
+        dealloc_frame(paddr)
+    }
 
     #[rvm::extern_fn(phys_to_virt)]
     fn rvm_phys_to_virt(paddr: usize) -> usize {
@@ -51,5 +61,28 @@ mod rvm_extern_fn {
             fn __alltraps();
         }
         __alltraps as usize
+    }
+
+    #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
+    #[rvm::extern_fn(riscv_trap_handler_no_frame)]
+    fn rvm_riscv_trap_handler_no_frame(sepc: &mut usize) {
+        crate::arch::interrupt::trap_handler_no_frame(sepc);
+    }
+
+    #[cfg(all(
+        any(target_arch = "riscv64", target_arch = "riscv32"),
+        feature = "hypervisor"
+    ))]
+    #[rvm::extern_fn(riscv_check_hypervisor_extension)]
+    fn rvm_riscv_check_hypervisor_extension() -> bool {
+        return true;
+    }
+    #[cfg(all(
+        any(target_arch = "riscv64", target_arch = "riscv32"),
+        not(feature = "hypervisor")
+    ))]
+    #[rvm::extern_fn(riscv_check_hypervisor_extension)]
+    fn rvm_riscv_check_hypervisor_extension() -> bool {
+        return false;
     }
 }
