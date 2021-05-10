@@ -5,7 +5,7 @@ use super::{
 use crate::arch::interrupt::consts::{
     is_intr, is_page_fault, is_reserved_inst, is_syscall, is_timer_intr,
 };
-use crate::arch::interrupt::{get_trap_num, handle_reserved_inst, handle_user_page_fault};
+use crate::arch::interrupt::{get_trap_num, handle_reserved_inst};
 use crate::arch::{
     cpu,
     fp::FpState,
@@ -505,10 +505,8 @@ pub fn spawn(thread: Arc<Thread>) {
             thread_context.fp.restore();
             cx.run();
             thread_context.fp.save();
-
             let trap_num = get_trap_num(&cx);
             trace!("back from user: {:#x?} trap_num {:#x}", cx, trap_num);
-
             let mut exit = false;
             let mut do_yield = false;
             match trap_num {
@@ -517,10 +515,36 @@ pub fn spawn(thread: Arc<Thread>) {
                     // page fault
                     let addr = get_page_fault_addr();
                     info!("page fault from user @ {:#x}", addr);
-
-                    if !handle_user_page_fault(&thread, addr) {
-                        // TODO: SIGSEGV
-                        panic!("page fault handle failed");
+                    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+                    {
+                        use crate::arch::interrupt::consts::{
+                            is_execute_page_fault, is_read_page_fault, is_write_page_fault,
+                        };
+                        use crate::arch::interrupt::handle_user_page_fault_ext;
+                        let access_type = match trap_num {
+                            _ if is_execute_page_fault(trap_num) => {
+                                crate::memory::AccessType::execute(true)
+                            }
+                            _ if is_read_page_fault(trap_num) => {
+                                crate::memory::AccessType::read(true)
+                            }
+                            _ if is_write_page_fault(trap_num) => {
+                                crate::memory::AccessType::write(true)
+                            }
+                            _ => unreachable!(),
+                        };
+                        if !handle_user_page_fault_ext(&thread, addr, access_type) {
+                            // TODO: SIGSEGV
+                            panic!("page fault handle failed");
+                        }
+                    }
+                    #[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+                    {
+                        use crate::arch::interrupt::handle_user_page_fault;
+                        if !handle_user_page_fault(&thread, addr) {
+                            // TODO: SIGSEGV
+                            panic!("page fault handle failed");
+                        }
                     }
                 }
                 _ if is_syscall(trap_num) => exit = handle_syscall(&thread, cx).await,

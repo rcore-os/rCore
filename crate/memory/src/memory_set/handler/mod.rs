@@ -1,5 +1,45 @@
 use super::*;
-
+#[derive(Copy, Clone, Debug)]
+pub struct AccessType {
+    pub write: bool,
+    pub execute: bool,
+    pub user: bool,
+}
+impl AccessType {
+    pub fn unknown() -> Self {
+        AccessType {
+            write: true,
+            execute: true,
+            user: true,
+        }
+    }
+    pub fn read(user: bool) -> Self {
+        AccessType {
+            write: false,
+            execute: false,
+            user,
+        }
+    }
+    pub fn write(user: bool) -> Self {
+        AccessType {
+            write: true,
+            execute: false,
+            user,
+        }
+    }
+    pub fn execute(user: bool) -> Self {
+        AccessType {
+            write: false,
+            execute: true,
+            user,
+        }
+    }
+    pub fn check_access(self, entry: &dyn paging::Entry) -> bool {
+        ((!self.write) || entry.writable())
+            && ((!self.execute) || entry.execute())
+            && ((!self.user) || entry.user())
+    }
+}
 // here may be a interesting part for lab
 pub trait MemoryHandler: Debug + Send + Sync + 'static {
     fn box_clone(&self) -> Box<dyn MemoryHandler>;
@@ -22,7 +62,20 @@ pub trait MemoryHandler: Debug + Send + Sync + 'static {
 
     /// Handle page fault on `addr`
     /// Return true if success, false if error
-    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool;
+    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool {
+        self.handle_page_fault_ext(pt, addr, AccessType::unknown())
+    }
+
+    /// Handle page fault on `addr` and access type `access`
+    /// Return true if success (or should-retry), false if error
+    fn handle_page_fault_ext(
+        &self,
+        pt: &mut dyn PageTable,
+        addr: VirtAddr,
+        _access: AccessType,
+    ) -> bool {
+        self.handle_page_fault(pt, addr)
+    }
 }
 
 impl Clone for Box<dyn MemoryHandler> {

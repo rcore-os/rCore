@@ -58,10 +58,24 @@ impl<F: Read, T: FrameAllocator> MemoryHandler for File<F, T> {
         }
     }
 
-    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: usize) -> bool {
+    fn handle_page_fault_ext(
+        &self,
+        pt: &mut dyn PageTable,
+        addr: usize,
+        access: super::AccessType,
+    ) -> bool {
         let addr = addr & !(PAGE_SIZE - 1);
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
+            // permission check.
+            if access.check_access(entry) {
+                return true;
+            }
+            // permisison check failed.
+            error!(
+                "Permission check failed at 0x{:x}, access = {:?}.",
+                addr, access
+            );
             return false;
         }
         let execute = entry.execute();

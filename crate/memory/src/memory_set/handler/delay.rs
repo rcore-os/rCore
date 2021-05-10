@@ -49,10 +49,20 @@ impl<T: FrameAllocator> MemoryHandler for Delay<T> {
         }
     }
 
-    fn handle_page_fault(&self, pt: &mut dyn PageTable, addr: VirtAddr) -> bool {
+    fn handle_page_fault_ext(
+        &self,
+        pt: &mut dyn PageTable,
+        addr: VirtAddr,
+        access: super::AccessType,
+    ) -> bool {
         let entry = pt.get_entry(addr).expect("failed to get entry");
         if entry.present() {
-            // not a delay case
+            // permission check.
+            if access.check_access(entry) {
+                return true;
+            }
+            // permisison check failed.
+            error!("Permission check failed at 0x{:x}.", addr);
             return false;
         }
         let frame = self.allocator.alloc().expect("failed to alloc frame");

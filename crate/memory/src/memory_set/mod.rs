@@ -376,6 +376,15 @@ impl<T: PageTableExt> MemorySet<T> {
         &mut self.page_table
     }
 
+    pub fn handle_page_fault_ext(&mut self, addr: VirtAddr, access: handler::AccessType) -> bool {
+        let area = self.areas.iter().find(|area| area.contains(addr));
+        match area {
+            Some(area) => area
+                .handler
+                .handle_page_fault_ext(&mut self.page_table, addr, access),
+            None => false,
+        }
+    }
     pub fn handle_page_fault(&mut self, addr: VirtAddr) -> bool {
         let area = self.areas.iter().find(|area| area.contains(addr));
         match area {
