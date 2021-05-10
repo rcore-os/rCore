@@ -17,6 +17,10 @@ pub(super) struct Guest {
 
 pub(super) struct Vcpu {
     pub(super) inner: Mutex<VcpuInner>,
+    //#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    //inner_id: usize,
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    pub(super) irq: Arc<rvm::InterruptState>,
 }
 
 impl Guest {
@@ -47,8 +51,22 @@ impl Guest {
 
 impl Vcpu {
     pub fn new(entry: u64, guest: Arc<GuestInner>) -> RvmResult<Self> {
-        Ok(Self {
-            inner: Mutex::new(VcpuInner::new(entry, guest)?),
-        })
+        #[cfg(any(target_arch = "x86_64"))]
+        {
+            Ok(Self {
+                inner: Mutex::new(VcpuInner::new(entry, guest)?),
+            })
+        }
+        #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+        {
+            let inner = VcpuInner::new(entry, Arc::clone(&guest))?;
+            let inner_id = inner.get_id();
+            let irq = guest.get_irq_by_id(inner_id);
+            return Ok(Self {
+                inner: Mutex::new(inner),
+                //inner_id,
+                irq,
+            });
+        }
     }
 }
