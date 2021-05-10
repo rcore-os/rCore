@@ -23,6 +23,7 @@ impl Driver for SerialPort {
     fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         if let Some(c) = self.getchar_option() {
             crate::trap::serial(c);
+            super::SERIAL_ACTIVITY.notify_all();
             true
         } else {
             false
@@ -72,7 +73,8 @@ impl SerialPort {
     /// non-blocking version of putchar()
     pub fn putchar(&self, c: u8) {
         for _ in 0..100 {
-            if (read::<u8>(self.base + COM_LSR * self.multiplier) & COM_LSR_TXRDY) == 0 {
+            if (read::<u8>(self.base + COM_LSR * self.multiplier) & COM_LSR_TXRDY) == COM_LSR_TXRDY
+            {
                 break;
             }
         }
@@ -112,6 +114,9 @@ impl SerialDriver for SerialPort {
             self.putchar(*byte);
         }
     }
+    fn try_read(&self) -> Option<u8> {
+        self.getchar_option()
+    }
 }
 
 const COM_RX: usize = 0; // In:  Receive buffer (DLAB=0)
@@ -149,6 +154,7 @@ pub fn init_dt(dt: &Node) {
             if let Some(manager) = DEVICE_TREE_INTC.write().get_mut(&intc) {
                 manager.register_local_irq(irq, com.clone());
                 info!("registered uart16550 to intc");
+                info!("Init uart16550 at {:#x}, {:?}", base, dt);
                 found = true;
             }
         }
