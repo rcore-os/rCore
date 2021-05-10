@@ -11,7 +11,7 @@ use rcore_fs_sfs::{INodeImpl, SimpleFileSystem};
 
 use self::devfs::{Fbdev, RandomINode};
 
-pub use self::devfs::{ShmINode, TTY};
+pub use self::devfs::{Serial, ShmINode, TTY};
 pub use self::file::*;
 pub use self::file_like::*;
 pub use self::pipe::Pipe;
@@ -82,6 +82,10 @@ lazy_static! {
         devfs.add("tty", TTY.clone()).expect("failed to mknod /dev/tty");
         devfs.add("fb0", Arc::new(Fbdev::default())).expect("failed to mknod /dev/fb0");
         devfs.add("shm", Arc::new(ShmINode::default())).expect("failed to mkdir shm");
+        for (i, serial) in Serial::wrap_all_serial_devices().into_iter().enumerate(){
+            devfs.add(&format!("ttyS{}", i), Arc::new(serial)).expect("failed to add a serial");
+        }
+
 
         #[cfg(feature = "hypervisor")]
         devfs.add("rvm", Arc::new(crate::rvm::RvmINode::new())).expect("failed to mknod /dev/rvm");
