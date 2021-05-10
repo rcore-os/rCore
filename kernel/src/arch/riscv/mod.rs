@@ -3,7 +3,10 @@ use trapframe;
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 pub mod board;
-#[cfg(not(feature = "board_u540"))]
+#[cfg(feature = "board_rcore_vmm_guest")]
+#[path = "board/rcore_vmm_guest/mod.rs"]
+pub mod board;
+#[cfg(not(any(feature = "board_u540", feature = "board_rcore_vmm_guest")))]
 #[path = "board/virt/mod.rs"]
 pub mod board;
 
@@ -16,7 +19,7 @@ pub mod io;
 pub mod memory;
 pub mod paging;
 pub mod rand;
-mod sbi;
+pub mod sbi;
 pub mod signal;
 pub mod syscall;
 pub mod timer;
