@@ -681,7 +681,7 @@ dependencies = [
 [[package]]
 name = "rvm"
 version = "1.2.0"
-source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=fa31039#fa310395b771590df3c6fc354798037c0ae0e9df"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5cde71c#5cde71c7f4c1a691e12adbe542d28b381bc8e383"
 dependencies = [
  "bit-set",
  "bit_field 0.10.1",
@@ -701,7 +701,7 @@ dependencies = [
 [[package]]
 name = "rvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=fa31039#fa310395b771590df3c6fc354798037c0ae0e9df"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5cde71c#5cde71c7f4c1a691e12adbe542d28b381bc8e383"
 dependencies = [
  "quote",
  "syn",

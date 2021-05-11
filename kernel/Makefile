@@ -141,13 +141,13 @@ qemu_opts += \
 	-cpu rv64,x-h=true \
 	-serial mon:stdio \
 	-bios ../tools/opensbi/fw_jump.elf \
-	-m 2G\
+	-m 1G\
 	-kernel $(kernel_img)
 else
 qemu_opts += \
 	-machine virt \
 	-cpu rv64,x-h=true \
-	-m 1G \
+	-m 2G \
 	-serial mon:stdio
 ifeq ($(UART2), on)
 qemu_opts += \
