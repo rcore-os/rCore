@@ -55,12 +55,16 @@ mod rvm_extern_fn {
     }
 
     #[cfg(target_arch = "x86_64")]
-    #[rvm::extern_fn(x86_all_traps_handler_addr)]
-    unsafe fn rvm_x86_all_traps_handler_addr() -> usize {
-        extern "C" {
-            fn __alltraps();
-        }
-        __alltraps as usize
+    #[rvm::extern_fn(is_host_timer_interrupt)]
+    fn rvm_x86_is_host_timer_interrupt(_vec: u8) -> bool {
+        // TODO: fill in the blanks.
+        false
+    }
+    #[cfg(target_arch = "x86_64")]
+    #[rvm::extern_fn(is_host_serial_interrupt)]
+    fn rvm_x86_is_host_serial_interrupt(_vec: u8) -> bool {
+        // TODO: fill in the blanks.
+        false
     }
 
     #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]

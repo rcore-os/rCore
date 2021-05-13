@@ -26,10 +26,15 @@ const RVM_VCPU_READ_STATE: u32 = RVM_IO + 0x13;
 const RVM_VCPU_WRITE_STATE: u32 = RVM_IO + 0x14;
 const RVM_VCPU_INTERRUPT: u32 = RVM_IO + 0x15;
 
-const RVM_RISCV_SET_SSIP: u32 = 0;
-const RVM_RISCV_CLEAR_SSIP: u32 = 1;
-const RVM_RISCV_SET_SEIP: u32 = 2;
-const RVM_RISCV_CLEAR_SEIP: u32 = 3;
+#[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
+mod riscv_intr_constants {
+    pub const RVM_RISCV_SET_SSIP: u32 = 0;
+    pub const RVM_RISCV_CLEAR_SSIP: u32 = 1;
+    pub const RVM_RISCV_SET_SEIP: u32 = 2;
+    pub const RVM_RISCV_CLEAR_SEIP: u32 = 3;
+}
+#[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
+use riscv_intr_constants::*;
 
 pub struct RvmINode {
     guests: RwLock<BTreeMap<usize, Guest>>,

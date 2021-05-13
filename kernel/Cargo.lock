@@ -472,7 +472,7 @@ dependencies = [
  "log",
  "rlibc",
  "uefi",
- "x86_64 0.11.7",
+ "x86_64",
  "xmas-elf",
 ]
 
@@ -523,7 +523,7 @@ dependencies = [
  "virtio-drivers",
  "volatile",
  "woke",
- "x86_64 0.11.7",
+ "x86_64",
  "xmas-elf",
 ]
 
@@ -681,7 +681,7 @@ dependencies = [
 [[package]]
 name = "rvm"
 version = "1.2.0"
-source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5cde71c#5cde71c7f4c1a691e12adbe542d28b381bc8e383"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5ccac8b#5ccac8ba6529cf06d5dabb8c137227c36f5ad2eb"
 dependencies = [
  "bit-set",
  "bit_field 0.10.1",
@@ -695,13 +695,13 @@ dependencies = [
  "rvm_macros",
  "spin",
  "x86 0.36.0",
- "x86_64 0.13.6",
+ "x86_64",
 ]
 
 [[package]]
 name = "rvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5cde71c#5cde71c7f4c1a691e12adbe542d28b381bc8e383"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=5ccac8b#5ccac8ba6529cf06d5dabb8c137227c36f5ad2eb"
 dependencies = [
  "quote",
  "syn",
@@ -777,7 +777,7 @@ version = "0.4.3"
 source = "git+https://github.com/rcore-os/trapframe-rs?rev=bdfe5aa#bdfe5aaebcdd64636c8831c2b8c17e4fede40c0b"
 dependencies = [
  "raw-cpuid 8.0.0",
- "x86_64 0.11.7",
+ "x86_64",
 ]
 
 [[package]]
@@ -793,7 +793,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e58fc40dc1712664fc9b0a7bd8ca2f21ab49960924fb245a80a05e1e92f3dfe9"
 dependencies = [
  "bitflags",
- "x86_64 0.11.7",
+ "x86_64",
 ]
 
 [[package]]
@@ -932,16 +932,6 @@ name = "x86_64"
 version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa580d2cf2a6a8c55f6283d6d06271b1ccab4d93cb3741edab290d5408d848c4"
-dependencies = [
- "bit_field 0.9.0",
- "bitflags",
-]
-
-[[package]]
-name = "x86_64"
-version = "0.13.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "021b49a4cb0a0d9490265cc169ca816014cbf61d3f3b75424815912977b81871"
 dependencies = [
  "bit_field 0.9.0",
  "bitflags",
