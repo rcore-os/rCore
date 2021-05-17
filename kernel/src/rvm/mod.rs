@@ -28,25 +28,20 @@ fn into_fs_error(e: RvmError) -> FsError {
 }
 
 mod rvm_extern_fn {
-    use crate::memory::{alloc_frame, dealloc_frame, phys_to_virt};
-    #[rvm::extern_fn(alloc_frame)]
-    fn rvm_alloc_frame() -> Option<usize> {
-        alloc_frame()
+    use crate::memory::{alloc_frame_contiguous, dealloc_frame, phys_to_virt};
+    use rvm::PAGE_SIZE;
+    #[rvm::extern_fn(alloc_frames)]
+    fn rvm_alloc_frames(n: usize, align_log2: usize) -> Option<usize> {
+        alloc_frame_contiguous(n, align_log2)
     }
 
-    #[rvm::extern_fn(dealloc_frame)]
-    fn rvm_dealloc_frame(paddr: usize) {
-        dealloc_frame(paddr)
-    }
-    #[rvm::extern_fn(alloc_frame_x4)]
-    fn rvm_alloc_frame_x4() -> Option<usize> {
-        use crate::memory::alloc_frame_contiguous;
-        alloc_frame_contiguous(4, 2)
-    }
-
-    #[rvm::extern_fn(dealloc_frame_x4)]
-    fn rvm_dealloc_frame_x4(paddr: usize) {
-        dealloc_frame(paddr)
+    #[rvm::extern_fn(dealloc_frames)]
+    fn rvm_dealloc_frames(paddr: usize, n: usize, _align_log2: usize) {
+        for i in 0..n {
+            dealloc_frame(paddr + i * PAGE_SIZE)
+        }
+        //use crate::memory::dealloc_frame_contiguous;
+        //dealloc_frame_contiguous(paddr, n, align_log2)
     }
 
     #[rvm::extern_fn(phys_to_virt)]
@@ -73,20 +68,13 @@ mod rvm_extern_fn {
         crate::arch::interrupt::trap_handler_no_frame(sepc);
     }
 
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        feature = "hypervisor"
-    ))]
+    #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
     #[rvm::extern_fn(riscv_check_hypervisor_extension)]
     fn rvm_riscv_check_hypervisor_extension() -> bool {
-        return true;
-    }
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        not(feature = "hypervisor")
-    ))]
-    #[rvm::extern_fn(riscv_check_hypervisor_extension)]
-    fn rvm_riscv_check_hypervisor_extension() -> bool {
-        return false;
+        if cfg!(feature = "hypervisor") {
+            true
+        } else {
+            false
+        }
     }
 }
