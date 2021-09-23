@@ -2,6 +2,7 @@ use super::super::block::virtio_blk;
 use super::super::gpu::virtio_gpu;
 use super::super::input::virtio_input;
 use super::super::net::virtio_net;
+use super::super::serial::virtio_console;
 use crate::drivers::device_tree::DEVICE_TREE_REGISTRY;
 use crate::memory::phys_to_virt;
 use device_tree::util::SliceRead;
@@ -35,6 +36,7 @@ pub fn virtio_probe(node: &Node) {
         DeviceType::Block => virtio_blk::init(header),
         DeviceType::GPU => virtio_gpu::init(header),
         DeviceType::Input => virtio_input::init(header),
+        DeviceType::Console => virtio_console::init(node, header),
         t => warn!("Unrecognized virtio device: {:?}", t),
     }
 }

@@ -36,18 +36,30 @@ pub unsafe fn restore(flags: usize) {
 /// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
+    trap_handler_no_frame(&mut tf.sepc);
+}
+
+use crate::memory::AccessType;
+#[inline]
+pub fn trap_handler_no_frame(sepc: &mut usize) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
     let scause = scause::read();
     let stval = stval::read();
+    let is_user = false;
     trace!("Interrupt @ CPU{}: {:?} ", super::cpu::id(), scause.cause());
     match scause.cause() {
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::LoadPageFault) => page_fault(stval, tf),
-        Trap::Exception(E::StorePageFault) => page_fault(stval, tf),
-        Trap::Exception(E::InstructionPageFault) => page_fault(stval, tf),
-        _ => panic!("unhandled trap {:?}", scause.cause()),
+        Trap::Exception(E::LoadPageFault) => page_fault(stval, sepc, AccessType::read(is_user)),
+        Trap::Exception(E::StorePageFault) => page_fault(stval, sepc, AccessType::write(is_user)),
+        Trap::Exception(E::InstructionPageFault) => {
+            page_fault(stval, sepc, AccessType::execute(is_user))
+        }
+        _ => {
+            let bits = scause.bits();
+            panic!("unhandled trap {:?} ({})", scause.cause(), bits);
+        }
     }
     trace!("Interrupt end");
 }
@@ -57,7 +69,6 @@ fn external() {
     unsafe {
         super::board::handle_external_interrupt();
     }
-
     IRQ_MANAGER
         .read()
         .try_handle_interrupt(Some(SupervisorExternal));
@@ -73,22 +84,23 @@ pub fn timer() {
     crate::trap::timer();
 }
 
-fn page_fault(stval: usize, tf: &mut TrapFrame) {
+fn page_fault(stval: usize, sepc: &mut usize, access: AccessType) {
     let addr = stval;
-    trace!("\nEXCEPTION: Page Fault @ {:#x}", addr);
+    info!("\nEXCEPTION: Page Fault @ {:#x}", addr);
 
-    if crate::memory::handle_page_fault(addr) {
+    if crate::memory::handle_page_fault_ext(addr, access) {
         return;
     }
     extern "C" {
         fn _copy_user_start();
         fn _copy_user_end();
     }
-    if tf.sepc >= _copy_user_start as usize && tf.sepc < _copy_user_end as usize {
-        debug!("fixup for addr {:x?}", addr);
-        tf.sepc = crate::memory::read_user_fixup as usize;
+    if *sepc >= _copy_user_start as usize && *sepc < _copy_user_end as usize {
+        info!("fixup for addr {:x?}", addr);
+        *sepc = crate::memory::read_user_fixup as usize;
         return;
     }
+    error!("unhandled page fault {:#x} from {:#x}", addr, sepc);
     panic!("unhandled page fault");
 }
 
@@ -116,8 +128,8 @@ pub fn wait_for_interrupt() {
     }
 }
 
-pub fn handle_user_page_fault(thread: &Arc<Thread>, addr: usize) -> bool {
-    thread.vm.lock().handle_page_fault(addr)
+pub fn handle_user_page_fault_ext(thread: &Arc<Thread>, addr: usize, access: AccessType) -> bool {
+    thread.vm.lock().handle_page_fault_ext(addr, access)
 }
 
 pub fn handle_reserved_inst(tf: &mut UserContext) -> bool {

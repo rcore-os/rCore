@@ -11,10 +11,21 @@ pub mod com;
 pub mod keyboard;
 pub mod uart16550;
 
+pub mod virtio_console;
+
 pub trait SerialDriver: Driver {
     // read one byte from tty
     fn read(&self) -> u8;
 
     // write bytes to tty
     fn write(&self, data: &[u8]);
+
+    // get if it is ready. as a hint.
+    fn try_read(&self) -> Option<u8> {
+        Some(self.read())
+    }
+}
+use crate::sync::Condvar;
+lazy_static! {
+    pub static ref SERIAL_ACTIVITY: Condvar = Condvar::new();
 }

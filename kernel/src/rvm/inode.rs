@@ -26,6 +26,16 @@ const RVM_VCPU_READ_STATE: u32 = RVM_IO + 0x13;
 const RVM_VCPU_WRITE_STATE: u32 = RVM_IO + 0x14;
 const RVM_VCPU_INTERRUPT: u32 = RVM_IO + 0x15;
 
+#[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
+mod riscv_intr_constants {
+    pub const RVM_RISCV_SET_SSIP: u32 = 0;
+    pub const RVM_RISCV_CLEAR_SSIP: u32 = 1;
+    pub const RVM_RISCV_SET_SEIP: u32 = 2;
+    pub const RVM_RISCV_CLEAR_SEIP: u32 = 3;
+}
+#[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
+use riscv_intr_constants::*;
+
 pub struct RvmINode {
     guests: RwLock<BTreeMap<usize, Guest>>,
     vcpus: RwLock<BTreeMap<usize, Vcpu>>,
@@ -44,6 +54,7 @@ struct RvmGuestAddMemoryRegionArgs {
     vmid: u16,
     guest_start_paddr: u64,
     memory_size: u64,
+    userspace_addr: u64,
 }
 
 #[repr(C)]
@@ -118,16 +129,19 @@ impl INode for RvmINode {
                 self.guest_create().map_err(into_fs_error)
             }
             RVM_GUEST_ADD_MEMORY_REGION => {
-                let args = UserInPtr::<RvmGuestAddMemoryRegionArgs>::from(data)
-                    .read()
-                    .or(Err(FsError::InvalidParam))?;
+                let mut ptr = UserInOutPtr::<RvmGuestAddMemoryRegionArgs>::from(data);
+                let mut args = ptr.read().or(Err(FsError::InvalidParam))?;
                 info!("[RVM] ioctl RVM_GUEST_ADD_MEMORY_REGION {:x?}", args);
-                self.guest_add_memory_region(
-                    args.vmid as usize,
-                    args.guest_start_paddr as usize,
-                    args.memory_size as usize,
-                )
-                .map_err(into_fs_error)
+                let userspace_addr = self
+                    .guest_add_memory_region(
+                        args.vmid as usize,
+                        args.guest_start_paddr as usize,
+                        args.memory_size as usize,
+                    )
+                    .map_err(into_fs_error)?;
+                args.userspace_addr = userspace_addr as u64;
+                ptr.write(args).or(Err(FsError::DeviceError))?;
+                Ok(0)
             }
             RVM_GUEST_SET_TRAP => {
                 let args = UserInPtr::<RvmGuestSetTrapArgs>::from(data)
@@ -354,10 +368,29 @@ impl RvmINode {
             Err(RvmError::InvalidParam)
         }
     }
-
+    #[cfg(any(target_arch = "x86_64"))]
     fn vcpu_interrupt(&self, vcpu_id: usize, vector: u32) -> RvmResult<()> {
         if let Some(vcpu) = self.vcpus.write().get_mut(&vcpu_id) {
             vcpu.inner.lock().virtual_interrupt(vector)
+        } else {
+            Err(RvmError::InvalidParam)
+        }
+    }
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+    fn vcpu_interrupt(&self, vcpu_id: usize, arg: u32) -> RvmResult<()> {
+        if let Some(vcpu) = self.vcpus.write().get_mut(&vcpu_id) {
+            //vcpu.inner.lock().virtual_interrupt(vector)
+            let irq = &vcpu.irq;
+            match arg {
+                self::RVM_RISCV_SET_SSIP => irq.set_software_interrupt(true),
+                self::RVM_RISCV_CLEAR_SSIP => irq.set_software_interrupt(false),
+                self::RVM_RISCV_SET_SEIP => irq.set_external_interrupt(true),
+                self::RVM_RISCV_CLEAR_SEIP => irq.set_external_interrupt(false),
+                _ => {
+                    return Err(RvmError::InvalidParam);
+                }
+            }
+            Ok(())
         } else {
             Err(RvmError::InvalidParam)
         }

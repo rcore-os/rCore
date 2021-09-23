@@ -190,7 +190,7 @@ impl Syscall<'_> {
         for elm in slice {
             unsafe {
                 // to prevent overflow
-                *elm = (i + crate::trap::TICK as u8 as u16) as u8;
+                *elm = (i + crate::trap::wall_tick() as u8 as u16) as u8;
             }
             i += 1;
         }

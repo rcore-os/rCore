@@ -46,7 +46,7 @@ impl Syscall<'_> {
         let rusage = unsafe { self.vm().check_write_ptr(rusage)? };
 
         let tick_base = *TICK_BASE;
-        let tick = unsafe { crate::trap::TICK as u64 };
+        let tick = unsafe { crate::trap::wall_tick() as u64 };
 
         let usec = (tick - tick_base) * USEC_PER_TICK as u64;
         let new_rusage = RUsage {
@@ -68,7 +68,7 @@ impl Syscall<'_> {
         let buf = unsafe { self.vm().check_write_ptr(buf)? };
 
         let _tick_base = *TICK_BASE;
-        let tick = unsafe { crate::trap::TICK as u64 };
+        let tick = unsafe { crate::trap::wall_tick() as u64 };
 
         let new_buf = Tms {
             tms_utime: 0,
@@ -85,7 +85,7 @@ impl Syscall<'_> {
 // should be initialized together
 lazy_static! {
     pub static ref EPOCH_BASE: u64 = crate::drivers::rtc::read_epoch();
-    pub static ref TICK_BASE: u64 = unsafe { crate::trap::TICK as u64 };
+    pub static ref TICK_BASE: u64 = unsafe { crate::trap::wall_tick() as u64 };
 }
 
 // 1ms msec
@@ -102,7 +102,7 @@ const NSEC_PER_MSEC: u64 = 1_000_000;
 fn get_epoch_usec() -> u64 {
     let tick_base = *TICK_BASE;
     let epoch_base = *EPOCH_BASE;
-    let tick = unsafe { crate::trap::TICK as u64 };
+    let tick = unsafe { crate::trap::wall_tick() as u64 };
 
     (tick - tick_base) * USEC_PER_TICK as u64 + epoch_base * USEC_PER_SEC
 }

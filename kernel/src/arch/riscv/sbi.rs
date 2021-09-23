@@ -63,6 +63,30 @@ pub fn sbi_hart_get_status(hartid: usize) -> SBIRet {
     )
 }
 
+pub fn sbi_set_timer(stime_value: u64) -> SBIRet {
+    #[cfg(target_pointer_width = "32")]
+    let ret = sbi_call(
+        SBICall {
+            eid: SBI_EID_TIME,
+            fid: SBI_FID_TIME_SET,
+        },
+        stime_value as usize,
+        (stime_value >> 32) as usize,
+        0,
+    );
+    #[cfg(target_pointer_width = "64")]
+    let ret = sbi_call(
+        SBICall {
+            eid: SBI_EID_TIME,
+            fid: SBI_FID_TIME_SET,
+        },
+        stime_value as usize,
+        0,
+        0,
+    );
+    ret
+}
+
 const SBI_SUCCESS: isize = 0;
 const SBI_ERR_FAILED: isize = -1;
 const SBI_ERR_NOT_SUPPORTED: isize = -2;
@@ -75,6 +99,8 @@ const SBI_EID_HSM: usize = 0x48534D;
 const SBI_FID_HSM_START: usize = 0;
 const SBI_FID_HSM_STOP: usize = 1;
 const SBI_FID_HSM_STATUS: usize = 2;
+const SBI_EID_TIME: usize = 0x54494D45;
+const SBI_FID_TIME_SET: usize = 0;
 
 /// Legacy calls.
 

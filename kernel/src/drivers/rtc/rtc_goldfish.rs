@@ -43,10 +43,11 @@ impl RtcDriver for RtcGoldfish {
 }
 
 fn init_dt(dt: &Node) {
+    use crate::memory::phys_to_virt;
     let addr = dt.prop_u64("reg").unwrap() as usize;
-    RTC_DRIVERS
-        .write()
-        .push(Arc::new(RtcGoldfish { base: addr }));
+    RTC_DRIVERS.write().push(Arc::new(RtcGoldfish {
+        base: phys_to_virt(addr),
+    }));
 }
 
 pub fn driver_init() {

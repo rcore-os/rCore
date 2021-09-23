@@ -1,0 +1,2 @@
+file ../tools/sbi/fw_jump.elf
+target remote 127.0.0.1:1234

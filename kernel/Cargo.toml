@@ -22,6 +22,7 @@ authors = [
 default = []
 board_qemu = []
 board_u540 = ["link_user"]
+board_rcore_vmm_guest = ["link_user"]
 # (for aarch64 RaspberryPi3)
 nographic = []
 consolegraphic = []
@@ -72,11 +73,11 @@ rlibc = "1.0"
 smoltcp = { git = "https://github.com/rcore-os/smoltcp", rev = "5bd87c7c", default-features = false, features = ["alloc", "log", "ethernet", "proto-ipv4", "proto-igmp", "socket-icmp", "socket-udp", "socket-tcp", "socket-raw"] }
 spin = "0.5"
 trapframe = { git = "https://github.com/rcore-os/trapframe-rs", rev = "bdfe5aa" }
-virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "dfa70e14" }
+virtio-drivers = { git = "https://github.com/rcore-riscv-hypervisor-dev/virtio-drivers", rev = "1201a0b" }
 volatile = "0.2"
 woke = "0.0.2"
 xmas-elf = "0.7"
-rvm = { git = "https://github.com/rcore-os/RVM", rev = "939eb0a", optional = true }
+rvm = { git = "https://github.com/rcore-riscv-hypervisor-dev/RVM", rev = "2867e78", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
@@ -88,7 +89,7 @@ uart_16550 = "0.2.7"
 x86_64 = "0.11"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv", rev = "38f3786", features = ["inline-asm"] }
+riscv = { git = "https://github.com/rcore-riscv-hypervisor-dev/riscv" , rev = "3f5efb1", features = ["inline-asm", "hypervisor"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { git = "https://github.com/rcore-os/aarch64", version = "3.0.1" }

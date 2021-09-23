@@ -14,6 +14,15 @@ pub fn is_page_fault(trap: usize) -> bool {
     trap == InstructionPageFault || trap == LoadPageFault || trap == StorePageFault
 }
 
+pub fn is_execute_page_fault(trap: usize) -> bool {
+    trap == InstructionPageFault
+}
+pub fn is_read_page_fault(trap: usize) -> bool {
+    trap == LoadPageFault
+}
+pub fn is_write_page_fault(trap: usize) -> bool {
+    trap == StorePageFault
+}
 pub fn is_syscall(trap: usize) -> bool {
     trap == Syscall
 }

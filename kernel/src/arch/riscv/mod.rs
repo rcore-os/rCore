@@ -3,7 +3,10 @@ use trapframe;
 #[cfg(feature = "board_u540")]
 #[path = "board/u540/mod.rs"]
 pub mod board;
-#[cfg(not(feature = "board_u540"))]
+#[cfg(feature = "board_rcore_vmm_guest")]
+#[path = "board/rcore_vmm_guest/mod.rs"]
+pub mod board;
+#[cfg(not(any(feature = "board_u540", feature = "board_rcore_vmm_guest")))]
 #[path = "board/virt/mod.rs"]
 pub mod board;
 
@@ -16,7 +19,7 @@ pub mod io;
 pub mod memory;
 pub mod paging;
 pub mod rand;
-mod sbi;
+pub mod sbi;
 pub mod signal;
 pub mod syscall;
 pub mod timer;
@@ -36,8 +39,6 @@ fn start_all_harts() {
 
 #[no_mangle]
 pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
-    let device_tree_vaddr = phys_to_virt(device_tree_paddr);
-
     unsafe {
         cpu::set_cpu_id(hartid);
     }
@@ -46,15 +47,15 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()
     {
-        LOTTERY_HART_ID.store(hartid, Ordering::SeqCst);
+        DEVICE_TREE_PADDR.store(device_tree_paddr, Ordering::SeqCst);
         start_all_harts();
     }
-    let main_hart = LOTTERY_HART_ID.load(Ordering::SeqCst);
-    if hartid != main_hart {
+
+    if hartid != BOOT_HART_ID {
         while !AP_CAN_INIT.load(Ordering::Relaxed) {}
         others_main(hartid);
     }
-
+    let device_tree_vaddr = phys_to_virt(DEVICE_TREE_PADDR.load(Ordering::SeqCst));
     unsafe {
         memory::clear_bss();
     }
@@ -93,7 +94,7 @@ fn others_main(hartid: usize) -> ! {
 
 static AP_CAN_INIT: AtomicBool = AtomicBool::new(false);
 static FIRST_HART: AtomicBool = AtomicBool::new(false);
-static LOTTERY_HART_ID: AtomicUsize = AtomicUsize::new(0);
+static DEVICE_TREE_PADDR: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(not(feature = "board_u540"))]
 const BOOT_HART_ID: usize = 0;

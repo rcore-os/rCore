@@ -35,7 +35,7 @@ impl<T: FrameAllocator> SharedGuard<T> {
         self.target.insert(virt_addr, phys_addr);
         Some(phys_addr)
     }
-    
+
     pub fn dealloc(&mut self, virt_addr: usize) {
         let phys_addr = self.target.get(&virt_addr).unwrap().clone();
         self.allocator.dealloc(phys_addr);

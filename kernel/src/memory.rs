@@ -139,6 +139,19 @@ pub fn handle_page_fault(addr: usize) -> bool {
     lock.handle_page_fault(addr)
 }
 
+/// Handle page fault at `addr` with access type `access`.
+/// Return true to continue, false to halt.
+pub fn handle_page_fault_ext(addr: usize, access: crate::memory::AccessType) -> bool {
+    debug!(
+        "page fault from kernel @ {:#x} with access type {:?}",
+        addr, access
+    );
+
+    let thread = current_thread().unwrap();
+    let mut lock = thread.vm.lock();
+    lock.handle_page_fault_ext(addr, access)
+}
+
 pub fn init_heap() {
     use crate::consts::KERNEL_HEAP_SIZE;
     const MACHINE_ALIGN: usize = mem::size_of::<usize>();
@@ -190,7 +203,6 @@ pub unsafe extern "C" fn read_user_fixup() -> usize {
 }
 
 pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
-    #[naked]
     #[inline(never)]
     #[link_section = ".text.copy_user"]
     unsafe extern "C" fn read_user<T>(dst: *mut T, src: *const T) -> usize {
@@ -208,7 +220,6 @@ pub fn copy_from_user<T>(addr: *const T) -> Option<T> {
 }
 
 pub fn copy_to_user<T>(addr: *mut T, src: *const T) -> bool {
-    #[naked]
     #[inline(never)]
     #[link_section = ".text.copy_user"]
     unsafe extern "C" fn write_user<T>(dst: *mut T, src: *const T) -> usize {

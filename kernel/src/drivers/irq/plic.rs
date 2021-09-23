@@ -45,7 +45,10 @@ impl IntcDriver for Plic {
     /// Register interrupt controller local irq
     fn register_local_irq(&self, irq: usize, driver: Arc<dyn Driver>) {
         // enable irq for context 1
-        write(self.base + 0x2080, 1 << irq);
+        write(
+            self.base + 0x2080,
+            read::<u32>(self.base + 0x2080) | (1 << irq),
+        );
         // set priority to 7
         write(self.base + irq * 4, 7);
         let mut manager = self.manager.lock();
@@ -58,7 +61,7 @@ pub const SupervisorExternal: usize = usize::MAX / 2 + 1 + 8;
 fn init_dt(dt: &Node) {
     let addr = dt.prop_u64("reg").unwrap() as usize;
     let phandle = dt.prop_u32("phandle").unwrap();
-    info!("Found riscv plic at {:#x}", addr);
+    info!("Found riscv plic at {:#x}, {:?}", addr, dt);
     let base = phys_to_virt(addr);
     let plic = Arc::new(Plic {
         base,

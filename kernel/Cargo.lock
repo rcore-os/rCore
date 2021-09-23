@@ -50,7 +50,7 @@ source = "git+https://github.com/rcore-os/apic-rs?rev=fb86bd7#fb86bd7c798608a18c
 dependencies = [
  "bit_field 0.10.1",
  "bitflags",
- "x86",
+ "x86 0.33.0",
 ]
 
 [[package]]
@@ -89,9 +89,9 @@ dependencies = [
 
 [[package]]
 name = "bit-vec"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0dc55f2d8a1a85650ac47858bb001b4c0dd73d79e3c455a842925e68d29cd3"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bit_field"
@@ -114,7 +114,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 [[package]]
 name = "bitmap-allocator"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/bitmap-allocator#03bd9909d0dc85e99f5559b97a163ab81073df83"
+source = "git+https://github.com/rcore-os/bitmap-allocator?rev=03bd990#03bd9909d0dc85e99f5559b97a163ab81073df83"
 dependencies = [
  "bit_field 0.9.0",
 ]
@@ -164,9 +164,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.60"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef611cc68ff783f18535d77ddd080185275713d852c4f5cbb6122c462a7a825c"
+checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
 
 [[package]]
 name = "cfg-if"
@@ -457,6 +457,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw-cpuid"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c27cb5785b85bd05d4eb171556c9a1a514552e26123aeae6bb7d811353148026"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "rboot"
 version = "0.1.3"
 dependencies = [
@@ -495,7 +504,7 @@ dependencies = [
  "paste",
  "pc-keyboard",
  "pci",
- "raw-cpuid",
+ "raw-cpuid 8.0.0",
  "rboot",
  "rcore-console",
  "rcore-fs",
@@ -623,8 +632,8 @@ dependencies = [
 
 [[package]]
 name = "riscv"
-version = "0.5.6"
-source = "git+https://github.com/rcore-os/riscv?rev=38f3786#38f3786966ba15cc76977375162e3f3622a30f4b"
+version = "0.6.0"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/riscv.git?rev=3f5efb1#3f5efb1b8d4ceb12e291ef3d7b27120ea038eb83"
 dependencies = [
  "bare-metal",
  "bit_field 0.10.1",
@@ -671,27 +680,28 @@ dependencies = [
 
 [[package]]
 name = "rvm"
-version = "1.0.1"
-source = "git+https://github.com/rcore-os/RVM?rev=939eb0a#939eb0aafd100e9944e4f2fe90eebfa8149d2b85"
+version = "1.2.0"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=2867e78#2867e782463fe81e572d7c3cd68abaf79252f50c"
 dependencies = [
  "bit-set",
  "bit_field 0.10.1",
  "bitflags",
- "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator)",
+ "bitmap-allocator 0.1.0 (git+https://github.com/rcore-os/bitmap-allocator?rev=03bd990)",
  "lazy_static",
  "log",
  "numeric-enum-macro",
- "raw-cpuid",
+ "raw-cpuid 9.0.0",
+ "riscv",
  "rvm_macros",
  "spin",
- "x86",
+ "x86 0.36.0",
  "x86_64",
 ]
 
 [[package]]
 name = "rvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/RVM?rev=939eb0a#939eb0aafd100e9944e4f2fe90eebfa8149d2b85"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/RVM?rev=2867e78#2867e782463fe81e572d7c3cd68abaf79252f50c"
 dependencies = [
  "quote",
  "syn",
@@ -766,7 +776,7 @@ name = "trapframe"
 version = "0.4.3"
 source = "git+https://github.com/rcore-os/trapframe-rs?rev=bdfe5aa#bdfe5aaebcdd64636c8831c2b8c17e4fede40c0b"
 dependencies = [
- "raw-cpuid",
+ "raw-cpuid 8.0.0",
  "x86_64",
 ]
 
@@ -845,7 +855,7 @@ checksum = "88dfeb711b61ce620c0cb6fd9f8e3e678622f0c971da2a63c4b3e25e88ed012f"
 [[package]]
 name = "virtio-drivers"
 version = "0.1.0"
-source = "git+https://github.com/rcore-os/virtio-drivers?rev=dfa70e14#dfa70e1425c9eac1b30e671be61b557a3ce56e7e"
+source = "git+https://github.com/rcore-riscv-hypervisor-dev/virtio-drivers?rev=1201a0b#1201a0b40c016301c8135e564439e40a769facc8"
 dependencies = [
  "bitflags",
  "log",
@@ -903,7 +913,18 @@ checksum = "2786ac694ed572ab5d2bbcd9e188805dba26b3501973dd69718914fb3d4a5a69"
 dependencies = [
  "bit_field 0.10.1",
  "bitflags",
- "raw-cpuid",
+ "raw-cpuid 8.0.0",
+]
+
+[[package]]
+name = "x86"
+version = "0.36.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "268696f47813d5744c80c868e014485e27b30d40eaeeff2f7685b10b70215e5c"
+dependencies = [
+ "bit_field 0.10.1",
+ "bitflags",
+ "raw-cpuid 9.0.0",
 ]
 
 [[package]]

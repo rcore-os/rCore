@@ -22,12 +22,15 @@
 #         | pc                  [ x86_64 only] Run on real pc
 #         | u540                [riscv64 only] Run on HiFive U540, use Sv39
 #         | raspi3              [aarch64 only] Run on Raspberry Pi 3 Model B/B+
+#         | rcore_vmm_guest     [riscv64 only] Run on rust-rvm-vmm/RVM. Requires variable GUEST_USER_IMG to be specified.
 #   NET = on | off              [ x86_64 only] Enable NIC
 #   PCI_PASSTHRU = 0000:00:00.1 [ x86_64 only] Passthrough the specified PCI device
 #   INIT = /bin/ls              [riscv64 only] Run specified program instead of user shell
 #   EXTRA_NIC = on | off        [ x86_64 only] Add an additional e1000 nic
 #   ACCEL = on | off            [ x86_64 only] Enable/disable kvm/hvf acceleration
-#   HYPERVISOR = on | off       [ x86_64 only] Enable/disable the RVM hypervisor, and set ACCEL to on
+#   HYPERVISOR = on | off       [ x86_64 and riscv64 only] Enable/disable the RVM hypervisor, and set ACCEL to on under x86_64
+#   UART2 = on | off            [riscv64 only] Add an extra virtio-driven UART port on unix domain socket /tmp/rcore_uart2
+#   GUEST_USER_IMG = <sfsimg>   Image path of user programs. Specially taken out to allow out-of-tree user image.
 #   FEATURES = profile | ...    Add additional features
 
 ARCH ?= riscv64
@@ -40,6 +43,7 @@ INIT ?=
 EXTRA_NIC ?= off
 ACCEL ?= off
 HYPERVISOR ?= off
+UART2 ?= off
 
 qemu := qemu-system-$(ARCH)
 target := $(ARCH)
@@ -53,7 +57,14 @@ user_dir := ../user
 
 ### export environments ###
 
+ifeq ($(BOARD), rcore_vmm_guest)
+ifeq ($(GUEST_USER_IMG), )
+$(error For building guest rCore image you have to specify the variable GUEST_USER_IMG .)
+endif
+export USER_IMG = $(GUEST_USER_IMG)
+else
 export USER_IMG = $(user_dir)/build/$(ARCH).img
+endif
 export USER_QCOW2 = $(user_dir)/build/$(ARCH).qcow2
 
 ifeq ($(ARCH), aarch64)
@@ -124,10 +135,27 @@ qemu_opts += \
 	-serial mon:stdio \
 	-bios ../tools/opensbi/fu540.elf \
 	-device loader,addr=0x80200000,file=$(kernel_img)
+else ifeq ($(BOARD), rcore_vmm_guest)
+qemu_opts += \
+	-machine virt \
+	-cpu rv64,x-h=true \
+	-serial mon:stdio \
+	-bios ../tools/opensbi/fw_jump.elf \
+	-m 1G\
+	-kernel $(kernel_img)
 else
 qemu_opts += \
 	-machine virt \
-	-serial mon:stdio \
+	-cpu rv64,x-h=true \
+	-m 2G \
+	-serial mon:stdio
+ifeq ($(UART2), on)
+qemu_opts += \
+-chardev socket,path=/tmp/rcore_uart2,server=on,wait=off,id=uart2 \
+-device virtio-serial-device,id=uart2-bus \
+-device virtconsole,chardev=uart2
+endif
+qemu_opts += \
 	-bios ../tools/opensbi/fw_jump.elf  \
 	-device loader,addr=0x80200000,file=$(kernel_img) \
 	-drive file=$(USER_QCOW2),format=qcow2,id=sfs \
@@ -173,7 +201,9 @@ endif
 
 ifeq ($(HYPERVISOR), on)
 FEATURES += hypervisor
+ifeq ($(ARCH), x86_64)
 ACCEL = on
+endif
 endif
 
 ifeq ($(ACCEL), on)
@@ -257,6 +287,8 @@ debug: $(kernel) $(kernel_img)
 	@sleep 1
 	@$(gdb) $(kernel) -x ../tools/gdbinit
 
+justdebug:
+	@$(qemu) $(qemu_opts) -s -S
 build: $(kernel_img)
 
 asm:
@@ -347,4 +379,4 @@ endif
 
 .PHONY:
 addr2line:
-	@python3.7 ../tools/addr2line.py $(prefix)addr2line $(ARCH) $(MODE)
+	@python3 ../tools/addr2line.py $(prefix)addr2line $(ARCH) $(MODE)
