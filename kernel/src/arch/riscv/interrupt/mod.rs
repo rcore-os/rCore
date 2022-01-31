@@ -36,12 +36,12 @@ pub unsafe fn restore(flags: usize) {
 /// This function is called from `trap.asm`.
 #[no_mangle]
 pub extern "C" fn trap_handler(tf: &mut TrapFrame) {
-    trap_handler_no_frame(&mut tf.sepc);
+    trap_handler_no_frame(tf);
 }
 
 use crate::memory::AccessType;
 #[inline]
-pub fn trap_handler_no_frame(sepc: &mut usize) {
+pub fn trap_handler_no_frame(tf: &mut TrapFrame) {
     use self::scause::{Exception as E, Interrupt as I, Trap};
     let scause = scause::read();
     let stval = stval::read();
@@ -51,11 +51,12 @@ pub fn trap_handler_no_frame(sepc: &mut usize) {
         Trap::Interrupt(I::SupervisorExternal) => external(),
         Trap::Interrupt(I::SupervisorSoft) => ipi(),
         Trap::Interrupt(I::SupervisorTimer) => timer(),
-        Trap::Exception(E::LoadPageFault) => page_fault(stval, sepc, AccessType::read(is_user)),
-        Trap::Exception(E::StorePageFault) => page_fault(stval, sepc, AccessType::write(is_user)),
+        Trap::Exception(E::LoadPageFault) => page_fault(stval, &mut tf.sepc, AccessType::read(is_user)),
+        Trap::Exception(E::StorePageFault) => page_fault(stval, &mut tf.sepc, AccessType::write(is_user)),
         Trap::Exception(E::InstructionPageFault) => {
-            page_fault(stval, sepc, AccessType::execute(is_user))
+            page_fault(stval, &mut tf.sepc, AccessType::execute(is_user))
         }
+        Trap::Exception(E::Breakpoint) => rkprobes::kprobes_trap_handler(tf),
         _ => {
             let bits = scause.bits();
             panic!("unhandled trap {:?} ({})", scause.cause(), bits);
