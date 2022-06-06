@@ -83,7 +83,7 @@ rvm = { git = "https://github.com/rcore-riscv-hypervisor-dev/RVM", rev = "2867e7
 apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
 acpi = "0.4"
 aml = "0.4"
-raw-cpuid = "8.0"
+raw-cpuid = "9.0"
 rboot = { path = "../rboot", default-features = false }
 uart_16550 = "0.2.7"
 x86_64 = "0.11"
