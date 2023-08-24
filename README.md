@@ -2,6 +2,13 @@
 
 [![CI](https://github.com/rcore-os/rCore/workflows/CI/badge.svg?branch=master)](https://github.com/rcore-os/rCore/actions)
 
+NO LONGER MAINTAINED. You can see recent developments in:
+
+- <https://github.com/rcore-os/zCore>
+- <https://github.com/rcore-os/arceos>
+- <https://github.com/rcore-os/rCore-Tutorial-Book-v3>
+- <https://github.com/rcore-os/arceos-tutorial-book>
+
 Rust version of THU [uCore OS Plus](https://github.com/chyyuu/ucore_os_plus).
 
 Going to be the next generation teaching operating system.
