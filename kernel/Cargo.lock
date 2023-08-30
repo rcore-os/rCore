@@ -514,6 +514,7 @@ dependencies = [
  "rcore-fs-sfs",
  "rcore-memory",
  "riscv",
+ "rkprobes",
  "rlibc",
  "rvm",
  "smoltcp",
@@ -643,6 +644,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "riscv-decode"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "920466101a1ec4ffac2ab9b72fa780eff62defa0ae9c4f77a07fa41dfd5450e6"
+
+[[package]]
 name = "riscv-target"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -650,6 +657,18 @@ checksum = "88aa938cda42a0cf62a20cfe8d139ff1af20c2e681212b5b34adb5a58333f222"
 dependencies = [
  "lazy_static",
  "regex",
+]
+
+[[package]]
+name = "rkprobes"
+version = "0.1.0"
+source = "git+https://github.com/hm1229/rkprobes?rev=d6e0f96#d6e0f962618329315f7806cec66f2891822e8999"
+dependencies = [
+ "lazy_static",
+ "log",
+ "riscv-decode",
+ "spin",
+ "trapframe",
 ]
 
 [[package]]
